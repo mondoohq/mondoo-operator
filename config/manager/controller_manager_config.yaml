@@ -8,4 +8,4 @@ webhook:
   port: 9443
 leaderElection:
   leaderElect: true
-  resourceName: 5b3a8922.mondoo.io
+  resourceName: 5b3a8922.mondoo.com

@@ -67,7 +67,7 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "5b3a8922.mondoo.io",
+		LeaderElectionID:       "5b3a8922.mondoo.com",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
