@@ -1,0 +1,6 @@
+apiVersion: mondoo.mondoo.com/v1alpha1
+kind: Mondoo
+metadata:
+  name: mondoo-sample
+spec:
+  # Add fields here

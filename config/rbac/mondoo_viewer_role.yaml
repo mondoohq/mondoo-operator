@@ -1,0 +1,20 @@
+# permissions for end users to view mondooes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mondoo-viewer-role
+rules:
+- apiGroups:
+  - mondoo.mondoo.com
+  resources:
+  - mondooes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - mondoo.mondoo.com
+  resources:
+  - mondooes/status
+  verbs:
+  - get

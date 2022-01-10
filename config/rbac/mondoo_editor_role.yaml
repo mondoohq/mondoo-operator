@@ -1,0 +1,24 @@
+# permissions for end users to edit mondooes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mondoo-editor-role
+rules:
+- apiGroups:
+  - mondoo.mondoo.com
+  resources:
+  - mondooes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mondoo.mondoo.com
+  resources:
+  - mondooes/status
+  verbs:
+  - get
