@@ -36,7 +36,7 @@ spec:
           spec:
             description: MondooSpec defines the desired state of Mondoo
             properties:
-              "1":
+              size:
                 description: Foo is an example field of Mondoo. Edit mondoo_types.go
                   to remove/update
                 format: int32
