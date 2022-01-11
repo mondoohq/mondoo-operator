@@ -35,12 +35,6 @@ spec:
             type: object
           spec:
             description: MondooSpec defines the desired state of Mondoo
-            properties:
-              size:
-                description: Foo is an example field of Mondoo. Edit mondoo_types.go
-                  to remove/update
-                format: int32
-                type: integer
             type: object
           status:
             description: MondooStatus defines the observed state of Mondoo

@@ -9,7 +9,7 @@ rules:
 - apiGroups:
   - apps
   resources:
-  - deployments
+  - daemonsets
   verbs:
   - create
   - delete

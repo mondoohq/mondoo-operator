@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"reflect"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -45,7 +44,7 @@ type MondooReconciler struct {
 //+kubebuilder:rbac:groups=mondoo.mondoo.com,resources=mondooes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=mondoo.mondoo.com,resources=mondooes/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=mondoo.mondoo.com,resources=mondooes/finalizers,verbs=update
-//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -76,42 +75,27 @@ func (r *MondooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	// Check if the deployment already exists, if not create a new one
-	found := &appsv1.Deployment{}
+	// Check if the daemonset already exists, if not create a new one
+	found := &appsv1.DaemonSet{}
 	err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
-		// Define a new deployment
-		dep := r.deploymentForMondoo(mondoo)
-		log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+		// Define a new daemonset
+		dep := r.deamonsetForMondoo(mondoo)
+		log.Info("Creating a new Daemonset", "Daemonset.Namespace", dep.Namespace, "Daemonset.Name", dep.Name)
 		err = r.Create(ctx, dep)
 		if err != nil {
-			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+			log.Error(err, "Failed to create new Daemonset", "Daemonset.Namespace", dep.Namespace, "Daemonset.Name", dep.Name)
 			return ctrl.Result{}, err
 		}
-		// Deployment created successfully - return and requeue
+		// Daemonset created successfully - return and requeue
 		return ctrl.Result{Requeue: true}, nil
 	} else if err != nil {
-		log.Error(err, "Failed to get Deployment")
+		log.Error(err, "Failed to get Daemonset")
 		return ctrl.Result{}, err
 	}
 
-	// Ensure the deployment size is the same as the spec
-	size := mondoo.Spec.Size
-	if *found.Spec.Replicas != size {
-		found.Spec.Replicas = &size
-		err = r.Update(ctx, found)
-		if err != nil {
-			log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
-			return ctrl.Result{}, err
-		}
-		// Ask to requeue after 1 minute in order to give enough time for the
-		// pods be created on the cluster side and the operand be able
-		// to do the next update step accurately.
-		return ctrl.Result{RequeueAfter: time.Minute}, nil
-	}
-
 	// Update the mondoo status with the pod names
-	// List the pods for this mondoo's deployment
+	// List the pods for this mondoo's daemonset
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(mondoo.Namespace),
@@ -136,18 +120,16 @@ func (r *MondooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{}, nil
 }
 
-// deploymentForMondoo returns a mondoo Deployment object
-func (r *MondooReconciler) deploymentForMondoo(m *mondoov1alpha1.Mondoo) *appsv1.Deployment {
+// deploymentForMondoo returns a mondoo Daemonset object
+func (r *MondooReconciler) deamonsetForMondoo(m *mondoov1alpha1.Mondoo) *appsv1.DaemonSet {
 	ls := labelsForMondoo(m.Name)
-	replicas := m.Spec.Size
 
-	dep := &appsv1.Deployment{
+	dep := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      m.Name,
 			Namespace: m.Namespace,
 		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
+		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: ls,
 			},
@@ -193,6 +175,6 @@ func getPodNames(pods []corev1.Pod) []string {
 func (r *MondooReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.Mondoo{}).
-		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.DaemonSet{}).
 		Complete(r)
 }

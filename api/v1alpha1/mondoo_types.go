@@ -29,7 +29,7 @@ type MondooSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Mondoo. Edit mondoo_types.go to remove/update
-	Size int32 `json:"size,omitempty"`
+	// Size int32 `json:"size,omitempty"`
 }
 
 // MondooStatus defines the observed state of Mondoo

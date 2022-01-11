@@ -2,5 +2,5 @@ apiVersion: mondoo.mondoo.com/v1alpha1
 kind: Mondoo
 metadata:
   name: mondoo-sample
-spec:
-  size: 3
+# spec:
+  # size: 1
