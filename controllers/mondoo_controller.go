@@ -157,9 +157,9 @@ func (r *MondooReconciler) deploymentForMondoo(m *mondoov1alpha1.Mondoo) *appsv1
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image:   "mondoo:latest",
+						Image:   "mondoolabs/mondoo:latest",
 						Name:    "mondoo",
-						Command: []string{"mondoo", "scan"},
+						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
 						Ports: []corev1.ContainerPort{{
 							ContainerPort: 11211,
 							Name:          "mondoo",
