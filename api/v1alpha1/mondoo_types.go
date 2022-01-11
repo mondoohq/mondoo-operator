@@ -29,13 +29,16 @@ type MondooSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Mondoo. Edit mondoo_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Size int32 `json:"1,omitempty"`
 }
 
 // MondooStatus defines the observed state of Mondoo
 type MondooStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Nodes store the name of the pods which are running Memcached instances
+	Nodes []string `json:"nodes,omitempty"`
 }
 
 //+kubebuilder:object:root=true

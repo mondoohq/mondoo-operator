@@ -1,0 +1,54 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - mondoo.mondoo.com
+  resources:
+  - mondooes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mondoo.mondoo.com
+  resources:
+  - mondooes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - mondoo.mondoo.com
+  resources:
+  - mondooes/status
+  verbs:
+  - get
+  - patch
+  - update
