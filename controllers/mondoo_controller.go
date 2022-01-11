@@ -68,11 +68,11 @@ func (r *MondooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			log.Info("Memcached resource not found. Ignoring since object must be deleted")
+			log.Info("mondoo resource not found. Ignoring since object must be deleted")
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		log.Error(err, "Failed to get Memcached")
+		log.Error(err, "Failed to get mondoo")
 		return ctrl.Result{}, err
 	}
 
@@ -110,8 +110,8 @@ func (r *MondooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}
 
-	// Update the Memcached status with the pod names
-	// List the pods for this memcached's deployment
+	// Update the mondoo status with the pod names
+	// List the pods for this mondoo's deployment
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(mondoo.Namespace),
@@ -128,7 +128,7 @@ func (r *MondooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		mondoo.Status.Nodes = podNames
 		err := r.Status().Update(ctx, mondoo)
 		if err != nil {
-			log.Error(err, "Failed to update Memcached status")
+			log.Error(err, "Failed to update mondoo status")
 			return ctrl.Result{}, err
 		}
 	}
@@ -136,7 +136,7 @@ func (r *MondooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{}, nil
 }
 
-// deploymentForMemcached returns a memcached Deployment object
+// deploymentForMondoo returns a mondoo Deployment object
 func (r *MondooReconciler) deploymentForMondoo(m *mondoov1alpha1.Mondoo) *appsv1.Deployment {
 	ls := labelsForMondoo(m.Name)
 	replicas := m.Spec.Size
@@ -169,13 +169,13 @@ func (r *MondooReconciler) deploymentForMondoo(m *mondoov1alpha1.Mondoo) *appsv1
 			},
 		},
 	}
-	// Set Memcached instance as the owner and controller
+	// Set mondoo instance as the owner and controller
 	ctrl.SetControllerReference(m, dep, r.Scheme)
 	return dep
 }
 
-// labelsForMemcached returns the labels for selecting the resources
-// belonging to the given memcached CR name.
+// labelsForMondoo returns the labels for selecting the resources
+// belonging to the given mondoo CR name.
 func labelsForMondoo(name string) map[string]string {
 	return map[string]string{"app": "mondoo", "mondoo_cr": name}
 }

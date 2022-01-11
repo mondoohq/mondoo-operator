@@ -46,7 +46,7 @@ spec:
             description: MondooStatus defines the observed state of Mondoo
             properties:
               nodes:
-                description: Nodes store the name of the pods which are running Memcached
+                description: Nodes store the name of the pods which are running mondoo
                   instances
                 items:
                   type: string
