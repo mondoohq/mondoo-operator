@@ -23,13 +23,13 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// MondooSpec defines the desired state of Mondoo
-type MondooSpec struct {
+// MondooData defines config for Mondoo
+type MondooData struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Mondoo. Edit mondoo_types.go to remove/update
-	// Size int32 `json:"size,omitempty"`
+	//config is mondoo configuration
+	Config string `json:"config,omitempty"`
 }
 
 // MondooStatus defines the observed state of Mondoo
@@ -49,7 +49,7 @@ type Mondoo struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MondooSpec   `json:"spec,omitempty"`
+	Data   MondooData   `json:"data,omitempty"`
 	Status MondooStatus `json:"status,omitempty"`
 }
 

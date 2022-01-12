@@ -45,6 +45,7 @@ type MondooReconciler struct {
 //+kubebuilder:rbac:groups=mondoo.mondoo.com,resources=mondooes/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=mondoo.mondoo.com,resources=mondooes/finalizers,verbs=update
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -72,6 +73,26 @@ func (r *MondooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 		// Error reading the object - requeue the request.
 		log.Error(err, "Failed to get mondoo")
+		return ctrl.Result{}, err
+	}
+
+	// TODO: Turn data.config string to opaque secret in namespace so it can be consumed by the daemonset and allow for update logic
+	// Check if the configmap already exists, if not create a new one
+	foundConfigMap := &corev1.ConfigMap{}
+	err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, foundConfigMap)
+	if err != nil && errors.IsNotFound(err) {
+		// Define a new configmap
+		dep := r.configMapForMondoo(mondoo)
+		log.Info("Creating a new Configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", dep.Name)
+		err = r.Create(ctx, dep)
+		if err != nil {
+			log.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", dep.Name)
+			return ctrl.Result{}, err
+		}
+		// configmap created successfully - return and requeue
+		return ctrl.Result{Requeue: true}, nil
+	} else if err != nil {
+		log.Error(err, "Failed to get ConfigMap")
 		return ctrl.Result{}, err
 	}
 
@@ -120,7 +141,7 @@ func (r *MondooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{}, nil
 }
 
-// deploymentForMondoo returns a mondoo Daemonset object
+// deamonsetForMondoo returns a mondoo Daemonset object
 func (r *MondooReconciler) deamonsetForMondoo(m *mondoov1alpha1.Mondoo) *appsv1.DaemonSet {
 	ls := labelsForMondoo(m.Name)
 
@@ -138,30 +159,84 @@ func (r *MondooReconciler) deamonsetForMondoo(m *mondoov1alpha1.Mondoo) *appsv1.
 					Labels: ls,
 				},
 				Spec: corev1.PodSpec{
+					Tolerations: []corev1.Toleration{{
+						Key:    "node-role.kubernetes.io/master",
+						Effect: corev1.TaintEffect("NoSchedule"),
+					}},
 					Containers: []corev1.Container{{
 						Image:   "mondoolabs/mondoo:latest",
 						Name:    "mondoo-agent",
 						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
-						VolumeMounts: []corev1.VolumeMount{{
-							Name:      "root",
-							ReadOnly:  true,
-							MountPath: "/mnt/host/",
-						}},
-					}},
-					Volumes: []corev1.Volume{{
-						Name: "root",
-						VolumeSource: corev1.VolumeSource{
-							HostPath: &corev1.HostPathVolumeSource{
-								Path: "/",
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "root",
+								ReadOnly:  true,
+								MountPath: "/mnt/host/",
+							},
+							{
+								Name:      "config",
+								ReadOnly:  true,
+								MountPath: "/etc/opt/mondoo/",
+							}},
+
+						Env: []corev1.EnvVar{
+							{
+								Name:  "DEBUG",
+								Value: "false",
+							},
+							{
+								Name:  "MONDOO_PROCFS",
+								Value: "on",
 							},
 						},
 					}},
+					Volumes: []corev1.Volume{
+						{
+							Name: "root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/",
+								},
+							},
+						},
+						{
+							Name: "config",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: m.Name,
+									},
+									Items: []corev1.KeyToPath{{
+										Key:  "config",
+										Path: "mondoo.yml",
+									}},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 	}
 	// Set mondoo instance as the owner and controller
 	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+
+func (r *MondooReconciler) configMapForMondoo(m *mondoov1alpha1.Mondoo) *corev1.ConfigMap {
+
+	dep := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      m.Name,
+			Namespace: m.Namespace,
+		},
+		Data: map[string]string{
+			"config": m.Data.Config,
+		},
+	}
+	// Set mondoo instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+
 	return dep
 }
 
