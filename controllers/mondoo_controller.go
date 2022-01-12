@@ -140,12 +140,21 @@ func (r *MondooReconciler) deamonsetForMondoo(m *mondoov1alpha1.Mondoo) *appsv1.
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
 						Image:   "mondoolabs/mondoo:latest",
-						Name:    "mondoo",
+						Name:    "mondoo-agent",
 						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
-						Ports: []corev1.ContainerPort{{
-							ContainerPort: 11211,
-							Name:          "mondoo",
+						VolumeMounts: []corev1.VolumeMount{{
+							Name:      "root",
+							ReadOnly:  true,
+							MountPath: "/mnt/host/",
 						}},
+					}},
+					Volumes: []corev1.Volume{{
+						Name: "root",
+						VolumeSource: corev1.VolumeSource{
+							HostPath: &corev1.HostPathVolumeSource{
+								Path: "/",
+							},
+						},
 					}},
 				},
 			},
