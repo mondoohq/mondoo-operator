@@ -5,10 +5,6 @@ metadata:
   name: mondoo-daemonset-config
 data:
   config: |
-    # configuration to scan mounted host
-    assets:
-    - connection: "fs:///mnt/host"
-    # service account configuration
     mrn: //agents.api.mondoo.app/spaces/test-infallible-taussig-796596/serviceaccounts/1u20vCfgWqaxOjGmWFFCH4qi2se
     space_mrn: //captain.api.mondoo.app/spaces/test-infallible-taussig-796596
     private_key: |
@@ -23,4 +19,17 @@ data:
       ...
       Rc3OFH5K0IWA0yDdL5QVoQ==
       -----END CERTIFICATE-----
-    api_endpoint: http://eb6668cdfec2.ngrok.io
+    api_endpoint: https://api.mondoo.app
+  inventory: |
+    apiVersion: v1
+    kind: Inventory
+    metadata:
+      name: mondoo-k8s-inventory
+      labels:
+        environment: production
+    spec:
+      assets:
+        - id: host
+          connections:
+            - host: /mnt/host
+              backend: fs
