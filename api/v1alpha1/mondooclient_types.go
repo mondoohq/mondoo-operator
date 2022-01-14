@@ -24,18 +24,21 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // MondooClientSpec defines the desired state of MondooClient
-type MondooClientSpec struct {
+type MondooClientData struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of MondooClient. Edit mondooclient_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Config is an example field of MondooClient. Edit mondooclient_types.go to remove/update
+	Config string `json:"config,omitempty"`
 }
 
 // MondooClientStatus defines the observed state of MondooClient
 type MondooClientStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Nodes store the name of the pods which are running mondoo instances
+	Nodes []string `json:"nodes,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -46,7 +49,7 @@ type MondooClient struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MondooClientSpec   `json:"spec,omitempty"`
+	Data   MondooClientData   `json:"data,omitempty"`
 	Status MondooClientStatus `json:"status,omitempty"`
 }
 
