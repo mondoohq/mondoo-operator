@@ -6,4 +6,14 @@ plugins:
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: mondoo-operator
 repo: go.mondoo.com/mondoo-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: mondoo.com
+  group: k8s
+  kind: MondooClient
+  path: go.mondoo.com/mondoo-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

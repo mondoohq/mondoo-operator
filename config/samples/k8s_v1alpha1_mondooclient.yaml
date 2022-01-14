@@ -1,0 +1,6 @@
+apiVersion: k8s.mondoo.com/v1alpha1
+kind: MondooClient
+metadata:
+  name: mondooclient-sample
+spec:
+  # Add fields here
