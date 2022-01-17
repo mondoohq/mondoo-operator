@@ -9,13 +9,14 @@ In Kubernetes, we support running in two ways:
 
 1. Download service account from mondooo
 2. Convert json to yaml via `yq e -P creds.json`
-3. Update the `daemonset-config.yaml` and/or `job-config.yaml` with the service account
+3. Update the `mondoo-credentials.yaml` with the service account 
+
 
 ## Deploy job
 
 ```bash
 # run job
-kubectl apply -f job.yaml -f job-config.yaml
+kubectl apply -f job.yaml -f mondoo-credentials.yaml -f mondoo-inventory.yaml
 # list job
 kubectl get jobs
 NAME         COMPLETIONS   DURATION   AGE
@@ -31,7 +32,7 @@ kubectl delete jobs mondoo-job
 
 ```bash
 # install daemonset
-kubectl apply -f daemonset.yaml -f daemonset-config.yaml 
+kubectl apply -f daemonset.yaml -f mondoo-credentials.yaml -f mondoo-inventory.yaml
 # delete daemonset
 kubectl delete daemonsets.apps mondoo-daemonset
 ```
