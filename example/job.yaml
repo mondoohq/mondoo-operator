@@ -15,7 +15,7 @@ spec:
               mountPath: /mnt/host/
               readOnly: true
             - name: config
-              mountPath: /etc/opt/mondoo/
+              mountPath: /etc/opt/
               readOnly: true
           env:
             - name: DEBUG
@@ -28,8 +28,16 @@ spec:
           hostPath:
             path: "/"
         - name: config
-          configMap:
-            name: mondoo-serviceaccount
-            items:
-            - key: config
-              path: mondoo.yml
+          projected:
+            sources:
+              - secret:
+                  name: mondoo-credentials
+                  items:
+                    - key: config
+                      path: mondoo/mondoo.yml
+                  path: 
+              - configMap:
+                  name: mondoo-inventory
+                  items:
+                    - key: inventory
+                      path: mondoo/inventory.yml
