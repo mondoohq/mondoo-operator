@@ -9,7 +9,16 @@ spec:
       containers:
         - name: mondoo-agent
           image: docker.io/mondoolabs/mondoo:latest
-          command: ["mondoo", "scan", "-t", "fs:///mnt/host", "--config", "/etc/opt/mondoo/mondoo.yml", "--exit-0-on-success"]
+          command:
+            [
+              "mondoo",
+              "scan",
+              "--inventory",
+              "/etc/opt/mondoo/inventory.yml",
+              "--config",
+              "/etc/opt/mondoo/mondoo.yml",
+              "--exit-0-on-success",
+            ]
           volumeMounts:
             - name: root
               mountPath: /mnt/host/
@@ -35,7 +44,6 @@ spec:
                   items:
                     - key: config
                       path: mondoo/mondoo.yml
-                  path: 
               - configMap:
                   name: mondoo-inventory
                   items:

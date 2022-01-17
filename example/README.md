@@ -7,12 +7,11 @@ In Kubernetes, we support running in two ways:
 
 ## Preparation
 
-1. Download service account from mondooo
+1. Download service account from Mondoo's dashboard
 2. Convert json to yaml via `yq e -P creds.json`
-3. Update the `mondoo-credentials.yaml` with the service account 
+3. Update the `mondoo-credentials.yaml` with the Mondoo service account
 
-
-## Deploy job
+## Deploy individual job
 
 ```bash
 # run job
