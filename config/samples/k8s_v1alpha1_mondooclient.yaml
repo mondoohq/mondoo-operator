@@ -1,7 +1,8 @@
 apiVersion: k8s.mondoo.com/v1alpha1
 kind: MondooClient
 metadata:
-  name: mondooclient-sample
+  name: mondoo-client
+  namespace: mondoo-operator-system
 data:
   config: |
     mrn: //agents.api.mondoo.app/spaces/test-infallible-taussig-796596/serviceaccounts/1u20vCfgWqaxOjGmWFFCH4qi2se
