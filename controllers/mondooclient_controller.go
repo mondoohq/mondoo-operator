@@ -247,33 +247,6 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient) *a
 								},
 							},
 						},
-						// {
-						// 	Name: "config",
-						// 	VolumeSource: corev1.VolumeSource{
-						// 		Projected: &corev1.ProjectedVolumeSource{
-						// 			Sources: []corev1.VolumeProjection{{
-						// 				Secret: &corev1.SecretProjection{
-						// 					LocalObjectReference: corev1.LocalObjectReference{
-						// 						Name: m.Name,
-						// 					},
-						// 					Items: []corev1.KeyToPath{{
-						// 						Key:  "config",
-						// 						Path: "mondoo/mondoo.yml",
-						// 					}},
-						// 				},
-						// 				ConfigMap: &corev1.ConfigMapProjection{
-						// 					LocalObjectReference: corev1.LocalObjectReference{
-						// 						Name: m.Name,
-						// 					},
-						// 					Items: []corev1.KeyToPath{{
-						// 						Key:  "inventory",
-						// 						Path: "mondoo/inventory.yml",
-						// 					}},
-						// 				},
-						// 			}},
-						// 		},
-						// 	},
-						// },
 					},
 				},
 			},
