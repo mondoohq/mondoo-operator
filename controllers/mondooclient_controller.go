@@ -44,6 +44,7 @@ type MondooClientReconciler struct {
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooclients/finalizers,verbs=update
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -84,6 +85,24 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		err = r.Create(ctx, dep)
 		if err != nil {
 			log.Error(err, "Failed to create new Secret", "Secret.Namespace", dep.Namespace, "Secret.Name", dep.Name)
+			return ctrl.Result{}, err
+		}
+		// secret created successfully - return and requeue
+		return ctrl.Result{Requeue: true}, nil
+	} else if err != nil {
+		log.Error(err, "Failed to get Secret")
+		return ctrl.Result{}, err
+	}
+	// Check if the Secret already exists, if not create a new one
+	foundConfigMap := &corev1.ConfigMap{}
+	err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, foundConfigMap)
+	if err != nil && errors.IsNotFound(err) {
+		// Define a new secret
+		dep := r.configMapForMondoo(mondoo)
+		log.Info("Creating a new configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", dep.Name)
+		err = r.Create(ctx, dep)
+		if err != nil {
+			log.Error(err, "Failed to create new Secret", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", dep.Name)
 			return ctrl.Result{}, err
 		}
 		// secret created successfully - return and requeue
@@ -173,8 +192,9 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient) *a
 							{
 								Name:      "config",
 								ReadOnly:  true,
-								MountPath: "/etc/opt/mondoo/",
-							}},
+								MountPath: "/etc/opt/",
+							},
+						},
 
 						Env: []corev1.EnvVar{
 							{
@@ -199,15 +219,61 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient) *a
 						{
 							Name: "config",
 							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: m.Name,
-									Items: []corev1.KeyToPath{{
-										Key:  "config",
-										Path: "mondoo.yml",
-									}},
+								Projected: &corev1.ProjectedVolumeSource{
+									Sources: []corev1.VolumeProjection{
+										{
+											ConfigMap: &corev1.ConfigMapProjection{
+												LocalObjectReference: corev1.LocalObjectReference{
+													Name: m.Name,
+												},
+												Items: []corev1.KeyToPath{{
+													Key:  "inventory",
+													Path: "mondoo/inventory.yml",
+												}},
+											},
+										},
+										{
+											Secret: &corev1.SecretProjection{
+												LocalObjectReference: corev1.LocalObjectReference{
+													Name: m.Name,
+												},
+												Items: []corev1.KeyToPath{{
+													Key:  "config",
+													Path: "mondoo/mondoo.yml",
+												}},
+											},
+										},
+									},
 								},
 							},
 						},
+						// {
+						// 	Name: "config",
+						// 	VolumeSource: corev1.VolumeSource{
+						// 		Projected: &corev1.ProjectedVolumeSource{
+						// 			Sources: []corev1.VolumeProjection{{
+						// 				Secret: &corev1.SecretProjection{
+						// 					LocalObjectReference: corev1.LocalObjectReference{
+						// 						Name: m.Name,
+						// 					},
+						// 					Items: []corev1.KeyToPath{{
+						// 						Key:  "config",
+						// 						Path: "mondoo/mondoo.yml",
+						// 					}},
+						// 				},
+						// 				ConfigMap: &corev1.ConfigMapProjection{
+						// 					LocalObjectReference: corev1.LocalObjectReference{
+						// 						Name: m.Name,
+						// 					},
+						// 					Items: []corev1.KeyToPath{{
+						// 						Key:  "inventory",
+						// 						Path: "mondoo/inventory.yml",
+						// 					}},
+						// 				},
+						// 			}},
+						// 		},
+						// 	},
+						// },
 					},
 				},
 			},
@@ -227,6 +293,23 @@ func (r *MondooClientReconciler) secretForMondoo(m *v1alpha1.MondooClient) *core
 		},
 		Data: map[string][]byte{
 			"config": []byte(m.Data.Config),
+		},
+	}
+	// Set mondoo instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+
+	return dep
+}
+
+func (r *MondooClientReconciler) configMapForMondoo(m *v1alpha1.MondooClient) *corev1.ConfigMap {
+
+	dep := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      m.Name,
+			Namespace: m.Namespace,
+		},
+		Data: map[string]string{
+			"inventory": m.Data.Inventory,
 		},
 	}
 	// Set mondoo instance as the owner and controller

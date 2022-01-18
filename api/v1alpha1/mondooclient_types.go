@@ -29,7 +29,8 @@ type MondooClientData struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Config is an example field of MondooClient. Edit mondooclient_types.go to remove/update
-	Config string `json:"config,omitempty"`
+	Config    string `json:"config,omitempty"`
+	Inventory string `json:"inventory,omitempty"`
 }
 
 // MondooClientStatus defines the observed state of MondooClient
