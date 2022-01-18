@@ -5,18 +5,34 @@ metadata:
   namespace: mondoo-operator-system
 data:
   config: |
-    mrn: //agents.api.mondoo.app/spaces/test-infallible-taussig-796596/serviceaccounts/1u20vCfgWqaxOjGmWFFCH4qi2se
-    space_mrn: //captain.api.mondoo.app/spaces/test-infallible-taussig-796596
+    mrn: //agents.api.mondoo.app/spaces/funny-dijkstra-486611/serviceaccounts/23alFczX47MqdEhH7Fsu2dMz2mO
+    space_mrn: //captain.api.mondoo.app/spaces/funny-dijkstra-486611
     private_key: |
       -----BEGIN PRIVATE KEY-----
-      MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDB4SxLzF7ZQvD0dxoWa
+      MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDCcKjDM21fpXg2ibufo
       ...
-      pJLAp0cuKBUrUNpOQ62qaQ9F17/r6/TBejq6FaYkok7og+MkQVr8gos=
+      4g8K/aHOl0dwdsBhQh2fNTPa0jIxKEj1CfkY/6jyCID0rnBKTbVHcD8=
       -----END PRIVATE KEY-----
     certificate: |
       -----BEGIN CERTIFICATE-----
-      MIICfDCCAgGgAwIBAgIRAKqQ9zkDA/rIBj96r4g+qJswCgYIKoZIzj0EAwMwSTFH
+      MIICXjCCAeWgAwIBAgIQDYQMeZyi9FBWlz/OvFS7sTAKBggqhkjOPQQDAzBAMT4w
       ...
-      Rc3OFH5K0IWA0yDdL5QVoQ==
+      HdVHPOSg3o01VET0ypQxG3j7vKsjVn9ztRUgj/pz4agCMHjhzE5gOgJlujLWRBYx
+      wSislvvKAO/8mxCzULTErCph4tyZvPVECMuCdCUctaSa3A==
       -----END CERTIFICATE-----
     api_endpoint: https://api.mondoo.app
+
+  inventory: |
+    apiVersion: v1
+    kind: Inventory
+    metadata:
+      name: mondoo-k8s-inventory
+      labels:
+        environment: production
+    spec:
+      assets:
+        - id: host
+          connections:
+            - host: /mnt/host
+              backend: fs
+
