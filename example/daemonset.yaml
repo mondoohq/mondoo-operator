@@ -47,7 +47,6 @@ spec:
                   items:
                     - key: config
                       path: mondoo/mondoo.yml
-                  path: 
               - configMap:
                   name: mondoo-inventory
                   items:
