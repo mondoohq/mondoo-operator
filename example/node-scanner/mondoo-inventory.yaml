@@ -16,6 +16,3 @@ data:
           connections:
             - host: /mnt/host
               backend: fs
-        - id: api
-          connections:
-            - backend: k8s

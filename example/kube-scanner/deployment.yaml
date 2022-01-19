@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mondoo-app-scanner
+  namespace: mondoo-operator
+spec:
+  selector:
+    matchLabels:
+      app: mondoo-app-scanner
+  template:
+    metadata:
+      labels:
+        app: mondoo-app-scanner
+    spec:
+      tolerations:
+        # this toleration is to have the daemonset runnable on master nodes
+        # remove it if your masters can't run pods
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      containers:
+        - name: mondoo-agent
+          image: docker.io/mondoolabs/mondoo:latest
+          command: ["mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"]
+          volumeMounts:
+            - name: root
+              mountPath: /mnt/host/
+              readOnly: true
+            - name: config
+              mountPath: /etc/opt/
+              readOnly: true
+          env:
+            - name: DEBUG
+              value: "true"
+            - name: MONDOO_PROCFS
+              value: "on"
+      terminationGracePeriodSeconds: 30
+      serviceAccountName: mondoo-sa
+      volumes:
+        - name: root
+          hostPath:
+            path: "/"
+        - name: config
+          projected:
+            sources:
+              - secret:
+                  name: mondoo-credentials
+                  items:
+                    - key: config
+                      path: mondoo/mondoo.yml
+              - configMap:
+                  name: mondoo-inventory
+                  items:
+                    - key: inventory
+                      path: mondoo/inventory.yml
