@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: mondoo-inventory
+  name: mondoo-job-inventory
 data:
   inventory: |
     apiVersion: v1
@@ -14,8 +14,8 @@ data:
       assets:
         - id: host
           connections:
-            - host: /mnt/host
-              backend: fs
+            - backend: fs
+              host: /mnt/host
         - id: api
           connections:
             - backend: k8s
