@@ -12,7 +12,6 @@ data:
         environment: production
     spec:
       assets:
-        - id: host
+        - id: api
           connections:
-            - host: /mnt/host
-              backend: fs
+            - backend: k8s
