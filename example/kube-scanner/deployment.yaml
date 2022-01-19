@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mondoo-app-scanner
-  namespace: mondoo-operator
+  namespace: default
 spec:
   selector:
     matchLabels:
@@ -30,7 +30,7 @@ spec:
               readOnly: true
           env:
             - name: DEBUG
-              value: "true"
+              value: "false"
             - name: MONDOO_PROCFS
               value: "on"
       terminationGracePeriodSeconds: 30
@@ -48,7 +48,7 @@ spec:
                     - key: config
                       path: mondoo/mondoo.yml
               - configMap:
-                  name: mondoo-inventory
+                  name: mondoo-kube-inventory
                   items:
                     - key: inventory
                       path: mondoo/inventory.yml
