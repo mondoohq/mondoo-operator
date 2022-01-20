@@ -29,6 +29,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -43,9 +44,13 @@ type MondooClientReconciler struct {
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooclients/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooclients/finalizers,verbs=update
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
+//+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -74,8 +79,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Error(err, "Failed to get mondoo")
 		return ctrl.Result{}, err
 	}
-
-	// Check if the Secret already exists, if not create a new one
+	// Check if the Credential Secret already exists, if not create a new one
 	foundSecret := &corev1.Secret{}
 	err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, foundSecret)
 	if err != nil && errors.IsNotFound(err) {
@@ -93,65 +97,191 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Error(err, "Failed to get Secret")
 		return ctrl.Result{}, err
 	}
-	// Check if the Secret already exists, if not create a new one
-	foundConfigMap := &corev1.ConfigMap{}
-	err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, foundConfigMap)
-	if err != nil && errors.IsNotFound(err) {
-		// Define a new secret
-		dep := r.configMapForMondoo(mondoo)
-		log.Info("Creating a new configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", dep.Name)
-		err = r.Create(ctx, dep)
-		if err != nil {
-			log.Error(err, "Failed to create new Secret", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", dep.Name)
+
+	if !mondoo.Data.KubeNodes.Disabled {
+
+		// Check if the Inventory Config already exists, if not create a new one
+		foundConfigMap := &corev1.ConfigMap{}
+		err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, foundConfigMap)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new configmap
+			dep := r.configMapForMondoo(mondoo)
+			log.Info("Creating a new configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", dep.Name)
+
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// configmap created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Configmap")
 			return ctrl.Result{}, err
 		}
-		// secret created successfully - return and requeue
-		return ctrl.Result{Requeue: true}, nil
-	} else if err != nil {
-		log.Error(err, "Failed to get Secret")
-		return ctrl.Result{}, err
-	}
 
-	// Check if the daemonset already exists, if not create a new one
-	found := &appsv1.DaemonSet{}
-	err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		// Define a new daemonset
-		dep := r.deamonsetForMondoo(mondoo)
-		log.Info("Creating a new Daemonset", "Daemonset.Namespace", dep.Namespace, "Daemonset.Name", dep.Name)
-		err = r.Create(ctx, dep)
-		if err != nil {
-			log.Error(err, "Failed to create new Daemonset", "Daemonset.Namespace", dep.Namespace, "Daemonset.Name", dep.Name)
+		// Check if the daemonset already exists, if not create a new one
+		found := &appsv1.DaemonSet{}
+		err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, found)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new daemonset
+			dep := r.deamonsetForMondoo(mondoo)
+			log.Info("Creating a new Daemonset", "Daemonset.Namespace", dep.Namespace, "Daemonset.Name", dep.Name)
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Daemonset", "Daemonset.Namespace", dep.Namespace, "Daemonset.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Daemonset created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Daemonset")
 			return ctrl.Result{}, err
 		}
-		// Daemonset created successfully - return and requeue
-		return ctrl.Result{Requeue: true}, nil
-	} else if err != nil {
-		log.Error(err, "Failed to get Daemonset")
-		return ctrl.Result{}, err
-	}
 
-	// Update the mondoo status with the pod names
-	// List the pods for this mondoo's daemonset
-	podList := &corev1.PodList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(mondoo.Namespace),
-		client.MatchingLabels(labelsForMondoo(mondoo.Name)),
-	}
-	if err = r.List(ctx, podList, listOpts...); err != nil {
-		log.Error(err, "Failed to list pods", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
-		return ctrl.Result{}, err
-	}
-	podNames := getPodNames(podList.Items)
-
-	// Update status.Nodes if needed
-	if !reflect.DeepEqual(podNames, mondoo.Status.Nodes) {
-		mondoo.Status.Nodes = podNames
-		err := r.Status().Update(ctx, mondoo)
-		if err != nil {
-			log.Error(err, "Failed to update mondoo status")
+		// Update the mondoo status with the pod names
+		// List the pods for this mondoo's daemonset
+		podList := &corev1.PodList{}
+		listOpts := []client.ListOption{
+			client.InNamespace(mondoo.Namespace),
+			client.MatchingLabels(labelsForMondoo(mondoo.Name)),
+		}
+		if err = r.List(ctx, podList, listOpts...); err != nil {
+			log.Error(err, "Failed to list pods", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
 			return ctrl.Result{}, err
 		}
+		podNames := getPodNames(podList.Items)
+
+		// Update status.Nodes if needed
+		if !reflect.DeepEqual(podNames, mondoo.Status.Nodes) {
+			mondoo.Status.Nodes = podNames
+			err := r.Status().Update(ctx, mondoo)
+			if err != nil {
+				log.Error(err, "Failed to update mondoo status")
+				return ctrl.Result{}, err
+			}
+		}
+
+	}
+	if !mondoo.Data.Kubeapi.Disabled {
+		// Check if the Inventory Config already exists, if not create a new one
+		foundConfigMap := &corev1.ConfigMap{}
+		err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, foundConfigMap)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new secret
+			dep := r.configMapForMondoo(mondoo)
+			log.Info("Creating a new configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", dep.Name)
+
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// configmap created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Configmap")
+			return ctrl.Result{}, err
+		}
+		// Check if the Mondoo Service Account already exists, if not create a new one
+		foundServiceAccount := &corev1.ServiceAccount{}
+		err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, foundServiceAccount)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new sericeaccount
+			dep := r.serviceAccountForMondoo(mondoo)
+			log.Info("Creating a new configmap", "ServiceAccount.Namespace", dep.Namespace, "ServiceAccount.Name", dep.Name)
+
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new ServiceAccount", "ServiceAccount.Namespace", dep.Namespace, "ServiceAccount.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// configmap created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get ServiceAccount")
+			return ctrl.Result{}, err
+		}
+		// Check if the Mondoo ClusterRole already exists, if not create a new one
+		foundClusterRole := &rbacv1.ClusterRole{}
+		err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: ""}, foundClusterRole)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new clusterrole
+			dep := r.clusterRoleForMondoo(mondoo)
+			log.Info("Creating a new clusterRole", "ClusterRole.Name", dep.Name)
+
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new ClusterRole", "ClusterRole.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// clusterRole created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get ClusterRole")
+			return ctrl.Result{}, err
+		}
+		// Check if the Mondoo ClusterRoleBinding already exists, if not create a new one
+		foundClusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+		err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: ""}, foundClusterRoleBinding)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new clusterrolebinding
+			dep := r.clusterRoleBindingForMondoo(mondoo)
+			log.Info("Creating a new clusterRoleBinding", "ClusterRoleBinding.Name", dep.Name)
+
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new ClusterRoleBinding", "ClusterRoleBinding.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// clusterRoleBinding created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get ClusterRoleBinding")
+			return ctrl.Result{}, err
+		}
+		// Check if the Deployment already exists, if not create a new one
+		found := &appsv1.Deployment{}
+		err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, found)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new Deployment
+			dep := r.deploymentForMondoo(mondoo)
+			log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Deployment created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Deployment")
+			return ctrl.Result{}, err
+		}
+
+		// Update the mondoo status with the pod names
+		// List the pods for this mondoo's Deployment
+		podList := &corev1.PodList{}
+		listOpts := []client.ListOption{
+			client.InNamespace(mondoo.Namespace),
+			client.MatchingLabels(labelsForMondoo(mondoo.Name)),
+		}
+		if err = r.List(ctx, podList, listOpts...); err != nil {
+			log.Error(err, "Failed to list pods", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
+			return ctrl.Result{}, err
+		}
+		podNames := getPodNames(podList.Items)
+
+		// Update status.Nodes if needed
+		if !reflect.DeepEqual(podNames, mondoo.Status.Nodes) {
+			mondoo.Status.Nodes = podNames
+			err := r.Status().Update(ctx, mondoo)
+			if err != nil {
+				log.Error(err, "Failed to update mondoo status")
+				return ctrl.Result{}, err
+			}
+		}
+
 	}
 
 	return ctrl.Result{}, nil
@@ -160,7 +290,6 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 // deamonsetForMondoo returns a mondoo Daemonset object
 func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient) *appsv1.DaemonSet {
 	ls := labelsForMondoo(m.Name)
-
 	dep := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      m.Name,
@@ -256,6 +385,131 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient) *a
 	ctrl.SetControllerReference(m, dep, r.Scheme)
 	return dep
 }
+func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient) *appsv1.Deployment {
+	ls := labelsForMondoo(m.Name)
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      m.Name,
+			Namespace: m.Namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: ls,
+			},
+			Replicas: &m.Data.Kubeapi.Replicas,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: ls,
+				},
+				Spec: corev1.PodSpec{
+					Tolerations: []corev1.Toleration{{
+						Key:    "node-role.kubernetes.io/master",
+						Effect: corev1.TaintEffect("NoSchedule"),
+					}},
+					Containers: []corev1.Container{{
+						Image:   "mondoolabs/mondoo:latest",
+						Name:    "mondoo-agent",
+						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
+
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "root",
+								ReadOnly:  true,
+								MountPath: "/mnt/host/",
+							},
+							{
+								Name:      "config",
+								ReadOnly:  true,
+								MountPath: "/etc/opt/",
+							},
+						},
+
+						Env: []corev1.EnvVar{
+							{
+								Name:  "DEBUG",
+								Value: "false",
+							},
+							{
+								Name:  "MONDOO_PROCFS",
+								Value: "on",
+							},
+						},
+					}},
+					ServiceAccountName: m.Name,
+					Volumes: []corev1.Volume{
+						{
+							Name: "root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/",
+								},
+							},
+						},
+						{
+							Name: "config",
+							VolumeSource: corev1.VolumeSource{
+								Projected: &corev1.ProjectedVolumeSource{
+									Sources: []corev1.VolumeProjection{
+										{
+											ConfigMap: &corev1.ConfigMapProjection{
+												LocalObjectReference: corev1.LocalObjectReference{
+													Name: m.Name,
+												},
+												Items: []corev1.KeyToPath{{
+													Key:  "inventory",
+													Path: "mondoo/inventory.yml",
+												}},
+											},
+										},
+										{
+											Secret: &corev1.SecretProjection{
+												LocalObjectReference: corev1.LocalObjectReference{
+													Name: m.Name,
+												},
+												Items: []corev1.KeyToPath{{
+													Key:  "config",
+													Path: "mondoo/mondoo.yml",
+												}},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	// Set mondoo instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+
+// const defaultInventoryNodes = `apiVersion: v1
+// kind: Inventory
+// metadata:
+//   name: mondoo-k8s-inventory
+//   labels:
+// 	environment: production
+// spec:
+//   assets:
+// 	- id: api
+// 	  connections:
+// 		- backend: k8s`
+
+const defaultInventoryNodes = `apiVersion: v1
+kind: Inventory
+metadata:
+	name: mondoo-k8s-inventory
+	labels:
+	  environment: production
+spec:
+	assets:
+	- id: host
+		connections:
+		- host: /mnt/host
+			backend: fs`
 
 func (r *MondooClientReconciler) secretForMondoo(m *v1alpha1.MondooClient) *corev1.Secret {
 
@@ -265,7 +519,7 @@ func (r *MondooClientReconciler) secretForMondoo(m *v1alpha1.MondooClient) *core
 			Namespace: m.Namespace,
 		},
 		Data: map[string][]byte{
-			"config": []byte(m.Data.Config),
+			"config": []byte(m.Data.Credentials),
 		},
 	}
 	// Set mondoo instance as the owner and controller
@@ -275,19 +529,70 @@ func (r *MondooClientReconciler) secretForMondoo(m *v1alpha1.MondooClient) *core
 }
 
 func (r *MondooClientReconciler) configMapForMondoo(m *v1alpha1.MondooClient) *corev1.ConfigMap {
-
+	var inventory string
+	if m.Data.KubeNodes.Inventory == "" {
+		inventory = defaultInventoryNodes
+	} else {
+		inventory = m.Data.KubeNodes.Inventory
+	}
 	dep := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      m.Name,
 			Namespace: m.Namespace,
 		},
 		Data: map[string]string{
-			"inventory": m.Data.Inventory,
+			"inventory": inventory,
 		},
 	}
 	// Set mondoo instance as the owner and controller
 	ctrl.SetControllerReference(m, dep, r.Scheme)
 
+	return dep
+}
+func (r *MondooClientReconciler) serviceAccountForMondoo(m *v1alpha1.MondooClient) *corev1.ServiceAccount {
+	dep := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      m.Name,
+			Namespace: m.Namespace,
+		},
+	}
+	// Set mondoo instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+func (r *MondooClientReconciler) clusterRoleForMondoo(m *v1alpha1.MondooClient) *rbacv1.ClusterRole {
+	dep := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: m.Name,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs: []string{"get", "watch", "list"},
+			},
+		},
+	}
+	// Set mondoo instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+func (r *MondooClientReconciler) clusterRoleBindingForMondoo(m *v1alpha1.MondooClient) *rbacv1.ClusterRoleBinding {
+	dep := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: m.Name,
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Name:     m.Name,
+			Kind:     "ClusterRole",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      m.Name,
+				Namespace: m.Namespace,
+			},
+		},
+	}
 	return dep
 }
 
