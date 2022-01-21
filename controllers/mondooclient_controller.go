@@ -52,6 +52,7 @@ type MondooClientReconciler struct {
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=*,resources=*,verbs=get;list;watch
+//The last line is required as we cant assign higher permissions that exist for operator serviceaccount
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -238,7 +239,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	// Update the mondoo status with the pod names
+	// Update the mondoo status with the pod names only after all pod creation actions are done
 	// List the pods for this mondoo's daemonset and deployment
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
@@ -264,7 +265,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-// deamonsetForMondoo returns a mondoo Daemonset object
+// deamonsetForMondoo returns a  Daemonset object
 func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient) *appsv1.DaemonSet {
 	ls := labelsForMondoo(m.Name)
 	dep := &appsv1.DaemonSet{
@@ -362,8 +363,17 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient) *a
 	ctrl.SetControllerReference(m, dep, r.Scheme)
 	return dep
 }
+
+// deploymentForMondoo returns a Deployment object
 func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient) *appsv1.Deployment {
 	ls := labelsForMondoo(m.Name)
+	var replicas int32
+	if m.Data.Kubeapi.Replicas == 0 {
+		replicas = 1
+	} else {
+		replicas = m.Data.Kubeapi.Replicas
+	}
+
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      m.Name,
@@ -373,7 +383,7 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient) *
 			Selector: &metav1.LabelSelector{
 				MatchLabels: ls,
 			},
-			Replicas: &m.Data.Kubeapi.Replicas,
+			Replicas: &replicas,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: ls,
@@ -463,18 +473,6 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient) *
 	return dep
 }
 
-// const defaultInventoryNodes = `apiVersion: v1
-// kind: Inventory
-// metadata:
-//   name: mondoo-k8s-inventory
-//   labels:
-// 	environment: production
-// spec:
-//   assets:
-// 	- id: api
-// 	  connections:
-// 		- backend: k8s`
-
 const defaultInventoryNodes = `apiVersion: v1
 kind: Inventory
 metadata:
@@ -559,22 +557,6 @@ func (r *MondooClientReconciler) serviceAccountForMondoo(m *v1alpha1.MondooClien
 	return dep
 }
 
-// func (r *MondooClientReconciler) clusterRoleForMondoo(m *v1alpha1.MondooClient) *rbacv1.ClusterRole {
-// 	dep := &rbacv1.ClusterRole{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name: m.Name,
-// 		},
-// 		Rules: []rbacv1.PolicyRule{
-// 			{
-// 				Verbs:     []string{"get", "watch", "list"},
-// 				APIGroups: []string{"*"},
-// 			},
-// 		},
-// 	}
-// 	// Set mondoo instance as the owner and controller
-// 	ctrl.SetControllerReference(m, dep, r.Scheme)
-// 	return dep
-// }
 func (r *MondooClientReconciler) clusterRoleForMondoo(m *v1alpha1.MondooClient) *rbacv1.ClusterRole {
 	dep := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
