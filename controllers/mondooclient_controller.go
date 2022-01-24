@@ -18,9 +18,11 @@ package controllers
 
 import (
 	"context"
+	_ "embed"
 	"reflect"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,6 +41,20 @@ type MondooClientReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
+
+// Embed the Default Inventory for Daemonset and Deployment Configurations
+//go:embed inventory-ds.yaml
+var dsInventoryyaml []byte
+
+//go:embed inventory-deploy.yaml
+var deployInventoryyaml []byte
+
+type Inventory struct {
+	Inventory string `yaml:"inventory,flow"`
+}
+
+var dsInventory Inventory
+var deployInventory Inventory
 
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooclients,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooclients/status,verbs=get;update;patch
@@ -66,10 +82,18 @@ type MondooClientReconciler struct {
 func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
+	err := yaml.Unmarshal(dsInventoryyaml, &dsInventory)
+	if err != nil {
+		log.Error(err, "could not load default inventory for daemonset")
+	}
+	err = yaml.Unmarshal(deployInventoryyaml, &deployInventory)
+	if err != nil {
+		log.Error(err, "could not load default inventory for deployment")
+	}
 	// Fetch the Mondoo instance
 	mondoo := &v1alpha1.MondooClient{}
 
-	err := r.Get(ctx, req.NamespacedName, mondoo)
+	err = r.Get(ctx, req.NamespacedName, mondoo)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -110,7 +134,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		err = r.Get(ctx, types.NamespacedName{Name: inventoryDaemonSet, Namespace: mondoo.Namespace}, foundConfigMap)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new configmap
-			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet)
+			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet, dsInventory.Inventory)
 			log.Info("Creating a new configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDaemonSet)
 
 			err = r.Create(ctx, dep)
@@ -151,7 +175,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		err = r.Get(ctx, types.NamespacedName{Name: inventoryDeployment, Namespace: mondoo.Namespace}, foundConfigMap)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new secret
-			dep := r.configMapForMondooDeployment(mondoo, inventoryDeployment)
+			dep := r.configMapForMondooDeployment(mondoo, inventoryDeployment, deployInventory.Inventory)
 			log.Info("Creating a new configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDeployment)
 
 			err = r.Create(ctx, dep)
@@ -476,19 +500,6 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, c
 	return dep
 }
 
-const defaultInventoryNodes = `apiVersion: v1
-kind: Inventory
-metadata:
-	name: mondoo-k8s-inventory
-	labels:
-	  environment: production
-spec:
-	assets:
-	- id: host
-		connections:
-		- host: /mnt/host
-			backend: fs`
-
 func (r *MondooClientReconciler) secretForMondoo(m *v1alpha1.MondooClient) *corev1.Secret {
 
 	dep := &corev1.Secret{
@@ -506,10 +517,10 @@ func (r *MondooClientReconciler) secretForMondoo(m *v1alpha1.MondooClient) *core
 	return dep
 }
 
-func (r *MondooClientReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooClient, name string) *corev1.ConfigMap {
+func (r *MondooClientReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooClient, name string, defaultInventory string) *corev1.ConfigMap {
 	var inventory string
 	if m.Data.KubeNodes.Inventory == "" {
-		inventory = defaultInventoryNodes
+		inventory = defaultInventory
 	} else {
 		inventory = m.Data.KubeNodes.Inventory
 	}
@@ -527,10 +538,10 @@ func (r *MondooClientReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooC
 
 	return dep
 }
-func (r *MondooClientReconciler) configMapForMondooDeployment(m *v1alpha1.MondooClient, name string) *corev1.ConfigMap {
+func (r *MondooClientReconciler) configMapForMondooDeployment(m *v1alpha1.MondooClient, name string, defaultInventory string) *corev1.ConfigMap {
 	var inventory string
 	if m.Data.Kubeapi.Inventory == "" {
-		inventory = defaultInventoryNodes
+		inventory = defaultInventory
 	} else {
 		inventory = m.Data.Kubeapi.Inventory
 	}

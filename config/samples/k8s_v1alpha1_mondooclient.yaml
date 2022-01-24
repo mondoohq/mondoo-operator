@@ -5,47 +5,24 @@ metadata:
   namespace: mondoo-operator-system
 data:
   credentials: |
-    mrn: //agents.api.mondoo.app/spaces/adoring-euler-695715/serviceaccounts/2406jMO20XZXtB0IhipFI5PsiUf
+    mrn: //agents.api.mondoo.app/spaces/adoring-euler-695715/serviceaccounts/248lStErL2KGeyWKesGAhWoeKqe
     space_mrn: //captain.api.mondoo.app/spaces/adoring-euler-695715
     private_key: |
       -----BEGIN PRIVATE KEY-----
-      MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDDLCXQPmGTRZet4mlCb
+      MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDD0NsjI0mgTvLQdAaOy
       ...
-      q+8ejqd/Uj//poK/OPQb++0ycsJ5W0pTJ2tzPxptAjYRZfvuCTVY1DI=
+      N3S2hWr/y9rzIpTzuUaCxWMWXqn93ftYOvIEQxPbxsDOGhJ4H1VKWMs=
       -----END PRIVATE KEY-----
     certificate: |
       -----BEGIN CERTIFICATE-----
-      MIICWzCCAeKgAwIBAgIQLOh5KgRV6AfMzkmS8yKydDAKBggqhkjOPQQDAzA/MT0w
+      MIICXDCCAeKgAwIBAgIQNLzUrrcfuFtUjS0r/8UQrzAKBggqhkjOPQQDAzA/MT0w
       ...
-      zhyOcUGPcRwlpZ77o5HzEN/ov40nULXREIRNweICMGLeF6AYrtYSZFvmSfKGpM31
-      kqgJMMCH8mR8fY16KRDZwi8C9n/Tm7A9GT//UK8FLA==
+      OelzFcex98y0h30j+AOrtddT1N7wlHcTqT2rTAMCMQD34a/NVb+RjE/DuvvfHybR
+      1c4SCS9tImUwLKJXHMNd9oL5HVRKUMqDoNSL7dK/VPw=
       -----END CERTIFICATE-----
     api_endpoint: https://api.mondoo.app
   kubenodes:
-    inventory: |
-      apiVersion: v1
-      kind: Inventory
-      metadata:
-        name: mondoo-k8s-inventory
-        labels:
-          environment: production
-      spec:
-        assets:
-          - id: host
-            connections:
-              - host: /mnt/host
-                backend: fs
+    inventory: ""
   kubeapi:
-    inventory: |
-      apiVersion: v1
-      kind: Inventory
-      metadata:
-        name: mondoo-k8s-inventory
-        labels:
-          environment: production
-      spec:
-        assets:
-          - id: api
-            connections:
-              - backend: k8s
+    inventory: ""
 
