@@ -68,6 +68,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Fetch the Mondoo instance
 	mondoo := &v1alpha1.MondooClient{}
+
 	err := r.Get(ctx, req.NamespacedName, mondoo)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -81,6 +82,8 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Error(err, "Failed to get mondoo")
 		return ctrl.Result{}, err
 	}
+	inventoryDaemonSet := mondoo.Name + "-ds"
+	inventoryDeployment := mondoo.Name + "-deploy"
 	// Check if the Credential Secret already exists, if not create a new one
 	foundSecret := &corev1.Secret{}
 	err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, foundSecret)
@@ -104,15 +107,15 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		// Check if the Inventory Config already exists, if not create a new one
 		foundConfigMap := &corev1.ConfigMap{}
-		err = r.Get(ctx, types.NamespacedName{Name: "cm-mondoo-ds", Namespace: mondoo.Namespace}, foundConfigMap)
+		err = r.Get(ctx, types.NamespacedName{Name: inventoryDaemonSet, Namespace: mondoo.Namespace}, foundConfigMap)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new configmap
-			dep := r.configMapForMondooDaemonSet(mondoo)
-			log.Info("Creating a new configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", "cm-mondoo-ds")
+			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet)
+			log.Info("Creating a new configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDaemonSet)
 
 			err = r.Create(ctx, dep)
 			if err != nil {
-				log.Error(err, "Failed to create new Configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", "cm-mondoo-ds")
+				log.Error(err, "Failed to create new Configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDaemonSet)
 				return ctrl.Result{}, err
 			}
 			// configmap created successfully - return and requeue
@@ -127,7 +130,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, found)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new daemonset
-			dep := r.deamonsetForMondoo(mondoo)
+			dep := r.deamonsetForMondoo(mondoo, inventoryDaemonSet)
 			log.Info("Creating a new Daemonset", "Daemonset.Namespace", dep.Namespace, "Daemonset.Name", dep.Name)
 			err = r.Create(ctx, dep)
 			if err != nil {
@@ -145,11 +148,11 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if !mondoo.Data.Kubeapi.Disabled {
 		// Check if the Inventory Config already exists, if not create a new one
 		foundConfigMap := &corev1.ConfigMap{}
-		err = r.Get(ctx, types.NamespacedName{Name: "cm-mondoo-dep", Namespace: mondoo.Namespace}, foundConfigMap)
+		err = r.Get(ctx, types.NamespacedName{Name: inventoryDeployment, Namespace: mondoo.Namespace}, foundConfigMap)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new secret
-			dep := r.configMapForMondooDeployment(mondoo)
-			log.Info("Creating a new configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", "cm-mondoo-dep")
+			dep := r.configMapForMondooDeployment(mondoo, inventoryDeployment)
+			log.Info("Creating a new configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDeployment)
 
 			err = r.Create(ctx, dep)
 			if err != nil {
@@ -224,7 +227,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, found)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new Deployment
-			dep := r.deploymentForMondoo(mondoo)
+			dep := r.deploymentForMondoo(mondoo, inventoryDeployment)
 			log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 			err = r.Create(ctx, dep)
 			if err != nil {
@@ -266,7 +269,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 // deamonsetForMondoo returns a  Daemonset object
-func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient) *appsv1.DaemonSet {
+func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient, cmName string) *appsv1.DaemonSet {
 	ls := labelsForMondoo(m.Name)
 	dep := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -331,7 +334,7 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient) *a
 										{
 											ConfigMap: &corev1.ConfigMapProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: "cm-mondoo-ds",
+													Name: cmName,
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "inventory",
@@ -365,7 +368,7 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient) *a
 }
 
 // deploymentForMondoo returns a Deployment object
-func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient) *appsv1.Deployment {
+func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, cmName string) *appsv1.Deployment {
 	ls := labelsForMondoo(m.Name)
 	var replicas int32
 	if m.Data.Kubeapi.Replicas == 0 {
@@ -440,7 +443,7 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient) *
 										{
 											ConfigMap: &corev1.ConfigMapProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: "cm-mondoo-dep",
+													Name: cmName,
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "inventory",
@@ -503,7 +506,7 @@ func (r *MondooClientReconciler) secretForMondoo(m *v1alpha1.MondooClient) *core
 	return dep
 }
 
-func (r *MondooClientReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooClient) *corev1.ConfigMap {
+func (r *MondooClientReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooClient, name string) *corev1.ConfigMap {
 	var inventory string
 	if m.Data.KubeNodes.Inventory == "" {
 		inventory = defaultInventoryNodes
@@ -512,7 +515,7 @@ func (r *MondooClientReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooC
 	}
 	dep := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cm-mondoo-ds",
+			Name:      name,
 			Namespace: m.Namespace,
 		},
 		Data: map[string]string{
@@ -524,7 +527,7 @@ func (r *MondooClientReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooC
 
 	return dep
 }
-func (r *MondooClientReconciler) configMapForMondooDeployment(m *v1alpha1.MondooClient) *corev1.ConfigMap {
+func (r *MondooClientReconciler) configMapForMondooDeployment(m *v1alpha1.MondooClient, name string) *corev1.ConfigMap {
 	var inventory string
 	if m.Data.Kubeapi.Inventory == "" {
 		inventory = defaultInventoryNodes
@@ -533,7 +536,7 @@ func (r *MondooClientReconciler) configMapForMondooDeployment(m *v1alpha1.Mondoo
 	}
 	dep := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cm-mondoo-dep",
+			Name:      name,
 			Namespace: m.Namespace,
 		},
 		Data: map[string]string{
