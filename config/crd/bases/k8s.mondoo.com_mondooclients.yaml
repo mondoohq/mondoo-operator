@@ -29,12 +29,29 @@ spec:
           data:
             description: MondooClientSpec defines the desired state of MondooClient
             properties:
-              config:
+              credentials:
                 description: Config is an example field of MondooClient. Edit mondooclient_types.go
                   to remove/update
                 type: string
-              inventory:
-                type: string
+              kubeapi:
+                properties:
+                  disabled:
+                    type: boolean
+                  inventory:
+                    type: string
+                  replicas:
+                    format: int32
+                    type: integer
+                type: object
+              kubenodes:
+                properties:
+                  disabled:
+                    type: boolean
+                  inventory:
+                    type: string
+                type: object
+            required:
+            - credentials
             type: object
           kind:
             description: 'Kind is a string value representing the REST resource this
