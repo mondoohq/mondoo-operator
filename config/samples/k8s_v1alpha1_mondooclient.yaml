@@ -4,23 +4,6 @@ metadata:
   name: mondoo-client
   namespace: mondoo-operator-system
 data:
-  credentials: |
-    mrn: //agents.api.mondoo.app/spaces/adoring-euler-695715/serviceaccounts/2406jMO20XZXtB0IhipFI5PsiUf
-    space_mrn: //captain.api.mondoo.app/spaces/adoring-euler-695715
-    private_key: |
-      -----BEGIN PRIVATE KEY-----
-      MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDDLCXQPmGTRZet4mlCb
-      ...
-      q+8ejqd/Uj//poK/OPQb++0ycsJ5W0pTJ2tzPxptAjYRZfvuCTVY1DI=
-      -----END PRIVATE KEY-----
-    certificate: |
-      -----BEGIN CERTIFICATE-----
-      MIICWzCCAeKgAwIBAgIQLOh5KgRV6AfMzkmS8yKydDAKBggqhkjOPQQDAzA/MT0w
-      ...
-      zhyOcUGPcRwlpZ77o5HzEN/ov40nULXREIRNweICMGLeF6AYrtYSZFvmSfKGpM31
-      kqgJMMCH8mR8fY16KRDZwi8C9n/Tm7A9GT//UK8FLA==
-      -----END CERTIFICATE-----
-    api_endpoint: https://api.mondoo.app
   kubeapi:
     enable: true
   kubenodes:

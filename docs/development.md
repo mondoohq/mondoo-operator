@@ -35,8 +35,8 @@ make deploy
 Now, we completed the setup for the operator. To start the service, we need to configure the client:
 
 1. Download service account from mondooo
-2. Convert json to yaml via `yq e -P creds.json`
-3. Update the `config/samples/k8s_v1alpha1_mondooclient.yaml` with the credentials
+2. Convert json to yaml via `yq e -P creds.json > creds.yml`
+3. Store service account as a secret in the mondoo namespace via `kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yml`
 
 Then apply the configuration:
 

@@ -29,9 +29,8 @@ type MondooClientData struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Config is an example field of MondooClient. Edit mondooclient_types.go to remove/update
-	Credentials string    `json:"credentials"`
-	KubeNodes   KubeNodes `json:"kubenodes,omitempty"`
-	Kubeapi     Kubeapi   `json:"kubeapi,omitempty"`
+	KubeNodes KubeNodes `json:"kubenodes,omitempty"`
+	Kubeapi   Kubeapi   `json:"kubeapi,omitempty"`
 }
 type KubeNodes struct {
 	Enable    bool   `json:"enable,omitempty"`
