@@ -449,7 +449,7 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, c
 													Name: m.Name,
 												},
 												Items: []corev1.KeyToPath{{
-													Key:  "mondoo-credentials",
+													Key:  "config",
 													Path: "mondoo/mondoo.yml",
 												}},
 											},
