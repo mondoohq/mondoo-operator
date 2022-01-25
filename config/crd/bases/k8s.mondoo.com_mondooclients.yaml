@@ -35,7 +35,7 @@ spec:
                 type: string
               kubeapi:
                 properties:
-                  disabled:
+                  enable:
                     type: boolean
                   inventory:
                     type: string
@@ -45,7 +45,7 @@ spec:
                 type: object
               kubenodes:
                 properties:
-                  disabled:
+                  enable:
                     type: boolean
                   inventory:
                     type: string

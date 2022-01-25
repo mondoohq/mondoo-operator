@@ -34,12 +34,12 @@ type MondooClientData struct {
 	Kubeapi     Kubeapi   `json:"kubeapi,omitempty"`
 }
 type KubeNodes struct {
-	Disabled  bool   `json:"disabled,omitempty"`
+	Enable    bool   `json:"enable,omitempty"`
 	Inventory string `json:"inventory,omitempty"`
 }
 
 type Kubeapi struct {
-	Disabled  bool   `json:"disabled,omitempty"`
+	Enable    bool   `json:"enable,omitempty"`
 	Inventory string `json:"inventory,omitempty"`
 	Replicas  int32  `json:"replicas,omitempty"`
 }

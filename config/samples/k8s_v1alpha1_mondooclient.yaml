@@ -21,3 +21,7 @@ data:
       kqgJMMCH8mR8fY16KRDZwi8C9n/Tm7A9GT//UK8FLA==
       -----END CERTIFICATE-----
     api_endpoint: https://api.mondoo.app
+  kubeapi:
+    enable: true
+  kubenodes:
+    enable: true
