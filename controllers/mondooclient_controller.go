@@ -468,20 +468,7 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, c
 	return dep
 }
 
-const defaultInventoryNodes = `apiVersion: v1
-kind: Inventory
-metadata:
-	name: mondoo-k8s-inventory
-	labels:
-	  environment: production
-spec:
-	assets:
-	- id: host
-		connections:
-		- host: /mnt/host
-			backend: fs`
-
-func (r *MondooClientReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooClient, name string) *corev1.ConfigMap {
+func (r *MondooClientReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooClient, name string, defaultInventory string) *corev1.ConfigMap {
 	var inventory string
 	if m.Data.KubeNodes.Inventory == "" {
 		inventory = defaultInventory
