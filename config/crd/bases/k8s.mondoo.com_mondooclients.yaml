@@ -31,7 +31,7 @@ spec:
             properties:
               kubeapi:
                 properties:
-                  disabled:
+                  enable:
                     type: boolean
                   inventory:
                     type: string
@@ -43,7 +43,7 @@ spec:
                 description: Config is an example field of MondooClient. Edit mondooclient_types.go
                   to remove/update
                 properties:
-                  disabled:
+                  enable:
                     type: boolean
                   inventory:
                     type: string

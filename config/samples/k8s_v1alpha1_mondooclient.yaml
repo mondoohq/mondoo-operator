@@ -3,3 +3,8 @@ kind: MondooClient
 metadata:
   name: mondoo-client
   namespace: mondoo-operator-system
+data:
+  kubeapi:
+    enable: true
+  kubenodes:
+    enable: true
