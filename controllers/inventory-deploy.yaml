@@ -1,12 +1,11 @@
-inventory: |
-    apiVersion: v1
-    kind: Inventory
-    metadata:
-      name: mondoo-k8s-inventory
-      labels:
-        environment: production
-    spec:
-      assets:
-        - id: api
-          connections:
-            - backend: k8s
+apiVersion: v1
+kind: Inventory
+metadata:
+  name: mondoo-k8s-inventory
+  labels:
+    environment: production
+spec:
+  assets:
+    - id: api
+      connections:
+        - backend: k8s
