@@ -8,4 +8,4 @@ data:
     enable: true
   kubenodes:
     enable: true
-  mondoosasecret: mondoo-client
+  mondoosecretref: mondoo-client
