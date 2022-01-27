@@ -48,6 +48,10 @@ spec:
                   inventory:
                     type: string
                 type: object
+              mondoosasecret:
+                type: string
+            required:
+            - mondoosasecret
             type: object
           kind:
             description: 'Kind is a string value representing the REST resource this

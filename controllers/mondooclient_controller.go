@@ -336,7 +336,7 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient, cm
 										{
 											Secret: &corev1.SecretProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: m.Name,
+													Name: m.Data.MondooSAsecret,
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "config",
@@ -445,7 +445,7 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, c
 										{
 											Secret: &corev1.SecretProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: m.Name,
+													Name: m.Data.MondooSAsecret,
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "config",

@@ -36,7 +36,9 @@ Now, we completed the setup for the operator. To start the service, we need to c
 
 1. Download service account from mondooo
 2. Convert json to yaml via `yq e -P creds.json > creds.yml`
-3. Store service account as a secret in the mondoo namespace via `kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yml`
+3. Create namespace using `kubectl create namespace mondoo-operator-system`
+4. Store service account as a secret in the mondoo namespace via `kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yml`
+5. Update SecretName created in step 4 in the mondoo-client CRD.
 
 Then apply the configuration:
 
