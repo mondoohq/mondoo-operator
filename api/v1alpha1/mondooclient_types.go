@@ -29,19 +29,20 @@ type MondooClientData struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Config is an example field of MondooClient. Edit mondooclient_types.go to remove/update
-	KubeNodes       KubeNodes `json:"kubenodes,omitempty"`
-	Kubeapi         Kubeapi   `json:"kubeapi,omitempty"`
+	Nodes           Nodes     `json:"nodes,omitempty"`
+	Workloads       Workloads `json:"workloads,omitempty"`
 	MondooSecretRef string    `json:"mondoosecretref"`
 }
-type KubeNodes struct {
+type Nodes struct {
 	Enable    bool   `json:"enable,omitempty"`
 	Inventory string `json:"inventory,omitempty"`
 }
 
-type Kubeapi struct {
-	Enable    bool   `json:"enable,omitempty"`
-	Inventory string `json:"inventory,omitempty"`
-	Replicas  int32  `json:"replicas,omitempty"`
+type Workloads struct {
+	Enable                 bool   `json:"enable,omitempty"`
+	Inventory              string `json:"inventory,omitempty"`
+	Replicas               int32  `json:"replicas,omitempty"`
+	WorkloadServiceAccount string `json:"workloadserviceaccount,omitempty"`
 }
 
 // MondooClientStatus defines the observed state of MondooClient
