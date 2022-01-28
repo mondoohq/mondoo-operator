@@ -91,9 +91,8 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	inventoryDaemonSet := mondoo.Name + "-ds"
 	inventoryDeployment := mondoo.Name + "-deploy"
-
-	if mondoo.Data.Nodes.Enable {
-
+	switch mondoo.Data.Nodes.Enable {
+	case true:
 		// Check if the Inventory Config already exists, if not create a new one
 		foundConfigMap := &corev1.ConfigMap{}
 		err = r.Get(ctx, types.NamespacedName{Name: inventoryDaemonSet, Namespace: mondoo.Namespace}, foundConfigMap)
@@ -128,14 +127,62 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return ctrl.Result{}, err
 			}
 			// Daemonset created successfully - return and requeue
-			return ctrl.Result{Requeue: false}, nil
+			return ctrl.Result{Requeue: true}, nil
 		} else if err != nil {
 			log.Error(err, "Failed to get Daemonset")
 			return ctrl.Result{}, err
 		}
+	case false:
+		// Check if the Inventory Config already exists, if delete it
+		foundConfigMap := &corev1.ConfigMap{}
+		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      inventoryDaemonSet,
+				Namespace: mondoo.Namespace,
+			},
+		}), foundConfigMap)
+		if err != nil && errors.IsNotFound(err) {
+			return ctrl.Result{Requeue: true}, nil
+		} else if err == nil {
+			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet, string(dsInventoryyaml))
+			err = r.Delete(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to delete Configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDaemonSet)
+				return ctrl.Result{}, err
+			}
+			// configmap deleted successfully - return and requeue
+		} else if err != nil {
+			log.Error(err, "Failed to get Configmap")
+			return ctrl.Result{}, err
+		}
 
+		// Check if the daemonset already exists, if remove it
+		found := &appsv1.DaemonSet{}
+		err = r.Get(ctx, client.ObjectKeyFromObject(&appsv1.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mondoo.Name,
+				Namespace: mondoo.Namespace,
+			},
+		}), found)
+		if err != nil && errors.IsNotFound(err) {
+			return ctrl.Result{Requeue: true}, nil
+		} else if err == nil {
+			dep := r.deamonsetForMondoo(mondoo, inventoryDaemonSet)
+			err = r.Delete(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to delete Daemonset", "Daemonset.Namespace", dep.Namespace, "Daemonset.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Daemonset deleted successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Daemonset")
+			return ctrl.Result{}, err
+		}
 	}
-	if mondoo.Data.Workloads.Enable {
+
+	switch mondoo.Data.Workloads.Enable {
+	case true:
 		// Check if the Inventory Config already exists, if not create a new one
 		foundConfigMap := &corev1.ConfigMap{}
 		err = r.Get(ctx, types.NamespacedName{Name: inventoryDeployment, Namespace: mondoo.Namespace}, foundConfigMap)
@@ -168,6 +215,53 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return ctrl.Result{}, err
 			}
 			// Deployment created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Deployment")
+			return ctrl.Result{}, err
+		}
+	case false:
+		// Check if the Inventory Config already exists, if delete it
+		foundConfigMap := &corev1.ConfigMap{}
+		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      inventoryDeployment,
+				Namespace: mondoo.Namespace,
+			},
+		}), foundConfigMap)
+		if err != nil && errors.IsNotFound(err) {
+			return ctrl.Result{Requeue: true}, nil
+		} else if err == nil {
+			dep := r.configMapForMondooDeployment(mondoo, inventoryDeployment, string(deployInventoryyaml))
+			err = r.Delete(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to delete Configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDaemonSet)
+				return ctrl.Result{}, err
+			}
+			// configmap deleted successfully - return and requeue
+		} else if err != nil {
+			log.Error(err, "Failed to get Configmap")
+			return ctrl.Result{}, err
+		}
+
+		// Check if the daemonset already exists, if remove it
+		found := &appsv1.Deployment{}
+		err = r.Get(ctx, client.ObjectKeyFromObject(&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mondoo.Name,
+				Namespace: mondoo.Namespace,
+			},
+		}), found)
+		if err != nil && errors.IsNotFound(err) {
+			return ctrl.Result{Requeue: true}, nil
+		} else if err == nil {
+			dep := r.deploymentForMondoo(mondoo, inventoryDeployment)
+			err = r.Delete(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to delete Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Daemonset deleted successfully - return and requeue
 			return ctrl.Result{Requeue: true}, nil
 		} else if err != nil {
 			log.Error(err, "Failed to get Deployment")
