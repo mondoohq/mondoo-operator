@@ -4,8 +4,10 @@ metadata:
   name: mondoo-client
   namespace: mondoo-operator-system
 data:
-  kubeapi:
+  workloads:
     enable: true
-  kubenodes:
+    workloadserviceaccount: mondoo-operator-workload
+  nodes:
     enable: true
   mondoosecretref: mondoo-client
+  

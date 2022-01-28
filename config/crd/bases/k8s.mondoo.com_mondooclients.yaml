@@ -29,17 +29,9 @@ spec:
           data:
             description: MondooClientSpec defines the desired state of MondooClient
             properties:
-              kubeapi:
-                properties:
-                  enable:
-                    type: boolean
-                  inventory:
-                    type: string
-                  replicas:
-                    format: int32
-                    type: integer
-                type: object
-              kubenodes:
+              mondoosecretref:
+                type: string
+              nodes:
                 description: Config is an example field of MondooClient. Edit mondooclient_types.go
                   to remove/update
                 properties:
@@ -48,8 +40,18 @@ spec:
                   inventory:
                     type: string
                 type: object
-              mondoosecretref:
-                type: string
+              workloads:
+                properties:
+                  enable:
+                    type: boolean
+                  inventory:
+                    type: string
+                  replicas:
+                    format: int32
+                    type: integer
+                  workloadserviceaccount:
+                    type: string
+                type: object
             required:
             - mondoosecretref
             type: object
