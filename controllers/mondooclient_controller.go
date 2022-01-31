@@ -92,7 +92,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	inventoryDaemonSet := mondoo.Name + "-ds"
 	inventoryDeployment := mondoo.Name + "-deploy"
 
-	if mondoo.Data.Nodes.Enable == true {
+	if mondoo.Data.Nodes.Enable {
 
 		// Check if the Inventory Config already exists, if not create a new one
 		foundConfigMap := &corev1.ConfigMap{}
@@ -133,7 +133,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Error(err, "Failed to get Daemonset")
 			return ctrl.Result{}, err
 		}
-	} else if mondoo.Data.Nodes.Enable != true {
+	} else {
 		// Check if the Inventory Config already exists, if delete it
 		foundConfigMap := &corev1.ConfigMap{}
 		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
@@ -182,7 +182,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	if mondoo.Data.Workloads.Enable == true {
+	if mondoo.Data.Workloads.Enable {
 		// Check if the Inventory Config already exists, if not create a new one
 		foundConfigMap := &corev1.ConfigMap{}
 		err = r.Get(ctx, types.NamespacedName{Name: inventoryDeployment, Namespace: mondoo.Namespace}, foundConfigMap)
@@ -220,7 +220,19 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Error(err, "Failed to get Deployment")
 			return ctrl.Result{}, err
 		}
-	} else if mondoo.Data.Workloads.Enable != true {
+		// Ensure the deployment size is the same as the spec
+		size := mondoo.Data.Workloads.Replicas
+		if *found.Spec.Replicas != size {
+			found.Spec.Replicas = &size
+			err = r.Update(ctx, found)
+			if err != nil {
+				log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+				return ctrl.Result{}, err
+			}
+			// Spec updated - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		}
+	} else {
 		// Check if the Inventory Config already exists, if delete it
 		foundConfigMap := &corev1.ConfigMap{}
 		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
