@@ -91,8 +91,9 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	inventoryDaemonSet := mondoo.Name + "-ds"
 	inventoryDeployment := mondoo.Name + "-deploy"
-	switch mondoo.Data.Nodes.Enable {
-	case true:
+
+	if mondoo.Data.Nodes.Enable == true {
+
 		// Check if the Inventory Config already exists, if not create a new one
 		foundConfigMap := &corev1.ConfigMap{}
 		err = r.Get(ctx, types.NamespacedName{Name: inventoryDaemonSet, Namespace: mondoo.Namespace}, foundConfigMap)
@@ -132,7 +133,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Error(err, "Failed to get Daemonset")
 			return ctrl.Result{}, err
 		}
-	case false:
+	} else if mondoo.Data.Nodes.Enable != true {
 		// Check if the Inventory Config already exists, if delete it
 		foundConfigMap := &corev1.ConfigMap{}
 		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
@@ -181,8 +182,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	switch mondoo.Data.Workloads.Enable {
-	case true:
+	if mondoo.Data.Workloads.Enable == true {
 		// Check if the Inventory Config already exists, if not create a new one
 		foundConfigMap := &corev1.ConfigMap{}
 		err = r.Get(ctx, types.NamespacedName{Name: inventoryDeployment, Namespace: mondoo.Namespace}, foundConfigMap)
@@ -220,7 +220,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Error(err, "Failed to get Deployment")
 			return ctrl.Result{}, err
 		}
-	case false:
+	} else if mondoo.Data.Workloads.Enable != true {
 		// Check if the Inventory Config already exists, if delete it
 		foundConfigMap := &corev1.ConfigMap{}
 		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
