@@ -102,7 +102,6 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				Namespace: mondoo.Namespace,
 			},
 		}), foundConfigMap)
-		err = r.Get(ctx, types.NamespacedName{Name: inventoryDaemonSet, Namespace: mondoo.Namespace}, foundConfigMap)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new configmap
 			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet, string(dsInventoryyaml))
@@ -140,17 +139,20 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				"kubectl.kubernetes.io/restartedAt": metav1.Time{Time: time.Now()}.String(),
 			}
 
-			if found.Spec.Template.ObjectMeta.Annotations == nil {
+			if found.Spec.Template.ObjectMeta.Annotations == nil && foundConfigMap.Data["inventory"] != "" {
 				found.Spec.Template.ObjectMeta.Annotations = annotation
-				r.Update(ctx, found)
-			} else {
+				err = r.Update(ctx, found)
+				if err != nil {
+					log.Error(err, "failed to restart daemonset", "Daemonset.Namespace", dep.Namespace, "Dameonset.Name", inventoryDaemonSet)
+					return ctrl.Result{}, err
+				}
+			} else if found.Spec.Template.ObjectMeta.Annotations != nil {
 				found.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = metav1.Time{Time: time.Now()}.String()
-				r.Update(ctx, found)
-			}
-
-			if err != nil {
-				log.Error(err, "Failed to restart daemonset", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDaemonSet)
-				return ctrl.Result{}, err
+				err = r.Update(ctx, found)
+				if err != nil {
+					log.Error(err, "failed to restart daemonset", "Daemonset.Namespace", dep.Namespace, "Dameonset.Name", inventoryDaemonSet)
+					return ctrl.Result{}, err
+				}
 			}
 
 		} else if err != nil {
