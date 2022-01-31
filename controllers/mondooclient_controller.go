@@ -293,7 +293,11 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 	podNames := getPodNames(podList.Items)
-	_ = r.Get(ctx, req.NamespacedName, mondoo)
+	err = r.Get(ctx, req.NamespacedName, mondoo)
+	if err != nil {
+		log.Error(err, "Failed to get mondoo")
+		return ctrl.Result{}, err
+	}
 	// Update status.Nodes if needed
 	if !reflect.DeepEqual(podNames, mondoo.Status.Nodes) {
 		mondoo.Status.Nodes = podNames
