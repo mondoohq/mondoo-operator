@@ -3,10 +3,7 @@ on:
   pull_request:
   push:
     branches:
-      - 'release-*'
-      - 'master'
       - 'main'
-      - 'unit-test'
     tags:
       - 'v*'
 jobs:
