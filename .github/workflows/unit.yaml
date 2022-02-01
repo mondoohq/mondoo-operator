@@ -1,0 +1,23 @@
+name: unit
+on:
+  pull_request:
+  push:
+    branches:
+      - 'release-*'
+      - 'master'
+      - 'main'
+      - 'unit-test'
+    tags:
+      - 'v*'
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    name: Unit tests
+    steps:
+    - uses: actions/checkout@v2
+    - name: Import environment variables from file
+      run: cat ".github/env" >> $GITHUB_ENV
+    - uses: actions/setup-go@v2
+      with:
+        go-version: '${{ env.golang-version }}'
+    - run: make test
