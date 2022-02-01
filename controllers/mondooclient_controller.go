@@ -347,9 +347,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				Namespace: mondoo.Namespace,
 			},
 		}), foundConfigMap)
-		if err != nil && errors.IsNotFound(err) {
-			return ctrl.Result{Requeue: true}, nil
-		} else if err == nil {
+		if err == nil {
 			dep := r.configMapForMondooDeployment(mondoo, inventoryDeployment, string(deployInventoryyaml))
 			err = r.Delete(ctx, dep)
 			if err != nil {
@@ -359,7 +357,6 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			// configmap deleted successfully - return and requeue
 		} else if err != nil {
 			log.Error(err, "Failed to get Configmap")
-			return ctrl.Result{}, err
 		}
 
 		// Check if the deployment already exists, if remove it
@@ -371,9 +368,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			},
 		}), found)
 
-		if err != nil && errors.IsNotFound(err) {
-			return ctrl.Result{Requeue: true}, nil
-		} else if err == nil {
+		if err == nil {
 			dep := r.deploymentForMondoo(mondoo, inventoryDeployment)
 			err = r.Delete(ctx, dep)
 			if err != nil {
@@ -384,7 +379,6 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{Requeue: true}, nil
 		} else if err != nil {
 			log.Error(err, "Failed to get Deployment")
-			return ctrl.Result{}, err
 		}
 	}
 
