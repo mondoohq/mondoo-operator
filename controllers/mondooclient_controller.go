@@ -114,11 +114,10 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return ctrl.Result{}, err
 			}
 			// configmap created successfully - return and requeue
-		} else if err == nil && mondoo.Data.Nodes.Inventory != foundConfigMap.Data["inventory"] {
+		} else if err == nil && mondoo.Data.Nodes.Inventory != foundConfigMap.Data["inventory"] && mondoo.Data.Nodes.Inventory != "" {
 			// Define a new configmap
 			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet, string(dsInventoryyaml))
-
-			log.Info("Updating configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDaemonSet)
+			log.Info("Updating configmap", "ConfigMap.Data.inventory", dep.Data["inventory"], "ConfigMap.Name", inventoryDaemonSet)
 
 			err = r.Update(ctx, dep)
 
