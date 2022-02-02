@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - 'main'
-      - 'e2etests'
     tags:
       - 'v*'
 jobs:
@@ -19,25 +18,21 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: '${{ env.golang-version }}'
-    # - name: Start minikube
-    #   uses: medyagh/setup-minikube@master
-    # - name: Try the cluster !
-    #   run: kubectl get pods -A
-    # - name: Build image
-    #   run: |
-    #     export SHELL=/bin/bash
-    #     eval $(minikube -p minikube docker-env)
-    #     make docker-build
-    #     echo -n "verifying images:"
-    #     docker images        
-    # - name: Deploy to minikube
-    #   run: |
-    #     make deploy
-    #     echo ${{ secrets.MONDOO_CLIENT }} > creds.yml
-    #     kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yml
-    #     kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
-    #     kubectl get namespace mondoo-operator-system -o yaml
-    #     kubectl get pods -A 
+    - name: Start minikube
+      uses: medyagh/setup-minikube@master
+    - name: Try the cluster !
+      run: kubectl get pods -A
+    - name: Build image
+      run: |
+        export SHELL=/bin/bash
+        eval $(minikube -p minikube docker-env)
+        make docker-build       
+    - name: Deploy to minikube
+      run: |
+        make deploy
+        echo ${{ secrets.MONDOO_CLIENT }} > creds.yml
+        kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yml
+        kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
     - name: Verify a Kubernetes Application
       run: |
         curl -sSL http://mondoo.io/download.sh | bash
