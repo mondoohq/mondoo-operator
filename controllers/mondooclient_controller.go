@@ -134,24 +134,26 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				},
 			}), found)
 
-			annotation := map[string]string{
-				"kubectl.kubernetes.io/restartedAt": metav1.Time{Time: time.Now()}.String(),
+			if err != nil {
+				log.Error(err, "failed to get daemonset", "Daemonset.Namespace", dep.Namespace, "Daemeonset.Name", inventoryDaemonSet)
+				return ctrl.Result{}, err
 			}
 
-			if found.Spec.Template.ObjectMeta.Annotations == nil && foundConfigMap.Data["inventory"] != "" {
-				found.Spec.Template.ObjectMeta.Annotations = annotation
-				err = r.Update(ctx, found)
-				if err != nil {
-					log.Error(err, "failed to restart daemonset", "Daemonset.Namespace", dep.Namespace, "Dameonset.Name", inventoryDaemonSet)
-					return ctrl.Result{}, err
+			// when objects are first created annotations are nil and we need to pass a initialized map
+			// after we can just update the proper key
+			if found.Spec.Template.ObjectMeta.Annotations == nil {
+				annotation := map[string]string{
+					"kubectl.kubernetes.io/restartedAt": metav1.Time{Time: time.Now()}.String(),
 				}
+
+				found.Spec.Template.ObjectMeta.Annotations = annotation
 			} else if found.Spec.Template.ObjectMeta.Annotations != nil {
 				found.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = metav1.Time{Time: time.Now()}.String()
-				err = r.Update(ctx, found)
-				if err != nil {
-					log.Error(err, "failed to restart daemonset", "Daemonset.Namespace", dep.Namespace, "Dameonset.Name", inventoryDaemonSet)
-					return ctrl.Result{}, err
-				}
+			}
+			err = r.Update(ctx, found)
+			if err != nil {
+				log.Error(err, "failed to restart daemonset", "Daemonset.Namespace", dep.Namespace, "Dameonset.Name", inventoryDaemonSet)
+				return ctrl.Result{}, err
 			}
 
 		} else if err == nil && mondoo.Data.Nodes.Inventory == "" {
@@ -182,7 +184,6 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return ctrl.Result{}, err
 			}
 			// Daemonset created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
 		} else if err != nil {
 			log.Error(err, "Failed to get Daemonset")
 			return ctrl.Result{}, err
@@ -271,24 +272,24 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				},
 			}), found)
 
-			annotation := map[string]string{
-				"kubectl.kubernetes.io/restartedAt": metav1.Time{Time: time.Now()}.String(),
+			if err != nil {
+				log.Error(err, "failed to get Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", inventoryDeployment)
+				return ctrl.Result{}, err
 			}
 
-			if found.Spec.Template.ObjectMeta.Annotations == nil && foundConfigMap.Data["inventory"] != "" {
-				found.Spec.Template.ObjectMeta.Annotations = annotation
-				err = r.Update(ctx, found)
-				if err != nil {
-					log.Error(err, "failed to restart deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", mondoo.Name)
-					return ctrl.Result{}, err
+			if found.Spec.Template.ObjectMeta.Annotations == nil {
+				annotation := map[string]string{
+					"kubectl.kubernetes.io/restartedAt": metav1.Time{Time: time.Now()}.String(),
 				}
+
+				found.Spec.Template.ObjectMeta.Annotations = annotation
 			} else if found.Spec.Template.ObjectMeta.Annotations != nil {
 				found.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = metav1.Time{Time: time.Now()}.String()
-				err = r.Update(ctx, found)
-				if err != nil {
-					log.Error(err, "failed to restart daemonset", "Deployment.Namespace", dep.Namespace, "Deployment.Name", mondoo.Name)
-					return ctrl.Result{}, err
-				}
+			}
+			err = r.Update(ctx, found)
+			if err != nil {
+				log.Error(err, "failed to restart Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", inventoryDeployment)
+				return ctrl.Result{}, err
 			}
 
 		} else if err == nil && mondoo.Data.Workloads.Inventory == "" {
