@@ -156,6 +156,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return ctrl.Result{}, err
 			}
 
+			// this handles the case when the user switches back to default inventory
 		} else if err == nil && mondoo.Data.Nodes.Inventory == "" {
 			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet, string(dsInventoryyaml))
 
