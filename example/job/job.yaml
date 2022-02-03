@@ -14,9 +14,9 @@ spec:
               "mondoo",
               "scan",
               "--inventory",
-              "/etc/opt/mondoo/inventory.yaml",
+              "/etc/opt/mondoo/inventory.yml",
               "--config",
-              "/etc/opt/mondoo/mondoo.yaml",
+              "/etc/opt/mondoo/mondoo.yml",
               "--exit-0-on-success",
             ]
           volumeMounts:
@@ -44,9 +44,9 @@ spec:
                   name: mondoo-credentials
                   items:
                     - key: config
-                      path: mondoo/mondoo.yaml
+                      path: mondoo/mondoo.yml
               - configMap:
                   name: mondoo-job-inventory
                   items:
                     - key: inventory
-                      path: mondoo/inventory.yaml
+                      path: mondoo/inventory.yml

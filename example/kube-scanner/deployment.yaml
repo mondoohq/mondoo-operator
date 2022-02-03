@@ -20,7 +20,7 @@ spec:
       containers:
         - name: mondoo-agent
           image: docker.io/mondoolabs/mondoo:latest
-          command: ["mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yaml"]
+          command: ["mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"]
           volumeMounts:
             - name: root
               mountPath: /mnt/host/
@@ -46,9 +46,9 @@ spec:
                   name: mondoo-credentials
                   items:
                     - key: config
-                      path: mondoo/mondoo.yaml
+                      path: mondoo/mondoo.yml
               - configMap:
                   name: mondoo-kube-inventory
                   items:
                     - key: inventory
-                      path: mondoo/inventory.yaml
+                      path: mondoo/inventory.yml
