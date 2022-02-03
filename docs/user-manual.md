@@ -6,16 +6,52 @@ The following steps sets up the mondoo operator using kubectl and a manifest fil
 
 - kubectl with admin role
 
-1. Download service account from mondooo
-2. Convert json to yaml via `yq e -P creds.json > creds.yaml`
-3. Create namespace using `kubectl create namespace mondoo-operator-system`
-4. Store service account as a secret in the mondoo namespace via `kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml`
-
 ## Deployment of Operator using Manifests
 
 ```bash
 IMG=mondoolabs/mondoo-operator:latest make deploy-yaml
 kubectl apply -f mondoo-operator-manifests.yaml 
+```
+
+Next we configure the Mondoo secret:
+
+1. Download service account from [Mondooo](https://mondoo.com)
+2. Convert json to yaml via:
+
+```bash
+yq e -P creds.json > creds.yaml
+```
+
+3. Store service account as a secret in the mondoo namespace via:
+
+```bash
+kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
+```
+
+Once the secret is configure, we configure the operator to define the scan targets:
+
+1. Create `mondoo-config.yaml`
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha1
+kind: MondooClient
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator-system
+data:
+  workloads:
+    enable: true
+    workloadserviceaccount: mondoo-operator-workload
+    replicas: 2
+  nodes:
+    enable: true
+  mondoosecretref: mondoo-client
+```
+
+5. Apply the configuration via:
+
+```bash
+kubectl apply -f mondoo-config.yaml 
 ```
 
 ## FAQ
