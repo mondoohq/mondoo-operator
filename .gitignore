@@ -26,3 +26,5 @@ testbin/*
 
 #MondooCreds
 creds.json
+creds.yaml
+mondoo-operator-manifests.yaml

@@ -1,4 +1,4 @@
-name: unit
+name: generate-manifests
 on:
   pull_request:
   push:
@@ -7,9 +7,11 @@ on:
     tags:
       - "v*"
 jobs:
-  unit-tests:
+  generate-manifests:
     runs-on: ubuntu-latest
-    name: Unit tests
+    name: Generate manifests
+    env:
+      IMG_DOCKERHUB: docker.io/mondoolabs/mondoo-operator:latest
     steps:
       - uses: actions/checkout@v2
       - name: Import environment variables from file
@@ -17,4 +19,4 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: "${{ env.golang-version }}"
-      - run: make test
+      - run: make deploy-yaml
