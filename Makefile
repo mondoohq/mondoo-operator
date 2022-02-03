@@ -114,7 +114,7 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
-deploy-yml: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy-yml: manifests kustomize ## As deploy without kubectl apply, but a pipe into a yml file
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > mondoo-operator-manifests.yml
 
