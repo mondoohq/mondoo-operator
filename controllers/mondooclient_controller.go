@@ -20,6 +20,7 @@ import (
 	"context"
 	_ "embed"
 	"reflect"
+	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -93,10 +94,14 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	inventoryDeployment := mondoo.Name + "-deploy"
 
 	if mondoo.Data.Nodes.Enable {
-
-		// Check if the Inventory Config already exists, if not create a new one
+		// Check if the Inventory Config already exists, if not create a new one, if it does reconcile with CRD
 		foundConfigMap := &corev1.ConfigMap{}
-		err = r.Get(ctx, types.NamespacedName{Name: inventoryDaemonSet, Namespace: mondoo.Namespace}, foundConfigMap)
+		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      inventoryDaemonSet,
+				Namespace: mondoo.Namespace,
+			},
+		}), foundConfigMap)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new configmap
 			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet, string(dsInventoryyaml))
@@ -109,7 +114,59 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return ctrl.Result{}, err
 			}
 			// configmap created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
+		} else if err == nil && mondoo.Data.Nodes.Inventory != foundConfigMap.Data["inventory"] && mondoo.Data.Nodes.Inventory != "" {
+			// Define a new configmap
+			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet, string(dsInventoryyaml))
+			log.Info("Updating configmap", "ConfigMap.Data.inventory", dep.Data["inventory"], "ConfigMap.Name", inventoryDaemonSet)
+
+			err = r.Update(ctx, dep)
+
+			if err != nil {
+				log.Error(err, "Failed to update Configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDaemonSet)
+				return ctrl.Result{}, err
+			}
+
+			found := &appsv1.DaemonSet{}
+			err = r.Get(ctx, client.ObjectKeyFromObject(&appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      mondoo.Name,
+					Namespace: mondoo.Namespace,
+				},
+			}), found)
+
+			if err != nil {
+				log.Error(err, "failed to get daemonset", "Daemonset.Namespace", dep.Namespace, "Daemeonset.Name", inventoryDaemonSet)
+				return ctrl.Result{}, err
+			}
+
+			// when objects are first created annotations are nil and we need to pass a initialized map
+			// after we can just update the proper key
+			if found.Spec.Template.ObjectMeta.Annotations == nil {
+				annotation := map[string]string{
+					"kubectl.kubernetes.io/restartedAt": metav1.Time{Time: time.Now()}.String(),
+				}
+
+				found.Spec.Template.ObjectMeta.Annotations = annotation
+			} else if found.Spec.Template.ObjectMeta.Annotations != nil {
+				found.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = metav1.Time{Time: time.Now()}.String()
+			}
+			err = r.Update(ctx, found)
+			if err != nil {
+				log.Error(err, "failed to restart daemonset", "Daemonset.Namespace", dep.Namespace, "Dameonset.Name", inventoryDaemonSet)
+				return ctrl.Result{}, err
+			}
+
+			// this handles the case when the user switches back to default inventory
+		} else if err == nil && mondoo.Data.Nodes.Inventory == "" {
+			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet, string(dsInventoryyaml))
+
+			log.Info("Creating a new configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDaemonSet)
+
+			err = r.Update(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDaemonSet)
+				return ctrl.Result{}, err
+			}
 		} else if err != nil {
 			log.Error(err, "Failed to get Configmap")
 			return ctrl.Result{}, err
@@ -128,17 +185,63 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return ctrl.Result{}, err
 			}
 			// Daemonset created successfully - return and requeue
-			return ctrl.Result{Requeue: false}, nil
 		} else if err != nil {
 			log.Error(err, "Failed to get Daemonset")
 			return ctrl.Result{}, err
 		}
-
-	}
-	if mondoo.Data.Workloads.Enable {
-		// Check if the Inventory Config already exists, if not create a new one
+	} else {
+		// Check if the Inventory Config already exists, if delete it
 		foundConfigMap := &corev1.ConfigMap{}
-		err = r.Get(ctx, types.NamespacedName{Name: inventoryDeployment, Namespace: mondoo.Namespace}, foundConfigMap)
+		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      inventoryDaemonSet,
+				Namespace: mondoo.Namespace,
+			},
+		}), foundConfigMap)
+		if err == nil {
+			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet, string(dsInventoryyaml))
+			err = r.Delete(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to delete Configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDaemonSet)
+				return ctrl.Result{}, err
+			}
+			// configmap deleted successfully - return and requeue
+		} else if err != nil {
+			log.Error(err, "Failed to get Configmap")
+		}
+
+		// Check if the daemonset already exists, if remove it
+		found := &appsv1.DaemonSet{}
+		err = r.Get(ctx, client.ObjectKeyFromObject(&appsv1.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mondoo.Name,
+				Namespace: mondoo.Namespace,
+			},
+		}), found)
+
+		if err == nil {
+			dep := r.deamonsetForMondoo(mondoo, inventoryDaemonSet)
+			err = r.Delete(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to delete Daemonset", "Daemonset.Namespace", dep.Namespace, "Daemonset.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Daemonset deleted successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Daemonset")
+		}
+	}
+
+	if mondoo.Data.Workloads.Enable {
+		// Check if the Inventory Config already exists, if not create a new one, if it does reconcile with CRD
+		foundConfigMap := &corev1.ConfigMap{}
+		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      inventoryDeployment,
+				Namespace: mondoo.Namespace,
+			},
+		}), foundConfigMap)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new configmap
 			dep := r.configMapForMondooDeployment(mondoo, inventoryDeployment, string(deployInventoryyaml))
@@ -150,7 +253,59 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return ctrl.Result{}, err
 			}
 			// configmap created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
+		} else if err == nil && mondoo.Data.Workloads.Inventory != foundConfigMap.Data["inventory"] && mondoo.Data.Workloads.Inventory != "" {
+			// Define a new configmap
+			dep := r.configMapForMondooDeployment(mondoo, inventoryDeployment, string(deployInventoryyaml))
+			log.Info("Updating configmap", "ConfigMap.Data.inventory", dep.Data["inventory"], "ConfigMap.Name", inventoryDeployment)
+
+			err = r.Update(ctx, dep)
+
+			if err != nil {
+				log.Error(err, "Failed to update Configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDeployment)
+				return ctrl.Result{}, err
+			}
+
+			found := &appsv1.Deployment{}
+			err = r.Get(ctx, client.ObjectKeyFromObject(&appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      mondoo.Name,
+					Namespace: mondoo.Namespace,
+				},
+			}), found)
+
+			if err != nil {
+				log.Error(err, "failed to get Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", inventoryDeployment)
+				return ctrl.Result{}, err
+			}
+
+			if found.Spec.Template.ObjectMeta.Annotations == nil {
+				annotation := map[string]string{
+					"kubectl.kubernetes.io/restartedAt": metav1.Time{Time: time.Now()}.String(),
+				}
+
+				found.Spec.Template.ObjectMeta.Annotations = annotation
+			} else if found.Spec.Template.ObjectMeta.Annotations != nil {
+				found.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = metav1.Time{Time: time.Now()}.String()
+			}
+			err = r.Update(ctx, found)
+			if err != nil {
+				log.Error(err, "failed to restart Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", inventoryDeployment)
+				return ctrl.Result{}, err
+			}
+
+		} else if err == nil && mondoo.Data.Workloads.Inventory == "" {
+
+			dep := r.configMapForMondooDeployment(mondoo, inventoryDeployment, string(deployInventoryyaml))
+
+			log.Info("Updating configmap", "ConfigMap.Data.inventory", dep.Data["inventory"], "ConfigMap.Name", inventoryDeployment)
+
+			err = r.Update(ctx, dep)
+
+			if err != nil {
+				log.Error(err, "Failed to update Configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDeployment)
+				return ctrl.Result{}, err
+			}
+
 		} else if err != nil {
 			log.Error(err, "Failed to get Configmap")
 			return ctrl.Result{}, err
@@ -173,6 +328,60 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Error(err, "Failed to get Deployment")
 			return ctrl.Result{}, err
 		}
+		// Ensure the deployment size is the same as the spec
+		size := mondoo.Data.Workloads.Replicas
+		if *found.Spec.Replicas != size {
+			found.Spec.Replicas = &size
+			err = r.Update(ctx, found)
+			if err != nil {
+				log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+				return ctrl.Result{}, err
+			}
+			// Spec updated - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		}
+	} else {
+		// Check if the Inventory Config already exists, if delete it
+		foundConfigMap := &corev1.ConfigMap{}
+		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      inventoryDeployment,
+				Namespace: mondoo.Namespace,
+			},
+		}), foundConfigMap)
+		if err == nil {
+			dep := r.configMapForMondooDeployment(mondoo, inventoryDeployment, string(deployInventoryyaml))
+			err = r.Delete(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to delete Configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDaemonSet)
+				return ctrl.Result{}, err
+			}
+			// configmap deleted successfully - return and requeue
+		} else if err != nil {
+			log.Error(err, "Failed to get Configmap")
+		}
+
+		// Check if the deployment already exists, if remove it
+		found := &appsv1.Deployment{}
+		err = r.Get(ctx, client.ObjectKeyFromObject(&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mondoo.Name,
+				Namespace: mondoo.Namespace,
+			},
+		}), found)
+
+		if err == nil {
+			dep := r.deploymentForMondoo(mondoo, inventoryDeployment)
+			err = r.Delete(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to delete Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Daemonset deleted successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Deployment")
+		}
 	}
 
 	// Update the mondoo status with the pod names only after all pod creation actions are done
@@ -187,7 +396,11 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 	podNames := getPodNames(podList.Items)
-
+	err = r.Get(ctx, req.NamespacedName, mondoo)
+	if err != nil {
+		log.Error(err, "Failed to get mondoo")
+		return ctrl.Result{}, err
+	}
 	// Update status.Nodes if needed
 	if !reflect.DeepEqual(podNames, mondoo.Status.Nodes) {
 		mondoo.Status.Nodes = podNames
