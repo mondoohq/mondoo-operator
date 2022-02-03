@@ -438,7 +438,7 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient, cm
 					Containers: []corev1.Container{{
 						Image:   "mondoolabs/mondoo:latest",
 						Name:    "mondoo-agent",
-						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
+						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yaml"},
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "root",
@@ -484,7 +484,7 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient, cm
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "inventory",
-													Path: "mondoo/inventory.yml",
+													Path: "mondoo/inventory.yaml",
 												}},
 											},
 										},
@@ -495,7 +495,7 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient, cm
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "config",
-													Path: "mondoo/mondoo.yml",
+													Path: "mondoo/mondoo.yaml",
 												}},
 											},
 										},
@@ -545,7 +545,7 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, c
 					Containers: []corev1.Container{{
 						Image:   "mondoolabs/mondoo:latest",
 						Name:    "mondoo-agent",
-						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
+						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yaml"},
 
 						VolumeMounts: []corev1.VolumeMount{
 							{
@@ -593,7 +593,7 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, c
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "inventory",
-													Path: "mondoo/inventory.yml",
+													Path: "mondoo/inventory.yaml",
 												}},
 											},
 										},
@@ -604,7 +604,7 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, c
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "config",
-													Path: "mondoo/mondoo.yml",
+													Path: "mondoo/mondoo.yaml",
 												}},
 											},
 										},

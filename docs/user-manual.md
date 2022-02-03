@@ -1,29 +1,22 @@
 
 # User Setup
 
-There are two ways to deploy the mondoo operator to a k8s cluster. 
-
-1. use the Manifest file
-2. use the Helm chart 
+The following steps sets up the mondoo operator using kubectl and a manifest file.
 
 ## Preconditions:
 
 - kubectl with admin role
 
 1. Download service account from mondooo
-2. Convert json to yaml via `yq e -P creds.json > creds.yml`
+2. Convert json to yaml via `yq e -P creds.json > creds.yaml`
 3. Create namespace using `kubectl create namespace mondoo-operator-system`
-4. Store service account as a secret in the mondoo namespace via `kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yml`
-
+4. Store service account as a secret in the mondoo namespace via `kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml`
 
 ## Deployment of Operator using Manifests
 
 ```bash
-kubectl apply -f mondoo-operator-manifest.yml 
+kubectl apply -f mondoo-operator-manifests.yaml 
 ```
-
-## Deployment of Operator using Helm 
-
 
 ## FAQ
 

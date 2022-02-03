@@ -116,7 +116,7 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 
 deploy-yml: manifests kustomize ## As deploy without kubectl apply, but a pipe into a yml file
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default > mondoo-operator-manifests.yml
+	$(KUSTOMIZE) build config/default > mondoo-operator-manifests.yaml
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
