@@ -11,6 +11,8 @@ jobs:
   generate-manifests:
     runs-on: ubuntu-latest
     name: Generate manifests
+    env:
+      IMG_DOCKERHUB: docker.io/mondoolabs/mondoo-operator:latest
     steps:
     - uses: actions/checkout@v2
     - name: Import environment variables from file

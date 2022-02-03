@@ -1,4 +1,3 @@
-
 # User Setup
 
 The following steps sets up the mondoo operator using kubectl and a manifest file.
@@ -15,6 +14,7 @@ The following steps sets up the mondoo operator using kubectl and a manifest fil
 ## Deployment of Operator using Manifests
 
 ```bash
+IMG=mondoolabs/mondoo-operator:latest make deploy-yaml
 kubectl apply -f mondoo-operator-manifests.yaml 
 ```
 

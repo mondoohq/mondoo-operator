@@ -38,9 +38,6 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
 
-# External image URL used when creating manifests for users
-IMG_DOCKERHUB ?= docker.io/mondoolabs/mondoo-operator:latest
-
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.22
 
@@ -119,7 +116,7 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 deploy-yaml: manifests kustomize ## As deploy without kubectl apply, but a pipe into a yaml file
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG_DOCKERHUB}
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > mondoo-operator-manifests.yaml
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
