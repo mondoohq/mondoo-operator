@@ -10,7 +10,7 @@ on:
 jobs:
   generate-manifests:
     runs-on: ubuntu-latest
-    name: generate manifests
+    name: Generate manifests
     steps:
     - uses: actions/checkout@v2
     - name: Import environment variables from file
