@@ -38,9 +38,6 @@ jobs:
         curl -sSL http://mondoo.io/download.sh | bash
         mv mondoo /usr/local/bin/ 
         make test/deployment 
-        
-      
-
 
   # Added to summarize the matrix and allow easy branch protection rules setup
   e2e-tests-result:
