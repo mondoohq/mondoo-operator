@@ -1,0 +1,85 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: mondooclients.k8s.mondoo.com
+spec:
+  group: k8s.mondoo.com
+  names:
+    kind: MondooClient
+    listKind: MondooClientList
+    plural: mondooclients
+    singular: mondooclient
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: MondooClient is the Schema for the mondooclients API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          data:
+            description: MondooClientSpec defines the desired state of MondooClient
+            properties:
+              mondoosecretref:
+                type: string
+              nodes:
+                description: Config is an example field of MondooClient. Edit mondooclient_types.go
+                  to remove/update
+                properties:
+                  enable:
+                    type: boolean
+                  inventory:
+                    type: string
+                type: object
+              workloads:
+                properties:
+                  enable:
+                    type: boolean
+                  inventory:
+                    type: string
+                  replicas:
+                    format: int32
+                    type: integer
+                  workloadserviceaccount:
+                    type: string
+                type: object
+            required:
+            - mondoosecretref
+            type: object
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          status:
+            description: MondooClientStatus defines the observed state of MondooClient
+            properties:
+              nodes:
+                description: Nodes store the name of the pods which are running mondoo
+                  instances
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
