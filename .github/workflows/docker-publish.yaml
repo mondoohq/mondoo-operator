@@ -88,9 +88,10 @@ jobs:
           context: .
           file: bundle.Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: "-bundle:manual"
-          labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          env: 
+            IMAGE_NAME: ${{ github.repository }}-bundle
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
