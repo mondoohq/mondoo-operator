@@ -9,7 +9,7 @@ on:
   schedule:
     - cron: "43 9 * * *"
   push:
-    branches: [ main ]
+    branches: [main]
     # Publish semver tags as releases.
     tags: ["v*.*.*"]
   pull_request:
@@ -19,7 +19,7 @@ env:
   # Use docker.io for Docker Hub if empty
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
-  IMAGE_NAME: '${{ github.repository }}'
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
@@ -41,7 +41,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@1e95c1de343b5b0c23352d6417ee3e48d5bcd422
         with:
-          cosign-release: 'v1.4.0'
+          cosign-release: "v1.4.0"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
