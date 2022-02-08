@@ -45,14 +45,16 @@ jobs:
           mv mondoo /usr/local/bin/ 
           make test/deployment
           make undeploy
-      - name: Deploy
+      - name: Deploy on minikube using helm
         run: |
+          kubectl create namespace mondoo-operator-system
+          kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
           helm install mondoo-operator ./chart --namespace mondoo-operator-system
+          kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
       - name: Verify helm installation 
         run: |
           curl -sSL http://mondoo.io/download.sh | bash
-          mv mondoo /usr/local/bin/ 
-          kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
+          mv mondoo /usr/local/bin/
           make test/deployment
 
   # Added to summarize the matrix and allow easy branch protection rules setup
