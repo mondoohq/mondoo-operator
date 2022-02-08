@@ -40,10 +40,13 @@ jobs:
           mv mondoo /usr/local/bin/ 
           make test/deployment
           make undeploy
-      - name: Deploy
-        uses: WyriHaximus/github-action-helm3@v2
+      - uses: azure/setup-helm@v1
         with:
-          exec: helm install mondoo-operator ./chart --namespace mondoo-operator-system
+          version: 'default' 
+        id: install
+      - name: Deploy
+        run: |
+          helm install mondoo-operator ./chart --namespace mondoo-operator-system
       - name: Verify helm installation 
         run: |
           curl -sSL http://mondoo.io/download.sh | bash
