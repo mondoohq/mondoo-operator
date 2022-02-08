@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "main"
+      - "helmify"
     tags:
       - "v*"
 jobs:
@@ -37,6 +38,17 @@ jobs:
         run: |
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
+          make test/deployment
+          make undeploy
+      - name: Deploy
+        uses: WyriHaximus/github-action-helm3@v2
+        with:
+          exec: helm install mondoo-operator ./chart --namespace mondoo-operator-system
+      - name: Verify helm installation 
+        run: |
+          curl -sSL http://mondoo.io/download.sh | bash
+          mv mondoo /usr/local/bin/ 
+          kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
           make test/deployment
 
   # Added to summarize the matrix and allow easy branch protection rules setup
