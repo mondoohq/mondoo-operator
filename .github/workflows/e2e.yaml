@@ -23,8 +23,13 @@ jobs:
         uses: medyagh/setup-minikube@master
       - name: Try the cluster !
         run: kubectl get pods -A
+      - uses: azure/setup-helm@v1
+        with:
+          version: 'default' 
+        id: install
       - name: Build image
         run: |
+          helm version
           export SHELL=/bin/bash
           eval $(minikube -p minikube docker-env)
           make docker-build
@@ -40,10 +45,6 @@ jobs:
           mv mondoo /usr/local/bin/ 
           make test/deployment
           make undeploy
-      - uses: azure/setup-helm@v1
-        with:
-          version: 'default' 
-        id: install
       - name: Deploy
         run: |
           helm install mondoo-operator ./chart --namespace mondoo-operator-system
