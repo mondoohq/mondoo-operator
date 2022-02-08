@@ -1,6 +1,9 @@
 # Build the manager binary
 FROM golang:1.16 as builder
 
+ARG GOARCH=amd64
+ARG GOARM=7
+
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
@@ -15,7 +18,7 @@ COPY api/ api/
 COPY controllers/ controllers/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} GOARM=${GOARM} go build -a -o manager main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
