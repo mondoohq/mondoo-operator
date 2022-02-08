@@ -7,7 +7,7 @@ The following steps setup a helm release of mondoo-operator on a Kubernetes. In 
 - [Minikube Installation](https://minikube.sigs.k8s.io/docs/start/)
 - helm 3.x
 - kubectl (or use the one bundled with minikube  bundled with minikube `alias kubectl="minikube kubectl --"`)
-- optional: `operator-sdk`
+
 
 ## Deployment of Operator
 
@@ -17,18 +17,9 @@ As the first step, we need to make sure the cluster is up and running:
 minikube start
 ```
 
-As preparation you need to build the operator container image for deployment in Kubernetes. The easiest way is to use the docker environment included in minikube. This ensures that the latest image is available in the cluster.
-
-```bash
-# build the operator image in minikube
-eval $(minikube docker-env)
-make docker-build
-```
-
-
 Now, we completed the setup for the operator. To start the service, we need to configure the client:
 
-1. Download service account from mondooo
+1. Download service account from mondooo and store it in a file called `creds.json`
 2. Convert json to yaml via `yq e -P creds.json > creds.yml`
 3. Create namespace using `kubectl create namespace mondoo-operator-system`
 4. Store service account as a secret in the mondoo namespace via `kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yml`
