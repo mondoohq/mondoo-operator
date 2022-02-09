@@ -53,7 +53,7 @@ jobs:
       - name: Verify helm installation 
         run: |
           make test/deployment
-          helm uninstall mondoo-operator
+          helm uninstall mondoo-operator --namespace mondoo-operator-system
 
   # Added to summarize the matrix and allow easy branch protection rules setup
   e2e-tests-result:
