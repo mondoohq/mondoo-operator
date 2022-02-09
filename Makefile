@@ -119,10 +119,9 @@ generate-manifests: manifests kustomize ## Generates manifests and pipes into a 
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > mondoo-operator-manifests.yaml
 
-deploy-olm: manifests kustomize ## As deploy without kubectl apply, but a pipe into a yaml file
+deploy-olm: manifests kustomize ## Deploy using operator-sdk OLM 
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default
-	operator-sdk run bundle ${BUNDLE_IMG}
+	$(KUSTOMIZE) build config/default | operator-sdk run bundle ${BUNDLE_IMG}
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
