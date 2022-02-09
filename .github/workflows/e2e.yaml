@@ -52,9 +52,8 @@ jobs:
           kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
       - name: Verify helm installation 
         run: |
-          curl -sSL http://mondoo.io/download.sh | bash
-          mv mondoo /usr/local/bin/
           make test/deployment
+          helm uninstall mondoo-operator
 
   # Added to summarize the matrix and allow easy branch protection rules setup
   e2e-tests-result:
