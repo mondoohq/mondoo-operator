@@ -214,7 +214,7 @@ test/deployment:
 .PHONY: helmify
 HELMIFY = $(shell pwd)/bin/helmify
 helmify:
-	$(call go-get-tool,$(HELMIFY),github.com/arttor/helmify/cmd/helmify@v0.3.7)
+	$(call go-get-tool,$(HELMIFY),github.com/arttor/helmify/cmd/helmify@latest)
 
 .PHONY: helm
 helm: manifests kustomize helmify
