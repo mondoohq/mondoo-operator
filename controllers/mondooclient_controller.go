@@ -93,7 +93,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	inventoryDaemonSet := mondoo.Name + "-ds"
 	inventoryDeployment := mondoo.Name + "-deploy"
 
-	if mondoo.Data.Nodes.Enable {
+	if mondoo.Spec.Nodes.Enable {
 		// Check if the Inventory Config already exists, if not create a new one, if it does reconcile with CRD
 		foundConfigMap := &corev1.ConfigMap{}
 		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
@@ -114,10 +114,10 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return ctrl.Result{}, err
 			}
 			// configmap created successfully - return and requeue
-		} else if err == nil && mondoo.Data.Nodes.Inventory != foundConfigMap.Data["inventory"] && mondoo.Data.Nodes.Inventory != "" {
+		} else if err == nil && mondoo.Spec.Nodes.Inventory != foundConfigMap.Data["inventory"] && mondoo.Spec.Nodes.Inventory != "" {
 			// Define a new configmap
 			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet, string(dsInventoryyaml))
-			log.Info("Updating configmap", "ConfigMap.Data.inventory", dep.Data["inventory"], "ConfigMap.Name", inventoryDaemonSet)
+			log.Info("Updating configmap", "ConfigMap.Spec.inventory", dep.Data["inventory"], "ConfigMap.Name", inventoryDaemonSet)
 
 			err = r.Update(ctx, dep)
 
@@ -157,7 +157,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 
 			// this handles the case when the user switches back to default inventory
-		} else if err == nil && mondoo.Data.Nodes.Inventory == "" {
+		} else if err == nil && mondoo.Spec.Nodes.Inventory == "" {
 			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet, string(dsInventoryyaml))
 
 			log.Info("Creating a new configmap", "ConfigMap.Namespace", dep.Namespace, "ConfigMap.Name", inventoryDaemonSet)
@@ -233,7 +233,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	if mondoo.Data.Workloads.Enable {
+	if mondoo.Spec.Workloads.Enable {
 		// Check if the Inventory Config already exists, if not create a new one, if it does reconcile with CRD
 		foundConfigMap := &corev1.ConfigMap{}
 		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
@@ -253,10 +253,10 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return ctrl.Result{}, err
 			}
 			// configmap created successfully - return and requeue
-		} else if err == nil && mondoo.Data.Workloads.Inventory != foundConfigMap.Data["inventory"] && mondoo.Data.Workloads.Inventory != "" {
+		} else if err == nil && mondoo.Spec.Workloads.Inventory != foundConfigMap.Data["inventory"] && mondoo.Spec.Workloads.Inventory != "" {
 			// Define a new configmap
 			dep := r.configMapForMondooDeployment(mondoo, inventoryDeployment, string(deployInventoryyaml))
-			log.Info("Updating configmap", "ConfigMap.Data.inventory", dep.Data["inventory"], "ConfigMap.Name", inventoryDeployment)
+			log.Info("Updating configmap", "ConfigMap.Spec.inventory", dep.Data["inventory"], "ConfigMap.Name", inventoryDeployment)
 
 			err = r.Update(ctx, dep)
 
@@ -293,11 +293,11 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return ctrl.Result{}, err
 			}
 
-		} else if err == nil && mondoo.Data.Workloads.Inventory == "" {
+		} else if err == nil && mondoo.Spec.Workloads.Inventory == "" {
 
 			dep := r.configMapForMondooDeployment(mondoo, inventoryDeployment, string(deployInventoryyaml))
 
-			log.Info("Updating configmap", "ConfigMap.Data.inventory", dep.Data["inventory"], "ConfigMap.Name", inventoryDeployment)
+			log.Info("Updating configmap", "ConfigMap.Spec.inventory", dep.Data["inventory"], "ConfigMap.Name", inventoryDeployment)
 
 			err = r.Update(ctx, dep)
 
@@ -329,7 +329,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, err
 		}
 		// Ensure the deployment size is the same as the spec
-		size := mondoo.Data.Workloads.Replicas
+		size := mondoo.Spec.Workloads.Replicas
 		if *found.Spec.Replicas != size {
 			found.Spec.Replicas = &size
 			err = r.Update(ctx, found)
@@ -491,7 +491,7 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient, cm
 										{
 											Secret: &corev1.SecretProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: m.Data.MondooSecretRef,
+													Name: m.Spec.MondooSecretRef,
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "config",
@@ -517,10 +517,10 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient, cm
 func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, cmName string) *appsv1.Deployment {
 	ls := labelsForMondoo(m.Name)
 	var replicas int32
-	if m.Data.Workloads.Replicas == 0 {
+	if m.Spec.Workloads.Replicas == 0 {
 		replicas = 1
 	} else {
-		replicas = m.Data.Workloads.Replicas
+		replicas = m.Spec.Workloads.Replicas
 	}
 
 	dep := &appsv1.Deployment{
@@ -571,7 +571,7 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, c
 							},
 						},
 					}},
-					ServiceAccountName: m.Data.Workloads.WorkloadServiceAccount,
+					ServiceAccountName: m.Spec.Workloads.WorkloadServiceAccount,
 					Volumes: []corev1.Volume{
 						{
 							Name: "root",
@@ -600,7 +600,7 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, c
 										{
 											Secret: &corev1.SecretProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: m.Data.MondooSecretRef,
+													Name: m.Spec.MondooSecretRef,
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "config",
@@ -624,10 +624,10 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, c
 
 func (r *MondooClientReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooClient, name string, defaultInventory string) *corev1.ConfigMap {
 	var inventory string
-	if m.Data.Nodes.Inventory == "" {
+	if m.Spec.Nodes.Inventory == "" {
 		inventory = defaultInventory
 	} else {
-		inventory = m.Data.Nodes.Inventory
+		inventory = m.Spec.Nodes.Inventory
 	}
 	dep := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -646,11 +646,11 @@ func (r *MondooClientReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooC
 
 func (r *MondooClientReconciler) configMapForMondooDeployment(m *v1alpha1.MondooClient, name string, defaultInventory string) *corev1.ConfigMap {
 	var inventory string
-	if m.Data.Workloads.Inventory == "" {
+	if m.Spec.Workloads.Inventory == "" {
 		inventory = defaultInventory
 
 	} else {
-		inventory = m.Data.Workloads.Inventory
+		inventory = m.Spec.Workloads.Inventory
 	}
 	dep := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
