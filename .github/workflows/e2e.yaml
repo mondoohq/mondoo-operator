@@ -22,12 +22,12 @@ jobs:
         uses: medyagh/setup-minikube@master
       - name: Try the cluster !
         run: kubectl get pods -A
-      # - name: Build controller and bundle images
-      #   run: |
-      #     export SHELL=/bin/bash
-      #     eval $(minikube -p minikube docker-env)
-      #     make docker-build
-      #     make bundle-build
+      - name: Build controller and bundle images
+        run: |
+          export SHELL=/bin/bash
+          eval $(minikube -p minikube docker-env)
+          make docker-build
+          make bundle-build
       - name: Get operator-sdk
         run: |
           export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
@@ -43,7 +43,7 @@ jobs:
       - name: Deploy to minikube with olm
         run: |
           operator-sdk olm install
-          operator-sdk run bundle --namespace mondoo-operator-system
+          operator-sdk run bundle ghcr.io/mondoolabs/mondoo-operator-bundle:v0.0.1 --namespace mondoo-operator-system
           echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
           kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
           kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
