@@ -22,17 +22,28 @@ jobs:
         uses: medyagh/setup-minikube@master
       - name: Try the cluster !
         run: kubectl get pods -A
-      - name: Build image
+      - name: Build controller image
         run: |
           export SHELL=/bin/bash
           eval $(minikube -p minikube docker-env)
           make docker-build
-      - name: Deploy to minikube
+          make bundle-build
+      - name: Deploy to minikube with operator-sdk
+        uses: shivanshs9/setup-k8s-operator-sdk@v1
+        with:
+          version: "1.15.0"
         run: |
-          make deploy
+          operator-sdk olm install
+          operator-sdk run bundle
           echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
           kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
-          kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
+          kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
+      # - name: Deploy to minikube with kubectl
+      #   run: |
+      #     make deploy
+      #     echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
+      #     kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
+      #     kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
       - name: Verify a Kubernetes Application
         run: |
           sleep 20
