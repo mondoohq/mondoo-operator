@@ -28,10 +28,11 @@ jobs:
           eval $(minikube -p minikube docker-env)
           make docker-build
           make bundle-build
-      - name: Deploy to minikube with operator-sdk
+      - name: get operator-sdk
         uses: shivanshs9/setup-k8s-operator-sdk@v1
         with:
           version: "1.15.0"
+      - name: Build docker images
         run: |
           operator-sdk olm install
           operator-sdk run bundle
