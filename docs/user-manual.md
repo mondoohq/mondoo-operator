@@ -9,7 +9,7 @@ The following steps sets up the mondoo operator using kubectl and a manifest fil
 ## Deployment of Operator using Manifests
 
 ```bash
-IMG=mondoolabs/mondoo-operator:latest make deploy-yaml
+IMG=mondoolabs/mondoo-operator:latest make generate-manifests
 kubectl apply -f mondoo-operator-manifests.yaml 
 ```
 
