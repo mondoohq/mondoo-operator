@@ -30,7 +30,7 @@ func (in *MondooClient) DeepCopyInto(out *MondooClient) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	out.Data = in.Data
+	out.Spec = in.Spec
 	in.Status.DeepCopyInto(&out.Status)
 }
 
