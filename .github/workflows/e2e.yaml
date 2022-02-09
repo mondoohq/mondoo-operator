@@ -24,15 +24,14 @@ jobs:
         run: kubectl get pods -A
       - name: Build controller and bundle images
         run: |
-          export SHELL=/bin/bash
           eval $(minikube -p minikube docker-env)
-          make docker-build
+          make docker-build 
           make bundle-build
       - name: Get operator-sdk
         run: |
           export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
           export OS=$(uname | awk '{print tolower($0)}')
-          export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.17.0
+          export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.15.0
           curl -LO ${OPERATOR_SDK_DL_URL}/operator-sdk_${OS}_${ARCH}
           gpg --keyserver keyserver.ubuntu.com --recv-keys 052996E2A20B5C7E
           curl -LO ${OPERATOR_SDK_DL_URL}/checksums.txt
@@ -43,17 +42,22 @@ jobs:
       - name: Deploy to minikube with olm
         run: |
           operator-sdk olm install
+          kubectl create namespace mondoo-operator-system
           operator-sdk run bundle ghcr.io/mondoolabs/mondoo-operator-bundle:v0.0.1 --namespace mondoo-operator-system
           echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
           kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
           kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
-      # - name: Deploy to minikube with kubectl
-      #   run: |
-      #     make deploy
-      #     echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
-      #     kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
-      #     kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
-      - name: Verify a Kubernetes Application
+      - name: Verify olm installation
+        run: |
+          curl -sSL http://mondoo.io/download.sh | bash
+          mv mondoo /usr/local/bin/ 
+          make test/deployment
+          make undeploy
+      - name: Deploy to minikube with kubectl
+        run: |
+          make deploy
+          kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
+      - name: Verify kubectl installation 
         run: |
           kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator-system 
           kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator-system --timeout=300s
