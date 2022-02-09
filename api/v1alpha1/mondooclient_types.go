@@ -62,7 +62,7 @@ type MondooClient struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Data   MondooClientData   `json:"data,omitempty"`
+	Spec   MondooClientData   `json:"spec,omitempty"`
 	Status MondooClientStatus `json:"status,omitempty"`
 }
 

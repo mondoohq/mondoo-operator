@@ -3,7 +3,7 @@ kind: MondooClient
 metadata:
   name: mondoo-client
   namespace: mondoo-operator-system
-data:
+spec:
   workloads:
     enable: true
     workloadserviceaccount: mondoo-operator-workload
