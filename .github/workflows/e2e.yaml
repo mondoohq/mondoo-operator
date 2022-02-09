@@ -43,26 +43,28 @@ jobs:
         run: |
           operator-sdk olm install
           kubectl create namespace mondoo-operator-system
-          operator-sdk run bundle ghcr.io/mondoolabs/mondoo-operator-bundle:v0.0.1 --namespace mondoo-operator-system
           echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
           kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
+          operator-sdk run bundle ghcr.io/mondoolabs/mondoo-operator-bundle:v0.0.1 --namespace mondoo-operator-system
           kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
       - name: Verify olm installation
         run: |
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
+          operator-sdk olm uninstall
           make undeploy
       - name: Deploy to minikube with kubectl
         run: |
+          kubectl create namespace mondoo-operator-system
+          echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
+          kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
           make deploy
           kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
       - name: Verify kubectl installation 
         run: |
-          sleep 20
-          curl -sSL http://mondoo.io/download.sh | bash
-          mv mondoo /usr/local/bin/ 
           make test/deployment
+          make undeploy
 
   # Added to summarize the matrix and allow easy branch protection rules setup
   e2e-tests-result:
