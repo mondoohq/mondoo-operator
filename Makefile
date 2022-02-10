@@ -98,7 +98,6 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 docker-build: test ## Build docker image with the manager.
-	sed -i "s/VERSION/${VERSION}/g" config/manager/kustomization.yaml
 	docker build -t ${IMG} .
 
 docker-push: ## Push docker image with the manager.
@@ -159,7 +158,6 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	sed -i "s/VERSION/${VERSION}/g" config/manager/kustomization.yaml
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
