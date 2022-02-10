@@ -5,7 +5,7 @@ controllerManager:
       tag: v0.8.0
   manager:
     image:
-      repository: controller
+      repository: ghcr.io/mondoolabs/mondoo-operator
       tag: latest
     resources:
       limits:
