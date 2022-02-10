@@ -28,9 +28,13 @@ Next let us deploy the operator application:
 
 ```
 make deploy
+# Or if you want to deploy using OLM
+make deploy-olm
 ```
 
-> NOTE: It uses `kubectl` under the cover, therefore make sure kubectl is configured to use minikube
+> NOTE: deploy target uses `kubectl` under the cover, therefore make sure kubectl is configured to use minikube
+> NOTE: deploy-olm target uses operator-sdk and depends on olm being installed
+
 
 Now, we completed the setup for the operator. To start the service, we need to configure the client:
 
