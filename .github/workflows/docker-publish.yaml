@@ -81,8 +81,7 @@ jobs:
           platforms: linux/amd64,linux/arm/v7
           push: ${{ github.event_name != 'pull_request' }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: GOARCH=${{ steps.meta.outputs.tag }}
-          tags: mondoolabs/mondoo-operator:${{ steps.meta.outputs.tag }}
+          tags: ${{ steps.meta.outputs.tag }}
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
