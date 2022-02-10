@@ -39,8 +39,8 @@ spec:
               mondoosecretref:
                 type: string
               nodes:
-                description: Config is an example field of MondooAuditConfig. Edit mondooauditconfig_types.go
-                  to remove/update
+                description: Config is an example field of MondooAuditConfig. Edit
+                  mondooauditconfig_types.go to remove/update
                 properties:
                   enable:
                     type: boolean

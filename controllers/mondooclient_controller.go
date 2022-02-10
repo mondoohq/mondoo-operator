@@ -35,8 +35,8 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// MondooClientReconciler reconciles a MondooClient object
-type MondooClientReconciler struct {
+// MondooAuditConfigReconciler reconciles a MondooAuditConfig object
+type MondooAuditConfigReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
@@ -48,9 +48,9 @@ var dsInventoryyaml []byte
 //go:embed inventory-deploy.yaml
 var deployInventoryyaml []byte
 
-//+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooclients,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooclients/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooclients/finalizers,verbs=update
+//+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooauditconfigs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooauditconfigs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooauditconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
@@ -64,17 +64,17 @@ var deployInventoryyaml []byte
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the MondooClient object against the actual cluster state, and then
+// the MondooAuditConfig object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
-func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	// Fetch the Mondoo instance
-	mondoo := &v1alpha1.MondooClient{}
+	mondoo := &v1alpha1.MondooAuditConfig{}
 
 	err := r.Get(ctx, req.NamespacedName, mondoo)
 
@@ -415,7 +415,7 @@ func (r *MondooClientReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 // deamonsetForMondoo returns a  Daemonset object
-func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient, cmName string) *appsv1.DaemonSet {
+func (r *MondooAuditConfigReconciler) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string) *appsv1.DaemonSet {
 	ls := labelsForMondoo(m.Name)
 	dep := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -514,7 +514,7 @@ func (r *MondooClientReconciler) deamonsetForMondoo(m *v1alpha1.MondooClient, cm
 }
 
 // deploymentForMondoo returns a Deployment object
-func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, cmName string) *appsv1.Deployment {
+func (r *MondooAuditConfigReconciler) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName string) *appsv1.Deployment {
 	ls := labelsForMondoo(m.Name)
 	var replicas int32
 	if m.Spec.Workloads.Replicas == 0 {
@@ -622,7 +622,7 @@ func (r *MondooClientReconciler) deploymentForMondoo(m *v1alpha1.MondooClient, c
 	return dep
 }
 
-func (r *MondooClientReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooClient, name string, defaultInventory string) *corev1.ConfigMap {
+func (r *MondooAuditConfigReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooAuditConfig, name string, defaultInventory string) *corev1.ConfigMap {
 	var inventory string
 	if m.Spec.Nodes.Inventory == "" {
 		inventory = defaultInventory
@@ -644,7 +644,7 @@ func (r *MondooClientReconciler) configMapForMondooDaemonSet(m *v1alpha1.MondooC
 	return dep
 }
 
-func (r *MondooClientReconciler) configMapForMondooDeployment(m *v1alpha1.MondooClient, name string, defaultInventory string) *corev1.ConfigMap {
+func (r *MondooAuditConfigReconciler) configMapForMondooDeployment(m *v1alpha1.MondooAuditConfig, name string, defaultInventory string) *corev1.ConfigMap {
 	var inventory string
 	if m.Spec.Workloads.Inventory == "" {
 		inventory = defaultInventory
@@ -683,9 +683,9 @@ func getPodNames(pods []corev1.Pod) []string {
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *MondooClientReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.MondooClient{}).
+		For(&v1alpha1.MondooAuditConfig{}).
 		Owns(&appsv1.DaemonSet{}).
 		Owns(&appsv1.Deployment{}).
 		Complete(r)

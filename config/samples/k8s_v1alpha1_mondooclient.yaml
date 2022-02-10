@@ -1,5 +1,5 @@
 apiVersion: k8s.mondoo.com/v1alpha1
-kind: MondooClient
+kind: MondooAuditConfig
 metadata:
   name: mondoo-client
   namespace: mondoo-operator-system

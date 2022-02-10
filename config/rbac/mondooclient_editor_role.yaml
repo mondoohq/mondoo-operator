@@ -1,13 +1,13 @@
-# permissions for end users to edit mondooclients.
+# permissions for end users to edit mondooauditconfigs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: mondooclient-editor-role
+  name: mondooauditconfig-editor-role
 rules:
 - apiGroups:
   - k8s.mondoo.com
   resources:
-  - mondooclients
+  - mondooauditconfigs
   verbs:
   - create
   - delete
@@ -19,6 +19,6 @@ rules:
 - apiGroups:
   - k8s.mondoo.com
   resources:
-  - mondooclients/status
+  - mondooauditconfigs/status
   verbs:
   - get

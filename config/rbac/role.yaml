@@ -73,7 +73,7 @@ rules:
 - apiGroups:
   - k8s.mondoo.com
   resources:
-  - mondooclients
+  - mondooauditconfigs
   verbs:
   - create
   - delete
@@ -85,13 +85,13 @@ rules:
 - apiGroups:
   - k8s.mondoo.com
   resources:
-  - mondooclients/finalizers
+  - mondooauditconfigs/finalizers
   verbs:
   - update
 - apiGroups:
   - k8s.mondoo.com
   resources:
-  - mondooclients/status
+  - mondooauditconfigs/status
   verbs:
   - get
   - patch
