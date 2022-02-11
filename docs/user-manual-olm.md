@@ -30,7 +30,7 @@ operator-sdk olm status | echo $?
 ```
 3. Run the operator-bundle
 ```bash
-operator-sdk run bundle ghcr.io/mondoolabs/mondoo-operator-bundle:v0.0.1 --namespace=mondoo-operator-system
+operator-sdk run bundle ghcr.io/mondoolabs/mondoo-operator-bundle:main --namespace=mondoo-operator-system
 ```
 
 4. Create `mondoo-config.yaml`
