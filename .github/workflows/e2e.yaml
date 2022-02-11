@@ -49,7 +49,8 @@ jobs:
         run: |
           kubectl create namespace mondoo-operator-system
           kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
-          helm install mondoo-operator ./chart --namespace mondoo-operator-system --set controllerManager.manager.image.tag=v0.0.1
+          export IMG_TAG=sha256-$(shell git rev-parse HEAD).sig
+          helm install mondoo-operator ./chart --namespace mondoo-operator-system --set controllerManager.manager.image.tag=$IMG_TAG
           kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
       - name: Verify helm installation 
         run: |
