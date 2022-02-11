@@ -9,3 +9,5 @@ spec:
     - id: api
       connections:
         - backend: k8s
+          options:
+            namespace: kube-system
