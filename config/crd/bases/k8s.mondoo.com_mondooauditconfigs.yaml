@@ -53,8 +53,10 @@ spec:
                     type: boolean
                   inventory:
                     type: string
+                  replicas:
+                    format: int32
+                    type: integer
                   serviceAccount:
-                    description: Replicas               int32  `json:"replicas,omitempty"`
                     type: string
                 type: object
             required:

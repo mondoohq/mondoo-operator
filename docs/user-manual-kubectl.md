@@ -43,11 +43,11 @@ metadata:
 spec:
   workloads:
     enable: true
-    workloadserviceaccount: mondoo-operator-workload
+    serviceAccount: mondoo-operator-workload
     replicas: 2
   nodes:
     enable: true
-  mondoosecretref: mondoo-client
+  mondooSecretRef: mondoo-client
 ```
 
 4. Apply the configuration via:
