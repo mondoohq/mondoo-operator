@@ -55,7 +55,8 @@ jobs:
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
       - name: Verify a Kubernetes Application
         run: |
-          kubectl wait --for=condition=ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator-system
+          kubectl wait --for=condition=ready deployment -l mondoo_cr=mondoo-client --namespace mondoo-operator-system
+          kubectl wait --for=condition=ready daemonset -l mondoo_cr=mondoo-client --namespace mondoo-operator-system
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
