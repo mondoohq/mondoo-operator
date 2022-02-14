@@ -32,9 +32,10 @@ jobs:
           make deploy
           echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
           kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
-          kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
+          kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
       - name: Verify a Kubernetes Application
         run: |
+          sleep 20
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
