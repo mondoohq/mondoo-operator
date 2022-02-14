@@ -48,6 +48,7 @@ jobs:
       - name: Install Helm chart
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
+          kubectl create namespace mondoo-operator-system
           kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
           export VERSION=sha256-$(git rev-parse HEAD).sig
           helm install mondoo-operator ./chart --namespace mondoo-operator-system --set controllerManager.manager.image.tag=$VERSION
