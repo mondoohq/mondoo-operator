@@ -39,6 +39,25 @@ jobs:
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
+          make undeploy
+      - name: Install Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: '<version>' # default is latest stable
+        id: install
+      - name: Install Helm chart
+        run: |
+          echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
+          kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
+          export VERSION=sha256-$(git rev-parse HEAD).sig
+          helm install mondoo-operator ./chart --namespace mondoo-operator-system --set controllerManager.manager.image.tag=$VERSION
+      - name: Verify a Kubernetes Application
+        run: |
+          sleep 20
+          curl -sSL http://mondoo.io/download.sh | bash
+          mv mondoo /usr/local/bin/ 
+          make test/deployment
+          helm uninstall mondoo-operator  --namespace mondoo-operator-system 
 
   # Added to summarize the matrix and allow easy branch protection rules setup
   e2e-tests-result:
