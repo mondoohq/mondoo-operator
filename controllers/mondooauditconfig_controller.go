@@ -328,18 +328,18 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			log.Error(err, "Failed to get Deployment")
 			return ctrl.Result{}, err
 		}
-		// Ensure the deployment size is the same as the spec
-		size := mondoo.Spec.Workloads.Replicas
-		if *found.Spec.Replicas != size {
-			found.Spec.Replicas = &size
-			err = r.Update(ctx, found)
-			if err != nil {
-				log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
-				return ctrl.Result{}, err
-			}
-			// Spec updated - return and requeue
-			return ctrl.Result{Requeue: true}, nil
-		}
+		// // Ensure the deployment size is the same as the spec
+		// size := mondoo.Spec.Workloads.Replicas
+		// if *found.Spec.Replicas != size {
+		// 	found.Spec.Replicas = &size
+		// 	err = r.Update(ctx, found)
+		// 	if err != nil {
+		// 		log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+		// 		return ctrl.Result{}, err
+		// 	}
+		// 	// Spec updated - return and requeue
+		// 	return ctrl.Result{Requeue: true}, nil
+		// }
 	} else {
 		// Check if the Inventory Config already exists, if delete it
 		foundConfigMap := &corev1.ConfigMap{}
@@ -516,12 +516,6 @@ func (r *MondooAuditConfigReconciler) deamonsetForMondoo(m *v1alpha1.MondooAudit
 // deploymentForMondoo returns a Deployment object
 func (r *MondooAuditConfigReconciler) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName string) *appsv1.Deployment {
 	ls := labelsForMondoo(m.Name)
-	var replicas int32
-	if m.Spec.Workloads.Replicas == 0 {
-		replicas = 1
-	} else {
-		replicas = m.Spec.Workloads.Replicas
-	}
 
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -532,7 +526,6 @@ func (r *MondooAuditConfigReconciler) deploymentForMondoo(m *v1alpha1.MondooAudi
 			Selector: &metav1.LabelSelector{
 				MatchLabels: ls,
 			},
-			Replicas: &replicas,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: ls,
@@ -571,7 +564,7 @@ func (r *MondooAuditConfigReconciler) deploymentForMondoo(m *v1alpha1.MondooAudi
 							},
 						},
 					}},
-					ServiceAccountName: m.Spec.Workloads.WorkloadServiceAccount,
+					ServiceAccountName: m.Spec.Workloads.ServiceAccount,
 					Volumes: []corev1.Volume{
 						{
 							Name: "root",
