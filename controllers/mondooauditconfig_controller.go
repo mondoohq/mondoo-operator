@@ -96,12 +96,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if mondoo.Spec.Nodes.Enable {
 		// Check if the Inventory Config already exists, if not create a new one, if it does reconcile with CRD
 		foundConfigMap := &corev1.ConfigMap{}
-		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      inventoryDaemonSet,
-				Namespace: mondoo.Namespace,
-			},
-		}), foundConfigMap)
+		err = r.Get(ctx, types.NamespacedName{Name: inventoryDaemonSet, Namespace: mondoo.Namespace}, foundConfigMap)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new configmap
 			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet, string(dsInventoryyaml))
@@ -127,13 +122,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			}
 
 			found := &appsv1.DaemonSet{}
-			err = r.Get(ctx, client.ObjectKeyFromObject(&appsv1.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      mondoo.Name,
-					Namespace: mondoo.Namespace,
-				},
-			}), found)
-
+			err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, found)
 			if err != nil {
 				log.Error(err, "failed to get daemonset", "Daemonset.Namespace", dep.Namespace, "Daemeonset.Name", inventoryDaemonSet)
 				return ctrl.Result{}, err
@@ -192,12 +181,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	} else {
 		// Check if the Inventory Config already exists, if delete it
 		foundConfigMap := &corev1.ConfigMap{}
-		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      inventoryDaemonSet,
-				Namespace: mondoo.Namespace,
-			},
-		}), foundConfigMap)
+		err = r.Get(ctx, types.NamespacedName{Name: inventoryDaemonSet, Namespace: mondoo.Namespace}, foundConfigMap)
 		if err == nil {
 			dep := r.configMapForMondooDaemonSet(mondoo, inventoryDaemonSet, string(dsInventoryyaml))
 			err = r.Delete(ctx, dep)
@@ -212,13 +196,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 		// Check if the daemonset already exists, if remove it
 		found := &appsv1.DaemonSet{}
-		err = r.Get(ctx, client.ObjectKeyFromObject(&appsv1.DaemonSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      mondoo.Name,
-				Namespace: mondoo.Namespace,
-			},
-		}), found)
-
+		err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, found)
 		if err == nil {
 			dep := r.deamonsetForMondoo(mondoo, inventoryDaemonSet)
 			err = r.Delete(ctx, dep)
@@ -236,12 +214,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if mondoo.Spec.Workloads.Enable {
 		// Check if the Inventory Config already exists, if not create a new one, if it does reconcile with CRD
 		foundConfigMap := &corev1.ConfigMap{}
-		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      inventoryDeployment,
-				Namespace: mondoo.Namespace,
-			},
-		}), foundConfigMap)
+		err = r.Get(ctx, types.NamespacedName{Name: inventoryDeployment, Namespace: mondoo.Namespace}, foundConfigMap)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new configmap
 			dep := r.configMapForMondooDeployment(mondoo, inventoryDeployment, string(deployInventoryyaml))
@@ -266,12 +239,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			}
 
 			found := &appsv1.Deployment{}
-			err = r.Get(ctx, client.ObjectKeyFromObject(&appsv1.Deployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      mondoo.Name,
-					Namespace: mondoo.Namespace,
-				},
-			}), found)
+			err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, found)
 
 			if err != nil {
 				log.Error(err, "failed to get Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", inventoryDeployment)
@@ -343,12 +311,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	} else {
 		// Check if the Inventory Config already exists, if delete it
 		foundConfigMap := &corev1.ConfigMap{}
-		err = r.Get(ctx, client.ObjectKeyFromObject(&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      inventoryDeployment,
-				Namespace: mondoo.Namespace,
-			},
-		}), foundConfigMap)
+		err = r.Get(ctx, types.NamespacedName{Name: inventoryDeployment, Namespace: mondoo.Namespace}, foundConfigMap)
+
 		if err == nil {
 			dep := r.configMapForMondooDeployment(mondoo, inventoryDeployment, string(deployInventoryyaml))
 			err = r.Delete(ctx, dep)
@@ -363,13 +327,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 		// Check if the deployment already exists, if remove it
 		found := &appsv1.Deployment{}
-		err = r.Get(ctx, client.ObjectKeyFromObject(&appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      mondoo.Name,
-				Namespace: mondoo.Namespace,
-			},
-		}), found)
-
+		err = r.Get(ctx, types.NamespacedName{Name: mondoo.Name, Namespace: mondoo.Namespace}, found)
 		if err == nil {
 			dep := r.deploymentForMondoo(mondoo, inventoryDeployment)
 			err = r.Delete(ctx, dep)
