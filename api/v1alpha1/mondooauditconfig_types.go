@@ -31,7 +31,7 @@ type MondooAuditConfigData struct {
 	// Config is an example field of MondooAuditConfig. Edit mondooauditconfig_types.go to remove/update
 	Nodes           Nodes     `json:"nodes,omitempty"`
 	Workloads       Workloads `json:"workloads,omitempty"`
-	MondooSecretRef string    `json:"mondoosecretref"`
+	MondooSecretRef string    `json:"mondooSecretRef"`
 }
 type Nodes struct {
 	Enable    bool   `json:"enable,omitempty"`
@@ -39,10 +39,10 @@ type Nodes struct {
 }
 
 type Workloads struct {
-	Enable                 bool   `json:"enable,omitempty"`
-	Inventory              string `json:"inventory,omitempty"`
-	Replicas               int32  `json:"replicas,omitempty"`
-	WorkloadServiceAccount string `json:"workloadserviceaccount,omitempty"`
+	Enable    bool   `json:"enable,omitempty"`
+	Inventory string `json:"inventory,omitempty"`
+	// Replicas               int32  `json:"replicas,omitempty"`
+	ServiceAccount string `json:"serviceAccount,omitempty"`
 }
 
 // MondooAuditConfigStatus defines the observed state of MondooAuditConfig

@@ -6,9 +6,8 @@ metadata:
 spec:
   workloads:
     enable: true
-    workloadserviceaccount: mondoo-operator-workload
-    replicas: 1
+    serviceAccount: mondoo-operator-workload
   nodes:
     enable: true
-  mondoosecretref: mondoo-client
+  mondooSecretRef: mondoo-client
   
