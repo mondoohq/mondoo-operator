@@ -36,7 +36,7 @@ Once the secret is configure, we configure the operator to define the scan targe
 
 ```yaml
 apiVersion: k8s.mondoo.com/v1alpha1
-kind: MondooClient
+kind: MondooAuditConfig
 metadata:
   name: mondoo-client
   namespace: mondoo-operator-system
@@ -65,13 +65,13 @@ First check that the CRD is properly registered with the operator:
 ```bash
 kubectl get crd
 NAME                           CREATED AT
-mondooclients.k8s.mondoo.com   2022-01-14T14:07:28Z
+mondooauditconfigs.k8s.mondoo.com   2022-01-14T14:07:28Z
 ```
 
 Then make sure a configuration for the mondoo client is deployed:
 
 ```bash
-kubectl get mondooclients
+kubectl get mondooauditconfigs
 NAME                  AGE
-mondooclient-sample   2m44s
+mondooauditconfig-sample   2m44s
 ```

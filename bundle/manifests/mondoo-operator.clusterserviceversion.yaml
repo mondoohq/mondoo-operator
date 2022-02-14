@@ -6,7 +6,7 @@ metadata:
       [
         {
           "apiVersion": "k8s.mondoo.com/v1alpha1",
-          "kind": "MondooClient",
+          "kind": "MondooAuditConfig",
           "metadata": {
             "name": "mondoo-client",
             "namespace": "mondoo-operator-system"
@@ -33,10 +33,10 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: MondooClient is the Schema for the mondooclients API
+    - description: MondooAuditConfig is the Schema for the mondooauditconfigs API
       displayName: Mondoo Client
-      kind: MondooClient
-      name: mondooclients.k8s.mondoo.com
+      kind: MondooAuditConfig
+      name: mondooauditconfigs.k8s.mondoo.com
       version: v1alpha1
   description: A Kubernetes Operator for creating and managing Mondoo controller instances.
   displayName: mondoo-operator
@@ -114,7 +114,7 @@ spec:
         - apiGroups:
           - k8s.mondoo.com
           resources:
-          - mondooclients
+          - mondooauditconfigs
           verbs:
           - create
           - delete
@@ -126,13 +126,13 @@ spec:
         - apiGroups:
           - k8s.mondoo.com
           resources:
-          - mondooclients/finalizers
+          - mondooauditconfigs/finalizers
           verbs:
           - update
         - apiGroups:
           - k8s.mondoo.com
           resources:
-          - mondooclients/status
+          - mondooauditconfigs/status
           verbs:
           - get
           - patch
