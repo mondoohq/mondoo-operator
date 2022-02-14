@@ -30,7 +30,7 @@ Next let us deploy the operator application:
 make deploy
 ```
 
-> NOTE: It usses `kubectl` under the cover, therefore make sure kubectl is configured to use minikube
+> NOTE: It uses `kubectl` under the cover, therefore make sure kubectl is configured to use minikube
 
 Now, we completed the setup for the operator. To start the service, we need to configure the client:
 
