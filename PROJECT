@@ -13,7 +13,7 @@ resources:
   controller: true
   domain: mondoo.com
   group: k8s
-  kind: MondooClient
+  kind: MondooAuditConfig
   path: go.mondoo.com/mondoo-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

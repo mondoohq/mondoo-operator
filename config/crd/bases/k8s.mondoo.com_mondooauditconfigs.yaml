@@ -6,20 +6,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.7.0
   creationTimestamp: null
-  name: mondooclients.k8s.mondoo.com
+  name: mondooauditconfigs.k8s.mondoo.com
 spec:
   group: k8s.mondoo.com
   names:
-    kind: MondooClient
-    listKind: MondooClientList
-    plural: mondooclients
-    singular: mondooclient
+    kind: MondooAuditConfig
+    listKind: MondooAuditConfigList
+    plural: mondooauditconfigs
+    singular: mondooauditconfig
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: MondooClient is the Schema for the mondooclients API
+        description: MondooAuditConfig is the Schema for the mondooauditconfigs API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -34,13 +34,13 @@ spec:
           metadata:
             type: object
           spec:
-            description: MondooClientSpec defines the desired state of MondooClient
+            description: MondooAuditConfigSpec defines the desired state of MondooAuditConfig
             properties:
               mondoosecretref:
                 type: string
               nodes:
-                description: Config is an example field of MondooClient. Edit mondooclient_types.go
-                  to remove/update
+                description: Config is an example field of MondooAuditConfig. Edit
+                  mondooauditconfig_types.go to remove/update
                 properties:
                   enable:
                     type: boolean
@@ -63,7 +63,7 @@ spec:
             - mondoosecretref
             type: object
           status:
-            description: MondooClientStatus defines the observed state of MondooClient
+            description: MondooAuditConfigStatus defines the observed state of MondooAuditConfig
             properties:
               nodes:
                 description: Nodes store the name of the pods which are running mondoo

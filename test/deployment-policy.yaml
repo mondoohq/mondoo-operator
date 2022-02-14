@@ -29,7 +29,7 @@ queries:
     query: k8s.namespaces.one ( name == "mondoo-operator-system")
   - uid: crd-created
     title: Ensure the CRD for MondooScanConfig exitsts
-    query: k8s.apiResources.one( kind == "MondooClient")
+    query: k8s.apiResources.one( kind == "MondooAuditConfig")
   - uid: controller-deployed
     title: Ensure the Controller is deployed
     query: k8s.deployments.one( name == "mondoo-operator-controller-manager" && namespace == "mondoo-operator-system" )

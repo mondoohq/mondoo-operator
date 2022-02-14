@@ -23,12 +23,12 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// MondooClientSpec defines the desired state of MondooClient
-type MondooClientData struct {
+// MondooAuditConfigSpec defines the desired state of MondooAuditConfig
+type MondooAuditConfigData struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Config is an example field of MondooClient. Edit mondooclient_types.go to remove/update
+	// Config is an example field of MondooAuditConfig. Edit mondooauditconfig_types.go to remove/update
 	Nodes           Nodes     `json:"nodes,omitempty"`
 	Workloads       Workloads `json:"workloads,omitempty"`
 	MondooSecretRef string    `json:"mondoosecretref"`
@@ -45,8 +45,8 @@ type Workloads struct {
 	WorkloadServiceAccount string `json:"workloadserviceaccount,omitempty"`
 }
 
-// MondooClientStatus defines the observed state of MondooClient
-type MondooClientStatus struct {
+// MondooAuditConfigStatus defines the observed state of MondooAuditConfig
+type MondooAuditConfigStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -57,24 +57,24 @@ type MondooClientStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// MondooClient is the Schema for the mondooclients API
-type MondooClient struct {
+// MondooAuditConfig is the Schema for the mondooauditconfigs API
+type MondooAuditConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MondooClientData   `json:"spec,omitempty"`
-	Status MondooClientStatus `json:"status,omitempty"`
+	Spec   MondooAuditConfigData   `json:"spec,omitempty"`
+	Status MondooAuditConfigStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// MondooClientList contains a list of MondooClient
-type MondooClientList struct {
+// MondooAuditConfigList contains a list of MondooAuditConfig
+type MondooAuditConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []MondooClient `json:"items"`
+	Items           []MondooAuditConfig `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&MondooClient{}, &MondooClientList{})
+	SchemeBuilder.Register(&MondooAuditConfig{}, &MondooAuditConfigList{})
 }

@@ -30,7 +30,7 @@ Next let us deploy the operator application:
 make deploy
 ```
 
-> NOTE: It usses `kubectl` under the cover, therefore make sure kubectl is configured to use minikube
+> NOTE: It uses `kubectl` under the cover, therefore make sure kubectl is configured to use minikube
 
 Now, we completed the setup for the operator. To start the service, we need to configure the client:
 
@@ -43,7 +43,7 @@ Now, we completed the setup for the operator. To start the service, we need to c
 Then apply the configuration:
 
 ```bash
-kubectl apply -f config/samples/k8s_v1alpha1_mondooclient.yaml
+kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
 ```
 
 Validate that everything is running:
@@ -58,7 +58,7 @@ mondoo-operator-controller-manager-556c7d4b56-qqsqh   2/2     Running   0       
 To delete the client configuration, run:
 
 ```bash
-kubectl delete -f config/samples/k8s_v1alpha1_mondooclient.yaml 
+kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml 
 ```
 
 ## FAQ
@@ -70,13 +70,13 @@ First check that the CRD is properly registered with the operator:
 ```bash
 kubectl get crd
 NAME                           CREATED AT
-mondooclients.k8s.mondoo.com   2022-01-14T14:07:28Z
+mondooauditconfigs.k8s.mondoo.com   2022-01-14T14:07:28Z
 ```
 
 Then make sure a configuration for the mondoo client is deployed:
 
 ```bash
-kubectl get mondooclients
+kubectl get mondooauditconfigs
 NAME                  AGE
-mondooclient-sample   2m44s
+mondooauditconfig-sample   2m44s
 ```
