@@ -43,7 +43,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v1
         with:
-          version: '<version>' # default is latest stable
+          version: 'v3.8.0' # default is latest stable
         id: install
       - name: Install Helm chart
         run: |
