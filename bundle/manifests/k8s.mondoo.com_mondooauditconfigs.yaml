@@ -37,8 +37,8 @@ spec:
               mondooSecretRef:
                 type: string
               nodes:
-                description: Config is an example field of MondooAuditConfig. Edit mondooauditconfig_types.go
-                  to remove/update
+                description: Config is an example field of MondooAuditConfig. Edit
+                  mondooauditconfig_types.go to remove/update
                 properties:
                   enable:
                     type: boolean
@@ -51,10 +51,8 @@ spec:
                     type: boolean
                   inventory:
                     type: string
-                  replicas:
-                    format: int32
-                    type: integer
                   serviceAccount:
+                    description: Replicas               int32  `json:"replicas,omitempty"`
                     type: string
                 type: object
             required:

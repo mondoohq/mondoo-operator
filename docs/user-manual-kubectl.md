@@ -44,7 +44,6 @@ spec:
   workloads:
     enable: true
     serviceAccount: mondoo-operator-workload
-    replicas: 2
   nodes:
     enable: true
   mondooSecretRef: mondoo-client
