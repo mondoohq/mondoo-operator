@@ -17,4 +17,9 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: "${{ env.golang-version }}"
-      - run: make deploy-yaml
+      - run: make generate-manifests 
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: mondoo-operator-manifests.yaml
