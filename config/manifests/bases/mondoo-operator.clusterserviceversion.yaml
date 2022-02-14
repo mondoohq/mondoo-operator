@@ -10,10 +10,10 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: MondooClient is the Schema for the mondooclients API
+    - description: MondooAuditConfig is the Schema for the mondooauditconfigs API
       displayName: Mondoo Client
-      kind: MondooClient
-      name: mondooclients.k8s.mondoo.com
+      kind: MondooAuditConfig
+      name: mondooauditconfigs.k8s.mondoo.com
       version: v1alpha1
   description: A Kubernetes Operator for creating and managing Mondoo controller instances.
   displayName: mondoo-operator
