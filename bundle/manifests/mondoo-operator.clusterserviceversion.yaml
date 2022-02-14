@@ -18,14 +18,13 @@ metadata:
             },
             "workloads": {
               "enable": true,
-              "replicas": 4,
               "serviceAccount": "mondoo-operator-workload"
             }
           }
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.14.0+git
+    operators.operatorframework.io/builder: operator-sdk-v1.16.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: mondoo-operator.v0.0.1
   namespace: placeholder
@@ -34,7 +33,7 @@ spec:
   customresourcedefinitions:
     owned:
     - description: MondooAuditConfig is the Schema for the mondooauditconfigs API
-      displayName: Mondoo Client
+      displayName: Mondoo Audit Config
       kind: MondooAuditConfig
       name: mondooauditconfigs.k8s.mondoo.com
       version: v1alpha1
