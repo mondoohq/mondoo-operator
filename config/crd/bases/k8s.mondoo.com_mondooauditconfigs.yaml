@@ -36,7 +36,7 @@ spec:
           spec:
             description: MondooAuditConfigSpec defines the desired state of MondooAuditConfig
             properties:
-              mondoosecretref:
+              mondooSecretRef:
                 type: string
               nodes:
                 description: Config is an example field of MondooAuditConfig. Edit
@@ -56,11 +56,11 @@ spec:
                   replicas:
                     format: int32
                     type: integer
-                  workloadserviceaccount:
+                  serviceAccount:
                     type: string
                 type: object
             required:
-            - mondoosecretref
+            - mondooSecretRef
             type: object
           status:
             description: MondooAuditConfigStatus defines the observed state of MondooAuditConfig

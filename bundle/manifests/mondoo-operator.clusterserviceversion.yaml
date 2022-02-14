@@ -12,14 +12,14 @@ metadata:
             "namespace": "mondoo-operator-system"
           },
           "spec": {
-            "mondoosecretref": "mondoo-client",
+            "mondooSecretRef": "mondoo-client",
             "nodes": {
               "enable": true
             },
             "workloads": {
               "enable": true,
               "replicas": 4,
-              "workloadserviceaccount": "mondoo-operator-workload"
+              "serviceAccount": "mondoo-operator-workload"
             }
           }
         }
