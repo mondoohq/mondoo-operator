@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -39,26 +40,31 @@ type Nodes struct {
 	dsInventoryyaml string
 }
 
-func (n *Nodes) DeclareConfigMap(ctx context.Context, clt client.Client, req ctrl.Request, inventory string) (ctrl.Result, error) {
+func (n *Nodes) DeclareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
 	log := ctrllog.FromContext(ctx)
 
-	var found corev1.ConfigMap
-	req.NamespacedName.Name = n.Mondoo.Name + "-ds"
-	err := clt.Get(ctx, req.NamespacedName, &found)
+	found := &corev1.ConfigMap{}
+	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name + "-ds", Namespace: n.Mondoo.Namespace}, found)
+
+	if n.Mondoo.Spec.Nodes.Inventory != "" {
+		inventory = n.Mondoo.Spec.Nodes.Inventory
+	}
 	if err != nil && errors.IsNotFound(err) {
 		found.ObjectMeta = metav1.ObjectMeta{
-			Name:      req.NamespacedName.Name,
+			Name:      req.NamespacedName.Name + "-ds",
 			Namespace: req.NamespacedName.Namespace,
 		}
 		found.Data = map[string]string{
 			"inventory": inventory,
 		}
-		err := clt.Create(ctx, &found)
+		err := clt.Create(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to create new Configmap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
 			return ctrl.Result{}, err
 		}
+
+		ctrl.SetControllerReference(&n.Mondoo, found, scheme)
 		return ctrl.Result{Requeue: true}, err
 
 	} else if err != nil {
@@ -69,7 +75,7 @@ func (n *Nodes) DeclareConfigMap(ctx context.Context, clt client.Client, req ctr
 			"inventory": inventory,
 		}
 
-		err := clt.Update(ctx, &found)
+		err := clt.Update(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to update Configmap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
 			return ctrl.Result{}, err
@@ -85,13 +91,13 @@ func (n *Nodes) DeclareDaemonSet(ctx context.Context, clt client.Client, scheme 
 
 	log := ctrllog.FromContext(ctx)
 
-	var found appsv1.DaemonSet
-	req.NamespacedName.Name = n.Mondoo.Name
-	err := clt.Get(ctx, req.NamespacedName, &found)
-
+	found := &appsv1.DaemonSet{}
+	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
 		declared := n.deamonsetForMondoo(&n.Mondoo, n.Mondoo.Name+"-ds", scheme)
+		myFinalizerName := "batch.tutorial.kubebuilder.io/finalizer"
+		controllerutil.AddFinalizer(declared, myFinalizerName)
 		err := clt.Create(ctx, declared)
 		if err != nil {
 			log.Error(err, "Failed to create new Daemonset", "Daemonset.Namespace", declared.Namespace, "Daemonset.Name", declared.Name)
@@ -112,7 +118,7 @@ func (n *Nodes) DeclareDaemonSet(ctx context.Context, clt client.Client, scheme 
 		} else if found.Spec.Template.ObjectMeta.Annotations != nil {
 			found.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = metav1.Time{Time: time.Now()}.String()
 		}
-		err := clt.Update(ctx, &found)
+		err := clt.Update(ctx, found)
 		if err != nil {
 			log.Error(err, "failed to restart daemonset", "Daemonset.Namespace", found.Namespace, "Dameonset.Name", found.Name)
 			return ctrl.Result{}, err
@@ -224,11 +230,10 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string,
 func (n *Nodes) Down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error) {
 
 	log := ctrllog.FromContext(ctx)
-	finalizer := "batch.tutorial.kubebuilder.io/finalizer"
 
-	var found appsv1.DaemonSet
-	req.NamespacedName.Name = n.Mondoo.Name
-	err := clt.Get(ctx, req.NamespacedName, &found)
+	myFinalizerName := "batch.tutorial.kubebuilder.io/finalizer"
+	found := &appsv1.DaemonSet{}
+	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil
@@ -236,22 +241,22 @@ func (n *Nodes) Down(ctx context.Context, clt client.Client, req ctrl.Request) (
 		log.Error(err, "Failed to get DaemonSet")
 		return ctrl.Result{}, err
 	} else if err == nil {
-		err := clt.Delete(ctx, &found)
+		err := clt.Delete(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to delete Daemonset", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
 			return ctrl.Result{}, err
 		}
-		if controllerutil.ContainsFinalizer(&found, finalizer) {
+		if controllerutil.ContainsFinalizer(found, myFinalizerName) {
 			// our finalizer is present, so lets handle any external dependency
-			if _, err := n.deleteExternalResources(ctx, clt, req, &found); err != nil {
+			if _, err := n.deleteExternalResources(ctx, clt, req, found); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
 				return ctrl.Result{}, err
 			}
 
 			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(&found, finalizer)
-			if err := clt.Update(ctx, &found); err != nil {
+			controllerutil.RemoveFinalizer(found, myFinalizerName)
+			if err := clt.Update(ctx, found); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -263,7 +268,7 @@ func (n *Nodes) Down(ctx context.Context, clt client.Client, req ctrl.Request) (
 func (n *Nodes) Up(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
 	if n.Enable {
-		n.DeclareConfigMap(ctx, clt, req, inventory)
+		n.DeclareConfigMap(ctx, clt, scheme, req, inventory)
 		n.DeclareDaemonSet(ctx, clt, scheme, req, true)
 	} else {
 		n.Down(ctx, clt, req)
@@ -279,16 +284,15 @@ func (n *Nodes) deleteExternalResources(ctx context.Context, clt client.Client, 
 	// multiple times for same object.
 
 	log := ctrllog.FromContext(ctx)
-	var found corev1.ConfigMap
-	req.NamespacedName.Name = n.Mondoo.Name + "-ds"
-	err := clt.Get(ctx, req.NamespacedName, &found)
+	found := &corev1.ConfigMap{}
+	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name + "-ds", Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil
 	} else if err != nil {
 		log.Error(err, "Failed to get ConfigMap")
 		return ctrl.Result{}, err
 	} else if err == nil {
-		err := clt.Delete(ctx, &found)
+		err := clt.Delete(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to delete ConfigMap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
 			return ctrl.Result{}, err
