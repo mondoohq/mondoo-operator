@@ -93,8 +93,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo: *mondoo,
 	}
 
-	inventory := mondoo.Name + "-ds"
-	nodes.Up(ctx, r.Client, req, inventory)
+	inventory := string(dsInventoryyaml)
+	nodes.Up(ctx, r.Client, r.Scheme, req, inventory)
 
 	// Update the mondoo status with the pod names only after all pod creation actions are done
 	// List the pods for this mondoo's daemonset and deployment

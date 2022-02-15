@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -32,9 +33,10 @@ import (
 )
 
 type Nodes struct {
-	Enable  bool
-	Mondoo  v1alpha1.MondooAuditConfig
-	Updated bool
+	Enable          bool
+	Mondoo          v1alpha1.MondooAuditConfig
+	Updated         bool
+	dsInventoryyaml string
 }
 
 func (n *Nodes) DeclareConfigMap(ctx context.Context, clt client.Client, req ctrl.Request, inventory string) (ctrl.Result, error) {
@@ -79,7 +81,7 @@ func (n *Nodes) DeclareConfigMap(ctx context.Context, clt client.Client, req ctr
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) DeclareDaemonSet(ctx context.Context, clt client.Client, req ctrl.Request, update bool) (ctrl.Result, error) {
+func (n *Nodes) DeclareDaemonSet(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
 
 	log := ctrllog.FromContext(ctx)
 
@@ -88,19 +90,17 @@ func (n *Nodes) DeclareDaemonSet(ctx context.Context, clt client.Client, req ctr
 	err := clt.Get(ctx, req.NamespacedName, &found)
 
 	if err != nil && errors.IsNotFound(err) {
-		found.ObjectMeta = metav1.ObjectMeta{
-			Name:      req.NamespacedName.Name,
-			Namespace: req.NamespacedName.Namespace,
-		}
-		err := clt.Create(ctx, &found)
+
+		declared := n.deamonsetForMondoo(&n.Mondoo, n.Mondoo.Name+"-ds", scheme)
+		err := clt.Create(ctx, declared)
 		if err != nil {
-			log.Error(err, "Failed to create new Configmap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
+			log.Error(err, "Failed to create new Daemonset", "Daemonset.Namespace", declared.Namespace, "Daemonset.Name", declared.Name)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, err
 
 	} else if err != nil {
-		log.Error(err, "Failed to get Configmap")
+		log.Error(err, "Failed to get Daemonset")
 		return ctrl.Result{}, err
 	} else if err == nil && n.Updated {
 		if found.Spec.Template.ObjectMeta.Annotations == nil {
@@ -121,6 +121,104 @@ func (n *Nodes) DeclareDaemonSet(ctx context.Context, clt client.Client, req ctr
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string, scheme *runtime.Scheme) *appsv1.DaemonSet {
+	ls := labelsForMondoo(m.Name)
+	dep := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      m.Name,
+			Namespace: m.Namespace,
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: ls,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: ls,
+				},
+				Spec: corev1.PodSpec{
+					Tolerations: []corev1.Toleration{{
+						Key:    "node-role.kubernetes.io/master",
+						Effect: corev1.TaintEffect("NoSchedule"),
+					}},
+					Containers: []corev1.Container{{
+						Image:   "mondoolabs/mondoo:latest",
+						Name:    "mondoo-agent",
+						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "root",
+								ReadOnly:  true,
+								MountPath: "/mnt/host/",
+							},
+							{
+								Name:      "config",
+								ReadOnly:  true,
+								MountPath: "/etc/opt/",
+							},
+						},
+
+						Env: []corev1.EnvVar{
+							{
+								Name:  "DEBUG",
+								Value: "false",
+							},
+							{
+								Name:  "MONDOO_PROCFS",
+								Value: "on",
+							},
+						},
+					}},
+					Volumes: []corev1.Volume{
+						{
+							Name: "root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/",
+								},
+							},
+						},
+						{
+							Name: "config",
+							VolumeSource: corev1.VolumeSource{
+								Projected: &corev1.ProjectedVolumeSource{
+									Sources: []corev1.VolumeProjection{
+										{
+											ConfigMap: &corev1.ConfigMapProjection{
+												LocalObjectReference: corev1.LocalObjectReference{
+													Name: cmName,
+												},
+												Items: []corev1.KeyToPath{{
+													Key:  "inventory",
+													Path: "mondoo/inventory.yml",
+												}},
+											},
+										},
+										{
+											Secret: &corev1.SecretProjection{
+												LocalObjectReference: corev1.LocalObjectReference{
+													Name: m.Spec.MondooSecretRef,
+												},
+												Items: []corev1.KeyToPath{{
+													Key:  "config",
+													Path: "mondoo/mondoo.yml",
+												}},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	// Set mondoo instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, scheme)
+	return dep
 }
 
 func (n *Nodes) Down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error) {
@@ -162,11 +260,11 @@ func (n *Nodes) Down(ctx context.Context, clt client.Client, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) Up(ctx context.Context, clt client.Client, req ctrl.Request, inventory string) (ctrl.Result, error) {
+func (n *Nodes) Up(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
 	if n.Enable {
 		n.DeclareConfigMap(ctx, clt, req, inventory)
-		n.DeclareDaemonSet(ctx, clt, req, true)
+		n.DeclareDaemonSet(ctx, clt, scheme, req, true)
 	} else {
 		n.Down(ctx, clt, req)
 	}
@@ -175,7 +273,7 @@ func (n *Nodes) Up(ctx context.Context, clt client.Client, req ctrl.Request, inv
 
 func (n *Nodes) deleteExternalResources(ctx context.Context, clt client.Client, req ctrl.Request, DaemonSet *appsv1.DaemonSet) (ctrl.Result, error) {
 	//
-	// delete any external resources associated with the cronJob
+	// delete any external resources associated with the daemonset
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
