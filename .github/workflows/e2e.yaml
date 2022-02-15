@@ -35,10 +35,33 @@ jobs:
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
       - name: Verify a Kubernetes Application
         run: |
-          sleep 20
+          kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator-system 
+          kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator-system --timeout=300s
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
+          make undeploy
+      - name: Install Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: 'v3.8.0' # default is latest stable
+        id: install
+      - name: Install Helm chart
+        run: |
+          echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
+          kubectl create namespace mondoo-operator-system
+          kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
+          export VERSION=sha256-$(git rev-parse HEAD).sig
+          helm install mondoo-operator ./chart --namespace mondoo-operator-system --set controllerManager.manager.image.tag=$VERSION
+          kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
+      - name: Verify a Kubernetes Application
+        run: |
+          kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator-system 
+          kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator-system --timeout=300s
+          curl -sSL http://mondoo.io/download.sh | bash
+          mv mondoo /usr/local/bin/ 
+          make test/deployment
+          helm uninstall mondoo-operator  --namespace mondoo-operator-system 
 
   # Added to summarize the matrix and allow easy branch protection rules setup
   e2e-tests-result:

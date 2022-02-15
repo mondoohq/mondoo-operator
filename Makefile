@@ -209,3 +209,10 @@ catalog-push: ## Push a catalog image.
 .PHONY: test/deployment
 test/deployment:
 	mondoo scan -t k8s test/deployment-policy.yaml --incognito
+
+HELMIFY = $(shell pwd)/bin/helmify
+helmify:
+	$(call go-get-tool,$(HELMIFY),github.com/arttor/helmify/cmd/helmify@latest)
+
+helm: manifests kustomize helmify
+	$(KUSTOMIZE) build config/default | $(HELMIFY)
