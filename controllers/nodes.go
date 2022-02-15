@@ -32,6 +32,12 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+type controller interface {
+	DeclareConfigMap
+	Declareruntimereset
+	corev1.DownwardAPIProjection
+}
+
 type Nodes struct {
 	Enable  bool
 	Mondoo  v1alpha1.MondooAuditConfig
