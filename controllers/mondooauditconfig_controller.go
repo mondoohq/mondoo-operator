@@ -27,7 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "k8s.io/api/apps/v1
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -36,7 +36,7 @@ import (
 type MondooAuditConfigReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-
+}
 
 // Embed the Default Inventory for Daemonset and Deployment Configurations
 //go:embed inventory-ds.yaml
@@ -89,12 +89,12 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	nodes := Nodes{
-		Enable : mondoo.Spec.Nodes.Enable, 
-		Mondoo : mondoo,
+		Enable: mondoo.Spec.Nodes.Enable,
+		Mondoo: *mondoo,
 	}
 
 	inventory := mondoo.Name + "-ds"
-	nodes.Up(ctx, r.Client, r.Scheme, req, inventory)
+	nodes.Up(ctx, r.Client, req, inventory)
 
 	// Update the mondoo status with the pod names only after all pod creation actions are done
 	// List the pods for this mondoo's daemonset and deployment
@@ -109,7 +109,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 	podNames := getPodNames(podList.Items)
-	err = r.Get(ctx, req.NamespacedName, &mondoo)
+	err = r.Get(ctx, req.NamespacedName, mondoo)
 	if err != nil {
 		log.Error(err, "Failed to get mondoo")
 		return ctrl.Result{}, err
@@ -117,7 +117,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// Update status.Nodes if needed
 	if !reflect.DeepEqual(podNames, mondoo.Status.Nodes) {
 		mondoo.Status.Nodes = podNames
-		err := r.Status().Update(ctx, &mondoo)
+		err := r.Status().Update(ctx, mondoo)
 		if err != nil {
 			log.Error(err, "Failed to update mondoo status")
 			return ctrl.Result{}, err

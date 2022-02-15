@@ -25,18 +25,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-type controller interface {
-	DeclareConfigMap
-	Declareruntimereset
-	corev1.DownwardAPIProjection
-}
 
 type Nodes struct {
 	Enable  bool
@@ -44,7 +37,7 @@ type Nodes struct {
 	Updated bool
 }
 
-func (n *Nodes) DeclareConfigMap(ctx context.Context, clt client.Client, scheme runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
+func (n *Nodes) DeclareConfigMap(ctx context.Context, clt client.Client, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
 	log := ctrllog.FromContext(ctx)
 
@@ -59,7 +52,6 @@ func (n *Nodes) DeclareConfigMap(ctx context.Context, clt client.Client, scheme 
 		found.Data = map[string]string{
 			"inventory": inventory,
 		}
-		ctrl.SetControllerReference(&n.Mondoo, &found, scheme.Scheme)
 		err := clt.Create(ctx, &found)
 		if err != nil {
 			log.Error(err, "Failed to create new Configmap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
@@ -170,10 +162,10 @@ func (n *Nodes) Down(ctx context.Context, clt client.Client, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) Up(ctx context.Context, clt client.Client, scheme runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
+func (n *Nodes) Up(ctx context.Context, clt client.Client, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
 	if n.Enable {
-		n.DeclareConfigMap(ctx, clt, scheme, req, inventory)
+		n.DeclareConfigMap(ctx, clt, req, inventory)
 		n.DeclareDaemonSet(ctx, clt, req, true)
 	} else {
 		n.Down(ctx, clt, req)
