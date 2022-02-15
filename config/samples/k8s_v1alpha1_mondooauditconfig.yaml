@@ -9,6 +9,5 @@ spec:
     serviceAccount: mondoo-operator-workload
   nodes:
     enable: true
-    inventory: "crash me"
   mondooSecretRef: mondoo-client
   
