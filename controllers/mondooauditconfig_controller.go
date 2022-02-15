@@ -92,9 +92,9 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Enable: mondoo.Spec.Nodes.Enable,
 		Mondoo: *mondoo,
 	}
-
 	inventory := string(dsInventoryyaml)
-	nodes.Up(ctx, r.Client, r.Scheme, req, inventory)
+
+	SuperUp(&nodes, ctx, r.Client, r.Scheme, req, inventory)
 
 	// Update the mondoo status with the pod names only after all pod creation actions are done
 	// List the pods for this mondoo's daemonset and deployment
@@ -124,6 +124,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 	return ctrl.Result{}, nil
+}
+
+func SuperUp(g Declare, ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) {
+	g.Up(ctx, clt, scheme, req, inventory)
 }
 
 // labelsForMondoo returns the labels for selecting the resources

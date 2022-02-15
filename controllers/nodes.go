@@ -33,6 +33,11 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+type Declare interface {
+	Up(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error)
+	Down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error)
+}
+
 type Nodes struct {
 	Enable          bool
 	Mondoo          v1alpha1.MondooAuditConfig
