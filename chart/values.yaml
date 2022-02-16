@@ -5,8 +5,8 @@ controllerManager:
       tag: v0.8.0
   manager:
     image:
-      repository: ghcr.io/mondoolabs/mondoo-operator
-      tag: latest
+      repository: ghcr.io/mondoohq/mondoo-operator
+      tag: sha256-d7748902611f97384cce217e19bc6c22bf7e3612.sig
     resources:
       limits:
         cpu: 200m
