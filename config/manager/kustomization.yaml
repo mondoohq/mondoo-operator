@@ -13,4 +13,5 @@ kind: Kustomization
 images:
 - name: controller
   newName: ghcr.io/mondoolabs/mondoo-operator
-  newTag: sha256-7bd3d1405f25b7ae8cbf03894e0e92397019e9a5.sig
+  newTag: v0.0.1
+

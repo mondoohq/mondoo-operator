@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - "main"
-    tags:
-      - "v*"
+    tags: ["v*.*.*"]
 jobs:
   generate-manifests:
     runs-on: ubuntu-latest
@@ -15,9 +14,10 @@ jobs:
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
       - uses: actions/setup-go@v2
+      - name: Generate manifests 
         with:
           go-version: "${{ env.golang-version }}"
-      - run: make generate-manifests 
+      - run: make generate-manifests
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
