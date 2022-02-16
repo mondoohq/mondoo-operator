@@ -2,6 +2,8 @@
 
 Mondoo client can be configured to run security policies against kubernetes objects in all  namespaces or a specific namespace. This can be acheived by altering the inventory in the MondooAuditConfig CRD.
 
+>By default mondoo client is configured to run policies against objects in all namespaces.
+
 # Example Config
 
 To run mondoo policies against kubernetes objects in the example namespace the following configuration can be used.
