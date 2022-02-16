@@ -33,25 +33,25 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type Nodes struct {
+type Workloads struct {
 	Enable  bool
 	Mondoo  v1alpha1.MondooAuditConfig
 	Updated bool
 }
 
-func (n *Nodes) DeclareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
+func (n *Workloads) DeclareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
 	log := ctrllog.FromContext(ctx)
 
 	found := &corev1.ConfigMap{}
-	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name + "-ds", Namespace: n.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name + "-deploy", Namespace: n.Mondoo.Namespace}, found)
 
-	if n.Mondoo.Spec.Nodes.Inventory != "" {
-		inventory = n.Mondoo.Spec.Nodes.Inventory
+	if n.Mondoo.Spec.Workloads.Inventory != "" {
+		inventory = n.Mondoo.Spec.Workloads.Inventory
 	}
 	if err != nil && errors.IsNotFound(err) {
 		found.ObjectMeta = metav1.ObjectMeta{
-			Name:      req.NamespacedName.Name + "-ds",
+			Name:      req.NamespacedName.Name + "-deploy",
 			Namespace: req.NamespacedName.Namespace,
 		}
 		found.Data = map[string]string{
@@ -86,26 +86,26 @@ func (n *Nodes) DeclareConfigMap(ctx context.Context, clt client.Client, scheme 
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) DeclareDaemonSet(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
+func (n *Workloads) DeclareDeployment(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
 
 	log := ctrllog.FromContext(ctx)
 
-	found := &appsv1.DaemonSet{}
+	found := &appsv1.Deployment{}
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
-		declared := n.deamonsetForMondoo(&n.Mondoo, n.Mondoo.Name+"-ds", scheme)
+		declared := n.deploymentForMondoo(&n.Mondoo, n.Mondoo.Name+"-deploy", scheme)
 		myFinalizerName := "batch.tutorial.kubebuilder.io/finalizer"
 		controllerutil.AddFinalizer(declared, myFinalizerName)
 		err := clt.Create(ctx, declared)
 		if err != nil {
-			log.Error(err, "Failed to create new Daemonset", "Daemonset.Namespace", declared.Namespace, "Daemonset.Name", declared.Name)
+			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", declared.Namespace, "Deployment.Name", declared.Name)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, err
 
 	} else if err != nil {
-		log.Error(err, "Failed to get Daemonset")
+		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
 	} else if err == nil && n.Updated {
 		if found.Spec.Template.ObjectMeta.Annotations == nil {
@@ -119,7 +119,7 @@ func (n *Nodes) DeclareDaemonSet(ctx context.Context, clt client.Client, scheme 
 		}
 		err := clt.Update(ctx, found)
 		if err != nil {
-			log.Error(err, "failed to restart daemonset", "Daemonset.Namespace", found.Namespace, "Dameonset.Name", found.Name)
+			log.Error(err, "failed to restart Deployment", "Deployment.Namespace", found.Namespace, "Dameonset.Name", found.Name)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, err
@@ -128,14 +128,16 @@ func (n *Nodes) DeclareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string, scheme *runtime.Scheme) *appsv1.DaemonSet {
+// deploymentForMondoo returns a Deployment object
+func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName string, scheme *runtime.Scheme) *appsv1.Deployment {
 	ls := labelsForMondoo(m.Name)
-	dep := &appsv1.DaemonSet{
+
+	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      m.Name,
 			Namespace: m.Namespace,
 		},
-		Spec: appsv1.DaemonSetSpec{
+		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: ls,
 			},
@@ -152,6 +154,7 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string,
 						Image:   "mondoolabs/mondoo:latest",
 						Name:    "mondoo-agent",
 						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
+
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "root",
@@ -176,6 +179,7 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string,
 							},
 						},
 					}},
+					ServiceAccountName: m.Spec.Workloads.ServiceAccount,
 					Volumes: []corev1.Volume{
 						{
 							Name: "root",
@@ -226,23 +230,23 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string,
 	return dep
 }
 
-func (n *Nodes) Down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error) {
+func (n *Workloads) Down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error) {
 
 	log := ctrllog.FromContext(ctx)
 
 	myFinalizerName := "batch.tutorial.kubebuilder.io/finalizer"
-	found := &appsv1.DaemonSet{}
+	found := &appsv1.Deployment{}
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil
 	} else if err != nil {
-		log.Error(err, "Failed to get DaemonSet")
+		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
 	} else if err == nil {
 		err := clt.Delete(ctx, found)
 		if err != nil {
-			log.Error(err, "Failed to delete Daemonset", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
+			log.Error(err, "Failed to delete Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
 			return ctrl.Result{}, err
 		}
 		if controllerutil.ContainsFinalizer(found, myFinalizerName) {
@@ -264,27 +268,27 @@ func (n *Nodes) Down(ctx context.Context, clt client.Client, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
+func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
 	if n.Enable {
 		n.DeclareConfigMap(ctx, clt, scheme, req, inventory)
-		n.DeclareDaemonSet(ctx, clt, scheme, req, true)
+		n.DeclareDeployment(ctx, clt, scheme, req, true)
 	} else {
 		n.Down(ctx, clt, req)
 	}
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) deleteExternalResources(ctx context.Context, clt client.Client, req ctrl.Request, DaemonSet *appsv1.DaemonSet) (ctrl.Result, error) {
+func (n *Workloads) deleteExternalResources(ctx context.Context, clt client.Client, req ctrl.Request, Deployment *appsv1.Deployment) (ctrl.Result, error) {
 	//
-	// delete any external resources associated with the daemonset
+	// delete any external resources associated with the Deployment
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
 
 	log := ctrllog.FromContext(ctx)
 	found := &corev1.ConfigMap{}
-	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name + "-ds", Namespace: n.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name + "-deploy", Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil
 	} else if err != nil {

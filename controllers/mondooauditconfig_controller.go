@@ -38,6 +38,11 @@ type MondooAuditConfigReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+// Interface for workloads that mondooAuditConfig CRD creates
+type Mondoo interface {
+	Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error)
+}
+
 // Embed the Default Inventory for Daemonset and Deployment Configurations
 //go:embed inventory-ds.yaml
 var dsInventoryyaml []byte
@@ -92,9 +97,14 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Enable: mondoo.Spec.Nodes.Enable,
 		Mondoo: *mondoo,
 	}
-	inventory := string(dsInventoryyaml)
 
-	SuperUp(&nodes, ctx, r.Client, r.Scheme, req, inventory)
+	workloads := Workloads{
+		Enable: mondoo.Spec.Workloads.Enable,
+		Mondoo: *mondoo,
+	}
+
+	Up(&nodes, ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
+	Up(&workloads, ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
 
 	// Update the mondoo status with the pod names only after all pod creation actions are done
 	// List the pods for this mondoo's daemonset and deployment
@@ -126,8 +136,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	return ctrl.Result{}, nil
 }
 
-func SuperUp(g Declare, ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) {
-	g.Up(ctx, clt, scheme, req, inventory)
+func Up(g Mondoo, ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) {
+	g.Reconcile(ctx, clt, scheme, req, inventory)
 }
 
 // labelsForMondoo returns the labels for selecting the resources
