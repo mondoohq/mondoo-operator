@@ -5,7 +5,7 @@ Mondoo client can be configured to run security policies against kubernetes obje
 # Example Config
 
 To run mondoo policies against kubernetes objects in the example namespace the following configuration can be used.
-```
+```yaml
 apiVersion: k8s.mondoo.com/v1alpha1
 kind: MondooAuditConfig
 metadata:
@@ -32,5 +32,4 @@ spec:
   nodes:
     enable: true
   mondooSecretRef: mondoo-client
-  
 ```
