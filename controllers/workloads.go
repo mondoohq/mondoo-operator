@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -95,8 +94,6 @@ func (n *Workloads) DeclareDeployment(ctx context.Context, clt client.Client, sc
 	if err != nil && errors.IsNotFound(err) {
 
 		declared := n.deploymentForMondoo(&n.Mondoo, n.Mondoo.Name+"-deploy", scheme)
-		myFinalizerName := "batch.tutorial.kubebuilder.io/finalizer"
-		controllerutil.AddFinalizer(declared, myFinalizerName)
 		err := clt.Create(ctx, declared)
 		if err != nil {
 			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", declared.Namespace, "Deployment.Name", declared.Name)
@@ -234,7 +231,6 @@ func (n *Workloads) Down(ctx context.Context, clt client.Client, req ctrl.Reques
 
 	log := ctrllog.FromContext(ctx)
 
-	myFinalizerName := "batch.tutorial.kubebuilder.io/finalizer"
 	found := &appsv1.Deployment{}
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 
@@ -249,20 +245,12 @@ func (n *Workloads) Down(ctx context.Context, clt client.Client, req ctrl.Reques
 			log.Error(err, "Failed to delete Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
 			return ctrl.Result{}, err
 		}
-		if controllerutil.ContainsFinalizer(found, myFinalizerName) {
-			// our finalizer is present, so lets handle any external dependency
-			if _, err := n.deleteExternalResources(ctx, clt, req, found); err != nil {
-				// if fail to delete the external dependency here, return with error
-				// so that it can be retried
-				return ctrl.Result{}, err
-			}
-
-			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(found, myFinalizerName)
-			if err := clt.Update(ctx, found); err != nil {
-				return ctrl.Result{}, err
-			}
+		if _, err := n.deleteExternalResources(ctx, clt, req, found); err != nil {
+			// if fail to delete the external dependency here, return with error
+			// so that it can be retried
+			return ctrl.Result{}, err
 		}
+
 		return ctrl.Result{Requeue: true}, err
 	}
 	return ctrl.Result{}, nil
