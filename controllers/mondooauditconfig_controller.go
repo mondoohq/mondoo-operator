@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -82,15 +83,44 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
 			log.Info("mondoo resource not found. Ignoring since object must be deleted")
-			return ctrl.Result{}, nil
+			// we'll ignore not-found errors, since they can't be fixed by an immediate
+			// requeue (we'll need to wait for a new notification), and we can get them
+			// on deleted requests.
+			return ctrl.Result{}, client.IgnoreNotFound(err)
+
 		}
 		// Error reading the object - requeue the request.
 		log.Error(err, "Failed to get mondoo")
 		return ctrl.Result{}, err
+	}
+
+	myFinalizerName := "batch.tutorial.kubebuilder.io/finalizer"
+
+	// examine DeletionTimestamp to determine if object is under deletion
+	if mondoo.ObjectMeta.DeletionTimestamp.IsZero() {
+		// The object is not being deleted, so if it does not have our finalizer,
+		// then lets add the finalizer and update the object. This is equivalent
+		// registering our finalizer.
+		if !controllerutil.ContainsFinalizer(mondoo, myFinalizerName) {
+			controllerutil.AddFinalizer(mondoo, myFinalizerName)
+			if err := r.Update(ctx, mondoo); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		// The object is being deleted
+		if controllerutil.ContainsFinalizer(mondoo, myFinalizerName) {
+			// our finalizer is present, so lets handle any external dependency
+
+			mondoo.Spec.Nodes.Enable = false
+			mondoo.Spec.Workloads.Enable = false
+			// remove our finalizer from the list and update it.
+			controllerutil.RemoveFinalizer(mondoo, myFinalizerName)
+			if err := r.Update(ctx, mondoo); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 
 	nodes := Nodes{
