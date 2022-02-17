@@ -39,6 +39,7 @@ jobs:
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
+          kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml --namespace mondoo-operator-system
           make undeploy
       - name: Install Helm
         uses: azure/setup-helm@v1
