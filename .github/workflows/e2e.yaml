@@ -82,6 +82,7 @@ jobs:
           make bundle IMG="localhost:5000/mondoohq/mondoo-operator:v0.0.1"
           make bundle-build bundle-push BUNDLE_IMG="localhost:5000/mondoohq/mondoo-operator-bundle:v0.0.1"
       - name: Run bundle with olm
+        run: |
           operator-sdk run bundle localhost:5000/mondoohq/mondoo-operator-bundle:v0.0.1 --skip-tls
           make test/deployment
           operator-sdk cleanup mondoo-operator 
