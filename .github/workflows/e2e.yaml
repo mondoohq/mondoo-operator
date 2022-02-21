@@ -22,10 +22,10 @@ jobs:
         uses: medyagh/setup-minikube@master
       - name: Try the cluster !
         run: kubectl get pods -A
-      # - name: Build image
-      #   run: |
-      #     export SHELL=/bin/bash
-      #     eval $(minikube -p minikube docker-env)
+      - name: Build image
+        run: |
+          export SHELL=/bin/bash
+          eval $(minikube -p minikube docker-env)
       #     make docker-build
       # - name: Deploy to minikube
       #   run: |
