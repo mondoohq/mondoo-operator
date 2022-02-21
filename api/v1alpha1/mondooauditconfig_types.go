@@ -51,7 +51,7 @@ type MondooAuditConfigStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Nodes store the name of the pods which are running mondoo instances
-	Nodes []string `json:"nodes,omitempty"`
+	Pods []string `json:"pods,omitempty"`
 }
 
 //+kubebuilder:object:root=true

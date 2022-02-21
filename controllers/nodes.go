@@ -93,18 +93,20 @@ func (n *Nodes) DeclareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
-		declared := n.deamonsetForMondoo(&n.Mondoo, n.Mondoo.Name+"-ds", scheme)
+		declared := n.deamonsetForMondoo(&n.Mondoo, n.Mondoo.Name+"-ds")
 		err := clt.Create(ctx, declared)
 		if err != nil {
 			log.Error(err, "Failed to create new Daemonset", "Daemonset.Namespace", declared.Namespace, "Daemonset.Name", declared.Name)
 			return ctrl.Result{}, err
 		}
+		ctrl.SetControllerReference(&n.Mondoo, declared, scheme)
 		return ctrl.Result{Requeue: true}, err
 
 	} else if err != nil {
 		log.Error(err, "Failed to get Daemonset")
 		return ctrl.Result{}, err
-	} else if err == nil && n.Updated {
+	}
+	if n.Updated {
 		if found.Spec.Template.ObjectMeta.Annotations == nil {
 			annotation := map[string]string{
 				"kubectl.kubernetes.io/restartedAt": metav1.Time{Time: time.Now()}.String(),
@@ -125,7 +127,7 @@ func (n *Nodes) DeclareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string, scheme *runtime.Scheme) *appsv1.DaemonSet {
+func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string) *appsv1.DaemonSet {
 	ls := labelsForMondoo(m.Name)
 	dep := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -218,38 +220,7 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string,
 			},
 		},
 	}
-	// Set mondoo instance as the owner and controller
-	ctrl.SetControllerReference(m, dep, scheme)
 	return dep
-}
-
-func (n *Nodes) Down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error) {
-
-	log := ctrllog.FromContext(ctx)
-
-	found := &appsv1.DaemonSet{}
-	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
-
-	if err != nil && errors.IsNotFound(err) {
-		return ctrl.Result{}, nil
-	} else if err != nil {
-		log.Error(err, "Failed to get DaemonSet")
-		return ctrl.Result{}, err
-	} else if err == nil {
-		err := clt.Delete(ctx, found)
-		if err != nil {
-			log.Error(err, "Failed to delete Daemonset", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
-			return ctrl.Result{}, err
-		}
-		if _, err := n.deleteExternalResources(ctx, clt, req, found); err != nil {
-			// if fail to delete the external dependency here, return with error
-			// so that it can be retried
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{Requeue: true}, err
-	}
-	return ctrl.Result{}, nil
 }
 
 func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
@@ -263,28 +234,52 @@ func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtim
 	return ctrl.Result{}, nil
 }
 
+func (n *Nodes) Down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error) {
+
+	log := ctrllog.FromContext(ctx)
+
+	found := &appsv1.DaemonSet{}
+	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
+
+	if err != nil && errors.IsNotFound(err) {
+		return ctrl.Result{}, nil
+	} else if err != nil {
+		log.Error(err, "Failed to get Daemonset")
+		return ctrl.Result{}, err
+	}
+
+	err = clt.Delete(ctx, found)
+	if err != nil {
+		log.Error(err, "Failed to delete Dameonst", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
+		return ctrl.Result{}, err
+	}
+	if _, err := n.deleteExternalResources(ctx, clt, req, found); err != nil {
+		// if fail to delete the external dependency here, return with error
+		// so that it can be retried
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{Requeue: true}, err
+}
+
+// deleteExternalResources deletes any external resources associated with the daemonset
 func (n *Nodes) deleteExternalResources(ctx context.Context, clt client.Client, req ctrl.Request, DaemonSet *appsv1.DaemonSet) (ctrl.Result, error) {
-	//
-	// delete any external resources associated with the daemonset
-	//
-	// Ensure that delete implementation is idempotent and safe to invoke
-	// multiple times for same object.
 
 	log := ctrllog.FromContext(ctx)
 	found := &corev1.ConfigMap{}
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name + "-ds", Namespace: n.Mondoo.Namespace}, found)
+
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil
 	} else if err != nil {
 		log.Error(err, "Failed to get ConfigMap")
 		return ctrl.Result{}, err
-	} else if err == nil {
-		err := clt.Delete(ctx, found)
-		if err != nil {
-			log.Error(err, "Failed to delete ConfigMap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{Requeue: true}, err
 	}
-	return ctrl.Result{}, nil
+
+	err = clt.Delete(ctx, found)
+	if err != nil {
+		log.Error(err, "Failed to delete ConfigMap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{Requeue: true}, err
 }

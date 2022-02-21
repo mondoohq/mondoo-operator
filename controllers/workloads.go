@@ -93,18 +93,21 @@ func (n *Workloads) DeclareDeployment(ctx context.Context, clt client.Client, sc
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
-		declared := n.deploymentForMondoo(&n.Mondoo, n.Mondoo.Name+"-deploy", scheme)
+		declared := n.deploymentForMondoo(&n.Mondoo, n.Mondoo.Name+"-deploy")
 		err := clt.Create(ctx, declared)
 		if err != nil {
 			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", declared.Namespace, "Deployment.Name", declared.Name)
 			return ctrl.Result{}, err
 		}
+		ctrl.SetControllerReference(&n.Mondoo, declared, scheme)
 		return ctrl.Result{Requeue: true}, err
 
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
-	} else if err == nil && n.Updated {
+	}
+
+	if n.Updated {
 		if found.Spec.Template.ObjectMeta.Annotations == nil {
 			annotation := map[string]string{
 				"kubectl.kubernetes.io/restartedAt": metav1.Time{Time: time.Now()}.String(),
@@ -126,7 +129,7 @@ func (n *Workloads) DeclareDeployment(ctx context.Context, clt client.Client, sc
 }
 
 // deploymentForMondoo returns a Deployment object
-func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName string, scheme *runtime.Scheme) *appsv1.Deployment {
+func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName string) *appsv1.Deployment {
 	ls := labelsForMondoo(m.Name)
 
 	dep := &appsv1.Deployment{
@@ -222,9 +225,18 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 			},
 		},
 	}
-	// Set mondoo instance as the owner and controller
-	ctrl.SetControllerReference(m, dep, scheme)
 	return dep
+}
+
+func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
+
+	if n.Enable {
+		n.DeclareConfigMap(ctx, clt, scheme, req, inventory)
+		n.DeclareDeployment(ctx, clt, scheme, req, true)
+	} else {
+		n.Down(ctx, clt, req)
+	}
+	return ctrl.Result{}, nil
 }
 
 func (n *Workloads) Down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error) {
@@ -239,32 +251,20 @@ func (n *Workloads) Down(ctx context.Context, clt client.Client, req ctrl.Reques
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
-	} else if err == nil {
-		err := clt.Delete(ctx, found)
-		if err != nil {
-			log.Error(err, "Failed to delete Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
-			return ctrl.Result{}, err
-		}
-		if _, err := n.deleteExternalResources(ctx, clt, req, found); err != nil {
-			// if fail to delete the external dependency here, return with error
-			// so that it can be retried
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{Requeue: true}, err
 	}
-	return ctrl.Result{}, nil
-}
 
-func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
-
-	if n.Enable {
-		n.DeclareConfigMap(ctx, clt, scheme, req, inventory)
-		n.DeclareDeployment(ctx, clt, scheme, req, true)
-	} else {
-		n.Down(ctx, clt, req)
+	err = clt.Delete(ctx, found)
+	if err != nil {
+		log.Error(err, "Failed to delete Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+		return ctrl.Result{}, err
 	}
-	return ctrl.Result{}, nil
+	if _, err := n.deleteExternalResources(ctx, clt, req, found); err != nil {
+		// if fail to delete the external dependency here, return with error
+		// so that it can be retried
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{Requeue: true}, err
 }
 
 func (n *Workloads) deleteExternalResources(ctx context.Context, clt client.Client, req ctrl.Request, Deployment *appsv1.Deployment) (ctrl.Result, error) {
@@ -282,13 +282,12 @@ func (n *Workloads) deleteExternalResources(ctx context.Context, clt client.Clie
 	} else if err != nil {
 		log.Error(err, "Failed to get ConfigMap")
 		return ctrl.Result{}, err
-	} else if err == nil {
-		err := clt.Delete(ctx, found)
-		if err != nil {
-			log.Error(err, "Failed to delete ConfigMap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{Requeue: true}, err
 	}
-	return ctrl.Result{}, nil
+
+	err = clt.Delete(ctx, found)
+	if err != nil {
+		log.Error(err, "Failed to delete ConfigMap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{Requeue: true}, err
 }

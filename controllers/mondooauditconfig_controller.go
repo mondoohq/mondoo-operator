@@ -38,11 +38,6 @@ type MondooAuditConfigReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// Interface for workloads that mondooAuditConfig CRD creates
-type Mondoo interface {
-	Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error)
-}
-
 // Embed the Default Inventory for Daemonset and Deployment Configurations
 //go:embed inventory-ds.yaml
 var dsInventoryyaml []byte
@@ -98,14 +93,24 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo: *mondoo,
 	}
 
+	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
+
+	if err != nil {
+		log.Error(err, "Failed to declare nodes")
+		return result, err
+	}
+
 	workloads := Workloads{
 		Enable: mondoo.Spec.Workloads.Enable,
 		Mondoo: *mondoo,
 	}
 
-	Up(&nodes, ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
-	Up(&workloads, ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
+	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
 
+	if err != nil {
+		log.Error(err, "Failed to declare workloads")
+		return result, err
+	}
 	// Update the mondoo status with the pod names only after all pod creation actions are done
 	// List the pods for this mondoo's daemonset and deployment
 
@@ -125,8 +130,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 	// Update status.Nodes if needed
-	if !reflect.DeepEqual(podNames, mondoo.Status.Nodes) {
-		mondoo.Status.Nodes = podNames
+	if !reflect.DeepEqual(podNames, mondoo.Status.Pods) {
+		mondoo.Status.Pods = podNames
 		err := r.Status().Update(ctx, mondoo)
 		if err != nil {
 			log.Error(err, "Failed to update mondoo status")
@@ -134,10 +139,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 	return ctrl.Result{}, nil
-}
-
-func Up(g Mondoo, ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) {
-	g.Reconcile(ctx, clt, scheme, req, inventory)
 }
 
 // labelsForMondoo returns the labels for selecting the resources
