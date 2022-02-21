@@ -5,6 +5,10 @@ on:
     branches:
       - "main"
     tags: ["v*.*.*"]
+
+env:
+  CHART_NAME: mondoo-operator
+
 jobs:
   e2e-tests:
     name: E2E tests
@@ -32,7 +36,7 @@ jobs:
           echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
           kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
-      - name: Verify a Kubernetes Application
+      - name: Verify Mondoo Operator kustomize manifests
         run: |
           kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator-system 
           kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator-system --timeout=300s
@@ -45,15 +49,15 @@ jobs:
         with:
           version: 'v3.8.0' # default is latest stable
         id: install
-      - name: Install Helm chart
+      - name: Create and Install Helm chart
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
           kubectl create namespace mondoo-operator-system
           kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
-          export VERSION=sha256-$(git rev-parse HEAD).sig
-          helm install mondoo-operator ./charts --namespace mondoo-operator-system --set controllerManager.manager.image.tag=$VERSION
+          make helm 
+          helm install mondoo-operator ./mondoo-operator --namespace mondoo-operator-system 
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
-      - name: Verify a Kubernetes Application
+      - name: Verify Mondoo Operator Helm Chart
         run: |
           kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator-system 
           kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator-system --timeout=300s
