@@ -219,4 +219,4 @@ helmify:
 	$(call go-get-tool,$(HELMIFY),github.com/arttor/helmify/cmd/helmify@latest)
 
 helm: manifests kustomize helmify
-	$(KUSTOMIZE) build config/default | $(HELMIFY)
+	$(KUSTOMIZE) build config/default | $(HELMIFY) $(CHART_NAME)
