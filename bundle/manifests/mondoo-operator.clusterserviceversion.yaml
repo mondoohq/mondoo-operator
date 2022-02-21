@@ -205,7 +205,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: ghcr.io/mondoolabs/mondoo-operator:v0.0.1
+                image: localhost:5000/mondoo-operator:v0.0.1
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
