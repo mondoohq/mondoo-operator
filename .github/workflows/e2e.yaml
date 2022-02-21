@@ -75,7 +75,7 @@ jobs:
           grep operator-sdk_${OS}_${ARCH} checksums.txt | sha256sum -c -
           chmod +x operator-sdk_${OS}_${ARCH} && sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
           operator-sdk olm install
-          docker run -d -p 5000:5000 --restart=always --name registry registry:2
+          docker run -d -p 5000:5000 --network minikube --restart=always --name registry registry:2
       - name: Make bundle  
         run: |
           make docker-build docker-push IMG="localhost:5000/mondoohq/mondoo-operator:v0.0.1"
