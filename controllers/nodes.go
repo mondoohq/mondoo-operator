@@ -38,8 +38,7 @@ type Nodes struct {
 	Updated bool
 }
 
-func (n *Nodes) DeclareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
-
+func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	found := &corev1.ConfigMap{}
@@ -85,8 +84,7 @@ func (n *Nodes) DeclareConfigMap(ctx context.Context, clt client.Client, scheme 
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) DeclareDaemonSet(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
-
+func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	found := &appsv1.DaemonSet{}
@@ -224,18 +222,16 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 }
 
 func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
-
 	if n.Enable {
-		n.DeclareConfigMap(ctx, clt, scheme, req, inventory)
-		n.DeclareDaemonSet(ctx, clt, scheme, req, true)
+		n.declareConfigMap(ctx, clt, scheme, req, inventory)
+		n.declareDaemonSet(ctx, clt, scheme, req, true)
 	} else {
-		n.Down(ctx, clt, req)
+		n.down(ctx, clt, req)
 	}
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) Down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error) {
-
+func (n *Nodes) down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	found := &appsv1.DaemonSet{}
@@ -264,7 +260,6 @@ func (n *Nodes) Down(ctx context.Context, clt client.Client, req ctrl.Request) (
 
 // deleteExternalResources deletes any external resources associated with the daemonset
 func (n *Nodes) deleteExternalResources(ctx context.Context, clt client.Client, req ctrl.Request, DaemonSet *appsv1.DaemonSet) (ctrl.Result, error) {
-
 	log := ctrllog.FromContext(ctx)
 	found := &corev1.ConfigMap{}
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name + "-ds", Namespace: n.Mondoo.Namespace}, found)

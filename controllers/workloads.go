@@ -38,8 +38,7 @@ type Workloads struct {
 	Updated bool
 }
 
-func (n *Workloads) DeclareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
-
+func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	found := &corev1.ConfigMap{}
@@ -85,8 +84,7 @@ func (n *Workloads) DeclareConfigMap(ctx context.Context, clt client.Client, sch
 	return ctrl.Result{}, nil
 }
 
-func (n *Workloads) DeclareDeployment(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
-
+func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	found := &appsv1.Deployment{}
@@ -229,18 +227,16 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 }
 
 func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
-
 	if n.Enable {
-		n.DeclareConfigMap(ctx, clt, scheme, req, inventory)
-		n.DeclareDeployment(ctx, clt, scheme, req, true)
+		n.declareConfigMap(ctx, clt, scheme, req, inventory)
+		n.declareDeployment(ctx, clt, scheme, req, true)
 	} else {
-		n.Down(ctx, clt, req)
+		n.down(ctx, clt, req)
 	}
 	return ctrl.Result{}, nil
 }
 
-func (n *Workloads) Down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error) {
-
+func (n *Workloads) down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	found := &appsv1.Deployment{}
@@ -267,13 +263,11 @@ func (n *Workloads) Down(ctx context.Context, clt client.Client, req ctrl.Reques
 	return ctrl.Result{Requeue: true}, err
 }
 
+// deleteExternalResources deletes any external resources associated with the Deployment
+//
+// Ensure that delete implementation is idempotent and safe to invoke
+// multiple times for same object.
 func (n *Workloads) deleteExternalResources(ctx context.Context, clt client.Client, req ctrl.Request, Deployment *appsv1.Deployment) (ctrl.Result, error) {
-	//
-	// delete any external resources associated with the Deployment
-	//
-	// Ensure that delete implementation is idempotent and safe to invoke
-	// multiple times for same object.
-
 	log := ctrllog.FromContext(ctx)
 	found := &corev1.ConfigMap{}
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name + "-deploy", Namespace: n.Mondoo.Namespace}, found)

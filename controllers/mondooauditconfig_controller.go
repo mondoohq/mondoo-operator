@@ -94,7 +94,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
-
 	if err != nil {
 		log.Error(err, "Failed to declare nodes")
 		return result, err
@@ -106,14 +105,13 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
-
 	if err != nil {
 		log.Error(err, "Failed to declare workloads")
 		return result, err
 	}
+
 	// Update the mondoo status with the pod names only after all pod creation actions are done
 	// List the pods for this mondoo's daemonset and deployment
-
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(mondoo.Namespace),
@@ -129,6 +127,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		log.Error(err, "Failed to get mondoo")
 		return ctrl.Result{}, err
 	}
+
 	// Update status.Nodes if needed
 	if !reflect.DeepEqual(podNames, mondoo.Status.Pods) {
 		mondoo.Status.Pods = podNames
