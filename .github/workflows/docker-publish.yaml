@@ -18,9 +18,10 @@ env:
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
+  RELEASE: ${{ github.ref_name }}
 
 jobs:
-  build:
+  build-operator:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -79,6 +80,50 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
       
+  build-bundle:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+    steps:
+      - name: Checkout repository
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "${{ env.golang-version }}"
+
+      # Install the cosign tool except on PR
+      # https://github.com/sigstore/cosign-installer
+      - name: Install cosign
+        uses: sigstore/cosign-installer@1e95c1de343b5b0c23352d6417ee3e48d5bcd422
+        with:
+          cosign-release: "v1.4.0"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+        with:
+          image: tonistiigi/binfmt:latest
+          platforms: amd64,arm
+
+      # Workaround: https://github.com/docker/build-push-action/issues/461
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@79abd3f86f79a9d68a23c75a09a9a85889262adf
+
+      # Login against a Docker registry except on PR
+      # https://github.com/docker/login-action
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
@@ -87,14 +132,10 @@ jobs:
         with:
           images: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle'
 
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: "${{ env.golang-version }}"
       - name: Make bundle
         id: make-bundle
         run: |
-          make bundle
+          make bundle IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:v${{ env.RELEASE }}' VERSION='${{ env.RELEASE }}'
 
       # Build and push Docker image bundle with Buildx
       - name: Build and push bundle image
@@ -106,7 +147,7 @@ jobs:
           platforms: linux/amd64,linux/arm/v7,linux/arm64
           push: true
           labels: ${{ steps.meta-bundle.outputs.labels }}
-          tags: ${{ steps.meta-bundle.outputs.tags }}
+          tags: 'v${{ env.RELEASE }}'
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
@@ -118,13 +159,13 @@ jobs:
           COSIGN_EXPERIMENTAL: "true"
         # This step uses the identity token to provision an ephemeral certificate
         # against the sigstore community Fulcio instance.
-        run: cosign sign ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push-operator.outputs.digest }}
+        run: cosign sign ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push-bundle.outputs.digest }}
 
   e2e-tests-olm:
-    name: E2E tests
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs:
-      - build
+      - build-operator
+      - build-bundle
     runs-on: ubuntu-latest
     steps:
       - name: Start minikube
@@ -154,18 +195,3 @@ jobs:
           make test/deployment
           operator-sdk cleanup mondoo-operator 
           operator-sdk olm uninstall 
-
-  # Added to summarize the matrix and allow easy branch protection rules setup
-  e2e-tests-result:
-    name: End-to-End Test Results
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs:
-      - e2e-tests-olm
-    runs-on: ubuntu-latest
-    steps:
-      - name: Mark the job as a success
-        if: needs.e2e-tests.result == 'success'
-        run: exit 0
-      - name: Mark the job as a failure
-        if: needs.e2e-tests.result != 'success'
-        run: exit 1
