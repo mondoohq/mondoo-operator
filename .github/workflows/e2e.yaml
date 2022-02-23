@@ -30,8 +30,16 @@ jobs:
           export SHELL=/bin/bash
           eval $(minikube -p minikube docker-env)
           make docker-build
+      - name: Install Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: 'v3.8.0' # default is latest stable
+        id: install
       - name: Deploy to minikube
         run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+          helm install prometheus prometheus-community/kube-prometheus-stack
           make deploy
           echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
           kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
@@ -44,11 +52,6 @@ jobs:
           mv mondoo /usr/local/bin/ 
           make test/deployment
           make undeploy
-      - name: Install Helm
-        uses: azure/setup-helm@v1
-        with:
-          version: 'v3.8.0' # default is latest stable
-        id: install
       - name: Create and Install Helm chart
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
