@@ -41,9 +41,8 @@ type Nodes struct {
 }
 
 type Workloads struct {
-	Enable    bool   `json:"enable,omitempty"`
-	Inventory string `json:"inventory,omitempty"`
-	// Replicas               int32  `json:"replicas,omitempty"`
+	Enable         bool   `json:"enable,omitempty"`
+	Inventory      string `json:"inventory,omitempty"`
 	ServiceAccount string `json:"serviceAccount,omitempty"`
 	Image          Image  `json:"image,omitempty"`
 }

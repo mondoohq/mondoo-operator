@@ -3,7 +3,15 @@ kind: ClusterServiceVersion
 metadata:
   annotations:
     alm-examples: '[]'
-    capabilities: Basic Install
+    capabilities: Full Lifecycle
+    categories: infrastructure security
+    certified: "false"
+    description: Mondoo is a cloud security platform for infrastructure developers.
+      Using Mondoo, your team will get automated risk assessment and real-time insights
+      into all of your business critical infrastructure, across all of your infrastructure
+      platforms.
+    repository: https://github.com/mondoohq/mondoo-operator
+    support: Mondoo
   name: mondoo-operator.v0.0.0
   namespace: placeholder
 spec:
@@ -19,7 +27,7 @@ spec:
   displayName: mondoo-operator
   icon:
   - base64data: ""
-    mediatype: ""
+    mediatype: image/svg+xml
   install:
     spec:
       deployments: null
@@ -36,10 +44,12 @@ spec:
   keywords:
   - policy-as-code
   links:
-  - name: Mondoo Operator
-    url: https://mondoo-operator.domain
+  - name: Mondoo
+    url: https://mondoo.com
+  maintainers:
+  - email: foo@mondoo.com
+    name: Foo
   maturity: alpha
   provider:
     name: Mondoo, Inc
-    url: 'Website: mondoo.com'
   version: 0.0.0
