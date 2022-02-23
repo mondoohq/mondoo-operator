@@ -162,6 +162,7 @@ jobs:
         run: cosign sign ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push-operator.outputs.digest }}
 
   e2e-tests-olm:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs:
       - build-operator
       - build-bundle
