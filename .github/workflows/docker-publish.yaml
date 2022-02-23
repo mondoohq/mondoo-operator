@@ -18,9 +18,10 @@ env:
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
+  RELEASE: ${{ github.ref_name }}
 
 jobs:
-  build:
+  build-operator:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -80,6 +81,16 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
       
+  build-bundle:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+    steps:
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
@@ -89,13 +100,14 @@ jobs:
           images: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle'
 
       - name: Install Go
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         uses: actions/setup-go@v2
         with:
           go-version: "${{ env.golang-version }}"
       - name: Make bundle
         id: make-bundle
         run: |
-          make bundle
+          make bundle IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:v${{ env.RELEASE }}' VERSION='${{ env.RELEASE }}'
 
       # Build and push Docker image bundle with Buildx
       - name: Build and push bundle image
@@ -122,10 +134,9 @@ jobs:
         run: cosign sign ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push-operator.outputs.digest }}
 
   e2e-tests-olm:
-    name: E2E tests
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs:
-      - build
+      - build-operator
+      - build-bundle
     runs-on: ubuntu-latest
     steps:
       - name: Start minikube
@@ -155,18 +166,3 @@ jobs:
           make test/deployment
           operator-sdk cleanup mondoo-operator 
           operator-sdk olm uninstall 
-
-  # Added to summarize the matrix and allow easy branch protection rules setup
-  e2e-tests-result:
-    name: End-to-End Test Results
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs:
-      - e2e-tests-olm
-    runs-on: ubuntu-latest
-    steps:
-      - name: Mark the job as a success
-        if: needs.e2e-tests.result == 'success'
-        run: exit 0
-      - name: Mark the job as a failure
-        if: needs.e2e-tests.result != 'success'
-        run: exit 1
