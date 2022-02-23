@@ -147,7 +147,7 @@ jobs:
           platforms: linux/amd64,linux/arm/v7,linux/arm64
           push: true
           labels: ${{ steps.meta-bundle.outputs.labels }}
-          tags: 'v${{ env.RELEASE}}'
+          tags: 'v${{ env.RELEASE }}'
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
