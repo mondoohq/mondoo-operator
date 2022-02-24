@@ -5,7 +5,7 @@ The following steps setup a development Kubernetes to test the operator locally.
 ## Preconditions:
 
 - [Minikube Installation](https://minikube.sigs.k8s.io/docs/start/)
-- kubectl (or use the one bundled with minikube  bundled with minikube `alias kubectl="minikube kubectl --"`)
+- kubectl (or use the one bundled with minikube bundled with minikube `alias kubectl="minikube kubectl --"`)
 - optional: `operator-sdk`
 
 ## Deployment of Operator
@@ -35,7 +35,6 @@ make deploy-olm
 > NOTE: deploy target uses `kubectl` under the cover, therefore make sure kubectl is configured to use minikube
 > NOTE: deploy-olm target uses operator-sdk and depends on olm being installed
 
-
 Now, we completed the setup for the operator. To start the service, we need to configure the client:
 
 1. Download service account from mondooo
@@ -62,7 +61,7 @@ mondoo-operator-controller-manager-556c7d4b56-qqsqh   2/2     Running   0       
 To delete the client configuration, run:
 
 ```bash
-kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml 
+kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
 ```
 
 ## FAQ

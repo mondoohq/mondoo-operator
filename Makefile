@@ -220,3 +220,15 @@ helmify:
 
 helm: manifests kustomize helmify
 	$(KUSTOMIZE) build config/default | $(HELMIFY) $(CHART_NAME)
+
+# Install prettier gloablly via
+# yarn global add prettier --prefix /usr/local
+.PHONY: fmt/docs
+fmt/docs:
+	prettier --write docs/
+	prettier --write README.md
+
+.PHONY: test/fmt
+test/fmt:
+	prettier --check docs/
+	prettier --check README.md
