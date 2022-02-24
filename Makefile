@@ -100,6 +100,9 @@ run: manifests generate fmt vet ## Run a controller from your host.
 docker-build: test ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
+buildah-build: test ## Build container image
+	buildah build -t ${IMG} .
+
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
 
