@@ -5,10 +5,6 @@ on:
     # Publish semver tags as releases.
     tags: ["v*.*.*"]
 
-env:
-  RELEASE: ${{ github.ref_name }}
-  CHART_NAME: mondoo-operator
-
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -22,40 +18,13 @@ jobs:
         run: |
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
-      - name: Import environment variables from file
-        run: cat ".github/env" >> $GITHUB_ENV
-
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: "${{ env.golang-version }}"
-
+      
       - name: Install Helm
         uses: azure/setup-helm@v1
         with:
           version: v3.7.1
-      
-      - name: Create Helm Chart
-        run: make helm
-      
-      - name: Set Chart and App Version to current release version
-        uses: mikefarah/yq@master
-        with:
-          cmd: |
-           yq -i '
-              .version = strenv(RELEASE) |
-              .appVersion = strenv(RELEASE)
-            ' mondoo-operator/Chart.yaml
-
-      - name: Set Image tag to latest in values.yaml
-        uses: mikefarah/yq@master
-        with:
-          cmd: yq -i '.controllerManager.manager.image.tag = "latest"' mondoo-operator/values.yaml
 
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.3.0
-        with:
-          charts_dir: .
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
