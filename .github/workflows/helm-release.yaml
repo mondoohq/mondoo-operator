@@ -2,8 +2,8 @@ name: Release Charts
 
 on:
   push:
-    # Publish semver tags as releases.
-    tags: ["v*.*.*"]
+    branches:
+      - "helm-rel-fix"
 
 jobs:
   release:
