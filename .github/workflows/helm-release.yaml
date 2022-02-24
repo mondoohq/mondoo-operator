@@ -39,22 +39,22 @@ jobs:
         with:
           version: v3.7.1
       
-      # - name: Create Helm Chart
-      #   run: make helm
+      - name: Create Helm Chart
+        run: make helm
       
-      # - name: Set Chart and App Version to current release version
-      #   uses: mikefarah/yq@master
-      #   with:
-      #     cmd: |
-      #      yq -i '
-      #         .version = "v0.0.7" |
-      #         .appVersion = "v0.0.7"
-      #       ' mondoo-operator/Chart.yaml
+      - name: Set Chart and App Version to current release version
+        uses: mikefarah/yq@master
+        with:
+          cmd: |
+           yq -i '
+              .version = "v0.0.7" |
+              .appVersion = "v0.0.7"
+            ' mondoo-operator/Chart.yaml
 
-      # - name: Set Image tag to latest in values.yaml
-      #   uses: mikefarah/yq@master
-      #   with:
-      #     cmd: yq -i '.controllerManager.manager.image.tag = "latest"' mondoo-operator/values.yaml
+      - name: Set Image tag to latest in values.yaml
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq -i '.controllerManager.manager.image.tag = "latest"' mondoo-operator/values.yaml
 
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.3.0
