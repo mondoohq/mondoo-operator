@@ -232,8 +232,14 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 
 func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 	if n.Enable {
-		n.declareConfigMap(ctx, clt, scheme, req, inventory)
-		n.declareDaemonSet(ctx, clt, scheme, req, true)
+		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
+		if err != nil || result.Requeue {
+			return result, err
+		}
+		result, err = n.declareDaemonSet(ctx, clt, scheme, req, true)
+		if err != nil || result.Requeue {
+			return result, err
+		}
 	} else {
 		n.down(ctx, clt, req)
 	}
