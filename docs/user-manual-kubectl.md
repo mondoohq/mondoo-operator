@@ -1,30 +1,33 @@
-# User Setup
+# Install Mondoo Operator with kubectl
 
 The following steps sets up the mondoo operator using kubectl and a manifest file.
 
 ## Preconditions:
 
 From manifests file
+
 - kubectl with admin role
 
 ## Deployment of Operator using Manifests
 
 //TODO where to fetch manifests from
+
 1. GET operator manifests
+
 ```bash
-kubectl apply -f mondoo-operator-manifests.yaml 
+kubectl apply -f mondoo-operator-manifests.yaml
 ```
 
 2. Configure the Mondoo secret:
 
- - Download service account from [Mondooo](https://mondoo.com)
- - Convert json to yaml via:
+- Download service account from [Mondooo](https://mondoo.com)
+- Convert json to yaml via:
 
 ```bash
 yq e -P creds.json > creds.yaml
 ```
 
- - Store service account as a secret in the mondoo namespace via:
+- Store service account as a secret in the mondoo namespace via:
 
 ```bash
 kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
@@ -52,7 +55,7 @@ spec:
 4. Apply the configuration via:
 
 ```bash
-kubectl apply -f mondoo-config.yaml 
+kubectl apply -f mondoo-config.yaml
 ```
 
 ## FAQ

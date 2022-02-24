@@ -1,39 +1,44 @@
-# User Setup
+# Install Mondoo Operator with olm
 
 The following steps sets up the mondoo operator using kubectl and a manifest file.
 
 ## Preconditions:
 
-- kubectl with admin role
-- operator-lifecycle-manager installed in cluster
-- operator-sdk
+- `kubectl` with admin role
+- `operator-lifecycle-manager` installed in cluster
+- `operator-sdk`
 
 ## Deployment of Operator using Manifests
 
 1. Configure the Mondoo secret:
 
- - Download service account from [Mondooo](https://mondoo.com)
- - Convert json to yaml via:
+- Download service account from [Mondooo](https://mondoo.com)
+- Convert json to yaml via:
 
 ```bash
 yq e -P creds.json > creds.yaml
 ```
 
- - Store service account as a secret in the mondoo namespace via:
+- Store service account as a secret in the mondoo namespace via:
 
 ```bash
 kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
 ```
+
 2. Verify that operator-lifecycle-manager is up
+
 ```bash
 operator-sdk olm status | echo $?
 ```
+
 3. Run the operator-bundle
+
 ```bash
 operator-sdk run bundle ghcr.io/mondoolabs/mondoo-operator-bundle:v0.0.2 --namespace=mondoo-operator-system
 ```
 
 4. Create `mondoo-config.yaml`
+
 ```yaml
 apiVersion: k8s.mondoo.com/v1alpha1
 kind: MondooAuditConfig
@@ -52,7 +57,7 @@ spec:
 5. Apply the configuration via:
 
 ```bash
-kubectl apply -f mondoo-config.yaml 
+kubectl apply -f mondoo-config.yaml
 ```
 
 ## FAQ
