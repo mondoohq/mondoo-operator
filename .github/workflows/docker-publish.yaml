@@ -142,7 +142,7 @@ jobs:
         id: meta-bundle
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
         with:
-          images: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}'
+          images: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle'
 
       - name: Make bundle
         id: make-bundle
