@@ -1,4 +1,4 @@
-# Development Setup
+# Development Setup for Operator
 
 The following steps setup a development Kubernetes to test the operator locally. In this walk-through, we are going to use [minikube](https://minikube.sigs.k8s.io/docs/).
 
@@ -37,11 +37,18 @@ make deploy-olm
 
 Now, we completed the setup for the operator. To start the service, we need to configure the client:
 
-1. Download service account from mondooo
-2. Convert json to yaml via `yq e -P creds.json > creds.yaml`
-3. Create namespace using `kubectl create namespace mondoo-operator-system`
-4. Store service account as a secret in the mondoo namespace via `kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml`
-5. Update SecretName created in step 4 in the mondoo-client CRD.
+1. Create namespace using `kubectl create namespace mondoo-operator-system`
+2. Configure the Mondoo secret:
+
+- Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts)
+- Store the service account json into a local file `creds.json`
+- Store service account as a secret in the mondoo namespace via:
+
+```bash
+kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.json
+```
+
+3. Update SecretName created in step 4 in the mondoo-client CRD.
 
 Then apply the configuration:
 

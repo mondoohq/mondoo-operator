@@ -12,17 +12,12 @@ The following steps sets up the mondoo operator using kubectl and a manifest fil
 
 1. Configure the Mondoo secret:
 
-- Download service account from [Mondooo](https://mondoo.com)
-- Convert json to yaml via:
-
-```bash
-yq e -P creds.json > creds.yaml
-```
-
+- Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts)
+- Store the service account json into a local file `creds.json`
 - Store service account as a secret in the mondoo namespace via:
 
 ```bash
-kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
+kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.json
 ```
 
 2. Verify that operator-lifecycle-manager is up
