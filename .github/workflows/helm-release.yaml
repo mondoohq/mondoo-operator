@@ -2,11 +2,14 @@ name: Release Charts
 
 on:
   push:
+    branches:
+      - "helm-release-fix"
     # Publish semver tags as releases.
     tags: ["v*.*.*"]
 
 env:
-  RELEASE: ${{ github.ref_name }}
+  # RELEASE: ${{ github.ref_name }}
+  # RELEASE: v0.0.6
   CHART_NAME: mondoo-operator
 
 jobs:
@@ -44,8 +47,8 @@ jobs:
         with:
           cmd: |
            yq -i '
-              .version = strenv(RELEASE) |
-              .appVersion = strenv(RELEASE)
+              .version = "v0.0.7" |
+              .appVersion = "v0.0.7"
             ' mondoo-operator/Chart.yaml
 
       - name: Set Image tag to latest in values.yaml
