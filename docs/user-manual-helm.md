@@ -19,7 +19,7 @@ minikube start
 
 Next let us deploy the operator application:
 
-```
+```bash
 helm install mondoo-operator ./chart --namespace mondoo-operator-system --create-namespace
 ```
 
@@ -27,10 +27,17 @@ helm install mondoo-operator ./chart --namespace mondoo-operator-system --create
 
 Now, we completed the setup for the operator. To start the service, we need to configure the client:
 
-1. Download service account from mondooo
-2. Convert json to yaml via `yq e -P creds.json > creds.yaml
-3. Store service account as a secret in the mondoo namespace via `kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml`
-4. Update SecretName created in step 4 in the mondooauditconfig CRD.
+1. Configure the Mondoo secret:
+
+- Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts)
+- Store the service account json into a local file `creds.json`
+- Store service account as a secret in the mondoo namespace via:
+
+```bash
+kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.json
+```
+
+2. Update SecretName created in step 4 in the mondooauditconfig CRD.
 
 Then apply the configuration:
 
@@ -40,7 +47,7 @@ kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
 
 Validate that everything is running:
 
-```
+```bash
 kubectl get pods --namespace mondoo-operator-system
 NAME                                                  READY   STATUS    RESTARTS   AGE
 mondoo-client-hjt8z                                   1/1     Running   0          16m
