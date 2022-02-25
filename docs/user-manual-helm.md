@@ -20,7 +20,8 @@ minikube start
 Next let us deploy the operator application:
 
 ```bash
-helm install mondoo-operator ./chart --namespace mondoo-operator-system --create-namespace
+helm repo add mondoo https://mondoohq.github.io/mondoo-operator
+helm install mondoo-operator mondoo/mondoo-operator --namespace mondoo-operator-system --create-namespace
 ```
 
 > NOTE: Make sure helm is configured to use minikube
