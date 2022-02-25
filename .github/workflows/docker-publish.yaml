@@ -136,14 +136,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Extract metadata (tags, labels) for Docker
-      # https://github.com/docker/metadata-action
-      - name: Extract Docker metadata
-        id: meta-bundle
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
-        with:
-          images: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle'
-
       - name: Make bundle
         id: make-bundle
         run: |
@@ -159,6 +151,14 @@ jobs:
           chmod +x operator-sdk_${OS}_${ARCH} && sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
           make bundle IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE }}' VERSION='${{ env.RELEASE }}'
 
+      # Extract metadata (tags, labels) for Docker
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker metadata
+        id: meta-bundle
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle'
+
       # Build and push Docker image bundle with Buildx
       - name: Build and push bundle image
         id: build-and-push-bundle
@@ -169,7 +169,7 @@ jobs:
           platforms: linux/amd64,linux/arm/v7,linux/arm64
           push: true
           labels: ${{ steps.meta-bundle.outputs.labels }}
-          tags: '${{ env.RELEASE }}'
+          tags: ${{ steps.meta-bundle.outputs.tags }}
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
