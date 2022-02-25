@@ -55,13 +55,17 @@ func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme 
 		found.Data = map[string]string{
 			"inventory": inventory,
 		}
+		if err := ctrl.SetControllerReference(&n.Mondoo, found, scheme); err != nil {
+			log.Error(err, "Failed to set ControllerReference", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
+			return ctrl.Result{}, err
+		}
+
 		err := clt.Create(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to create new Configmap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
 			return ctrl.Result{}, err
 		}
 
-		ctrl.SetControllerReference(&n.Mondoo, found, scheme)
 		return ctrl.Result{Requeue: true}, err
 
 	} else if err != nil {
@@ -92,12 +96,17 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	if err != nil && errors.IsNotFound(err) {
 
 		declared := n.deamonsetForMondoo(&n.Mondoo, n.Mondoo.Name+"-ds")
+		if err := ctrl.SetControllerReference(&n.Mondoo, declared, scheme); err != nil {
+			log.Error(err, "Failed to set ControllerReference", "Daemonset.Namespace", declared.Namespace, "Daemonset.Name", declared.Name)
+			return ctrl.Result{}, err
+		}
+
 		err := clt.Create(ctx, declared)
 		if err != nil {
 			log.Error(err, "Failed to create new Daemonset", "Daemonset.Namespace", declared.Namespace, "Daemonset.Name", declared.Name)
 			return ctrl.Result{}, err
 		}
-		ctrl.SetControllerReference(&n.Mondoo, declared, scheme)
+
 		return ctrl.Result{Requeue: true}, err
 
 	} else if err != nil {
@@ -223,8 +232,14 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 
 func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 	if n.Enable {
-		n.declareConfigMap(ctx, clt, scheme, req, inventory)
-		n.declareDaemonSet(ctx, clt, scheme, req, true)
+		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
+		if err != nil || result.Requeue {
+			return result, err
+		}
+		result, err = n.declareDaemonSet(ctx, clt, scheme, req, true)
+		if err != nil || result.Requeue {
+			return result, err
+		}
 	} else {
 		n.down(ctx, clt, req)
 	}

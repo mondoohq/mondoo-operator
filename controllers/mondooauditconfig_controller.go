@@ -19,11 +19,11 @@ package controllers
 import (
 	"context"
 	_ "embed"
-	"reflect"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -96,6 +96,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
 	if err != nil {
 		log.Error(err, "Failed to declare nodes")
+	}
+	if err != nil || result.Requeue {
 		return result, err
 	}
 
@@ -107,6 +109,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
 	if err != nil {
 		log.Error(err, "Failed to declare workloads")
+	}
+	if err != nil || result.Requeue {
 		return result, err
 	}
 
@@ -121,16 +125,18 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		log.Error(err, "Failed to list pods", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
 		return ctrl.Result{}, err
 	}
-	podNames := getPodNames(podList.Items)
+	podListNames := getPodNames(podList.Items)
 	err = r.Get(ctx, req.NamespacedName, mondoo)
 	if err != nil {
 		log.Error(err, "Failed to get mondoo")
 		return ctrl.Result{}, err
 	}
 
-	// Update status.Nodes if needed
-	if !reflect.DeepEqual(podNames, mondoo.Status.Pods) {
-		mondoo.Status.Pods = podNames
+	// Update status.Pods list if needed
+	statusPodNames := sets.NewString(mondoo.Status.Pods...)
+
+	if !statusPodNames.Equal(podListNames) {
+		mondoo.Status.Pods = podListNames.List()
 		err := r.Status().Update(ctx, mondoo)
 		if err != nil {
 			log.Error(err, "Failed to update mondoo status")
@@ -146,13 +152,13 @@ func labelsForMondoo(name string) map[string]string {
 	return map[string]string{"app": "mondoo", "mondoo_cr": name}
 }
 
-// getPodNames returns the pod names of the array of pods passed in
-func getPodNames(pods []corev1.Pod) []string {
+// getPodNames returns a Set of the pod names of the array of pods passed in
+func getPodNames(pods []corev1.Pod) sets.String {
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
 	}
-	return podNames
+	return sets.NewString(podNames...)
 }
 
 // SetupWithManager sets up the controller with the Manager.

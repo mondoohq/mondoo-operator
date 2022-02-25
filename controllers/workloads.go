@@ -55,13 +55,17 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 		found.Data = map[string]string{
 			"inventory": inventory,
 		}
+		if err := ctrl.SetControllerReference(&n.Mondoo, found, scheme); err != nil {
+			log.Error(err, "Failed to set ControllerReference", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
+			return ctrl.Result{}, err
+		}
+
 		err := clt.Create(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to create new Configmap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
 			return ctrl.Result{}, err
 		}
 
-		ctrl.SetControllerReference(&n.Mondoo, found, scheme)
 		return ctrl.Result{Requeue: true}, err
 
 	} else if err != nil {
@@ -92,12 +96,16 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 	if err != nil && errors.IsNotFound(err) {
 
 		declared := n.deploymentForMondoo(&n.Mondoo, n.Mondoo.Name+"-deploy")
+		if err := ctrl.SetControllerReference(&n.Mondoo, declared, scheme); err != nil {
+			log.Error(err, "Failed to set ControllerReference", "Deployment.Namespace", declared.Namespace, "Deployment.Name", declared.Name)
+			return ctrl.Result{}, err
+		}
+
 		err := clt.Create(ctx, declared)
 		if err != nil {
 			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", declared.Namespace, "Deployment.Name", declared.Name)
 			return ctrl.Result{}, err
 		}
-		ctrl.SetControllerReference(&n.Mondoo, declared, scheme)
 		return ctrl.Result{Requeue: true}, err
 
 	} else if err != nil {
@@ -228,8 +236,14 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 
 func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 	if n.Enable {
-		n.declareConfigMap(ctx, clt, scheme, req, inventory)
-		n.declareDeployment(ctx, clt, scheme, req, true)
+		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
+		if err != nil || result.Requeue {
+			return result, err
+		}
+		result, err = n.declareDeployment(ctx, clt, scheme, req, true)
+		if err != nil || result.Requeue {
+			return result, err
+		}
 	} else {
 		n.down(ctx, clt, req)
 	}
