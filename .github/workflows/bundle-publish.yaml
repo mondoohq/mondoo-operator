@@ -24,8 +24,6 @@ env:
 jobs:
   build-bundle:
     runs-on: ubuntu-latest
-    needs:
-      - build-operator
     permissions:
       contents: read
       packages: write
@@ -113,28 +111,3 @@ jobs:
         # This step uses the identity token to provision an ephemeral certificate
         # against the sigstore community Fulcio instance.
         run: cosign sign ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push-bundle.outputs.digest }}
-
-      - name: Start minikube
-        uses: medyagh/setup-minikube@master
-
-      - name: Try the cluster !
-        run: kubectl get pods -A
-      - name: Build image
-        run: |
-          export SHELL=/bin/bash
-          eval $(minikube -p minikube docker-env)
-      - name: Install olm and mondoo
-        run: |
-          operator-sdk olm install
-          curl -sSL http://mondoo.io/download.sh | bash
-          mv mondoo /usr/local/bin/ 
-          echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
-          kubectl create ns mondoo-operator-system
-          kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
-      - name: Run e2e test with olm
-        run: |
-          operator-sdk run bundle '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:${{ env.REGISTRY }}' --namespace mondoo-operator-system
-          kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
-          make test/deployment
-          operator-sdk cleanup mondoo-operator --namespace mondoo-operator-system
-          operator-sdk olm uninstall 
