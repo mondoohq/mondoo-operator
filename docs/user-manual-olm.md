@@ -5,7 +5,7 @@ The following steps sets up the mondoo operator using kubectl and a manifest fil
 ## Preconditions:
 
 - `kubectl` with admin role
-- `operator-lifecycle-manager` installed in cluster
+- [`operator-lifecycle-manager`](https://olm.operatorframework.io/) installed in cluster
 - `operator-sdk`
 
 ## Deployment of Operator using Manifests
@@ -29,7 +29,7 @@ operator-sdk olm status | echo $?
 3. Run the operator-bundle
 
 ```bash
-operator-sdk run bundle ghcr.io/mondoolabs/mondoo-operator-bundle:v0.0.2 --namespace=mondoo-operator-system
+operator-sdk run bundle ghcr.io/mondoohq/mondoo-operator-bundle:latest --namespace=mondoo-operator-system
 ```
 
 4. Create `mondoo-config.yaml`

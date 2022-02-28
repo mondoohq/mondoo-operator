@@ -1,34 +1,28 @@
 # Development Setup
 
-The following steps setup a development Kubernetes to test the operator locally using helm. In this walk-through, we are going to use [minikube](https://minikube.sigs.k8s.io/docs/).
+The following steps setup a development Kubernetes to test the operator using helm.
 
 ## Preconditions:
 
-- Kubernetes Cluster, e.g. [Minikube Installation](https://minikube.sigs.k8s.io/docs/start/)
-- `kubectl` (or use the one bundled with minikube bundled with minikube `alias kubectl="minikube kubectl --"`)
-- `helm`
-- optional: `operator-sdk`
+- Kubernetes Cluster with admin access
+- `kubectl` 
+- `helm 3`
 
 ## Deployment of Operator
 
-Optional: As the first step, we need to make sure the cluster is up and running:
-
-```bash
-minikube start
-```
-
-Next let us deploy the operator application:
+1. Get helm Repo Info
 
 ```bash
 helm repo add mondoo https://mondoohq.github.io/mondoo-operator
+helm repo update
+```
+2. Deploy the operator using helm:
+
+```bash
 helm install mondoo-operator mondoo/mondoo-operator --namespace mondoo-operator-system --create-namespace
 ```
 
-> NOTE: Make sure helm is configured to use minikube
-
-Now, we completed the setup for the operator. To start the service, we need to configure the client:
-
-1. Configure the Mondoo secret:
+3. Configure the Mondoo secret:
 
 - Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts)
 - Store the service account json into a local file `creds.json`
@@ -37,29 +31,31 @@ Now, we completed the setup for the operator. To start the service, we need to c
 ```bash
 kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.json
 ```
+Once the secret is configure, we configure the operator to define the scan targets:
 
-2. Update SecretName created in step 4 in the mondooauditconfig CRD.
+4. Create `mondoo-config.yaml`
 
-Then apply the configuration:
-
-```bash
-kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha1
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator-system
+spec:
+  workloads:
+    enable: true
+    serviceAccount: mondoo-operator-workload
+  nodes:
+    enable: true
+  mondooSecretRef: mondoo-client
 ```
 
-Validate that everything is running:
+5. Apply the configuration via:
 
 ```bash
-kubectl get pods --namespace mondoo-operator-system
-NAME                                                  READY   STATUS    RESTARTS   AGE
-mondoo-client-hjt8z                                   1/1     Running   0          16m
-mondoo-operator-controller-manager-556c7d4b56-qqsqh   2/2     Running   0          88m
+kubectl apply -f mondoo-config.yaml
 ```
 
-To delete the client configuration, run:
-
-```bash
-kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
-```
 
 ## FAQ
 
