@@ -31,6 +31,7 @@ type MondooAuditConfigData struct {
 	// Config is an example field of MondooAuditConfig. Edit mondooauditconfig_types.go to remove/update
 	Nodes           Nodes     `json:"nodes,omitempty"`
 	Workloads       Workloads `json:"workloads,omitempty"`
+	Webhooks        Webhooks  `json:"webhooks,omitempty"`
 	MondooSecretRef string    `json:"mondooSecretRef"`
 }
 type Nodes struct {
@@ -43,6 +44,28 @@ type Workloads struct {
 	Inventory string `json:"inventory,omitempty"`
 	// Replicas               int32  `json:"replicas,omitempty"`
 	ServiceAccount string `json:"serviceAccount,omitempty"`
+}
+
+// InjectionStyle is the specified method the cluster uses for automated creation of TLS certificates
+type InjectionStyle string
+
+const (
+	CertManager InjectionStyle = "cert-manager"
+)
+
+type WebhookCertificateConfig struct {
+	// +kubebuilder:validation:Enum="";cert-manager
+	InjectionStyle string `json:"injectionStyle,omitempty"`
+}
+
+type Webhooks struct {
+	Enable bool `json:"enable,omitemmpty"`
+
+	// CertificateConfig allows defining which certificate system to use.
+	// Leaving it as the empty string will mean the user will be responsible
+	// for creating the Secret with the TLS data, and inserting the CA data
+	// into the ValidatingWebhookConfigurations as well.
+	CertificateConfig WebhookCertificateConfig `json:"certificateConfig,omitempty"`
 }
 
 // MondooAuditConfigStatus defines the observed state of MondooAuditConfig
