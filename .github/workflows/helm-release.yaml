@@ -3,7 +3,7 @@ name: Release Charts
 on:
   push:
     branches:
-      - "main"
+      - "e2e-tests-fix"
 
 jobs:
   release:
@@ -18,13 +18,42 @@ jobs:
         run: |
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-      
+
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "${{ env.golang-version }}"
+
+      - name: Start minikube
+        uses: medyagh/setup-minikube@master
+
+      - name: Try the cluster !
+        run: kubectl get pods -A
+
       - name: Install Helm
         uses: azure/setup-helm@v1
         with:
-          version: v3.7.1
+          version: 'v3.8.0' # default is latest stable
+        id: install
 
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.3.0
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Create and Install Helm chart
+        run: |
+          echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
+          kubectl create namespace mondoo-operator-system
+          kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml 
+          helm install mondoo-operator charts/mondoo-operator --namespace mondoo-operator-system 
+          kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
+
+      - name: Verify Mondoo Operator Helm Chart
+        run: |
+          kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator-system 
+          kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator-system --timeout=300s
+          curl -sSL http://mondoo.io/download.sh | bash
+          mv mondoo /usr/local/bin/ 
+          make test/deployment
+          helm uninstall mondoo-operator  --namespace mondoo-operator-system 
+
+      # - name: Run chart-releaser
+      #   uses: helm/chart-releaser-action@v1.3.0
+      #   env:
+      #     CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
