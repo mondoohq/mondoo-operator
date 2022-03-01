@@ -10,10 +10,6 @@ on:
   push:
     # Publish semver tags as releases.
     tags: ["v*.*.*"]
-  workflow_run:
-    workflows: [bundle-publish]
-    types:
-      - completed
 
 env:
   # Use docker.io for Docker Hub if empty
