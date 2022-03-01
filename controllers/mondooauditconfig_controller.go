@@ -53,8 +53,11 @@ var deployInventoryyaml []byte
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=cert-manager.io,resources=certificates;issuers,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=*,resources=*,verbs=get;list;watch
 //The last line is required as we cant assign higher permissions that exist for operator serviceaccount
 
@@ -109,6 +112,22 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
 	if err != nil {
 		log.Error(err, "Failed to declare workloads")
+	}
+	if err != nil || result.Requeue {
+		return result, err
+	}
+
+	webhooks := Webhooks{
+		Enable:          mondoo.Spec.Webhooks.Enable,
+		Mondoo:          mondoo,
+		KubeClient:      r.Client,
+		TargetNamespace: req.Namespace,
+		Scheme:          r.Scheme,
+	}
+
+	result, err = webhooks.Reconcile(ctx, req)
+	if err != nil {
+		log.Error(err, "Failed to set up webhooks")
 	}
 	if err != nil || result.Requeue {
 		return result, err

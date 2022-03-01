@@ -9,5 +9,7 @@ spec:
     serviceAccount: mondoo-operator-workload
   nodes:
     enable: true
+  webhooks:
+    enable: false
   mondooSecretRef: mondoo-client
   
