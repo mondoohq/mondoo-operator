@@ -93,6 +93,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 
 build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go
+	go build -o bin/webhook pkg/webhooks/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
@@ -121,6 +122,8 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 generate-manifests: manifests kustomize ## Generates manifests and pipes into a yaml file
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > mondoo-operator-manifests.yaml
+	cd config/webhook && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/webhook > controllers/webhook-manifests.yaml
 
 deploy-olm: manifests kustomize ## Deploy using operator-sdk OLM 
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
