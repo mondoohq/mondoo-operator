@@ -6,6 +6,7 @@ metadata:
     capabilities: Full Lifecycle
     categories: Security
     certified: "false"
+    containerImage: ghcr.io/mondoohq/mondoo-operator:v0.0.10
     description: Mondoo is a cloud security platform for infrastructure developers.
       Using Mondoo, your team will get automated risk assessment and real-time insights
       into all of your business critical infrastructure, across all of your infrastructure
@@ -62,8 +63,8 @@ spec:
   - name: Mondoo
     url: https://mondoo.com
   maintainers:
-  - email: foo@mondoo.com
-    name: Foo
+  - email: hello@mondoo.com
+    name: Mondoo
   maturity: alpha
   provider:
     name: Mondoo, Inc
