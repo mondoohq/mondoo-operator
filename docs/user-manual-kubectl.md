@@ -73,5 +73,5 @@ Then make sure a configuration for the mondoo client is deployed:
 ```bash
 kubectl get mondooauditconfigs
 NAME                  AGE
-mondooauditconfig-sample   2m44s
+mondoo-client        2m44s
 ```
