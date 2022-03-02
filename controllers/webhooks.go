@@ -57,7 +57,6 @@ const (
 var webhookManifestsyaml []byte
 
 type Webhooks struct {
-	Enable          bool
 	Mondoo          *mondoov1alpha1.MondooAuditConfig
 	KubeClient      client.Client
 	TargetNamespace string
@@ -384,12 +383,12 @@ func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
 			return result, err
 		}
 	} else {
-		n.down(ctx, req)
+		n.down(ctx)
 	}
 	return ctrl.Result{}, nil
 }
 
-func (n *Webhooks) down(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 	// Check for every possible object we could have created, and delete it
 
 	// Cleanup cert-manager Certificate and Issuer
@@ -422,7 +421,7 @@ func (n *Webhooks) down(ctx context.Context, req ctrl.Request) (ctrl.Result, err
 	yamlDecoder := yamlutil.NewYAMLOrJSONDecoder(r, 4096)
 	objectDecoder := scheme.Codecs.UniversalDeserializer()
 
-	// Go through each YAML object, convert as needed to Create/Update
+	// Go through each YAML object, convert as needed to Delete()
 	for {
 		// First just read a single YAML object from the list
 		rawObject := runtime.RawExtension{}
@@ -444,7 +443,7 @@ func (n *Webhooks) down(ctx context.Context, req ctrl.Request) (ctrl.Result, err
 
 		webhookLog.Info("Decoding object", "GVK", gvk)
 
-		// Cast the runtime to the actual type and apply the resources
+		// Cast the runtime to the actual type and delete the resources
 		var genericObject client.Object
 		var conversionOK bool
 		switch gvk.Kind {
