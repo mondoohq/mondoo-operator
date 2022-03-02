@@ -118,14 +118,13 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	webhooks := Webhooks{
-		Enable:          mondoo.Spec.Webhooks.Enable,
 		Mondoo:          mondoo,
 		KubeClient:      r.Client,
 		TargetNamespace: req.Namespace,
 		Scheme:          r.Scheme,
 	}
 
-	result, err = webhooks.Reconcile(ctx, req)
+	result, err = webhooks.Reconcile(ctx)
 	if err != nil {
 		log.Error(err, "Failed to set up webhooks")
 	}
