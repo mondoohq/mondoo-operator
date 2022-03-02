@@ -4,7 +4,7 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Full Lifecycle
-    categories: infrastructure security
+    categories: Security
     certified: "false"
     description: Mondoo is a cloud security platform for infrastructure developers.
       Using Mondoo, your team will get automated risk assessment and real-time insights
@@ -26,7 +26,22 @@ spec:
   description: A Kubernetes Operator for creating and managing Mondoo controller instances.
   displayName: mondoo-operator
   icon:
-  - base64data: ""
+  - base64data: PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB3aWR0aD0iMzAwcHgi
+      IGhlaWdodD0iMzAwcHgiIHZpZXdCb3g9IjAgMCAzMDAgMzAwIiB2ZXJzaW9uPSIxLjEiIHhtbG5z
+      PSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMu
+      b3JnLzE5OTkveGxpbmsiPgogICAgPHRpdGxlPkFydGJvYXJkPC90aXRsZT4KICAgIDxnIGlkPSJB
+      cnRib2FyZCIgc3Ryb2tlPSJub25lIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiIGZpbGwt
+      cnVsZT0iZXZlbm9kZCI+CiAgICAgICAgPHBhdGggZD0iTTI0OCwyMjUgTDIxNC40OTU3MjYsMjI1
+      IEwyMDIuNzE1MTkyLDEzMy4zNTI0NTkgTDE2My4wNzc0NzQsMjA4LjI1NDA5OCBMMTM3LjM4MTg1
+      OCwyMDguMjU0MDk4IEw5Ny4yODQ4MDg0LDEzMy4zNTI0NTkgTDg1LjUwNDI3MzUsMjI1IEw1Miwy
+      MjUgTDcyLjA0ODUyNSw3NSBMODguODI3NjgxMyw3NSBDOTIuMTMyMTc1NCw3NSA5NS4zNjkxMjA1
+      LDc1Ljg0ODM2MDcgOTguMTU3NTQwNyw3Ny40NjE0NzU0IEMxMDAuOTQ4NjYzLDc5LjA3MjEzMTEg
+      MTAzLjE3NTA3Niw4MS4zNzM3NzA1IDEwNC41ODAwOTQsODQuMDk4MzYwNyBMMTUwLjA1NDAzOSwx
+      NzQuMDk4MzYxIEwxOTUuMTIyNjkxLDg0LjE3MjEzMTEgQzE5Ni41MjUwMDcsODEuNDM1MjQ1OSAx
+      OTguNzU5NTI2LDc5LjEyMTMxMTUgMjAxLjU1ODc1NCw3Ny41MDA4MTk3IEMyMDQuMzYwNjg0LDc1
+      Ljg4MDMyNzkgMjA3LjYxMTEzOSw3NS4wMTk2NzIxIDIxMC45MjkxNDMsNzUuMDI0NTkwMiBMMjI4
+      LjExMzU5Myw3NS4wMjQ1OTAyIEwyNDgsMjI1IFoiIGlkPSJwYXRoMTAyOCIgZmlsbD0iIzREMjFB
+      RSIgZmlsbC1ydWxlPSJub256ZXJvIj48L3BhdGg+CiAgICA8L2c+Cjwvc3ZnPg==
     mediatype: image/svg+xml
   install:
     spec:

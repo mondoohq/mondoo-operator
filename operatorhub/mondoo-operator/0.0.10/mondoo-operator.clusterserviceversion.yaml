@@ -24,7 +24,7 @@ metadata:
         }
       ]
     capabilities: Full Lifecycle
-    categories: infrastructure security
+    categories: Security
     certified: "false"
     containerImage: foo
     createdAt: foo
