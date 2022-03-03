@@ -46,6 +46,7 @@ spec:
     serviceAccount: mondoo-operator-workload
   nodes:
     enable: true
+    serviceAccount: mondoo-operator-workload
   mondooSecretRef: mondoo-client
 ```
 

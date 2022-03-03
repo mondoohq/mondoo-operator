@@ -182,6 +182,7 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 							},
 						},
 					}},
+					ServiceAccountName: m.Spec.Nodes.ServiceAccount,
 					Volumes: []corev1.Volume{
 						{
 							Name: "root",
