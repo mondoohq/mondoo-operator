@@ -157,7 +157,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 						Effect: corev1.TaintEffect("NoSchedule"),
 					}},
 					Containers: []corev1.Container{{
-						Image:   "mondoolabs/mondoo:latest",
+						Image:   "mondoolabs/mondoo:" + m.Spec.Workloads.Tag,
 						Name:    "mondoo-agent",
 						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
 
