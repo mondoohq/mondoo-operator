@@ -34,9 +34,8 @@ type MondooAuditConfigData struct {
 	MondooSecretRef string    `json:"mondooSecretRef"`
 }
 type Nodes struct {
-	Enable         bool   `json:"enable,omitempty"`
-	Inventory      string `json:"inventory,omitempty"`
-	ServiceAccount string `json:"serviceAccount,omitempty"`
+	Enable    bool   `json:"enable,omitempty"`
+	Inventory string `json:"inventory,omitempty"`
 }
 
 type Workloads struct {

@@ -46,8 +46,6 @@ spec:
                     type: boolean
                   inventory:
                     type: string
-                  serviceAccount:
-                    type: string
                 type: object
               workloads:
                 properties:
