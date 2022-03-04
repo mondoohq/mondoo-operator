@@ -7,9 +7,9 @@ spec:
   workloads:
     enable: true
     serviceAccount: mondoo-operator-workload
+    tag: latest
   nodes:
     enable: true
-  webhooks:
-    enable: false
+    tag: latest
   mondooSecretRef: mondoo-client
   

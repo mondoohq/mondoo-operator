@@ -53,6 +53,8 @@ spec:
                     type: object
                   inventory:
                     type: string
+                  tag:
+                    type: string
                 type: object
               webhooks:
                 properties:
@@ -90,6 +92,8 @@ spec:
                     type: string
                   serviceAccount:
                     description: Replicas               int32  `json:"replicas,omitempty"`
+                    type: string
+                  tag:
                     type: string
                 type: object
             required:
