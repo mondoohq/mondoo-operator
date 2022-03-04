@@ -24,3 +24,11 @@ Read the seperate installation instructions:
 - [Install Mondoo Operator with kubectl](docs/user-manual-kubectl.md)
 - [Install Mondoo Operator with helm](docs/user-manual-helm.md)
 - [Install Mondoo Operator with olm](docs/user-manual-olm.md)
+
+## Tested environments
+
+The operator has been tested in the following environments
+
+ - EKS: 1.21
+ - AKS: 1.21
+ - GKE: 1.21 and 1.22
