@@ -56,6 +56,115 @@ spec:
 kubectl apply -f mondoo-config.yaml
 ```
 
+## Deploying the Validating webhook
+
+K8s webhooks require TLS certs to establish the trust between the Certificate Authority listed in the ValidaitngWebhookConfiguration.Webhooks[].ClientConfig.CABundle and the TLS certificates presented when connecting to the HTTPS endpoint specified in the webhook.
+
+You can choose to install and use cert-manager to automate the creation and updating of the TLS certs, or you can create (and rotate) your own TLS certificates manually.
+
+A working setup should show the Pods being created/modified/deleted being processed by the webhook Pod.
+
+Display the logs in one window:
+``` kubectl logs -f deployment/mondoo-operator-system/mondoo-operator-webhook-manager -n mondoo-operator-system ``
+
+And create/modify/delete a Pod in another window:
+``` kubectl delete pod -n mondoo-operator-system --selector control-plane=controller-manager ```
+
+### Using cert-manager
+
+1. Install cert-manger on the cluster if it hasn't already been installed https://cert-manager.io/docs/installation/#default-static-install:
+
+2. Update MondooAuditConfig so that the webhook section requests TLS certificates from cert-manager:
+
+```yaml
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator-system
+spec:
+  workloads:
+    enable: true
+    serviceAccount: mondoo-operator-workload
+  webhooks:
+    enable: true
+    certificateConfig:
+      injectionStyle: cert-manager
+  nodes:
+    enable: true
+  mondooSecretRef: mondoo-client
+```
+
+3. The webhook Deployment should start up, and the ValidatingWebhookConfiguration should be annotated to insert the Certificate Authority data along with the Secret containing the TLS certs will be created by cert-manager (named webhook-serving-cert).3. The webhook Deployment should start up, and the ValidatingWebhookConfiguration should be annotated to insert the Certificate Authority data along with the Secret containing the TLS certs will be created by cert-manager (named webhook-serving-cert).
+
+
+### Manually creating TLS certificates using OpenSSL
+
+1. Create key for your CA.
+``` openssl genrsa -out ca.key 2048 ```
+
+2. Generate certificate for your CA.
+``` openssl req -x509 -new -nodes -key ca.key -subj "/CN=Webhook Issuer" -days 10000 -out ca.crt ```
+
+3. Generate key for webhook server pod.
+``` openssl genrsa -out server.key 2048 ```
+
+4. Create a config file csr.conf to specify the options for the webhook server certificate. Substitute NAMESPACE with the namespace where the MondooAuditConfig resource was created (ie. mondoo-operator-system).
+```
+[ req ]
+default_bits = 2048
+prompt = no
+default_md = sha256
+req_extensions = req_ext
+distinguished_name = dn
+[ dn ]
+C = US
+ST = NY
+L = NYC
+O = My Company
+OU = My Organization
+CN = Webhook Server
+[ req_ext ]
+subjectAltName = @alt_names
+[ alt_names ]
+DNS.1 = mondoo-operator-webhook-service.NAMESPACE.svc
+DNS.2 = mondoo-operator-webhook-service.NAMESPACE.svc.cluster.local
+[ v3_ext ]
+authorityKeyIdentifier=keyid,issuer:always
+basicConstraints=CA:FALSE
+keyUsage=keyEncipherment,dataEncipherment
+extendedKeyUsage=serverAuth,clientAuth
+subjectAltName=@alt_names
+```
+
+5. Generate the certificate signing request.
+``` openssl req -new -key server.key -out server.csr -config csr.conf ```
+
+6. Generate the certificate for the webhook server.
+``` openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 10000 -extensions v3_ext -extfile csr.conf ```
+
+7. Create the Secret holding the TLS certificate data.
+``` kubectl create secret tls -n mondoo-operator-system webhook-server-cert --cert ./server.crt --key ./server.key ```
+
+8. Add the certificate authority as bas64 encoded CA data (`base64 ./ca.crt`) to the ValidatingWebhookConfiguration under the webhooks[].clientConfig.caBundle field. The end result should look something like this after a `kubectl edit validatingwebhookconfiguration mondoo-operator-system-mondoo-webhook`:
+```yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    mondoo.com/tls-mode: manual
+  name: mondoo-operator-system-mondoo-webhook
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURFekNDQWZ1Z0F3SUJBZ0lVTVkxRElxc2VQVGxrZGhpRzRmZ0h0K2NORDQ0d0RRWUpLb1pJaHZjTkFRRUwKQlFBd0dURVhNQlVHQTFVRUF3d09kMlZpYUc5dmF5MXpaWEoyWlhJd0hoY05Nakl3TXpBM01UY3hPRFE1V2hjTgpNak13TXpBM01UY3hPRFE1V2pBWk1SY3dGUVlEVlFRRERBNTNaV0pvYjI5ckxYTmxjblpsY2pDQ0FTSXdEUVlKCktvWklodmNOQVFFQkJRQURnZ0VQQURDQ0FRb0NnZ0VCQU5VMVkxcmMxelRBQUxLUVpRbnRZdVc3WE5vejlZYWIKM0drUVdkODZhUjQzc05BdmFHVlNIbENsWkIvM1dZZFJYUDlmd1dQS1o3WTBiNnFBRVNLL0RtZDg5c0JXMW8wdwp2VWtUaVVTNTBuQ1BSbXFPU04ycDl6bHQ2VjNieFExaU1WeXhEVlNFS3JZaE1TSGVGMlZpUkFuaXFoKzhPQ2ZxCm9wNGVpcm9kRFRyOERSaWNtOHQyMjFYYkg4Zk5lK29icGtvYU9UMStYN2xGa3RBcW9ua2F0aUJiYkhSWlBZU0YKYUlScDBuNm5OSmJBZmw2NGpCYmcySXp6U3VTMkYvcnVLM3ZNVlhwL3hzY0k3OHV1TGdIdmVSNDB4dW9yc29TZQpVVlRJSUc2RUsxNmJ0R2U3QS96MjRkazVKallUN2tUVTdOYTd2dk5BelVMY2Z3VXBFYnprdEdrQ0F3RUFBYU5UCk1GRXdIUVlEVlIwT0JCWUVGRDg1bkNBaDdMK2VJSmh3ZjBiKzRzZjh5bXArTUI4R0ExVWRJd1FZTUJhQUZEODUKbkNBaDdMK2VJSmh3ZjBiKzRzZjh5bXArTUE4R0ExVWRFd0VCL3dRRk1BTUJBZjh3RFFZSktvWklodmNOQVFFTApCUUFEZ2dFQkFIR1pDWUlzMUt6anFYT01MMnd5cmc4VUlkdmlkR2RqQ0wyL2RiVGFhWGFnNHc1bWhOcjNmd1FjCndtS3JHS1NsdlBLSDFteUQ1VS9HQXFpZHBaclF0azBOeHFtcHB1R0FjeitCRW5hWEJPMGNTQnI4dVh3OUxicUsKNm1FUmFKSkJZUFVxT2I0ak4zRkxHQTVjWi9vcHJRVVp2NzFMZXZWMnlzOVlObmFSOUpkUlpFUU5lUzk4SHliRwpiTzNFaHp0SU9YK2hhV0FCcHlKR1o1ZkdwQVR3RGlIQ0twWEJhL3Y2Mi9BOGNGSW9Nb2E3NnJjejJIelpJeVlpCkhkczNkQ0x1YitkakI4aWt4WDNDVnhBYVdqTklaK05VdWhVUGFnams2cE4yaURYME0rVEhjaVI5RVdCRjVDN0QKbWZmWnlkMmxjWTloR0pxbDh5K0JQWFZGMEIzcGlMYz0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+    service:
+      name: mondoo-operator-webhook-service
+      namespace: mondoo-operator-system
+      path: /validate-k8s-mondoo-com-core
+      port: 443
+```
+
 ## FAQ
 
 **I do not see the service running, only the operator?**
