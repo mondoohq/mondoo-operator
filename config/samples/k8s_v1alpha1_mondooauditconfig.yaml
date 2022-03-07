@@ -4,12 +4,11 @@ metadata:
   name: mondoo-client
   namespace: mondoo-operator
 spec:
+  tag: latest
   workloads:
     enable: true
     serviceAccount: mondoo-operator-workload
-    tag: latest
   nodes:
     enable: true
-    tag: latest
   mondooSecretRef: mondoo-client
   
