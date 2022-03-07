@@ -20,7 +20,6 @@ import (
 	"context"
 	_ "embed"
 
-	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -30,6 +29,12 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+
+	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+)
+
+const (
+	finalizerString = "k8s.mondoo.com/delete"
 )
 
 // MondooAuditConfigReconciler reconciles a MondooAuditConfig object
@@ -89,6 +94,39 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// Error reading the object - requeue the request.
 		log.Error(err, "Failed to get mondoo")
 		return ctrl.Result{}, err
+	}
+
+	if mondoo.DeletionTimestamp != nil {
+		log.Info("deleting")
+
+		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
+		// deleted should be called here
+
+		webhooks := Webhooks{
+			Mondoo:          mondoo,
+			KubeClient:      r.Client,
+			TargetNamespace: req.Namespace,
+			Scheme:          r.Scheme,
+		}
+		result, err := webhooks.Reconcile(ctx)
+		if err != nil {
+			log.Error(err, "failed to cleanup webhooks")
+			return result, err
+		}
+
+		removeFinalizer(mondoo)
+		if err := r.Update(ctx, mondoo); err != nil {
+			log.Error(err, "failed to remove finalizer")
+		}
+		return ctrl.Result{}, err
+	} else {
+		if !hasFinalizer(mondoo) {
+			addFinalizer(mondoo)
+			if err := r.Update(ctx, mondoo); err != nil {
+				log.Error(err, "failed to set finalizer")
+			}
+			return ctrl.Result{}, err
+		}
 	}
 
 	nodes := Nodes{
@@ -186,4 +224,29 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.DaemonSet{}).
 		Owns(&appsv1.Deployment{}).
 		Complete(r)
+}
+
+func hasFinalizer(mac *v1alpha1.MondooAuditConfig) bool {
+	for _, f := range mac.Finalizers {
+		if f == finalizerString {
+			return true
+		}
+	}
+	return false
+}
+
+func addFinalizer(mac *v1alpha1.MondooAuditConfig) {
+	finalizerSet := sets.NewString(mac.Finalizers...)
+	finalizerSet.Insert(finalizerString)
+	mac.SetFinalizers(finalizerSet.List())
+
+	return
+}
+
+func removeFinalizer(mac *v1alpha1.MondooAuditConfig) {
+	finalizerSet := sets.NewString(mac.Finalizers...)
+	finalizerSet.Delete(finalizerString)
+	mac.SetFinalizers(finalizerSet.List())
+
+	return
 }

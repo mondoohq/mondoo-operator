@@ -46,6 +46,9 @@ var webhookLog = ctrl.Log.WithName("webhook")
 
 const (
 	webhookTLSSecretName = "webhook-server-cert"
+	// Keep a field to allow inserting the namespace so that we can have
+	// multiple MondooAuditConfig resources each with their own webhook registered.
+	webhookNameTemplate = `%s-mondoo-webhook`
 
 	certManagerCertificateName = "webhook-serving-cert"
 	certManagerIssuerName      = "mondoo-operator-selfsigned-issuer"
@@ -165,6 +168,16 @@ func (n *Webhooks) syncCertManagerCertificate(ctx context.Context) error {
 func (n *Webhooks) syncValidatingWebhookConfiguration(ctx context.Context,
 	vwc *webhooksv1.ValidatingWebhookConfiguration,
 	annotationKey, annotationValue string) error {
+
+	// Override the default name to allow for multiple MondooAudicConfig resources
+	// to each have their own Webhook
+	vwc.Name = fmt.Sprintf(webhookNameTemplate, n.Mondoo.Namespace)
+
+	// And update the Webhook entries to point to the right namespace for the Service
+	// receiving the webhook calls
+	for i := range vwc.Webhooks {
+		vwc.Webhooks[i].ClientConfig.Service.Namespace = n.Mondoo.Namespace
+	}
 
 	existingVWC := &webhooksv1.ValidatingWebhookConfiguration{}
 
@@ -377,18 +390,25 @@ func (n *Webhooks) applyWebhooks(ctx context.Context) (ctrl.Result, error) {
 }
 
 func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
-	if n.Mondoo.Spec.Webhooks.Enable {
+	if n.Mondoo.Spec.Webhooks.Enable && n.Mondoo.DeletionTimestamp == nil {
 		result, err := n.applyWebhooks(ctx)
 		if err != nil || result.Requeue {
 			return result, err
 		}
 	} else {
-		n.down(ctx)
+		result, err := n.down(ctx)
+		if err != nil || result.Requeue {
+			return result, err
+		}
 	}
 	return ctrl.Result{}, nil
 }
 
 func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
+	// NOTE: If we ever remove a resource that was previously deployed for a webhook,
+	// we would need to add custom code here to clean it up as it will no longer be
+	// included in the webhook-manifests.yaml embedded list of resources.
+
 	// Check for every possible object we could have created, and delete it
 
 	// Cleanup cert-manager Certificate and Issuer
@@ -455,6 +475,8 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 			genericObject.SetNamespace(n.TargetNamespace)
 		case "ValidatingWebhookConfiguration":
 			genericObject, conversionOK = obj.(*webhooksv1.ValidatingWebhookConfiguration)
+			// Generate the namespace-specific name for the webhook that needs to be cleaned up
+			genericObject.SetName(fmt.Sprintf(webhookNameTemplate, n.Mondoo.Namespace))
 		default:
 			err := fmt.Errorf("Unexpected type %s to decode", gvk.Kind)
 			webhookLog.Error(err, "Failed to convert type")

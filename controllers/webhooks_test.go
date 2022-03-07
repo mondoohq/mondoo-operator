@@ -186,6 +186,10 @@ func TestWebhooksReconcile(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithObjects(test.existingObjects...).Build()
 
 			auditConfig := &mondoov1alpha1.MondooAuditConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mondoo-client",
+					Namespace: testNamespace,
+				},
 				Spec: test.mondooAuditConfigSpec,
 			}
 			webhooks := &Webhooks{
@@ -228,7 +232,7 @@ func defaultResourcesWhenEnabled() []client.Object {
 
 	vwc := &webhooksv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "mondoo-operator-validating-webhook-configuration", // from webhook-manifests.yaml
+			Name: fmt.Sprintf(webhookNameTemplate, testNamespace), // from webhook-manifests.yaml
 		},
 	}
 	objects = append(objects, vwc)
