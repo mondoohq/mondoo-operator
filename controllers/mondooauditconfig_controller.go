@@ -20,6 +20,9 @@ import (
 	"context"
 	_ "embed"
 
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -96,47 +99,25 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	if mondoo.DeletionTimestamp != nil {
-		log.Info("deleting")
-
-		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
-		// deleted should be called here
-
-		webhooks := Webhooks{
-			Mondoo:          mondoo,
-			KubeClient:      r.Client,
-			TargetNamespace: req.Namespace,
-			Scheme:          r.Scheme,
-		}
-		result, err := webhooks.Reconcile(ctx)
-		if err != nil {
-			log.Error(err, "failed to cleanup webhooks")
-			return result, err
-		}
-
-		removeFinalizer(mondoo)
-		if err := r.Update(ctx, mondoo); err != nil {
-			log.Error(err, "failed to remove finalizer")
-		}
-		return ctrl.Result{}, err
-	} else {
-		if !hasFinalizer(mondoo) {
-			addFinalizer(mondoo)
-			if err := r.Update(ctx, mondoo); err != nil {
-				log.Error(err, "failed to set finalizer")
-			}
-			return ctrl.Result{}, err
-		}
+	ref, err := name.ParseReference("mondoolabs/mondoo:" + mondoo.Spec.Tag)
+	if err != nil {
+		log.Error(err, "failed to get container reference")
 	}
+
+	desc, err := remote.Get(ref)
+	imgDigest := desc.Digest.String()
+	repoName := ref.Context().Name()
+	imageUrl := repoName + "@" + imgDigest
 
 	nodes := Nodes{
 		Enable: mondoo.Spec.Nodes.Enable,
 		Mondoo: *mondoo,
+		Image:  imageUrl,
 	}
 
 	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
 	if err != nil {
-		log.Error(err, "Failed to declare nodes")
+		log.Error(err, "failed to declare nodes")
 	}
 	if err != nil || result.Requeue {
 		return result, err
@@ -145,6 +126,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	workloads := Workloads{
 		Enable: mondoo.Spec.Workloads.Enable,
 		Mondoo: *mondoo,
+		Image:  imageUrl,
 	}
 
 	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))

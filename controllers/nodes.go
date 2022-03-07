@@ -167,7 +167,7 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 						Effect: corev1.TaintEffect("NoSchedule"),
 					}},
 					Containers: []corev1.Container{{
-						Image:   "mondoolabs/mondoo:" + m.Spec.Nodes.Tag,
+						Image:   n.Image,
 						Name:    "mondoo-agent",
 						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
 						VolumeMounts: []corev1.VolumeMount{

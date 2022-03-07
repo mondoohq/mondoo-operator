@@ -3,11 +3,8 @@ module go.mondoo.com/mondoo-operator
 go 1.17
 
 require (
-	github.com/google/martian v2.1.0+incompatible
-	github.com/jetstack/cert-manager v1.7.1
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
-	github.com/stretchr/testify v1.7.0
 	k8s.io/api v0.23.4
 	k8s.io/apimachinery v0.23.4
 	k8s.io/client-go v0.23.4
@@ -23,8 +20,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.3.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.0.2 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.0.2-0.20211117181255-693428a734f5 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
