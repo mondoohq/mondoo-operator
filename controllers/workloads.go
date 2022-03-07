@@ -36,6 +36,7 @@ type Workloads struct {
 	Enable  bool
 	Mondoo  v1alpha1.MondooAuditConfig
 	Updated bool
+	Image   string
 }
 
 func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
@@ -157,7 +158,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 						Effect: corev1.TaintEffect("NoSchedule"),
 					}},
 					Containers: []corev1.Container{{
-						Image:   "mondoolabs/mondoo:" + m.Spec.Workloads.Tag,
+						Image:   n.Image,
 						Name:    "mondoo-agent",
 						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
 

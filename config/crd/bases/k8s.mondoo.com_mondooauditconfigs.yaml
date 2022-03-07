@@ -46,30 +46,9 @@ spec:
                     type: boolean
                   inventory:
                     type: string
-                  tag:
-                    type: string
                 type: object
-              webhooks:
-                properties:
-                  certificateConfig:
-                    description: CertificateConfig allows defining which certificate
-                      system to use. Leaving it as the empty string will mean the
-                      user will be responsible for creating the Secret with the TLS
-                      data, and inserting the CA data into the ValidatingWebhookConfigurations
-                      as well.
-                    properties:
-                      injectionStyle:
-                        enum:
-                        - ""
-                        - cert-manager
-                        - openshift
-                        type: string
-                    type: object
-                  enable:
-                    type: boolean
-                required:
-                - enable
-                type: object
+              tag:
+                type: string
               workloads:
                 properties:
                   enable:
@@ -78,8 +57,6 @@ spec:
                     type: string
                   serviceAccount:
                     description: Replicas               int32  `json:"replicas,omitempty"`
-                    type: string
-                  tag:
                     type: string
                 type: object
             required:
