@@ -29,15 +29,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
-	certmanagerrefv1 "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
 
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 )
@@ -49,10 +45,6 @@ const (
 	// Keep a field to allow inserting the namespace so that we can have
 	// multiple MondooAuditConfig resources each with their own webhook registered.
 	webhookNameTemplate = `%s-mondoo-webhook`
-
-	certManagerCertificateName = "webhook-serving-cert"
-	certManagerIssuerName      = "mondoo-operator-selfsigned-issuer"
-	certManagerAnnotationKey   = "cert-manager.io/inject-ca-from"
 )
 
 // Embed the Service/Desployment/ValidatingWebhookConfiguration payloads
@@ -64,104 +56,6 @@ type Webhooks struct {
 	KubeClient      client.Client
 	TargetNamespace string
 	Scheme          *runtime.Scheme
-	ForceCleanup    bool
-}
-
-// syncCertManagerIssuer will create/update Issuer resource for cert-manager
-func (n *Webhooks) syncCertManagerIssuer(ctx context.Context) error {
-	issuer := &certmanagerv1.Issuer{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      certManagerIssuerName,
-			Namespace: n.TargetNamespace,
-		},
-	}
-
-	if err := n.setControllerRef(issuer); err != nil {
-		return err
-	}
-
-	issuerSpec := certmanagerv1.IssuerSpec{
-		IssuerConfig: certmanagerv1.IssuerConfig{
-			SelfSigned: &certmanagerv1.SelfSignedIssuer{},
-		},
-	}
-
-	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(issuer), issuer); err != nil {
-		if errors.IsNotFound(err) {
-			issuer.Spec = issuerSpec
-			if err := n.KubeClient.Create(ctx, issuer); err != nil {
-				webhookLog.Error(err, "Failed to create cert-manager Issuer resource")
-				return err
-			}
-			// Creation succeeded
-			return nil
-		} else {
-			webhookLog.Error(err, "Failed to check for existing cert-manager Issuer resource")
-			return err
-		}
-	}
-
-	if !reflect.DeepEqual(issuer.Spec, issuerSpec) {
-		issuer.Spec = issuerSpec
-		if err := n.KubeClient.Update(ctx, issuer); err != nil {
-			webhookLog.Error(err, "Failed to update existing cert-manager Issuer resource")
-			return err
-		}
-	}
-
-	return nil
-}
-
-// syncCertManagerCertificate will create/update the cert-manager Certificate resource
-func (n *Webhooks) syncCertManagerCertificate(ctx context.Context) error {
-
-	certificate := &certmanagerv1.Certificate{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      certManagerCertificateName,
-			Namespace: n.TargetNamespace,
-		},
-	}
-
-	if err := n.setControllerRef(certificate); err != nil {
-		return err
-	}
-
-	certificateSpec := certmanagerv1.CertificateSpec{
-		DNSNames: []string{
-			fmt.Sprintf("mondoo-operator-webhook-service.%s.svc", n.TargetNamespace),
-			fmt.Sprintf("mondoo-operator-webhook-service.%s.svc.cluster.local", n.TargetNamespace),
-		},
-		IssuerRef: certmanagerrefv1.ObjectReference{
-			Kind: "Issuer",
-			Name: certManagerIssuerName,
-		},
-		SecretName: webhookTLSSecretName,
-	}
-
-	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(certificate), certificate); err != nil {
-		if errors.IsNotFound(err) {
-			certificate.Spec = certificateSpec
-			if err := n.KubeClient.Create(ctx, certificate); err != nil {
-				webhookLog.Error(err, "Failed to create cert-manager Certificate resource")
-				return err
-			}
-			// Creation succeeded
-			return nil
-		} else {
-			webhookLog.Error(err, "Failed to check for existing cert-manager Certificate resource")
-			return err
-		}
-	}
-
-	if !reflect.DeepEqual(certificate.Spec, certificateSpec) {
-		certificate.Spec = certificateSpec
-		if err := n.KubeClient.Update(ctx, certificate); err != nil {
-			webhookLog.Error(err, "Failed to update existing cert-manager Certificate resource")
-			return err
-		}
-	}
-
-	return nil
 }
 
 // syncValidatingWebhookConfiguration will create/update the ValidatingWebhookConfiguration
@@ -296,35 +190,33 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context, deployment *appsv1
 
 func (n *Webhooks) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1.ValidatingWebhookConfiguration) error {
 
+	var annotationKey, annotationValue string
+
 	switch n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle {
 	case string(mondoov1alpha1.CertManager):
-		if err := n.syncCertManagerIssuer(ctx); err != nil {
-			return err
+		cm := &CertManagerHandler{
+			KubeClient:      n.KubeClient,
+			TargetNamespace: n.TargetNamespace,
+			Mondoo:          n.Mondoo,
+			Scheme:          n.Scheme,
 		}
 
-		if err := n.syncCertManagerCertificate(ctx); err != nil {
+		var err error
+		annotationKey, annotationValue, err = cm.Setup(ctx)
+		if err != nil {
 			return err
 		}
-
-		// format for cert-manager annotation value is namespace/nameOfCertManagerCertificate
-		annotationValue := n.TargetNamespace + "/" + certManagerCertificateName
-
-		if err := n.syncValidatingWebhookConfiguration(ctx, vwc, certManagerAnnotationKey, annotationValue); err != nil {
-			return err
-		}
-
-		return nil
 
 	default:
 		// Consider this "manual" mode where the user is responsible for populating the Secret with
 		// appropriate TLS certificates. Populating the Secret will unblock the Pod and allow it to run.
 		// User also needs to populate the CA data on the webhook.
 		// So just apply the ValidatingWebhookConfiguration as-is
-		if err := n.syncValidatingWebhookConfiguration(ctx, vwc, "mondoo.com/tls-mode", "manual"); err != nil {
-			return err
-		}
-		return nil
+		annotationKey = "mondoo.com/tls-mode"
+		annotationValue = "manual"
 	}
+
+	return n.syncValidatingWebhookConfiguration(ctx, vwc, annotationKey, annotationValue)
 }
 
 func (n *Webhooks) applyWebhooks(ctx context.Context) (ctrl.Result, error) {
@@ -396,6 +288,16 @@ func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
 			return result, err
 		}
 	} else {
+		cm := CertManagerHandler{
+			TargetNamespace: n.TargetNamespace,
+			KubeClient:      n.KubeClient,
+			Mondoo:          n.Mondoo,
+			Scheme:          n.Scheme,
+		}
+		if err := cm.Cleanup(ctx); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		result, err := n.down(ctx)
 		if err != nil || result.Requeue {
 			return result, err
@@ -410,31 +312,6 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 	// included in the webhook-manifests.yaml embedded list of resources.
 
 	// Check for every possible object we could have created, and delete it
-
-	// Cleanup cert-manager Certificate and Issuer
-	certificate := &certmanagerv1.Certificate{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      certManagerCertificateName,
-			Namespace: n.TargetNamespace,
-		},
-	}
-
-	if err := n.genericDelete(ctx, certificate); err != nil {
-		webhookLog.Error(err, "Failed to clean up cert-manager Certificate resource")
-		return ctrl.Result{}, err
-	}
-
-	issuer := &certmanagerv1.Issuer{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      certManagerIssuerName,
-			Namespace: n.TargetNamespace,
-		},
-	}
-
-	if err := n.genericDelete(ctx, issuer); err != nil {
-		webhookLog.Error(err, "Failed to clean up cert-manager Issuer resource")
-		return ctrl.Result{}, err
-	}
 
 	// Cleanup standard manifests that are always applied
 	r := bytes.NewReader(webhookManifestsyaml)
@@ -487,7 +364,7 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 			return ctrl.Result{}, fmt.Errorf("Failed to convert to resource")
 		}
 
-		if err := n.genericDelete(ctx, genericObject); err != nil {
+		if err := genericDelete(ctx, n.KubeClient, genericObject); err != nil {
 			webhookLog.Error(err, "Failed to clean up resource")
 			return ctrl.Result{}, err
 		}
@@ -497,8 +374,8 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-func (n *Webhooks) genericDelete(ctx context.Context, object client.Object) error {
-	if err := n.KubeClient.Delete(ctx, object); err != nil {
+func genericDelete(ctx context.Context, kubeClient client.Client, object client.Object) error {
+	if err := kubeClient.Delete(ctx, object); err != nil {
 		if errors.IsNotFound(err) || strings.Contains(err.Error(), "no matches for kind") {
 			return nil
 		}
