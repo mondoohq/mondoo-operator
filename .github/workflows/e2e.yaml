@@ -40,6 +40,7 @@ jobs:
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
+          kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
           make undeploy
 
   # Added to summarize the matrix and allow easy branch protection rules setup
