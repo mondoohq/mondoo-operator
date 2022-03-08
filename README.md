@@ -29,6 +29,6 @@ Read the seperate installation instructions:
 
 The operator has been tested in the following environments
 
- - EKS: 1.21
- - AKS: 1.21
- - GKE: 1.21 and 1.22
+- EKS: 1.21
+- AKS: 1.21
+- GKE: 1.21 and 1.22

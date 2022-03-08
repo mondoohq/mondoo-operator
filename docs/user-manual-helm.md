@@ -5,7 +5,7 @@ The following steps setup a development Kubernetes to test the operator using he
 ## Preconditions:
 
 - Kubernetes Cluster with admin access
-- `kubectl` 
+- `kubectl`
 - `helm 3`
 
 ## Deployment of Operator
@@ -16,6 +16,7 @@ The following steps setup a development Kubernetes to test the operator using he
 helm repo add mondoo https://mondoohq.github.io/mondoo-operator
 helm repo update
 ```
+
 2. Deploy the operator using helm:
 
 ```bash
@@ -31,6 +32,7 @@ helm install mondoo-operator mondoo/mondoo-operator --namespace mondoo-operator-
 ```bash
 kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.json
 ```
+
 Once the secret is configure, we configure the operator to define the scan targets:
 
 4. Create `mondoo-config.yaml`
@@ -55,7 +57,6 @@ spec:
 ```bash
 kubectl apply -f mondoo-config.yaml
 ```
-
 
 ## FAQ
 
