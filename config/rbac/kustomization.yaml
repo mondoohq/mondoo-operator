@@ -7,6 +7,9 @@ resources:
 - service_account.yaml
 - role.yaml
 - role_binding.yaml
+- service_account_nodes.yaml
+- role_nodes.yaml
+- role_binding_nodes.yaml
 - leader_election_role.yaml
 - leader_election_role_binding.yaml
 # Comment the following 4 lines if you want to disable

@@ -182,6 +182,7 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 							},
 						},
 					}},
+					ServiceAccountName: "mondoo-operator-nodes",
 					Volumes: []corev1.Volume{
 						{
 							Name: "root",
