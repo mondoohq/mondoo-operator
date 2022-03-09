@@ -89,7 +89,7 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 	return ctrl.Result{}, nil
 }
 
-func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool, image string) (ctrl.Result, error) {
+func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	found := &appsv1.Deployment{}
@@ -109,8 +109,8 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 		}
 		return ctrl.Result{Requeue: true}, err
 
-	} else if err == nil && found.Spec.Template.Spec.Containers[0].Image != image {
-		found.Spec.Template.Spec.Containers[0].Image = image
+	} else if err == nil && found.Spec.Template.Spec.Containers[0].Image != n.Image {
+		found.Spec.Template.Spec.Containers[0].Image = n.Image
 		err := clt.Update(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
@@ -244,13 +244,13 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 	return dep
 }
 
-func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string, image string) (ctrl.Result, error) {
+func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 	if n.Enable {
 		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
 		if err != nil || result.Requeue {
 			return result, err
 		}
-		result, err = n.declareDeployment(ctx, clt, scheme, req, true, image)
+		result, err = n.declareDeployment(ctx, clt, scheme, req, true)
 		if err != nil || result.Requeue {
 			return result, err
 		}
