@@ -4,11 +4,16 @@ metadata:
   name: mondoo-client
   namespace: mondoo-operator
 spec:
-  tag: latest
   workloads:
     enable: true
     serviceAccount: mondoo-operator-workload
+    image:
+      name: docker.io/mondoolabs/mondoo
+      tag: latest
   nodes:
     enable: true
+    image:
+      name: docker.io/mondoolabs/mondoo
+      tag: latest
   mondooSecretRef: mondoo-client
   
