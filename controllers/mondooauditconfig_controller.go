@@ -116,7 +116,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Image:  imageUrl,
 	}
 
-	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml), image)
+	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
 	if err != nil {
 		log.Error(err, "Failed to declare nodes")
 	}
@@ -141,7 +141,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Image:  imageUrl,
 	}
 
-	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml), image)
+	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
 	if err != nil {
 		log.Error(err, "Failed to declare workloads")
 	}

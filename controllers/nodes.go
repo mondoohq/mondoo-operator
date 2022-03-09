@@ -91,7 +91,7 @@ func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme 
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool, image string) (ctrl.Result, error) {
+func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	found := &appsv1.DaemonSet{}
@@ -112,8 +112,8 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 
 		return ctrl.Result{Requeue: true}, err
 
-	} else if err == nil && found.Spec.Template.Spec.Containers[0].Image != image {
-		found.Spec.Template.Spec.Containers[0].Image = image
+	} else if err == nil && found.Spec.Template.Spec.Containers[0].Image != n.Image {
+		found.Spec.Template.Spec.Containers[0].Image = n.Image
 		err := clt.Update(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to update Daemonset", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
@@ -243,13 +243,13 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 	return dep
 }
 
-func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string, image string) (ctrl.Result, error) {
+func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 	if n.Enable {
 		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
 		if err != nil || result.Requeue {
 			return result, err
 		}
-		result, err = n.declareDaemonSet(ctx, clt, scheme, req, true, image)
+		result, err = n.declareDaemonSet(ctx, clt, scheme, req, true)
 		if err != nil || result.Requeue {
 			return result, err
 		}
