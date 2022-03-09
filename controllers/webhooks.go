@@ -45,6 +45,14 @@ const (
 	// Keep a field to allow inserting the namespace so that we can have
 	// multiple MondooAuditConfig resources each with their own webhook registered.
 	webhookNameTemplate = `%s-mondoo-webhook`
+
+	// openShiftServiceAnnotationKey is how we annotate a Service so that OpenShift
+	// will create TLS certificates for the webhook Service.
+	openShiftServiceAnnotationKey = "service.beta.openshift.io/serving-cert-secret-name"
+
+	// openShiftWebhookAnnotationKey is how we annotate a webhook so that OpenShift
+	// injects the cluster-wide CA data for auto-generated TLS certificates.
+	openShiftWebhookAnnotationKey = "service.beta.openshift.io/inject-cabundle"
 )
 
 // Embed the Service/Desployment/ValidatingWebhookConfiguration payloads
@@ -118,6 +126,16 @@ func (n *Webhooks) syncWebhookService(ctx context.Context, service *corev1.Servi
 
 	desiredService := service.DeepCopy()
 
+	// Annotate the Service if the Mondo config is asking for OpenShift-style TLS certificate management.
+	if n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) {
+		if service.Annotations == nil {
+			service.Annotations = map[string]string{}
+		}
+
+		// Just set the value to the name of the Secret the webhook Deployment mounts in.
+		service.Annotations[openShiftServiceAnnotationKey] = webhookTLSSecretName
+	}
+
 	service.SetNamespace(n.TargetNamespace)
 
 	if err := n.setControllerRef(service); err != nil {
@@ -136,7 +154,13 @@ func (n *Webhooks) syncWebhookService(ctx context.Context, service *corev1.Servi
 		}
 	}
 
-	if !reflect.DeepEqual(service.Spec.Ports, desiredService.Spec.Ports) || !reflect.DeepEqual(service.Spec.Selector, desiredService.Spec.Selector) {
+	if n.webhookServiceNeedsUpdate(desiredService, service) {
+		if n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) {
+			if service.Annotations == nil {
+				service.Annotations = map[string]string{}
+			}
+			service.Annotations[openShiftServiceAnnotationKey] = webhookTLSSecretName
+		}
 		service.Spec.Ports = desiredService.Spec.Ports
 		service.Spec.Selector = desiredService.Spec.Selector
 		if err := n.KubeClient.Update(ctx, service); err != nil {
@@ -146,6 +170,23 @@ func (n *Webhooks) syncWebhookService(ctx context.Context, service *corev1.Servi
 	}
 
 	return nil
+}
+
+func (n *Webhooks) webhookServiceNeedsUpdate(desired, existing *corev1.Service) bool {
+	if !reflect.DeepEqual(desired.Spec.Ports, existing.Spec.Ports) {
+		return true
+	}
+	if !reflect.DeepEqual(desired.Spec.Selector, existing.Spec.Selector) {
+		return true
+	}
+
+	if n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) {
+		if existing.Annotations == nil || existing.Annotations[openShiftServiceAnnotationKey] != webhookTLSSecretName {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (n *Webhooks) syncWebhookDeployment(ctx context.Context, deployment *appsv1.Deployment) error {
@@ -206,6 +247,12 @@ func (n *Webhooks) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1
 		if err != nil {
 			return err
 		}
+
+	case string(mondoov1alpha1.OpenShift):
+		// For OpenShift we just annotate the webhook so that the necessary CA data is injected
+		// into the webhook.
+		annotationKey = openShiftWebhookAnnotationKey
+		annotationValue = "true"
 
 	default:
 		// Consider this "manual" mode where the user is responsible for populating the Secret with

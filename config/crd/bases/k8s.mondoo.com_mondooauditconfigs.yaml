@@ -60,6 +60,7 @@ spec:
                         enum:
                         - ""
                         - cert-manager
+                        - openshift
                         type: string
                     type: object
                   enable:

@@ -51,10 +51,11 @@ type InjectionStyle string
 
 const (
 	CertManager InjectionStyle = "cert-manager"
+	OpenShift   InjectionStyle = "openshift"
 )
 
 type WebhookCertificateConfig struct {
-	// +kubebuilder:validation:Enum="";cert-manager
+	// +kubebuilder:validation:Enum="";cert-manager;openshift
 	InjectionStyle string `json:"injectionStyle,omitempty"`
 }
 
