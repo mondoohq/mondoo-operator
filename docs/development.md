@@ -37,7 +37,7 @@ make deploy-olm
 
 Now, we completed the setup for the operator. To start the service, we need to configure the client:
 
-1. Create namespace using `kubectl create namespace mondoo-operator-system`
+1. Create namespace using `kubectl create namespace mondoo-operator`
 2. Configure the Mondoo secret:
 
 - Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts)
@@ -45,7 +45,7 @@ Now, we completed the setup for the operator. To start the service, we need to c
 - Store service account as a secret in the mondoo namespace via:
 
 ```bash
-kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.json
+kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
 ```
 
 3. Update SecretName created in step 4 in the mondoo-client CRD.
@@ -59,7 +59,7 @@ kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
 Validate that everything is running:
 
 ```
-kubectl get pods --namespace mondoo-operator-system
+kubectl get pods --namespace mondoo-operator
 NAME                                                  READY   STATUS    RESTARTS   AGE
 mondoo-client-hjt8z                                   1/1     Running   0          16m
 mondoo-operator-controller-manager-556c7d4b56-qqsqh   2/2     Running   0          88m

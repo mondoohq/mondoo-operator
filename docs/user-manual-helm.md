@@ -20,7 +20,7 @@ helm repo update
 2. Deploy the operator using helm:
 
 ```bash
-helm install mondoo-operator mondoo/mondoo-operator --namespace mondoo-operator-system --create-namespace
+helm install mondoo-operator mondoo/mondoo-operator --namespace mondoo-operator --create-namespace
 ```
 
 3. Configure the Mondoo secret:
@@ -30,7 +30,7 @@ helm install mondoo-operator mondoo/mondoo-operator --namespace mondoo-operator-
 - Store service account as a secret in the mondoo namespace via:
 
 ```bash
-kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.json
+kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
 ```
 
 Once the secret is configure, we configure the operator to define the scan targets:
@@ -42,7 +42,7 @@ apiVersion: k8s.mondoo.com/v1alpha1
 kind: MondooAuditConfig
 metadata:
   name: mondoo-client
-  namespace: mondoo-operator-system
+  namespace: mondoo-operator
 spec:
   workloads:
     enable: true

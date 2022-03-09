@@ -222,13 +222,13 @@ jobs:
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
-          kubectl create ns mondoo-operator-system
-          kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.yaml
+          kubectl create ns mondoo-operator
+          kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.yaml
       - name: Run e2e test with olm
         run: |
-          operator-sdk run bundle '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:${{ env.RELEASE}}' --namespace mondoo-operator-system
+          operator-sdk run bundle '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:${{ env.RELEASE}}' --namespace mondoo-operator
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
           make test/deployment
-          operator-sdk cleanup mondoo-operator --namespace mondoo-operator-system
+          operator-sdk cleanup mondoo-operator --namespace mondoo-operator
           operator-sdk olm uninstall 
 

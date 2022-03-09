@@ -28,7 +28,7 @@ kubectl apply -f mondoo-operator-manifests.yaml
 - Store service account as a secret in the mondoo namespace via:
 
 ```bash
-kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.json
+kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
 ```
 
 Once the secret is configure, we configure the operator to define the scan targets:
@@ -40,7 +40,7 @@ apiVersion: k8s.mondoo.com/v1alpha1
 kind: MondooAuditConfig
 metadata:
   name: mondoo-client
-  namespace: mondoo-operator-system
+  namespace: mondoo-operator
 spec:
   workloads:
     enable: true

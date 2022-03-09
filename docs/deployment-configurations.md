@@ -13,7 +13,7 @@ apiVersion: k8s.mondoo.com/v1alpha1
 kind: MondooAuditConfig
 metadata:
   name: mondoo-client
-  namespace: mondoo-operator-system
+  namespace: mondoo-operator
 spec:
   workloads:
     enable: true

@@ -17,7 +17,7 @@ The following steps sets up the mondoo operator using kubectl and a manifest fil
 - Store service account as a secret in the mondoo namespace via:
 
 ```bash
-kubectl create secret generic mondoo-client --namespace mondoo-operator-system --from-file=config=creds.json
+kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
 ```
 
 2. Verify that operator-lifecycle-manager is up
@@ -29,7 +29,7 @@ operator-sdk olm status | echo $?
 3. Run the operator-bundle
 
 ```bash
-operator-sdk run bundle ghcr.io/mondoohq/mondoo-operator-bundle:latest --namespace=mondoo-operator-system
+operator-sdk run bundle ghcr.io/mondoohq/mondoo-operator-bundle:latest --namespace=mondoo-operator
 ```
 
 4. Create `mondoo-config.yaml`
@@ -39,7 +39,7 @@ apiVersion: k8s.mondoo.com/v1alpha1
 kind: MondooAuditConfig
 metadata:
   name: mondoo-client
-  namespace: mondoo-operator-system
+  namespace: mondoo-operator
 spec:
   workloads:
     enable: true
