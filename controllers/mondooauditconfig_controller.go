@@ -99,7 +99,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	ref, err := name.ParseReference(mondoo.Spec.Nodes.Image.Name + mondoo.Spec.Nodes.Image.Tag)
+	ref, err := name.ParseReference(mondoo.Spec.Nodes.Image.Name + ":" + mondoo.Spec.Nodes.Image.Tag)
 	if err != nil {
 		log.Error(err, "Failed to get container reference")
 	}
@@ -123,7 +123,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return result, err
 	}
 
-	ref, err = name.ParseReference(mondoo.Spec.Workloads.Image.Name + mondoo.Spec.Workloads.Image.Tag)
+	ref, err = name.ParseReference(mondoo.Spec.Workloads.Image.Name + ":" + mondoo.Spec.Workloads.Image.Tag)
 	if err != nil {
 		log.Error(err, "Failed to get container reference")
 	}
