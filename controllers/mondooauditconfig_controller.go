@@ -99,7 +99,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	ref, err := name.ParseReference(mondoo.Spec.Nodes.Image.Name + ":" + mondoo.Spec.Nodes.Image.Tag)
+	image := mondoo.Spec.Nodes.Image.Name + ":" + mondoo.Spec.Nodes.Image.Tag
+	ref, err := name.ParseReference(image)
 	if err != nil {
 		log.Error(err, "Failed to get container reference")
 	}
@@ -115,7 +116,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Image:  imageUrl,
 	}
 
-	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
+	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml), image)
 	if err != nil {
 		log.Error(err, "Failed to declare nodes")
 	}
@@ -123,7 +124,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return result, err
 	}
 
-	ref, err = name.ParseReference(mondoo.Spec.Workloads.Image.Name + ":" + mondoo.Spec.Workloads.Image.Tag)
+	image = mondoo.Spec.Workloads.Image.Name + ":" + mondoo.Spec.Workloads.Image.Tag
+	ref, err = name.ParseReference(image)
 	if err != nil {
 		log.Error(err, "Failed to get container reference")
 	}
@@ -139,7 +141,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Image:  imageUrl,
 	}
 
-	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
+	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml), image)
 	if err != nil {
 		log.Error(err, "Failed to declare workloads")
 	}
