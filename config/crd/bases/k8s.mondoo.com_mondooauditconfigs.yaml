@@ -54,8 +54,6 @@ spec:
                   inventory:
                     type: string
                 type: object
-              tag:
-                type: string
               workloads:
                 properties:
                   enable:
