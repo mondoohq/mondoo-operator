@@ -18,12 +18,14 @@ package controllers
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -122,6 +124,15 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	} else if err != nil {
 		log.Error(err, "Failed to get Daemonset")
 		return ctrl.Result{}, err
+	} else if err == nil && !reflect.DeepEqual(found.Spec.Template.Spec.Containers[0].Resources, n.getNodeResources(&n.Mondoo)) {
+		found.Spec.Template.Spec.Containers[0].Resources = n.getNodeResources(&n.Mondoo)
+		err := clt.Update(ctx, found)
+		if err != nil {
+			log.Error(err, "Failed to update Daemonset", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, err
+
 	}
 	if n.Updated {
 		if found.Spec.Template.ObjectMeta.Annotations == nil {
@@ -165,9 +176,10 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 						Effect: corev1.TaintEffect("NoSchedule"),
 					}},
 					Containers: []corev1.Container{{
-						Image:   n.Image,
-						Name:    "mondoo-agent",
-						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
+						Image:     n.Image,
+						Name:      "mondoo-agent",
+						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
+						Resources: n.getNodeResources(m),
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "root",
@@ -240,7 +252,6 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 	}
 	return dep
 }
-
 func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
 	log := ctrllog.FromContext(ctx)
@@ -311,4 +322,34 @@ func (n *Nodes) deleteExternalResources(ctx context.Context, clt client.Client, 
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{Requeue: true}, err
+}
+
+// defaultNodeResources for Mondoo container
+func (n *Nodes) defaultNodeResources() corev1.ResourceRequirements {
+	return corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("1G"),
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+		},
+		// 75% of the limits
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("750M"),
+			corev1.ResourceCPU:    resource.MustParse("375m"),
+		},
+	}
+}
+
+// getNodeResources will return the ResourceRequirements for the Mondoo container.
+func (n *Nodes) getNodeResources(m *v1alpha1.MondooAuditConfig) corev1.ResourceRequirements {
+
+	// Default values for Mondoo resources requirements.
+	resources := n.defaultNodeResources()
+
+	// Allow override of resource requirements from Mondoo Object
+	if m.Spec.Nodes.Resources.Size() != 0 {
+		resources = m.Spec.Nodes.Resources
+		return resources
+	}
+
+	return resources
 }
