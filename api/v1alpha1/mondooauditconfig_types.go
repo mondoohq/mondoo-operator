@@ -45,7 +45,7 @@ type Workloads struct {
 	Inventory string `json:"inventory,omitempty"`
 	// Replicas               int32  `json:"replicas,omitempty"`
 	ServiceAccount string `json:"serviceAccount,omitempty"`
-	Image          `json:"image,omitempty"`
+	Image          Image  `json:"image,omitempty"`
 }
 
 type Image struct {
