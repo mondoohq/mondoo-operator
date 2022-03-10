@@ -246,15 +246,18 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
 	log := ctrllog.FromContext(ctx)
-	var image string
 
-	if n.Mondoo.Spec.Nodes.Image.Name == "" || n.Mondoo.Spec.Nodes.Image.Tag == "" {
-		image = "docker.io/mondoolabs/mondoo:latest"
-	} else {
-		image = n.Mondoo.Spec.Nodes.Image.Name + ":" + n.Mondoo.Spec.Nodes.Image.Tag
+	mondooImage := "docker.io/mondoolabs/mondoo"
+	mondooTag := "latest"
+	if n.Mondoo.Spec.Nodes.Image.Name != "" {
+		mondooImage = n.Mondoo.Spec.Nodes.Image.Name
 	}
+	if n.Mondoo.Spec.Nodes.Image.Tag != "" {
+		mondooTag = n.Mondoo.Spec.Nodes.Image.Tag
+	}
+	mondooContainer := mondooImage + ":" + mondooTag
 
-	ref, err := name.ParseReference(image)
+	ref, err := name.ParseReference(mondooContainer)
 	if err != nil {
 		log.Error(err, "Failed to parse container reference")
 		return ctrl.Result{}, err
