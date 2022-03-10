@@ -3,6 +3,7 @@ module go.mondoo.com/mondoo-operator
 go 1.17
 
 require (
+	github.com/google/martian v2.1.0+incompatible
 	github.com/jetstack/cert-manager v1.7.1
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0

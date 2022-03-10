@@ -247,6 +247,33 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 }
 
 func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
+
+	log := ctrllog.FromContext(ctx)
+	var image string
+
+	if n.Mondoo.Spec.Workloads.Image.Name == "" || n.Mondoo.Spec.Workloads.Image.Tag == "" {
+		image = "docker.io/mondoolabs/mondoo:latest"
+	} else {
+		image = n.Mondoo.Spec.Workloads.Image.Name + ":" + n.Mondoo.Spec.Workloads.Image.Tag
+	}
+
+	ref, err := name.ParseReference(image)
+	if err != nil {
+		log.Error(err, "Failed to parse container reference")
+		return ctrl.Result{}, err
+	}
+
+	desc, err := remote.Get(ref)
+	if err != nil {
+		log.Error(err, "Failed to get container reference")
+		return ctrl.Result{}, err
+	}
+	imgDigest := desc.Digest.String()
+	repoName := ref.Context().Name()
+	imageUrl := repoName + "@" + imgDigest
+
+	n.Image = imageUrl
+
 	if n.Enable {
 		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
 		if err != nil || result.Requeue {
