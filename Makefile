@@ -164,6 +164,13 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 	operator-sdk generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION:v%=%) $(BUNDLE_METADATA_OPTS)
+	sed -i -e 's|containerImage: .*|containerImage: $(IMG)|' bundle/manifests/*.clusterserviceversion.yaml
+	# TODO: find a portable way to in-place sed edit a file between Linux/MacOS
+	# MacOS sed requires a '-i""' to avoid making backup files when doing in-place edits, but that
+	# causes trouble for GNU sed which only needs '-i'.
+	# Just remove the MacOS-generated backup file in a way that doesn't error on Linux so that the
+	# 'validate' step below doesn't complain about multiple CSV files in the generated bundle.
+	rm -f bundle/manifests/*-e
 	operator-sdk bundle validate ./bundle
 
 .PHONY: bundle-build
