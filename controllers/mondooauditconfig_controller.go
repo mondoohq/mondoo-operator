@@ -20,8 +20,6 @@ import (
 	"context"
 	_ "embed"
 
-	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -131,21 +129,9 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
-	image := mondoo.Spec.Nodes.Image.Name + ":" + mondoo.Spec.Nodes.Image.Tag
-	ref, err := name.ParseReference(image)
-	if err != nil {
-		log.Error(err, "Failed to get container reference")
-	}
-
-	desc, err := remote.Get(ref)
-	imgDigest := desc.Digest.String()
-	repoName := ref.Context().Name()
-	imageUrl := repoName + "@" + imgDigest
-
 	nodes := Nodes{
 		Enable: mondoo.Spec.Nodes.Enable,
 		Mondoo: *mondoo,
-		Image:  imageUrl,
 	}
 
 	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
@@ -156,21 +142,9 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return result, err
 	}
 
-	image = mondoo.Spec.Workloads.Image.Name + ":" + mondoo.Spec.Workloads.Image.Tag
-	ref, err = name.ParseReference(image)
-	if err != nil {
-		log.Error(err, "Failed to get container reference")
-	}
-
-	desc, err = remote.Get(ref)
-	imgDigest = desc.Digest.String()
-	repoName = ref.Context().Name()
-	imageUrl = repoName + "@" + imgDigest
-
 	workloads := Workloads{
 		Enable: mondoo.Spec.Workloads.Enable,
 		Mondoo: *mondoo,
-		Image:  imageUrl,
 	}
 
 	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
