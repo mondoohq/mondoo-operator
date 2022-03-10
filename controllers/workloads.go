@@ -20,8 +20,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -249,34 +247,14 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
 	log := ctrllog.FromContext(ctx)
-	mondooImage := "docker.io/mondoolabs/mondoo"
-	mondooTag := "latest"
-	if n.Mondoo.Spec.Workloads.Image.Name != "" {
-		mondooImage = n.Mondoo.Spec.Workloads.Image.Name
-	}
-	if n.Mondoo.Spec.Workloads.Image.Tag != "" {
-		mondooTag = n.Mondoo.Spec.Workloads.Image.Tag
-	}
-	mondooContainer := mondooImage + ":" + mondooTag
-
-	ref, err := name.ParseReference(mondooContainer)
-	if err != nil {
-		log.Error(err, "Failed to parse container reference")
-		return ctrl.Result{}, err
-	}
-
-	desc, err := remote.Get(ref)
-	if err != nil {
-		log.Error(err, "Failed to get container reference")
-		return ctrl.Result{}, err
-	}
-	imgDigest := desc.Digest.String()
-	repoName := ref.Context().Name()
-	imageUrl := repoName + "@" + imgDigest
-
-	n.Image = imageUrl
 
 	if n.Enable {
+		mondooImage, err := resolveImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		n.Image = mondooImage
+
 		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
 		if err != nil || result.Requeue {
 			return result, err

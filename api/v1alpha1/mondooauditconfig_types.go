@@ -37,7 +37,7 @@ type MondooAuditConfigData struct {
 type Nodes struct {
 	Enable    bool   `json:"enable,omitempty"`
 	Inventory string `json:"inventory,omitempty"`
-	Image     `json:"image,omitempty"`
+	Image     Image  `json:"image,omitempty"`
 }
 
 type Workloads struct {
