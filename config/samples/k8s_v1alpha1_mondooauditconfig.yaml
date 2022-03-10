@@ -7,13 +7,9 @@ spec:
   workloads:
     enable: true
     serviceAccount: mondoo-operator-workload
-    image:
-      name: docker.io/mondoolabs/mondoo
-      tag: latest
   nodes:
     enable: true
-    image:
-      name: docker.io/mondoolabs/mondoo
-      tag: latest
+  webhooks:
+    enable: false
   mondooSecretRef: mondoo-client
   

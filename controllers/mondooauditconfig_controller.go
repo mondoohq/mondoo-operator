@@ -22,7 +22,6 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -97,6 +96,39 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// Error reading the object - requeue the request.
 		log.Error(err, "Failed to get mondoo")
 		return ctrl.Result{}, err
+	}
+
+	if mondoo.DeletionTimestamp != nil {
+		log.Info("deleting")
+
+		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
+		// deleted should be called here
+
+		webhooks := Webhooks{
+			Mondoo:          mondoo,
+			KubeClient:      r.Client,
+			TargetNamespace: req.Namespace,
+			Scheme:          r.Scheme,
+		}
+		result, err := webhooks.Reconcile(ctx)
+		if err != nil {
+			log.Error(err, "failed to cleanup webhooks")
+			return result, err
+		}
+
+		removeFinalizer(mondoo)
+		if err := r.Update(ctx, mondoo); err != nil {
+			log.Error(err, "failed to remove finalizer")
+		}
+		return ctrl.Result{}, err
+	} else {
+		if !hasFinalizer(mondoo) {
+			addFinalizer(mondoo)
+			if err := r.Update(ctx, mondoo); err != nil {
+				log.Error(err, "failed to set finalizer")
+			}
+			return ctrl.Result{}, err
+		}
 	}
 
 	image := mondoo.Spec.Nodes.Image.Name + ":" + mondoo.Spec.Nodes.Image.Tag
