@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	testNamespace = "mondoo-operator-system" // from the defaults in webhook-manifests.yaml
+	testNamespace = "mondoo-operator" // from the defaults in webhook-manifests.yaml
 )
 
 func init() {

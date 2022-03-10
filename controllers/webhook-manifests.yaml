@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mondoo-operator-webhook-service
-  namespace: mondoo-operator-system
+  namespace: mondoo-operator
 spec:
   ports:
   - port: 443
@@ -17,7 +17,7 @@ metadata:
   labels:
     control-plane: webhook-manager
   name: mondoo-operator-webhook-manager
-  namespace: mondoo-operator-system
+  namespace: mondoo-operator
 spec:
   replicas: 1
   selector:
@@ -79,7 +79,7 @@ webhooks:
   clientConfig:
     service:
       name: mondoo-operator-webhook-service
-      namespace: mondoo-operator-system
+      namespace: mondoo-operator
       path: /validate-k8s-mondoo-com-core
   failurePolicy: Ignore
   name: core-policy.k8s.mondoo.com
