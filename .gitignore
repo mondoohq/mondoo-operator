@@ -29,3 +29,6 @@ testbin/*
 creds.json
 creds.yaml
 mondoo-operator-manifests.yaml
+
+#bundle output
+bundle/*

@@ -89,7 +89,6 @@ spec:
                   inventory:
                     type: string
                   serviceAccount:
-                    description: Replicas               int32  `json:"replicas,omitempty"`
                     type: string
                 type: object
             required:
