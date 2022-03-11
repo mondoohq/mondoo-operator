@@ -18,14 +18,12 @@ package controllers
 
 import (
 	"context"
-	"reflect"
 	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -93,7 +91,6 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 
 func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-
 	found := &appsv1.Deployment{}
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
@@ -123,15 +120,19 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
-	} else if err == nil && !reflect.DeepEqual(found.Spec.Template.Spec.Containers[0].Resources, n.getWorkloadResources(&n.Mondoo)) {
-		found.Spec.Template.Spec.Containers[0].Resources = n.getWorkloadResources(&n.Mondoo)
+	}
+
+	// check that the resource limites are identical
+	expectedResourceRequirements := getResourcesRequirements(n.Mondoo.Spec.Workloads.Resources)
+	if !equalResouceRequirements(found.Spec.Template.Spec.Containers[0].Resources, expectedResourceRequirements) {
+		log.Info("update resource requirements for workload client")
+		found.Spec.Template.Spec.Containers[0].Resources = expectedResourceRequirements
 		err := clt.Update(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, err
-
 	}
 
 	if n.Updated {
@@ -181,7 +182,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 						Image:     n.Image,
 						Name:      "mondoo-agent",
 						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
-						Resources: n.getWorkloadResources(m),
+						Resources: getResourcesRequirements(m.Spec.Workloads.Resources),
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "root",
@@ -329,40 +330,3 @@ func (n *Workloads) deleteExternalResources(ctx context.Context, clt client.Clie
 	}
 	return ctrl.Result{Requeue: true}, err
 }
-
-// defaultNodeResources for Mondoo container
-func (n *Workloads) defaultNodeResources() corev1.ResourceRequirements {
-	return corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceMemory: resource.MustParse("1G"),
-			corev1.ResourceCPU:    resource.MustParse("500m"),
-		},
-		// 75% of the limits
-		Requests: corev1.ResourceList{
-			corev1.ResourceMemory: resource.MustParse("750M"),
-			corev1.ResourceCPU:    resource.MustParse("375m"),
-		},
-	}
-}
-
-// getWorkloadResources will return the ResourceRequirements for the Mondoo container.
-func (n *Workloads) getWorkloadResources(m *v1alpha1.MondooAuditConfig) corev1.ResourceRequirements {
-
-	// Default values for Mondoo resources requirements.
-	resources := n.defaultNodeResources()
-
-	// Allow override of resource requirements from Mondoo Object
-	if m.Spec.Workloads.Resources.Size() != 0 {
-		resources = m.Spec.Workloads.Resources
-		return resources
-	}
-
-	return resources
-}
-
-// func compare(x corev1.ResourceRequirements, y corev1.ResourceRequirements) bool {
-// 	if x.Limits.Cpu().Equal(*y.Limits.Cpu()) && x.Limits.Memory().Equal(*y.Limits.Memory()) && x.Requests.Cpu().Equal(*y.Requests.Cpu()) && x.Requests.Memory().Equal(*y.Requests.Memory()) {
-// 		return true
-// 	}
-// 	return false
-// }
