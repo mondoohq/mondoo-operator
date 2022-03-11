@@ -3,7 +3,7 @@ kind: ClusterServiceVersion
 metadata:
   annotations:
     alm-examples: '[]'
-    capabilities: Full Lifecycle
+    capabilities: Basic Install 
     categories: Security
     certified: "false"
     containerImage: ghcr.io/mondoohq/mondoo-operator:v0.0.10

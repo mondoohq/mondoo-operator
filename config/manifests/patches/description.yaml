@@ -1,0 +1,18 @@
+- op: add
+  path: "/spec/description"
+  value: |
+    The **Mondoo Operator** provides a new [Kubernetes](https://kubernetes.io/) native way to do a security assessment of your whole Kubernetes Cluster. The purpose of this project is to simplify and automate the configuration for a Mondoo-based security assessment for Kubernetes clusters.
+
+    The Mondoo Operator provides the following features:
+
+    - Continuous validation of deployed workloads
+    - Continuous validation of Kubernetes nodes **without** priviledged access
+    - Admission Controller
+
+    It is backed by Mondoo's powerful [Policy-as-Code](https://mondoo.com/docs/getstarted/policy-as-code) engine and [MQL](https://mondoo.com/docs/getstarted/policy-as-code#introducing-the-mondoo-query-language-mql). Mondoo ships out-of-the-box security polices for:
+
+    - CIS Kubernetes Benchmark
+    - Kubernetes Application Benchmark
+
+    Further information is available at [service-account-doc](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual-olm.md).
+    ```
