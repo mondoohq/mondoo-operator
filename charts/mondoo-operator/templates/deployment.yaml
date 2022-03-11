@@ -8,6 +8,13 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
+  name: {{ include "mondoo-operator.fullname" . }}-nodes
+  labels:
+  {{- include "mondoo-operator.labels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
   name: {{ include "mondoo-operator.fullname" . }}-workload
   labels:
   {{- include "mondoo-operator.labels" . | nindent 4 }}
@@ -53,7 +60,6 @@ spec:
         - /manager
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
-        imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
             path: /healthz
