@@ -36,6 +36,24 @@ spec:
           spec:
             description: MondooAuditConfigSpec defines the desired state of MondooAuditConfig
             properties:
+              containerRegistries:
+                description: ContainerRegistries defines the configuration for container
+                  registry scanning.
+                properties:
+                  enable:
+                    type: boolean
+                  registries:
+                    items:
+                      description: Registry holds all the data related to a single
+                        container image registry.
+                      properties:
+                        registry:
+                          type: string
+                      required:
+                      - registry
+                      type: object
+                    type: array
+                type: object
               mondooSecretRef:
                 type: string
               nodes:
