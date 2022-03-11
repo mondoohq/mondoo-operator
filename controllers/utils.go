@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	mondooImage = "docker.io/mondoolabs/mondoo"
+	mondooImage = "docker.io/mondoo/client"
 	mondooTag   = "latest"
 )
 
