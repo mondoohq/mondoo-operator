@@ -115,8 +115,10 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy: manifests kustomize yq ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	# Set the environment variable for the operator to match the container image set on the Deployment
+	IMG=$(IMG) $(YQ) -i ".spec.template.spec.containers[].env[0].value = env(IMG)" config/manager/manager.yaml
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 generate-manifests: manifests kustomize ## Generates manifests and pipes into a yaml file
@@ -127,6 +129,8 @@ generate-manifests: manifests kustomize ## Generates manifests and pipes into a 
 
 deploy-olm: manifests kustomize ## Deploy using operator-sdk OLM 
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	# Set the environment variable for the operator to match the container image set on the Deployment
+	IMG=$(IMG) $(YQ) -i ".spec.template.spec.containers[].env[0].value = env(IMG)" config/manager/manager.yaml
 	$(KUSTOMIZE) build config/default | operator-sdk run bundle ${BUNDLE_IMG}
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
@@ -140,6 +144,10 @@ controller-gen: ## Download controller-gen locally if necessary.
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
 	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@v3.8.7)
+
+YQ = $(shell pwd)/bin/yq
+yq: ## Build yq locally
+	$(call go-get-tool,$(YQ),github.com/mikefarah/yq/v4@v4.22.1)
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
@@ -163,6 +171,8 @@ endef
 bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
 	operator-sdk generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	# Set the environment variable for the operator to match the container image set on the Deployment
+	IMG=$(IMG) $(YQ) -i ".spec.template.spec.containers[].env[0].value = env(IMG)" config/manager/manager.yaml
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION:v%=%) $(BUNDLE_METADATA_OPTS)
 	sed -i -e 's|containerImage: .*|containerImage: $(IMG)|' bundle/manifests/*.clusterserviceversion.yaml
 	# TODO: find a portable way to in-place sed edit a file between Linux/MacOS

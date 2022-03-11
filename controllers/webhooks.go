@@ -22,6 +22,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"strings"
 
@@ -53,6 +54,8 @@ const (
 	// openShiftWebhookAnnotationKey is how we annotate a webhook so that OpenShift
 	// injects the cluster-wide CA data for auto-generated TLS certificates.
 	openShiftWebhookAnnotationKey = "service.beta.openshift.io/inject-cabundle"
+
+	mondooOperatorImageEnvVar = "MONDOO_OPERATOR_IMAGE"
 )
 
 // Embed the Service/Desployment/ValidatingWebhookConfiguration payloads
@@ -198,6 +201,11 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context, deployment *appsv1
 		return err
 	}
 
+	webhookImage, exists := os.LookupEnv(mondooOperatorImageEnvVar)
+	if exists {
+		setWebhookImage(deployment, webhookImage)
+	}
+
 	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(deployment), deployment); err != nil {
 		if errors.IsNotFound(err) {
 			if err := n.KubeClient.Create(ctx, deployment); err != nil {
@@ -227,6 +235,28 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context, deployment *appsv1
 
 	return nil
 
+}
+
+// setWebhookImage will set the MONDOO_OPERATOR_IMAGE environment variable on all
+// containers in the Deployment.
+func setWebhookImage(deployment *appsv1.Deployment, image string) {
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		setEnvVar := false
+
+		for i := range container.Env {
+			if container.Env[i].Name == mondooOperatorImageEnvVar {
+				container.Env[i].Value = image
+				setEnvVar = true
+			}
+		}
+
+		if !setEnvVar {
+			container.Env = append(container.Env, corev1.EnvVar{
+				Name:  mondooOperatorImageEnvVar,
+				Value: image,
+			})
+		}
+	}
 }
 
 func (n *Webhooks) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1.ValidatingWebhookConfiguration) error {
