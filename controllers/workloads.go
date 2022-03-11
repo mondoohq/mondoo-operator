@@ -36,6 +36,7 @@ type Workloads struct {
 	Enable  bool
 	Mondoo  v1alpha1.MondooAuditConfig
 	Updated bool
+	Image   string
 }
 
 func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
@@ -108,6 +109,15 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 		}
 		return ctrl.Result{Requeue: true}, err
 
+	} else if err == nil && found.Spec.Template.Spec.Containers[0].Image != n.Image {
+		found.Spec.Template.Spec.Containers[0].Image = n.Image
+		err := clt.Update(ctx, found)
+		if err != nil {
+			log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{Requeue: true}, err
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
@@ -125,7 +135,7 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 		}
 		err := clt.Update(ctx, found)
 		if err != nil {
-			log.Error(err, "failed to restart Deployment", "Deployment.Namespace", found.Namespace, "Dameonset.Name", found.Name)
+			log.Error(err, "failed to restart Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, err
@@ -157,7 +167,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 						Effect: corev1.TaintEffect("NoSchedule"),
 					}},
 					Containers: []corev1.Container{{
-						Image:   "mondoolabs/mondoo:latest",
+						Image:   n.Image,
 						Name:    "mondoo-agent",
 						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
 
@@ -235,7 +245,16 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 }
 
 func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
+
+	log := ctrllog.FromContext(ctx)
+
 	if n.Enable {
+		mondooImage, err := resolveImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		n.Image = mondooImage
+
 		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
 		if err != nil || result.Requeue {
 			return result, err

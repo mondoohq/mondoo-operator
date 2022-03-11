@@ -44,6 +44,13 @@ spec:
                 properties:
                   enable:
                     type: boolean
+                  image:
+                    properties:
+                      name:
+                        type: string
+                      tag:
+                        type: string
+                    type: object
                   inventory:
                     type: string
                 type: object
@@ -72,6 +79,13 @@ spec:
                 properties:
                   enable:
                     type: boolean
+                  image:
+                    properties:
+                      name:
+                        type: string
+                      tag:
+                        type: string
+                    type: object
                   inventory:
                     type: string
                   serviceAccount:

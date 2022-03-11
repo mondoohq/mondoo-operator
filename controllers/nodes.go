@@ -36,6 +36,7 @@ type Nodes struct {
 	Enable  bool
 	Mondoo  v1alpha1.MondooAuditConfig
 	Updated bool
+	Image   string
 }
 
 func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
@@ -109,6 +110,15 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 
 		return ctrl.Result{Requeue: true}, err
 
+	} else if err == nil && found.Spec.Template.Spec.Containers[0].Image != n.Image {
+		found.Spec.Template.Spec.Containers[0].Image = n.Image
+		err := clt.Update(ctx, found)
+		if err != nil {
+			log.Error(err, "Failed to update Daemonset", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{Requeue: true}, err
 	} else if err != nil {
 		log.Error(err, "Failed to get Daemonset")
 		return ctrl.Result{}, err
@@ -155,7 +165,7 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 						Effect: corev1.TaintEffect("NoSchedule"),
 					}},
 					Containers: []corev1.Container{{
-						Image:   "mondoolabs/mondoo:latest",
+						Image:   n.Image,
 						Name:    "mondoo-agent",
 						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
 						VolumeMounts: []corev1.VolumeMount{
@@ -232,7 +242,15 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 }
 
 func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
+
+	log := ctrllog.FromContext(ctx)
+
 	if n.Enable {
+		mondooImage, err := resolveImage(log, n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		n.Image = mondooImage
 		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
 		if err != nil || result.Requeue {
 			return result, err
