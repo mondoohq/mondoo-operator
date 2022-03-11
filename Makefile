@@ -240,8 +240,10 @@ helm: manifests kustomize helmify
 fmt/docs:
 	prettier --write docs/
 	prettier --write README.md
+	prettier --write RELEASE.md
 
 .PHONY: test/fmt
 test/fmt:
 	prettier --check docs/
 	prettier --check README.md
+	prettier --check RELEASE.md
