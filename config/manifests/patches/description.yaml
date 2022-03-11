@@ -14,18 +14,5 @@
     - CIS Kubernetes Benchmark
     - Kubernetes Application Benchmark
 
-    ## Preconditions
-
-    The operator depends on two service accounts: [service-account-doc](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual-olm.md), 
-    and a mondoo secret [secret-doc](https://github.com/mondoohq/mondoo-operator/blob/main/docs/rbac.md).
-
-    Confirm that these three objects exist in the mondoo-operator namespace before deploying the operator itself. 
-
+    Further information is available at [service-account-doc](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual-olm.md).
     ```
-    kubectl get secrets -n mondoo-operator
-    NAME                                             TYPE
-    mondoo-client                                    Opaque
-    mondoo-operator-nodes-token-v9d67                kubernetes.io/service-account-token
-    mondoo-operator-workload-token-cv5hh             kubernetes.io/service-account-token
-    ```
-
