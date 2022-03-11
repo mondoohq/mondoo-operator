@@ -8,13 +8,32 @@ The following steps setup a development Kubernetes to test the operator locally.
 - kubectl (or use the one bundled with minikube bundled with minikube `alias kubectl="minikube kubectl --"`)
 - optional: `operator-sdk`
 
-## Deployment of Operator
+## Run Operator
 
 As the first step, we need to make sure the cluster is up and running:
 
 ```bash
 minikube start
 ```
+
+### Local Go Binary
+
+Run the operator:
+
+```bash
+make install
+make run
+```
+
+Create `Mondoo Secret` and add the `MondooAuditConfig`:
+
+```bash
+kubectl create namespace mondoo-operator
+kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
+kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
+```
+
+### Docker Build
 
 As preparation you need to build the operator container image for deployment in Kubernetes. The easiest way is to use the docker environment included in minikube. This ensures that the latest image is available in the cluster.
 
