@@ -123,6 +123,20 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 		log.Error(err, "Failed to get Daemonset")
 		return ctrl.Result{}, err
 	}
+
+	// check that the resource limites are identical
+	expectedResourceRequirements := getResourcesRequirements(n.Mondoo.Spec.Nodes.Resources)
+	if !equalResouceRequirements(found.Spec.Template.Spec.Containers[0].Resources, expectedResourceRequirements) {
+		log.Info("update resource requirements for nodes client")
+		found.Spec.Template.Spec.Containers[0].Resources = expectedResourceRequirements
+		err := clt.Update(ctx, found)
+		if err != nil {
+			log.Error(err, "Failed to update Daemonset", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, err
+	}
+
 	if n.Updated {
 		if found.Spec.Template.ObjectMeta.Annotations == nil {
 			annotation := map[string]string{
@@ -165,9 +179,10 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 						Effect: corev1.TaintEffect("NoSchedule"),
 					}},
 					Containers: []corev1.Container{{
-						Image:   n.Image,
-						Name:    "mondoo-agent",
-						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
+						Image:     n.Image,
+						Name:      "mondoo-agent",
+						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
+						Resources: getResourcesRequirements(m.Spec.Nodes.Resources),
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "root",
@@ -180,7 +195,6 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 								MountPath: "/etc/opt/",
 							},
 						},
-
 						Env: []corev1.EnvVar{
 							{
 								Name:  "DEBUG",
@@ -240,7 +254,6 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 	}
 	return dep
 }
-
 func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
 	log := ctrllog.FromContext(ctx)

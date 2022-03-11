@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -35,16 +36,18 @@ type MondooAuditConfigData struct {
 	MondooSecretRef string    `json:"mondooSecretRef"`
 }
 type Nodes struct {
-	Enable    bool   `json:"enable,omitempty"`
-	Inventory string `json:"inventory,omitempty"`
-	Image     Image  `json:"image,omitempty"`
+	Enable    bool                        `json:"enable,omitempty"`
+	Inventory string                      `json:"inventory,omitempty"`
+	Image     Image                       `json:"image,omitempty"`
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type Workloads struct {
-	Enable         bool   `json:"enable,omitempty"`
-	Inventory      string `json:"inventory,omitempty"`
-	ServiceAccount string `json:"serviceAccount,omitempty"`
-	Image          Image  `json:"image,omitempty"`
+	Enable         bool                        `json:"enable,omitempty"`
+	Inventory      string                      `json:"inventory,omitempty"`
+	Resources      corev1.ResourceRequirements `json:"resources,omitempty"`
+	ServiceAccount string                      `json:"serviceAccount,omitempty"`
+	Image          Image                       `json:"image,omitempty"`
 }
 
 type Image struct {

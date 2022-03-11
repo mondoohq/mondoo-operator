@@ -91,7 +91,6 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 
 func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-
 	found := &appsv1.Deployment{}
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
@@ -121,6 +120,19 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
+	}
+
+	// check that the resource limites are identical
+	expectedResourceRequirements := getResourcesRequirements(n.Mondoo.Spec.Workloads.Resources)
+	if !equalResouceRequirements(found.Spec.Template.Spec.Containers[0].Resources, expectedResourceRequirements) {
+		log.Info("update resource requirements for workload client")
+		found.Spec.Template.Spec.Containers[0].Resources = expectedResourceRequirements
+		err := clt.Update(ctx, found)
+		if err != nil {
+			log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, err
 	}
 
 	if n.Updated {
@@ -167,10 +179,10 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 						Effect: corev1.TaintEffect("NoSchedule"),
 					}},
 					Containers: []corev1.Container{{
-						Image:   n.Image,
-						Name:    "mondoo-agent",
-						Command: []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
-
+						Image:     n.Image,
+						Name:      "mondoo-agent",
+						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
+						Resources: getResourcesRequirements(m.Spec.Workloads.Resources),
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "root",
