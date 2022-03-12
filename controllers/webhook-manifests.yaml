@@ -31,7 +31,7 @@ spec:
       containers:
       - command:
         - /webhook
-        image: ghcr.io/mondoohq/mondoo-operator:v0.0.1
+        image: ghcr.io/mondoohq/mondoo-operator:v0.0.11
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

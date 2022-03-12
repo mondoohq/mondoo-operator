@@ -14,6 +14,7 @@ The following steps need to be followed to release helm chart.
 
 1. Update `Chart.yaml` in the `charts/mondoo-operator` repository with the latest appVersion.
 2. Update `Chart.yaml` in the `charts/mondoo-operator` repository with the corresponding version.
+3. Run `CHART_NAME=charts/mondoo-operator make helm`
 
 ### Helm Chart Release Workflow
 
