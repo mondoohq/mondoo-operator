@@ -2,8 +2,7 @@ name: Release Charts
 
 on:
   push:
-    branches:
-      - "main"
+    tags: ["v*.*.*"]
 
 jobs:
   release:
@@ -33,7 +32,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v1
         with:
-          version: 'v3.8.0' # default is latest stable
+          version: "v3.8.0" # default is latest stable
         id: install
 
       - name: Create and Install Helm chart
@@ -51,7 +50,7 @@ jobs:
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
-          helm uninstall mondoo-operator  --namespace mondoo-operator 
+          helm uninstall mondoo-operator  --namespace mondoo-operator
 
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.3.0
