@@ -49,5 +49,6 @@ jobs:
           echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
           make test/deployment
       - name: Clean up
+        run: |
           operator-sdk cleanup mondoo-operator --namespace mondoo-operator
           operator-sdk olm uninstall
