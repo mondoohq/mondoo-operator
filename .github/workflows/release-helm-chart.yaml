@@ -1,8 +1,7 @@
 name: Release Charts
 
 on:
-  push:
-    tags: ["v*.*.*"]
+  workflow_call:
 
 jobs:
   release:

@@ -1,7 +1,7 @@
 name: generate-manifests
+
 on:
-  push:
-    tags: ["v*.*.*"]
+  workflow_call:
 
 env:
   # Use docker.io for Docker Hub if empty
@@ -22,8 +22,8 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: "${{ env.golang-version }}"
-      - name: Generate manifests 
-        run: make generate-manifests IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE }}' 
+      - name: Generate manifests
+        run: make generate-manifests IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE }}'
       - name: Release
         uses: softprops/action-gh-release@v1
         with:

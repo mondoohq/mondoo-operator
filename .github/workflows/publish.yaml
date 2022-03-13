@@ -1,4 +1,4 @@
-name: Docker
+name: Publish Container Images
 
 # This workflow uses actions that are not certified by GitHub.
 # They are provided by a third-party and are governed by
@@ -67,7 +67,7 @@ jobs:
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-      
+
       # Build and push Docker image with Buildx
       # https://github.com/docker/build-push-action
       - name: Build and push operator image
@@ -91,7 +91,7 @@ jobs:
         # This step uses the identity token to provision an ephemeral certificate
         # against the sigstore community Fulcio instance.
         run: cosign sign ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push-operator.outputs.digest }}
-  
+
   build-bundle:
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
@@ -159,7 +159,7 @@ jobs:
         id: meta-bundle
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
         with:
-          images: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle'
+          images: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle"
 
       # Build and push Docker image bundle with Buildx
       - name: Build and push bundle image
@@ -185,50 +185,14 @@ jobs:
         # against the sigstore community Fulcio instance.
         run: cosign sign ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push-bundle.outputs.digest }}
 
-  e2e-olm:
-    if: startsWith(github.ref, 'refs/tags/v')
-    name: E2E tests
-    needs:
-      - build-bundle
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Import environment variables from file
-        run: cat ".github/env" >> $GITHUB_ENV
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: "${{ env.golang-version }}"
-      - name: Start minikube
-        uses: medyagh/setup-minikube@master
-      - name: Try the cluster !
-        run: kubectl get pods -A
-      - name: Install operator-sdk 
-        id: operator-sdk 
-        run: |
-          export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
-          export OS=$(uname | awk '{print tolower($0)}')
-          export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.17.0
-          curl -LO ${OPERATOR_SDK_DL_URL}/operator-sdk_${OS}_${ARCH}
-          gpg --keyserver keyserver.ubuntu.com --recv-keys 052996E2A20B5C7E
-          curl -LO ${OPERATOR_SDK_DL_URL}/checksums.txt
-          curl -LO ${OPERATOR_SDK_DL_URL}/checksums.txt.asc
-          gpg -u "Operator SDK (release) <cncf-operator-sdk@cncf.io>" --verify checksums.txt.asc
-          grep operator-sdk_${OS}_${ARCH} checksums.txt | sha256sum -c -
-          chmod +x operator-sdk_${OS}_${ARCH} && sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
-      - name: Install olm and mondoo
-        run: |
-          operator-sdk olm install
-          curl -sSL http://mondoo.io/download.sh | bash
-          mv mondoo /usr/local/bin/ 
-          echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
-          kubectl create ns mondoo-operator
-          kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.yaml
-      - name: Run e2e test with olm
-        run: |
-          operator-sdk run bundle '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:${{ env.RELEASE}}' --namespace mondoo-operator
-          kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
-          make test/deployment
-          operator-sdk cleanup mondoo-operator --namespace mondoo-operator
-          operator-sdk olm uninstall 
+  # run olm e2e tests
+  run-olm-e2e:
+    uses: ./.github/workflows/e2e-olm.yaml
 
+  # publish kubectl manifests
+  run-release-manifests:
+    uses: ./.github/workflows/release-manifests.yaml
+
+  # publish helm chart after the release of container images is complete
+  run-release-helm:
+    uses: ./.github/workflows/release-helm-chart.yaml

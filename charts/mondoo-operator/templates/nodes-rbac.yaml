@@ -1,0 +1,30 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "mondoo-operator.fullname" . }}-nodes
+  labels:
+  {{- include "mondoo-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - '*'
+  resources:
+  - pods
+  verbs:
+  - get
+  - watch
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "mondoo-operator.fullname" . }}-nodes
+  labels:
+  {{- include "mondoo-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: '{{ include "mondoo-operator.fullname" . }}-nodes'
+subjects:
+- kind: ServiceAccount
+  name: '{{ include "mondoo-operator.fullname" . }}-nodes'
+  namespace: '{{ .Release.Namespace }}'
