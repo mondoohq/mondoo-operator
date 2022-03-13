@@ -188,6 +188,8 @@ jobs:
   # run olm e2e tests
   run-olm-e2e:
     uses: ./.github/workflows/e2e-olm.yaml
+    needs:
+      - build-bundle
 
   # publish kubectl manifests
   run-release-manifests:
