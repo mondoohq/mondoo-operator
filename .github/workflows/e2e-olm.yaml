@@ -5,7 +5,6 @@ on:
 
 jobs:
   e2e-olm:
-    if: startsWith(github.ref, 'refs/tags/v')
     name: E2E tests
     needs:
       - build-bundle
