@@ -64,6 +64,7 @@ type Webhooks struct {
 	KubeClient      client.Client
 	TargetNamespace string
 	Scheme          *runtime.Scheme
+	Image           string
 }
 
 // syncValidatingWebhookConfiguration will create/update the ValidatingWebhookConfiguration
@@ -307,6 +308,7 @@ func (n *Webhooks) applyWebhooks(ctx context.Context) (ctrl.Result, error) {
 			if !ok {
 				return ctrl.Result{}, fmt.Errorf("Failed to convert to Deployment")
 			}
+			deployment.Spec.Template.Spec.Containers[0].Image = n.Image
 			syncErr = n.syncWebhookDeployment(ctx, deployment)
 		case "ValidatingWebhookConfiguration":
 			vwc, ok := obj.(*webhooksv1.ValidatingWebhookConfiguration)
@@ -330,6 +332,11 @@ func (n *Webhooks) applyWebhooks(ctx context.Context) (ctrl.Result, error) {
 
 func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	if n.Mondoo.Spec.Webhooks.Enable && n.Mondoo.DeletionTimestamp == nil {
+		mondooOperatorImage, err := resolveMondooOperatorImage(webhookLog, n.Mondoo.Spec.Webhooks.Image.Name, n.Mondoo.Spec.Webhooks.Image.Tag)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		n.Image = mondooOperatorImage
 		result, err := n.applyWebhooks(ctx)
 		if err != nil || result.Requeue {
 			return result, err
