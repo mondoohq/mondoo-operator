@@ -20,7 +20,6 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/prometheus/common/log"
 )
 
 const (
@@ -41,7 +40,7 @@ func resolveMondooImage(log logr.Logger, userImageName, userImageTag string) (st
 	}
 	mondooContainer := useImage + ":" + useTag
 
-	imageUrl, err := parseReference(mondooContainer)
+	imageUrl, err := parseReference(log, mondooContainer)
 
 	if err != nil {
 		log.Error(err, "Failed to parse reference")
@@ -62,7 +61,7 @@ func resolveMondooOperatorImage(log logr.Logger, userImageName, userImageTag str
 	}
 	mondooContainer := useImage + ":" + useTag
 
-	imageUrl, err := parseReference(mondooContainer)
+	imageUrl, err := parseReference(log, mondooContainer)
 
 	if err != nil {
 		log.Error(err, "Failed to parse reference")
@@ -71,7 +70,7 @@ func resolveMondooOperatorImage(log logr.Logger, userImageName, userImageTag str
 	return imageUrl, nil
 }
 
-func parseReference(container string) (string, error) {
+func parseReference(log logr.Logger, container string) (string, error) {
 	ref, err := name.ParseReference(container)
 	if err != nil {
 		log.Error(err, "Failed to parse container reference")
