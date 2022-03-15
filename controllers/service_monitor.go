@@ -67,7 +67,7 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *v1alpha1.MondooAuditConfig, 
 	ls := labelsForMondoo(m.Name)
 	dep := &monitoringv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      m.Name + "metrics-monitor",
+			Name:      m.Name + "-metrics-monitor",
 			Namespace: m.Namespace,
 			Labels:    ls,
 		},
