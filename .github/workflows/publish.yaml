@@ -187,19 +187,18 @@ jobs:
 
   # run olm e2e tests
   run-olm-e2e:
+    if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/e2e-olm.yaml
+    runs-on: ubuntu-latest
     needs:
       - build-bundle
-    env:
-      registry: ${{ env.REGISTRY }}
-      image_name: ${{ env.IMAGE_NAME }}
-      release: ${{ env.RELEASE }}
     with:
-      bundle-img: ${{ env.registry }}/${{ env.image_name }}-bundle:${{ env.release }}
+      bundle-img: ghcr.io/${{ github.repository }}-bundle:${{ github.ref_name }}
 
   # publish kubectl manifests
   run-release-manifests:
     if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
     uses: ./.github/workflows/release-manifests.yaml
     needs:
       - build-operator
@@ -207,6 +206,7 @@ jobs:
   # publish helm chart after the release of container images is complete
   run-release-helm:
     if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
     uses: ./.github/workflows/release-helm-chart.yaml
     needs:
       - build-operator

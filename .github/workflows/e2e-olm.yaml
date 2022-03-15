@@ -1,4 +1,4 @@
-name: Release Charts
+name: E2E Tests for OLM
 
 on:
   workflow_call:

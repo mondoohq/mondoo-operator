@@ -1,4 +1,4 @@
-name: Unit Tests
+name: Validate Github Actions
 on:
   pull_request:
   push:
@@ -9,7 +9,7 @@ on:
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
-    name: Unit tests
+    name: Verify Github Actions
     steps:
       - uses: actions/checkout@v2
       - name: Import environment variables from file
@@ -17,4 +17,7 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: "${{ env.golang-version }}"
-      - run: make test
+      - run: |
+          curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+          export PATH=$PATH:./bin
+          make test/github-actions
