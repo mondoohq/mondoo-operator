@@ -190,8 +190,12 @@ jobs:
     uses: ./.github/workflows/e2e-olm.yaml
     needs:
       - build-bundle
+    env:
+      registry: ${{ env.REGISTRY }}
+      image_name: ${{ env.IMAGE_NAME }}
+      release: ${{ env.RELEASE }}
     with:
-      bundle-img: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:${{ env.RELEASE }}
+      bundle-img: ${{ env.registry }}/${{ env.image_name }}-bundle:${{ env.release }}
 
   # publish kubectl manifests
   run-release-manifests:
