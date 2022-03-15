@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -209,6 +210,90 @@ func TestWebhooksReconcile(t *testing.T) {
 			test.validate(t, fakeClient)
 		})
 	}
+}
+
+func TestWebhookImageSetting(t *testing.T) {
+	testDefaultWebhookImage := "DEFAULT_IMAGE_VALUE"
+
+	tests := []struct {
+		name     string
+		envValue string
+	}{
+		{
+			name:     "update image to env value",
+			envValue: "my.registry.com/myimage:mytag",
+		},
+		{
+			name:     "no image update because no env var",
+			envValue: "",
+		},
+	}
+
+	// Just in case the test exits uncleanly, try to clean up
+	defer os.Unsetenv(mondooOperatorImageEnvVar)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+
+			// Start from a clean environment every run
+			os.Unsetenv(mondooOperatorImageEnvVar)
+
+			if test.envValue != "" {
+				os.Setenv(mondooOperatorImageEnvVar, test.envValue)
+			}
+
+			deployment := testDeployment(testDefaultWebhookImage)
+
+			// Act
+			setWebhookImage(deployment)
+
+			// Assert
+
+			// If the env var was set, assert that the value for the "webhook"
+			// container was updated.
+			for _, cont := range deployment.Spec.Template.Spec.Containers {
+				if cont.Name == "webhook" {
+					if test.envValue != "" {
+						assert.Equal(t, test.envValue, cont.Image)
+					} else {
+						assert.Equal(t, testDefaultWebhookImage, cont.Image)
+					}
+				} else {
+					// Make sure the other containers were left untouched.
+					assert.Equal(t, testDefaultWebhookImage, cont.Image)
+				}
+			}
+		})
+	}
+}
+
+func testDeployment(image string) *appsv1.Deployment {
+
+	dep := &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "notwebhook",
+							Image: image,
+						},
+						{
+							Name:  "webhook",
+							Image: image,
+						},
+						{
+							Name:  "anothernotwebhook",
+							Image: image,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return dep
 }
 
 func defaultResourcesWhenEnabled() []client.Object {

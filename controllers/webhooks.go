@@ -201,10 +201,7 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context, deployment *appsv1
 		return err
 	}
 
-	webhookImage, exists := os.LookupEnv(mondooOperatorImageEnvVar)
-	if exists {
-		setWebhookImage(deployment, webhookImage)
-	}
+	setWebhookImage(deployment)
 
 	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(deployment), deployment); err != nil {
 		if errors.IsNotFound(err) {
@@ -237,24 +234,21 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context, deployment *appsv1
 
 }
 
-// setWebhookImage will set the MONDOO_OPERATOR_IMAGE environment variable on all
-// containers in the Deployment.
-func setWebhookImage(deployment *appsv1.Deployment, image string) {
-	for _, container := range deployment.Spec.Template.Spec.Containers {
-		setEnvVar := false
+// setWebhookImage will set the container image value on the container
+// named "webhook" to whatever is set a MONDOO_OPERATOR_IMAGE if defined.
+func setWebhookImage(deployment *appsv1.Deployment) {
+	image, exists := os.LookupEnv(mondooOperatorImageEnvVar)
+	if !exists {
+		// Do not modify the Deployment and hope for the best
+		return
 
-		for i := range container.Env {
-			if container.Env[i].Name == mondooOperatorImageEnvVar {
-				container.Env[i].Value = image
-				setEnvVar = true
-			}
-		}
+	}
 
-		if !setEnvVar {
-			container.Env = append(container.Env, corev1.EnvVar{
-				Name:  mondooOperatorImageEnvVar,
-				Value: image,
-			})
+	for i, container := range deployment.Spec.Template.Spec.Containers {
+		if container.Name == "webhook" {
+			deployment.Spec.Template.Spec.Containers[i].Image = image
+			// All done
+			return
 		}
 	}
 }
