@@ -20,12 +20,9 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,7 +32,6 @@ import (
 
 	k8sv1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	//+kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -100,45 +96,4 @@ var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
-})
-
-var _ = Describe("Nodes", func() {
-	const (
-		name      = "test-resource"
-		namespace = "default"
-		timeout   = time.Second * 10
-		duration  = time.Second * 10
-		interval  = time.Millisecond * 250
-	)
-	Context("When deploying the operator", func() {
-		It("Should", func() {
-			By("By creating a new Daemonset")
-			ctx := context.Background()
-			createdMondoo := &k8sv1alpha1.MondooAuditConfig{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: namespace,
-				},
-				Spec: k8sv1alpha1.MondooAuditConfigData{
-					Nodes: k8sv1alpha1.Nodes{
-						Enable: true,
-					}},
-			}
-
-			Expect(k8sClient.Create(ctx, createdMondoo)).Should(Succeed())
-
-			foundMondoo := &k8sv1alpha1.MondooAuditConfig{}
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundMondoo)
-				if err != nil {
-					return false
-				}
-				return true
-			}, timeout, interval).Should(BeTrue())
-
-			Expect(foundMondoo.Spec.Nodes.Enable).Should(Equal(true))
-
-		})
-	})
-
 })
