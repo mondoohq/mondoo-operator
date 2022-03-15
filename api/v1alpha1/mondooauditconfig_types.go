@@ -30,10 +30,11 @@ type MondooAuditConfigData struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Config is an example field of MondooAuditConfig. Edit mondooauditconfig_types.go to remove/update
-	Nodes           Nodes     `json:"nodes,omitempty"`
-	Workloads       Workloads `json:"workloads,omitempty"`
-	Webhooks        Webhooks  `json:"webhooks,omitempty"`
-	MondooSecretRef string    `json:"mondooSecretRef"`
+	Nodes                 Nodes     `json:"nodes,omitempty"`
+	Workloads             Workloads `json:"workloads,omitempty"`
+	Webhooks              Webhooks  `json:"webhooks,omitempty"`
+	MondooSecretRef       string    `json:"mondooSecretRef"`
+	ServiceMonitorEnabled bool      `json:"serviceMonitorEnabled"`
 }
 type Nodes struct {
 	Enable    bool                        `json:"enable,omitempty"`

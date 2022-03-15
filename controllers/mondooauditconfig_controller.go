@@ -170,6 +170,18 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return result, err
 	}
 
+	serviceMonitor := ServiceMonitor{
+		Mondoo: *mondoo,
+		Enable: mondoo.Spec.ServiceMonitorEnabled,
+	}
+	result, err = serviceMonitor.Reconcile(ctx, r.Client, r.Scheme, req)
+	if err != nil {
+		log.Error(err, "Failed to set up serviceMonitor")
+	}
+	if err != nil || result.Requeue {
+		return result, err
+	}
+
 	// Update the mondoo status with the pod names only after all pod creation actions are done
 	// List the pods for this mondoo's daemonset and deployment
 	podList := &corev1.PodList{}
