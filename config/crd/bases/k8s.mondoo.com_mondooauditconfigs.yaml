@@ -99,6 +99,13 @@ spec:
                     type: object
                   enable:
                     type: boolean
+                  image:
+                    properties:
+                      name:
+                        type: string
+                      tag:
+                        type: string
+                    type: object
                 required:
                 - enable
                 type: object

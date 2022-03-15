@@ -76,6 +76,7 @@ type Webhooks struct {
 	// for creating the Secret with the TLS data, and inserting the CA data
 	// into the ValidatingWebhookConfigurations as well.
 	CertificateConfig WebhookCertificateConfig `json:"certificateConfig,omitempty"`
+	Image             Image                    `json:"image,omitempty"`
 }
 
 // MondooAuditConfigStatus defines the observed state of MondooAuditConfig
