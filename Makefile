@@ -247,3 +247,7 @@ test/fmt:
 	prettier --check docs/
 	prettier --check README.md
 	prettier --check RELEASE.md
+
+.PHONY: test/github-actions
+test/github-actions:
+	act -n --container-architecture linux/amd64 
