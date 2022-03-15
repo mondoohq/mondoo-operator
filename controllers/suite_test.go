@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	k8sv1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	//+kubebuilder:scaffold:imports
 )
@@ -95,6 +94,7 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
+	cancel()
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
@@ -103,7 +103,7 @@ var _ = AfterSuite(func() {
 var _ = Describe("Nodes", func() {
 	const (
 		name      = "test-resource"
-		namespace = "test-namespace"
+		namespace = "default"
 	)
 	Context("When deploying the operator", func() {
 		It("Should", func() {
@@ -115,11 +115,6 @@ var _ = Describe("Nodes", func() {
 					Namespace: namespace,
 				},
 			}
-			Expect(k8sClient.Create(ctx, &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: namespace,
-				}})).Should(Succeed())
 			Expect(k8sClient.Create(ctx, mondoo)).Should(Succeed())
 		})
 	})
