@@ -12,7 +12,7 @@ The Mondoo Operator provides the following features:
 
 - Continuous validation of deployed workloads
 - Continuous validation of Kubernetes nodes **without** priviledged access
-- Admission Controller
+- Admission Controller (coming soon)
 
 It is backed by Mondoo's powerful [Policy-as-Code](https://mondoo.com/docs/getstarted/policy-as-code) engine and [MQL](https://mondoo.com/docs/getstarted/policy-as-code#introducing-the-mondoo-query-language-mql). Mondoo ships out-of-the-box security polices for:
 

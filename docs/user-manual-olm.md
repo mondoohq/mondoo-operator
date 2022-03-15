@@ -13,18 +13,7 @@ The following steps sets up the mondoo operator using kubectl and a manifest fil
 1. Install Operator Lifecycle Manager (OLM)
    `curl -sL https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v0.20.0/install.sh | bash -s v0.20.0`
 
-2. Configure the Mondoo secret:
-
-- Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts)
-- Store the service account json into a local file `creds.json`
-- Store service account as a secret in the mondoo namespace via:
-
-```bash
-kubectl create namespace mondoo-operator
-kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
-```
-
-3. Verify that operator-lifecycle-manager is up
+2. Verify that operator-lifecycle-manager is up
 
 ```bash
 operator-sdk olm status | echo $?
@@ -34,16 +23,27 @@ INFO[0000] Fetching resources for resolved version "v0.20.0"
 INFO[0001] Successfully got OLM status for version "v0.20.0"
 ```
 
-4. Install the Mondoo Operator Bundle
+3. Install the Mondoo Operator Bundle
 
 ```bash
+kubectl create namespace mondoo-operator
 operator-sdk run bundle ghcr.io/mondoohq/mondoo-operator-bundle:latest --namespace=mondoo-operator
 ```
 
-5. Verify that the operator is properly installed
+4. Verify that the operator is properly installed
 
 ```bash
 kubectl get csv -n operators
+```
+
+5. Configure the Mondoo Secret:
+
+- Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts)
+- Store the service account json into a local file `creds.json`
+- Store service account as a secret in the mondoo namespace via:
+
+```bash
+kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
 ```
 
 6. Create `mondoo-config.yaml`

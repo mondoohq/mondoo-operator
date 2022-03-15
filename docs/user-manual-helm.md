@@ -23,7 +23,7 @@ helm repo update
 helm install mondoo-operator mondoo/mondoo-operator --namespace mondoo-operator --create-namespace
 ```
 
-3. Configure the Mondoo secret:
+3. Configure the Mondoo Secret:
 
 - Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts)
 - Store the service account json into a local file `creds.json`

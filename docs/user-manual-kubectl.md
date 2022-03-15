@@ -21,7 +21,7 @@ curl -sSL https://github.com/mondoohq/mondoo-operator/releases/latest/download/m
 kubectl apply -f mondoo-operator-manifests.yaml
 ```
 
-2. Configure the Mondoo secret:
+2. Configure the Mondoo Secret:
 
 - Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts)
 - Store the service account json into a local file `creds.json`
