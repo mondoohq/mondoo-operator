@@ -18,7 +18,7 @@ package controllers
 import (
 	"context"
 
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +34,7 @@ type ServiceMonitor struct {
 	Mondoo v1alpha1.MondooAuditConfig
 }
 
-func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
+func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.Client, scheme *runtime.Scheme) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	found := &monitoringv1.ServiceMonitor{}
@@ -94,19 +94,19 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *v1alpha1.MondooAuditConfig, 
 	}
 	return dep
 }
-func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
+func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme) (ctrl.Result, error) {
 	if s.Enable {
-		result, err := s.declareServiceMonitor(ctx, clt, scheme, req)
+		result, err := s.declareServiceMonitor(ctx, clt, scheme)
 		if err != nil || result.Requeue {
 			return result, err
 		}
 	} else {
-		s.down(ctx, clt, req)
+		s.down(ctx, clt)
 	}
 	return ctrl.Result{}, nil
 }
 
-func (s *ServiceMonitor) down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error) {
+func (s *ServiceMonitor) down(ctx context.Context, clt client.Client) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	found := &monitoringv1.ServiceMonitor{}

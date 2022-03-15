@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	k8sv1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"go.mondoo.com/mondoo-operator/controllers"

@@ -174,7 +174,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo: *mondoo,
 		Enable: mondoo.Spec.ServiceMonitorEnabled,
 	}
-	result, err = serviceMonitor.Reconcile(ctx, r.Client, r.Scheme, req)
+	result, err = serviceMonitor.Reconcile(ctx, r.Client, r.Scheme)
 	if err != nil {
 		log.Error(err, "Failed to set up serviceMonitor")
 	}
