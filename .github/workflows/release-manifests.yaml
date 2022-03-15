@@ -1,4 +1,4 @@
-name: generate-manifests
+name: Release Manifests
 
 on:
   workflow_call:
