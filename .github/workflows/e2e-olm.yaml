@@ -2,6 +2,18 @@ name: Release Charts
 
 on:
   workflow_call:
+    inputs:
+      bundle-img:
+        description: "bundle image that is used for e2e testing"
+        required: true
+        type: string
+
+  workflow_dispatch:
+    inputs:
+      bundle-img:
+        description: "bundle image that is used for e2e testing"
+        required: true
+        type: string
 
 jobs:
   e2e-olm:
@@ -24,7 +36,7 @@ jobs:
         run: |
           export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
           export OS=$(uname | awk '{print tolower($0)}')
-          export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.17.0
+          export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.18.1
           curl -LO ${OPERATOR_SDK_DL_URL}/operator-sdk_${OS}_${ARCH}
           gpg --keyserver keyserver.ubuntu.com --recv-keys 052996E2A20B5C7E
           curl -LO ${OPERATOR_SDK_DL_URL}/checksums.txt
@@ -32,14 +44,14 @@ jobs:
           gpg -u "Operator SDK (release) <cncf-operator-sdk@cncf.io>" --verify checksums.txt.asc
           grep operator-sdk_${OS}_${ARCH} checksums.txt | sha256sum -c -
           chmod +x operator-sdk_${OS}_${ARCH} && sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
-      - name: Install olm and mondoo
+      - name: Install olm
         run: |
           operator-sdk olm install
-          operator-sdk run bundle '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:${{ env.RELEASE}}' --namespace mondoo-operator
+          operator-sdk run bundle '${{ inputs.bundle-img }}' --namespace mondoo-operator
           kubectl create ns mondoo-operator
           kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.yaml
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
-      - name: Run e2e test with olm
+      - name: Install mondoo and run e2e test with olm
         run: |
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
