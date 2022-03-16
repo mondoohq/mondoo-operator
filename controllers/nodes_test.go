@@ -39,9 +39,8 @@ var _ = Describe("Nodes", func() {
 		duration  = time.Second * 10
 		interval  = time.Millisecond * 250
 	)
-	Context("When deploying the operator", func() {
-		It("Should", func() {
-			By("By creating a new Daemonset")
+	Context("When deploying the operator with nodes enabled", func() {
+		It("Should create a new Daemonset", func() {
 			ctx := context.Background()
 			createdMondoo := &k8sv1alpha1.MondooAuditConfig{
 				ObjectMeta: metav1.ObjectMeta{
