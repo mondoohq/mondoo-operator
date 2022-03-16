@@ -22,10 +22,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	k8sv1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -42,6 +44,15 @@ var _ = Describe("nodes", func() {
 	Context("When deploying the operator with nodes enabled", func() {
 		It("Should create a new Daemonset", func() {
 			ctx := context.Background()
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Data: map[string][]byte{"config": []byte("foo")},
+			}
+			Expect(k8sClient.Create(ctx, secret)).Should(Succeed())
+
 			createdMondoo := &k8sv1alpha1.MondooAuditConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
@@ -50,7 +61,8 @@ var _ = Describe("nodes", func() {
 				Spec: k8sv1alpha1.MondooAuditConfigData{
 					Nodes: k8sv1alpha1.Nodes{
 						Enable: true,
-					}},
+					},
+					MondooSecretRef: name},
 			}
 
 			Expect(k8sClient.Create(ctx, createdMondoo)).Should(Succeed())
@@ -65,6 +77,18 @@ var _ = Describe("nodes", func() {
 			}, timeout, interval).Should(BeTrue())
 
 			Expect(foundMondoo.Spec.Nodes.Enable).Should(Equal(true))
+
+			foundDaemonset := &appsv1.DaemonSet{}
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundDaemonset)
+				if err != nil {
+					return false
+				}
+				return true
+			}, timeout, interval).Should(BeTrue())
+
+			Expect(foundDaemonset.Spec.Template.Spec.Containers[0].Image).ShouldNot(BeEmpty())
 
 		})
 	})

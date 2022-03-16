@@ -293,7 +293,7 @@ func (n *Nodes) down(ctx context.Context, clt client.Client, req ctrl.Request) (
 
 	err = clt.Delete(ctx, found)
 	if err != nil {
-		log.Error(err, "Failed to delete Dameonst", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
+		log.Error(err, "Failed to delete Daemonset", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
 		return ctrl.Result{}, err
 	}
 	if _, err := n.deleteExternalResources(ctx, clt, req, found); err != nil {
