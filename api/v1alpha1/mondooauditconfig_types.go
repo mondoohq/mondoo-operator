@@ -30,11 +30,11 @@ type MondooAuditConfigData struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Config is an example field of MondooAuditConfig. Edit mondooauditconfig_types.go to remove/update
-	Nodes                 Nodes     `json:"nodes,omitempty"`
-	Workloads             Workloads `json:"workloads,omitempty"`
-	Webhooks              Webhooks  `json:"webhooks,omitempty"`
-	MondooSecretRef       string    `json:"mondooSecretRef"`
-	ServiceMonitorEnabled bool      `json:"serviceMonitorEnabled"`
+	Nodes           Nodes     `json:"nodes,omitempty"`
+	Workloads       Workloads `json:"workloads,omitempty"`
+	Webhooks        Webhooks  `json:"webhooks,omitempty"`
+	MondooSecretRef string    `json:"mondooSecretRef"`
+	Metrics         Metrics   `json:"metrics,omitempty"`
 }
 type Nodes struct {
 	Enable    bool                        `json:"enable,omitempty"`
@@ -54,6 +54,10 @@ type Workloads struct {
 type Image struct {
 	Name string `json:"name,omitempty"`
 	Tag  string `json:"tag,omitempty"`
+}
+
+type Metrics struct {
+	Enable bool `json:"enable,omitempty"`
 }
 
 // InjectionStyle is the specified method the cluster uses for automated creation of TLS certificates

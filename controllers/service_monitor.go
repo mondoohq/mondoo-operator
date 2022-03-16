@@ -17,15 +17,20 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -38,10 +43,10 @@ func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.C
 	log := ctrllog.FromContext(ctx)
 
 	found := &monitoringv1.ServiceMonitor{}
-	err := clt.Get(ctx, types.NamespacedName{Name: s.Mondoo.Name, Namespace: s.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: s.Mondoo.Name + "-metrics-monitor", Namespace: s.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
-		declared := s.serviceMonitorForMondoo(&s.Mondoo, s.Mondoo.Name)
+		declared := s.serviceMonitorForMondoo(&s.Mondoo)
 		if err := ctrl.SetControllerReference(&s.Mondoo, declared, scheme); err != nil {
 			log.Error(err, "Failed to set ControllerReference", "ServiceMonitor.Namespace", declared.Namespace, "ServiceMonitor.Name", declared.Name)
 			return ctrl.Result{}, err
@@ -63,7 +68,7 @@ func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.C
 	return ctrl.Result{}, nil
 }
 
-func (s *ServiceMonitor) serviceMonitorForMondoo(m *v1alpha1.MondooAuditConfig, cmName string) *monitoringv1.ServiceMonitor {
+func (s *ServiceMonitor) serviceMonitorForMondoo(m *v1alpha1.MondooAuditConfig) *monitoringv1.ServiceMonitor {
 	ls := labelsForMondoo(m.Name)
 	dep := &monitoringv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
@@ -87,7 +92,7 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *v1alpha1.MondooAuditConfig, 
 			},
 			Selector: metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"control_plane": "controller_manager",
+					"control-plane": "controller-manager",
 				},
 			},
 		},
@@ -95,13 +100,22 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *v1alpha1.MondooAuditConfig, 
 	return dep
 }
 func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme) (ctrl.Result, error) {
-	if s.Enable {
-		result, err := s.declareServiceMonitor(ctx, clt, scheme)
-		if err != nil || result.Requeue {
-			return result, err
+
+	found, err := VerifyAPI(monitoringv1.SchemeGroupVersion.Group, monitoringv1.SchemeGroupVersion.Version, ctx)
+
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if found {
+		if s.Enable {
+			result, err := s.declareServiceMonitor(ctx, clt, scheme)
+			if err != nil || result.Requeue {
+				return result, err
+			}
+		} else {
+			s.down(ctx, clt)
 		}
-	} else {
-		s.down(ctx, clt)
+		return ctrl.Result{}, nil
 	}
 	return ctrl.Result{}, nil
 }
@@ -110,7 +124,7 @@ func (s *ServiceMonitor) down(ctx context.Context, clt client.Client) (ctrl.Resu
 	log := ctrllog.FromContext(ctx)
 
 	found := &monitoringv1.ServiceMonitor{}
-	err := clt.Get(ctx, types.NamespacedName{Name: s.Mondoo.Name, Namespace: s.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: s.Mondoo.Name + "-metrics-monitor", Namespace: s.Mondoo.Namespace}, found)
 
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil
@@ -125,4 +139,33 @@ func (s *ServiceMonitor) down(ctx context.Context, clt client.Client) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{Requeue: true}, err
+}
+
+// Verify if Prometheus API exists
+func VerifyAPI(group string, version string, ctx context.Context) (bool, error) {
+	log := ctrllog.FromContext(ctx)
+	cfg, err := config.GetConfig()
+	if err != nil {
+		log.Error(err, "unable to get k8s config")
+		return false, err
+	}
+
+	k8s, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		log.Error(err, "unable to create k8s client")
+		return false, err
+	}
+
+	gv := schema.GroupVersion{
+		Group:   group,
+		Version: version,
+	}
+
+	if err = discovery.ServerSupportsVersion(k8s, gv); err != nil {
+		// error, API not available
+		return false, nil
+	}
+
+	log.Info(fmt.Sprintf("%s/%s API verified", group, version))
+	return true, nil
 }

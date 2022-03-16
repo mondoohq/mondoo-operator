@@ -170,7 +170,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	serviceMonitor := ServiceMonitor{
 		Mondoo: *mondoo,
-		Enable: mondoo.Spec.ServiceMonitorEnabled,
+		Enable: mondoo.Spec.Metrics.Enable,
 	}
 	result, err = serviceMonitor.Reconcile(ctx, r.Client, r.Scheme)
 	if err != nil {

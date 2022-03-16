@@ -36,6 +36,11 @@ spec:
           spec:
             description: MondooAuditConfigSpec defines the desired state of MondooAuditConfig
             properties:
+              metrics:
+                properties:
+                  enable:
+                    type: boolean
+                type: object
               mondooSecretRef:
                 type: string
               nodes:
@@ -81,8 +86,6 @@ spec:
                         type: object
                     type: object
                 type: object
-              serviceMonitorEnabled:
-                type: boolean
               webhooks:
                 properties:
                   certificateConfig:
@@ -149,7 +152,6 @@ spec:
                 type: object
             required:
             - mondooSecretRef
-            - serviceMonitorEnabled
             type: object
           status:
             description: MondooAuditConfigStatus defines the observed state of MondooAuditConfig
