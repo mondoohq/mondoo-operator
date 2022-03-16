@@ -38,7 +38,11 @@ import (
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 )
 
-var webhookLog = ctrl.Log.WithName("webhook")
+var (
+	webhookLog = ctrl.Log.WithName("webhook")
+
+	Version string
+)
 
 const (
 	webhookTLSSecretName = "webhook-server-cert"
@@ -332,7 +336,16 @@ func (n *Webhooks) applyWebhooks(ctx context.Context) (ctrl.Result, error) {
 
 func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	if n.Mondoo.Spec.Webhooks.Enable && n.Mondoo.DeletionTimestamp == nil {
-		mondooOperatorImage, err := resolveMondooOperatorImage(webhookLog, n.Mondoo.Spec.Webhooks.Image.Name, n.Mondoo.Spec.Webhooks.Image.Tag)
+		// On a normal mondoo-operator build, the Version variable will be set at build time to match
+		// the $VERSION being built (or default to the git SHA). In the event that someone did a manual
+		// build of mondoo-operator and failed to set the Version variable, we will pass an empty string
+		// down to resolve the image which will result in the 'latest' tag being used as a fallback.
+		imageTag := Version
+		// Allow user to override the tag if specified
+		if n.Mondoo.Spec.Webhooks.Image.Tag != "" {
+			imageTag = n.Mondoo.Spec.Webhooks.Image.Tag
+		}
+		mondooOperatorImage, err := resolveMondooOperatorImage(webhookLog, n.Mondoo.Spec.Webhooks.Image.Name, imageTag)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
