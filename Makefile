@@ -92,14 +92,14 @@ test: manifests generate fmt vet envtest ## Run tests.
 ##@ Build
 
 build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager main.go
+	go build -o bin/manager -ldflags "-s -w -X go.mondoo.com/mondoo-operator/controllers.Version=${VERSION}" main.go
 	go build -o bin/webhook pkg/webhooks/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+	docker build --build-arg VERSION=${VERSION} -t ${IMG} .
 
 buildah-build: test ## Build container image
 	buildah build -t ${IMG} .

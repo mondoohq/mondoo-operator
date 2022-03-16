@@ -16,7 +16,8 @@ COPY controllers/ controllers/
 COPY pkg/ pkg/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -a -o manager main.go
+ARG VERSION
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -a -o manager -ldflags "-X go.mondoo.com/mondoo-operator/controllers.Version=$VERSION" main.go
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -a -o webhook pkg/webhooks/main.go
 
 # Use distroless as minimal base image to package the manager binary
