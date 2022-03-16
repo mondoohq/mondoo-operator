@@ -31,16 +31,16 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-var _ = Describe("nodes", func() {
+var _ = Describe("workloads", func() {
 	const (
-		name      = "nodes"
+		name      = "workloads"
 		namespace = "default"
 		timeout   = time.Second * 10
 		duration  = time.Second * 10
 		interval  = time.Millisecond * 250
 	)
-	Context("When deploying the operator with nodes enabled", func() {
-		It("Should create a new Daemonset", func() {
+	Context("When deploying the operator with workloads enabled", func() {
+		It("Should create a new Deployment", func() {
 			ctx := context.Background()
 			createdMondoo := &k8sv1alpha1.MondooAuditConfig{
 				ObjectMeta: metav1.ObjectMeta{
@@ -48,7 +48,7 @@ var _ = Describe("nodes", func() {
 					Namespace: namespace,
 				},
 				Spec: k8sv1alpha1.MondooAuditConfigData{
-					Nodes: k8sv1alpha1.Nodes{
+					Workloads: k8sv1alpha1.Workloads{
 						Enable: true,
 					}},
 			}
@@ -64,7 +64,7 @@ var _ = Describe("nodes", func() {
 				return true
 			}, timeout, interval).Should(BeTrue())
 
-			Expect(foundMondoo.Spec.Nodes.Enable).Should(Equal(true))
+			Expect(foundMondoo.Spec.Workloads.Enable).Should(Equal(true))
 
 		})
 	})
