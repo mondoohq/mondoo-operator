@@ -52,6 +52,8 @@ jobs:
           helm uninstall mondoo-operator  --namespace mondoo-operator
 
       - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.3.0
+        # switch back to helm/chart-releaser-action when #60 is fixed
+        # https://github.com/helm/chart-releaser-action/issues/60
+        uses: luisico/chart-releaser-action@on-tags
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
