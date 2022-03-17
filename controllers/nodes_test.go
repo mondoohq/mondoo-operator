@@ -102,7 +102,6 @@ var _ = Describe("nodes", func() {
 			}, timeout, interval).Should(BeTrue())
 
 			By("Updating the daemonset to be false")
-			foundMondoo = &k8sv1alpha1.MondooAuditConfig{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundMondoo)
 				if err != nil {
