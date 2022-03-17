@@ -146,8 +146,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo: mondoo,
 	}
 	if mondoo.Spec.Workloads.ServiceAccount == "" && mondoo.Namespace == "mondoo-operator" {
-		log.Info("updating serviceaccount")
-		mondoo.Spec.Workloads.ServiceAccount = "default-token"
+		mondoo.Spec.Workloads.ServiceAccount = "mondoo-operator-workload"
 	}
 
 	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
