@@ -130,7 +130,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	nodes := Nodes{
 		Enable: mondoo.Spec.Nodes.Enable,
-		Mondoo: *mondoo,
+		Mondoo: mondoo,
 	}
 
 	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
@@ -143,7 +143,11 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	workloads := Workloads{
 		Enable: mondoo.Spec.Workloads.Enable,
-		Mondoo: *mondoo,
+		Mondoo: mondoo,
+	}
+	if mondoo.Spec.Workloads.ServiceAccount == "" && mondoo.Namespace == "mondoo-operator" {
+		log.Info("updating serviceaccount")
+		mondoo.Spec.Workloads.ServiceAccount = "default-token"
 	}
 
 	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
