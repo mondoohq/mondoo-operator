@@ -1,6 +1,6 @@
 # Install Mondoo Operator with kubectl
 
-The following steps sets up the mondoo operator using `kubectl` and a manifest file.
+The following steps sets up the Mondoo operator using `kubectl` and a manifest file.
 
 ## Preconditions:
 
@@ -31,7 +31,7 @@ kubectl apply -f mondoo-operator-manifests.yaml
 kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
 ```
 
-Once the secret is configure, we configure the operator to define the scan targets:
+Once the secret is configured, we configure the operator to define the scan targets:
 
 3. Create `mondoo-config.yaml`
 
@@ -58,7 +58,7 @@ kubectl apply -f mondoo-config.yaml
 
 ## Deploying the Validating webhook
 
-K8s webhooks require TLS certs to establish the trust between the Certificate Authority listed in the ValidaitngWebhookConfiguration.Webhooks[].ClientConfig.CABundle and the TLS certificates presented when connecting to the HTTPS endpoint specified in the webhook.
+K8s webhooks require TLS certs to establish the trust between the Certificate Authority listed in the ValidatingWebhookConfiguration.Webhooks[].ClientConfig.CABundle and the TLS certificates presented when connecting to the HTTPS endpoint specified in the webhook.
 
 You can choose to install and use cert-manager to automate the creation and updating of the TLS certs, or you can create (and rotate) your own TLS certificates manually.
 
@@ -178,7 +178,7 @@ NAME                           CREATED AT
 mondooauditconfigs.k8s.mondoo.com   2022-01-14T14:07:28Z
 ```
 
-Then make sure a configuration for the mondoo client is deployed:
+Then make sure a configuration for the Mondoo Client is deployed:
 
 ```bash
 kubectl get mondooauditconfigs

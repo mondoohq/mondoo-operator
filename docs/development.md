@@ -102,7 +102,7 @@ NAME                           CREATED AT
 mondooauditconfigs.k8s.mondoo.com   2022-01-14T14:07:28Z
 ```
 
-Then make sure a configuration for the mondoo client is deployed:
+Then make sure a configuration for the Mondoo Client is deployed:
 
 ```bash
 kubectl get mondooauditconfigs
