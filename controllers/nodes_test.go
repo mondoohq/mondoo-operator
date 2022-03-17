@@ -36,7 +36,7 @@ import (
 var _ = Describe("nodes", func() {
 	const (
 		name      = "nodes"
-		namespace = "default"
+		namespace = "nodes-namespace"
 		timeout   = time.Second * 10
 		duration  = time.Second * 10
 		interval  = time.Millisecond * 250
@@ -44,6 +44,16 @@ var _ = Describe("nodes", func() {
 	Context("When deploying the operator with nodes enabled", func() {
 		It("Should create a new Daemonset", func() {
 			ctx := context.Background()
+
+			By("Creating a namespace")
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
+				},
+			}
+			Expect(k8sClient.Create(ctx, ns)).Should(Succeed())
+
+			By("Creating a secret")
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
@@ -53,6 +63,7 @@ var _ = Describe("nodes", func() {
 			}
 			Expect(k8sClient.Create(ctx, secret)).Should(Succeed())
 
+			By("Creating the mondoo crd")
 			createdMondoo := &k8sv1alpha1.MondooAuditConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
@@ -64,9 +75,13 @@ var _ = Describe("nodes", func() {
 					},
 					MondooSecretRef: name},
 			}
-
 			Expect(k8sClient.Create(ctx, createdMondoo)).Should(Succeed())
+			defer func() {
+				Expect(k8sClient.Delete(context.Background(), createdMondoo)).Should(Succeed())
+				time.Sleep(time.Second * 5)
+			}()
 
+			By("Checking that the mondoo crd is found")
 			foundMondoo := &k8sv1alpha1.MondooAuditConfig{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundMondoo)
@@ -76,10 +91,8 @@ var _ = Describe("nodes", func() {
 				return true
 			}, timeout, interval).Should(BeTrue())
 
-			Expect(foundMondoo.Spec.Nodes.Enable).Should(Equal(true))
-
+			By("Checking that the daemonset is found")
 			foundDaemonset := &appsv1.DaemonSet{}
-
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundDaemonset)
 				if err != nil {
@@ -88,7 +101,18 @@ var _ = Describe("nodes", func() {
 				return true
 			}, timeout, interval).Should(BeTrue())
 
-			Expect(foundDaemonset.Spec.Template.Spec.Containers[0].Image).ShouldNot(BeEmpty())
+			By("Updating the daemonset to be false")
+			foundMondoo.Spec.Nodes.Enable = false
+			Expect(k8sClient.Update(ctx, foundMondoo)).Should(Succeed())
+
+			By("Checking that the daemonset is NOT found")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundDaemonset)
+				if err != nil {
+					return false
+				}
+				return true
+			}, timeout, interval).Should(BeFalse())
 
 		})
 	})

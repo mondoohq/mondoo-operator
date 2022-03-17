@@ -36,7 +36,7 @@ import (
 var _ = Describe("workloads", func() {
 	const (
 		name      = "workloads"
-		namespace = "default"
+		namespace = "workloads-namespace"
 		timeout   = time.Second * 10
 		duration  = time.Second * 10
 		interval  = time.Millisecond * 250
@@ -44,6 +44,16 @@ var _ = Describe("workloads", func() {
 	Context("When deploying the operator with workloads enabled", func() {
 		It("Should create a new Deployment", func() {
 			ctx := context.Background()
+
+			By("Creating a namespace")
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
+				},
+			}
+			Expect(k8sClient.Create(ctx, ns)).Should(Succeed())
+
+			By("Creating a secret")
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
@@ -53,6 +63,7 @@ var _ = Describe("workloads", func() {
 			}
 			Expect(k8sClient.Create(ctx, secret)).Should(Succeed())
 
+			By("Creating the mondoo crd")
 			createdMondoo := &k8sv1alpha1.MondooAuditConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
@@ -65,9 +76,13 @@ var _ = Describe("workloads", func() {
 					MondooSecretRef: name,
 				},
 			}
-
 			Expect(k8sClient.Create(ctx, createdMondoo)).Should(Succeed())
+			defer func() {
+				Expect(k8sClient.Delete(context.Background(), createdMondoo)).Should(Succeed())
+				time.Sleep(time.Second * 5)
+			}()
 
+			By("Checking that the mondoo crd is found")
 			foundMondoo := &k8sv1alpha1.MondooAuditConfig{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundMondoo)
@@ -77,8 +92,7 @@ var _ = Describe("workloads", func() {
 				return true
 			}, timeout, interval).Should(BeTrue())
 
-			Expect(foundMondoo.Spec.Workloads.Enable).Should(Equal(true))
-
+			By("Checking that the deployment is found")
 			foundDeployment := &appsv1.Deployment{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundDeployment)
@@ -88,7 +102,18 @@ var _ = Describe("workloads", func() {
 				return true
 			}, timeout, interval).Should(BeTrue())
 
-			Expect(foundDeployment.Spec.Template.Spec.Containers[0].Image).ShouldNot(BeEmpty())
+			By("Updating the deployment to be false")
+			foundMondoo.Spec.Workloads.Enable = false
+			Expect(k8sClient.Update(ctx, foundMondoo)).Should(Succeed())
+
+			By("Checking that the deployment is NOT found")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundDeployment)
+				if err != nil {
+					return false
+				}
+				return true
+			}, timeout, interval).Should(BeFalse())
 
 		})
 	})
