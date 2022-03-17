@@ -60,6 +60,16 @@ func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.C
 
 		return ctrl.Result{Requeue: true}, err
 
+	} else if err == nil {
+
+		declared := s.serviceMonitorForMondoo(&s.Mondoo)
+		err = clt.Update(ctx, declared)
+		if err != nil {
+			log.Error(err, "Failed to update ServiceMonitor", "ServiceMonitor.Namespace", declared.Namespace, "ServiceMonitor.Name", declared.Name)
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, err
+
 	} else if err != nil {
 		log.Error(err, "Failed to get ServiceMonitor")
 		return ctrl.Result{}, err
@@ -95,27 +105,64 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *v1alpha1.MondooAuditConfig) 
 					"control-plane": "controller-manager",
 				},
 			},
+			NamespaceSelector: monitoringv1.NamespaceSelector{
+				MatchNames: []string{m.Namespace},
+			},
 		},
 	}
 	return dep
 }
-func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme) (ctrl.Result, error) {
-
-	found, err := VerifyAPI(monitoringv1.SchemeGroupVersion.Group, monitoringv1.SchemeGroupVersion.Version, ctx)
+func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, r *MondooAuditConfigReconciler) (ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	found, err := verifyAPI(monitoringv1.SchemeGroupVersion.Group, monitoringv1.SchemeGroupVersion.Version, ctx)
 
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if found {
-		if s.Enable {
-			result, err := s.declareServiceMonitor(ctx, clt, scheme)
-			if err != nil || result.Requeue {
-				return result, err
+	if s.Enable {
+		// Update MondooAuditConfig.Status to communicate why metrics couldn't be configured
+		mondoo := &v1alpha1.MondooAuditConfig{}
+
+		err := clt.Get(ctx, req.NamespacedName, mondoo)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				// Request object not found, could have been deleted after reconcile request.
+				// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+				// Return and don't requeue
+				log.Info("mondoo resource not found. Ignoring since object must be deleted")
+				return ctrl.Result{}, nil
 			}
+			// Error reading the object - requeue the request.
+			log.Error(err, "Failed to get mondoo")
+			return ctrl.Result{}, err
+		}
+		if !found {
+			mondoo.Status.PrometheusApiStatus = "Prometheus API Not Found"
+			log.Info("Prometheus API Not found")
+			r.Status().Update(ctx, mondoo)
+			if err != nil {
+				log.Error(err, "Failed to update Mondoo Status", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, nil
 		} else {
+			// Update MondoAuditConfig.Status to say that we are not blocked on prometheus CRDs not being installed (in case we were previously in an error state we need to be sure to clear it here)
+			mondoo.Status.PrometheusApiStatus = "Prometheus API Found"
+			log.Info("Prometheus API found")
+			r.Status().Update(ctx, mondoo)
+			if err != nil {
+				log.Error(err, "Failed to update Mondoo Status", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
+				return ctrl.Result{}, err
+			}
+		}
+		result, err := s.declareServiceMonitor(ctx, clt, scheme)
+		if err != nil || result.Requeue {
+			return result, err
+		}
+	} else {
+		if found {
 			s.down(ctx, clt)
 		}
-		return ctrl.Result{}, nil
 	}
 	return ctrl.Result{}, nil
 }
@@ -142,7 +189,7 @@ func (s *ServiceMonitor) down(ctx context.Context, clt client.Client) (ctrl.Resu
 }
 
 // Verify if Prometheus API exists
-func VerifyAPI(group string, version string, ctx context.Context) (bool, error) {
+func verifyAPI(group string, version string, ctx context.Context) (bool, error) {
 	log := ctrllog.FromContext(ctx)
 	cfg, err := config.GetConfig()
 	if err != nil {
