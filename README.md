@@ -1,8 +1,9 @@
 # Mondoo Operator for Kubernetes
 
-![badge](https://github.com/mondoohq/mondoo-operator/actions/workflows/e2e.yaml/badge.svg)
+![CI](https://github.com/mondoohq/mondoo-operator/actions/workflows/e2e.yaml/badge.svg)
+![License](https://img.shields.io/github/license/mondoohq/mondoo-operator)
 
-> **Project Status**: This project is currently in Early-Access. The API and CRD may change
+> **Project Status**: This project is currently in Early-Access. The API and CRD may change.
 
 ## Overview
 
@@ -11,15 +12,15 @@ The **Mondoo Operator** provides a new [Kubernetes](https://kubernetes.io/) nati
 The Mondoo Operator provides the following features:
 
 - Continuous validation of deployed workloads
-- Continuous validation of Kubernetes nodes **without** priviledged access
+- Continuous validation of Kubernetes nodes **without** privileged access
 - Admission Controller (coming soon)
 
-It is backed by Mondoo's powerful [Policy-as-Code](https://mondoo.com/docs/getstarted/policy-as-code) engine and [MQL](https://mondoo.com/docs/getstarted/policy-as-code#introducing-the-mondoo-query-language-mql). Mondoo ships out-of-the-box security polices for:
+It is backed by Mondoo's powerful [Policy-as-Code](https://mondoo.com/docs/getstarted/policy-as-code) engine and [MQL](https://mondoo.com/docs/getstarted/policy-as-code#introducing-the-mondoo-query-language-mql). Mondoo ships out-of-the-box security policies for:
 
 - CIS Kubernetes Benchmark
 - Kubernetes Application Benchmark
 
-```
+```text
            ┌─────────────────────────────────────────────────────────────────┐
            │                       Kubernetes Cluster                        │
            │┌───┐    ┌────────────────────────┐ ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐│
@@ -45,17 +46,17 @@ It is backed by Mondoo's powerful [Policy-as-Code](https://mondoo.com/docs/getst
            └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Getting started
+## Getting Started
 
-The **Mondoo Operator** is available via different installation methods. The are all installing the operator into your cluster:
+The **Mondoo Operator** can be installed via different methods depending on your Kubernetes workflow:
 
 - [kubectl](docs/user-manual-kubectl.md)
 - [helm chart](docs/user-manual-helm.md)
 - [operatorhub.io / olm](docs/user-manual-olm.md)
 
-## Tested Kuberntes environments
+## Tested Kubernetes Environments
 
-The operator has been tested in the following environments
+The following Kubernetes environments are tested:
 
 - AWS EKS 1.21
 - Azure AKS 1.21
@@ -77,4 +78,20 @@ Many files (documentation, manifests, ...) are auto-generated. Before proposing 
 
 ## Security
 
-If you find a security vulnerability related to the Mondoo Operator, please do not report it by opening a GitHub issue. Instead send an e-mail to [security](mailto:security@mondoo.com)
+If you find a security vulnerability related to the Mondoo Operator, please do not report it by opening a GitHub issue. Instead, send an e-mail to [security](mailto:security@mondoo.com)
+
+## License
+
+```text
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
