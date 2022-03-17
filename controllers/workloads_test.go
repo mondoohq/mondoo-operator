@@ -103,6 +103,14 @@ var _ = Describe("workloads", func() {
 			}, timeout, interval).Should(BeTrue())
 
 			By("Updating the deployment to be false")
+			foundMondoo = &k8sv1alpha1.MondooAuditConfig{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundMondoo)
+				if err != nil {
+					return false
+				}
+				return true
+			}, timeout, interval).Should(BeTrue())
 			foundMondoo.Spec.Workloads.Enable = false
 			Expect(k8sClient.Update(ctx, foundMondoo)).Should(Succeed())
 
