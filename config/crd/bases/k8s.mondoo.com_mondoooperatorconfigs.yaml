@@ -43,6 +43,12 @@ spec:
                 properties:
                   enable:
                     type: boolean
+                  resourceLabels:
+                    additionalProperties:
+                      type: string
+                    description: ResourceLabels allows providing a list of extra labels
+                      to apply to the metrics-related resources (eg. ServiceMonitor)
+                    type: object
                 type: object
             type: object
           status:

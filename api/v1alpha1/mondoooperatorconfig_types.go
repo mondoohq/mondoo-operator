@@ -41,6 +41,9 @@ type MondooOperatorConfigSpec struct {
 
 type Metrics struct {
 	Enable bool `json:"enable,omitempty"`
+	// ResourceLabels allows providing a list of extra labels to apply to the metrics-related
+	// resources (eg. ServiceMonitor)
+	ResourceLabels map[string]string `json:"resourceLabels,omitempty"`
 }
 
 // MondooOperatorConfigStatus defines the observed state of MondooOperatorConfig

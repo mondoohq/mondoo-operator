@@ -91,6 +91,9 @@ func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.C
 
 func (s *ServiceMonitor) serviceMonitorForMondoo(m *mondoov1alpha1.MondooOperatorConfig) *monitoringv1.ServiceMonitor {
 	ls := labelsForMondoo(m.Name)
+	for key, value := range s.Config.Spec.Metrics.ResourceLabels {
+		ls[key] = value
+	}
 	dep := &monitoringv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      s.serviceMonitorName(),
@@ -100,15 +103,10 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *mondoov1alpha1.MondooOperato
 		Spec: monitoringv1.ServiceMonitorSpec{
 			Endpoints: []monitoringv1.Endpoint{
 				{
-					Path:   "/metrics",
-					Port:   "https",
-					Scheme: "https",
-					TLSConfig: &monitoringv1.TLSConfig{
-						SafeTLSConfig: monitoringv1.SafeTLSConfig{
-							InsecureSkipVerify: true,
-						},
-					},
-					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+					Path: "/metrics",
+					// The named port exposing metrics from the mondoo-operator Deployment
+					Port:   "metrics",
+					Scheme: "http",
 				},
 			},
 			Selector: metav1.LabelSelector{
@@ -139,6 +137,10 @@ func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, schem
 			return ctrl.Result{}, err
 		}
 
+		if !found {
+			// exit early as there is no ServiceMonitor CRD
+			return ctrl.Result{}, nil
+		}
 		// Create/Update the ServiceMonitor
 		result, err := s.declareServiceMonitor(ctx, clt, scheme)
 		if err != nil || result.Requeue {
