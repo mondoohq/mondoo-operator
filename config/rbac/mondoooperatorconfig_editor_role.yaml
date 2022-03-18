@@ -1,0 +1,24 @@
+# permissions for end users to edit mondoooperatorconfigs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mondoooperatorconfig-editor-role
+rules:
+- apiGroups:
+  - k8s.mondoo.com
+  resources:
+  - mondoooperatorconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - k8s.mondoo.com
+  resources:
+  - mondoooperatorconfigs/status
+  verbs:
+  - get

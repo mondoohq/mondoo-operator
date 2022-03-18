@@ -18,9 +18,9 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"reflect"
 
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,22 +32,30 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+
+	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 )
 
 type ServiceMonitor struct {
-	Enable bool
-	Mondoo v1alpha1.MondooAuditConfig
+	Config          *mondoov1alpha1.MondooOperatorConfig
+	TargetNamespace string
 }
 
+func (s *ServiceMonitor) serviceMonitorName() string {
+	return "mondoo-operator-metrics-monitor"
+
+}
 func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.Client, scheme *runtime.Scheme) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	found := &monitoringv1.ServiceMonitor{}
-	err := clt.Get(ctx, types.NamespacedName{Name: s.Mondoo.Name + "-metrics-monitor", Namespace: s.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: s.serviceMonitorName(), Namespace: s.TargetNamespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
-		declared := s.serviceMonitorForMondoo(&s.Mondoo)
-		if err := ctrl.SetControllerReference(&s.Mondoo, declared, scheme); err != nil {
+		declared := s.serviceMonitorForMondoo(s.Config)
+		if err := ctrl.SetControllerReference(s.Config, declared, scheme); err != nil {
 			log.Error(err, "Failed to set ControllerReference", "ServiceMonitor.Namespace", declared.Namespace, "ServiceMonitor.Name", declared.Name)
 			return ctrl.Result{}, err
 		}
@@ -62,11 +70,14 @@ func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.C
 
 	} else if err == nil {
 
-		declared := s.serviceMonitorForMondoo(&s.Mondoo)
-		err = clt.Update(ctx, declared)
-		if err != nil {
-			log.Error(err, "Failed to update ServiceMonitor", "ServiceMonitor.Namespace", declared.Namespace, "ServiceMonitor.Name", declared.Name)
-			return ctrl.Result{}, err
+		declared := s.serviceMonitorForMondoo(s.Config)
+		if !reflect.DeepEqual(found.Spec, declared.Spec) {
+			found.Spec = declared.Spec
+			err = clt.Update(ctx, found)
+			if err != nil {
+				log.Error(err, "Failed to update ServiceMonitor", "ServiceMonitor.Namespace", declared.Namespace, "ServiceMonitor.Name", declared.Name)
+				return ctrl.Result{}, err
+			}
 		}
 		return ctrl.Result{}, err
 
@@ -78,12 +89,12 @@ func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.C
 	return ctrl.Result{}, nil
 }
 
-func (s *ServiceMonitor) serviceMonitorForMondoo(m *v1alpha1.MondooAuditConfig) *monitoringv1.ServiceMonitor {
+func (s *ServiceMonitor) serviceMonitorForMondoo(m *mondoov1alpha1.MondooOperatorConfig) *monitoringv1.ServiceMonitor {
 	ls := labelsForMondoo(m.Name)
 	dep := &monitoringv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      m.Name + "-metrics-monitor",
-			Namespace: m.Namespace,
+			Name:      s.serviceMonitorName(),
+			Namespace: s.TargetNamespace,
 			Labels:    ls,
 		},
 		Spec: monitoringv1.ServiceMonitorSpec{
@@ -112,49 +123,23 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *v1alpha1.MondooAuditConfig) 
 	}
 	return dep
 }
-func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, r *MondooAuditConfigReconciler) (ctrl.Result, error) {
+func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 	found, err := verifyAPI(monitoringv1.SchemeGroupVersion.Group, monitoringv1.SchemeGroupVersion.Version, ctx)
 
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if s.Enable {
-		// Update MondooAuditConfig.Status to communicate why metrics couldn't be configured
-		mondoo := &v1alpha1.MondooAuditConfig{}
+	if s.Config.Spec.Metrics.Enable {
+		// Update MondooOperatorConfig.Status to communicate why metrics could/couldn't be configured
+		config := s.Config.DeepCopy()
+		updatePrometheusNotInstalledCondition(config, found)
 
-		err := clt.Get(ctx, req.NamespacedName, mondoo)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				// Request object not found, could have been deleted after reconcile request.
-				// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-				// Return and don't requeue
-				log.Info("mondoo resource not found. Ignoring since object must be deleted")
-				return ctrl.Result{}, nil
-			}
-			// Error reading the object - requeue the request.
-			log.Error(err, "Failed to get mondoo")
+		if err := UpdateMondooOperatorConfigStatus(ctx, clt, s.Config, config, log); err != nil {
 			return ctrl.Result{}, err
 		}
-		if !found {
-			mondoo.Status.PrometheusApiStatus = "Prometheus API Not Found"
-			log.Info("Prometheus API Not found")
-			r.Status().Update(ctx, mondoo)
-			if err != nil {
-				log.Error(err, "Failed to update Mondoo Status", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{}, nil
-		} else {
-			// Update MondoAuditConfig.Status to say that we are not blocked on prometheus CRDs not being installed (in case we were previously in an error state we need to be sure to clear it here)
-			mondoo.Status.PrometheusApiStatus = "Prometheus API Found"
-			log.Info("Prometheus API found")
-			r.Status().Update(ctx, mondoo)
-			if err != nil {
-				log.Error(err, "Failed to update Mondoo Status", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
-				return ctrl.Result{}, err
-			}
-		}
+
+		// Create/Update the ServiceMonitor
 		result, err := s.declareServiceMonitor(ctx, clt, scheme)
 		if err != nil || result.Requeue {
 			return result, err
@@ -167,11 +152,25 @@ func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, schem
 	return ctrl.Result{}, nil
 }
 
+func updatePrometheusNotInstalledCondition(config *mondoov1alpha1.MondooOperatorConfig, found bool) {
+	msg := "Prometheus installation detected"
+	reason := "PrometheusFound"
+	status := corev1.ConditionFalse
+	updateCheck := UpdateConditionIfReasonOrMessageChange
+	if !found {
+		msg = "Prometheus installation not detected"
+		reason = "PrometheusMissing"
+		status = corev1.ConditionTrue
+	}
+
+	config.Status.Conditions = SetMondooOperatorConfigCondition(config.Status.Conditions, mondoov1alpha1.PrometheusMissingCondition, status, reason, msg, updateCheck)
+}
+
 func (s *ServiceMonitor) down(ctx context.Context, clt client.Client) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	found := &monitoringv1.ServiceMonitor{}
-	err := clt.Get(ctx, types.NamespacedName{Name: s.Mondoo.Name + "-metrics-monitor", Namespace: s.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: s.serviceMonitorName(), Namespace: s.TargetNamespace}, found)
 
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil
@@ -180,10 +179,12 @@ func (s *ServiceMonitor) down(ctx context.Context, clt client.Client) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	err = clt.Delete(ctx, found)
-	if err != nil {
-		log.Error(err, "Failed to delete ServiceMonitor", "ServiceMonitor.Namespace", found.Namespace, "ServiceMonitor.Name", found.Name)
-		return ctrl.Result{}, err
+	// If the ServiceMonitor was created by mondoo-operator then delete it
+	if found.Labels["app"] == "mondoo" {
+		if err := clt.Delete(ctx, found); err != nil {
+			log.Error(err, "Failed to delete ServiceMonitor", "ServiceMonitor.Namespace", found.Namespace, "ServiceMonitor.Name", found.Name)
+			return ctrl.Result{}, err
+		}
 	}
 	return ctrl.Result{Requeue: true}, err
 }

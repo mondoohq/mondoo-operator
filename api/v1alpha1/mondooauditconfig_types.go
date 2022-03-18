@@ -34,7 +34,6 @@ type MondooAuditConfigData struct {
 	Workloads       Workloads `json:"workloads,omitempty"`
 	Webhooks        Webhooks  `json:"webhooks,omitempty"`
 	MondooSecretRef string    `json:"mondooSecretRef"`
-	Metrics         Metrics   `json:"metrics,omitempty"`
 }
 type Nodes struct {
 	Enable    bool                        `json:"enable,omitempty"`
@@ -54,10 +53,6 @@ type Workloads struct {
 type Image struct {
 	Name string `json:"name,omitempty"`
 	Tag  string `json:"tag,omitempty"`
-}
-
-type Metrics struct {
-	Enable bool `json:"enable,omitempty"`
 }
 
 // InjectionStyle is the specified method the cluster uses for automated creation of TLS certificates

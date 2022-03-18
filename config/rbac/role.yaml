@@ -122,6 +122,27 @@ rules:
   - patch
   - update
 - apiGroups:
+  - k8s.mondoo.com
+  resources:
+  - mondoooperatorconfigs
+  verbs:
+  - get
+  - watch
+- apiGroups:
+  - k8s.mondoo.com
+  resources:
+  - mondoooperatorconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - k8s.mondoo.com
+  resources:
+  - mondoooperatorconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - monitoring.coreos.com
   resources:
   - servicemonitors

@@ -36,11 +36,6 @@ spec:
           spec:
             description: MondooAuditConfigSpec defines the desired state of MondooAuditConfig
             properties:
-              metrics:
-                properties:
-                  enable:
-                    type: boolean
-                type: object
               mondooSecretRef:
                 type: string
               nodes:
