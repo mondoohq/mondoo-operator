@@ -1,7 +1,7 @@
 ---
-name: lint
+name: Spell Checking
 
-"on":
+on:
   pull_request:
   push:
     branches:
@@ -9,24 +9,23 @@ name: lint
 
 jobs:
   spelling:
-    name: Spell checking
+    name: Run spell check
     runs-on: ubuntu-latest
     steps:
-    - name: checkout-merge
-      if: "contains(github.event_name, 'pull_request')"
-      uses: actions/checkout@v2
-      with:
-        ref: refs/pull/${{github.event.pull_request.number}}/merge
-    - name: checkout
-      if: ${{ github.event_name == 'push' ||
-        (
+      - name: checkout-merge
+        if: "contains(github.event_name, 'pull_request')"
+        uses: actions/checkout@v2
+        with:
+          ref: refs/pull/${{github.event.pull_request.number}}/merge
+      - name: checkout
+        if: ${{ github.event_name == 'push' ||
+          (
           contains(github.event.comment.body, '@check-spelling-bot apply')
-        ) }}
-      uses: actions/checkout@v2
-    - uses: check-spelling/check-spelling@main
-      id: spelling
-      with:
-        post_comment: 0
-        extra_dictionaries:
-          cspell:aws/aws.txt
-          cspell:filetypes/filetypes.txt
+          ) }}
+        uses: actions/checkout@v2
+      - uses: check-spelling/check-spelling@main
+        id: spelling
+        with:
+          post_comment: 0
+          extra_dictionaries: cspell:aws/aws.txt
+            cspell:filetypes/filetypes.txt
