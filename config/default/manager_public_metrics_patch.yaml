@@ -1,0 +1,20 @@
+# This patch exposes the metrics port for direct scraping by Prometheus, and it
+# binds the metrics port to :8080 (instead of 127.0.0.1:8080).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        args:
+        - "--health-probe-bind-address=:8081"
+        - "--metrics-bind-address=:8080"
+        - "--leader-elect"
+        ports:
+        - name: metrics
+          containerPort: 8080
+          protocol: TCP

@@ -86,18 +86,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - serviceaccounts
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - services
   verbs:
   - create
@@ -134,21 +122,30 @@ rules:
   - patch
   - update
 - apiGroups:
-  - rbac.authorization.k8s.io
+  - k8s.mondoo.com
   resources:
-  - clusterrolebindings
+  - mondoooperatorconfigs
   verbs:
-  - create
-  - delete
   - get
-  - list
-  - patch
-  - update
   - watch
 - apiGroups:
-  - rbac.authorization.k8s.io
+  - k8s.mondoo.com
   resources:
-  - clusterroles
+  - mondoooperatorconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - k8s.mondoo.com
+  resources:
+  - mondoooperatorconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
   verbs:
   - create
   - delete

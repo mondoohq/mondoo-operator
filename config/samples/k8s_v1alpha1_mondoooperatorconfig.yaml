@@ -1,0 +1,7 @@
+apiVersion: k8s.mondoo.com/v1alpha1
+kind: MondooOperatorConfig
+metadata:
+  name: mondoo-operator-config
+spec:
+  metrics:
+    enable: false

@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	k8sv1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"go.mondoo.com/mondoo-operator/controllers"
@@ -50,6 +51,7 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 
 	utilruntime.Must(certmanagerv1.AddToScheme(scheme))
+	utilruntime.Must(monitoringv1.AddToScheme(scheme))
 }
 
 func main() {
@@ -87,6 +89,13 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MondooAuditConfig")
+		os.Exit(1)
+	}
+	if err = (&controllers.MondooOperatorConfigReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "MondooOperatorConfig")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
