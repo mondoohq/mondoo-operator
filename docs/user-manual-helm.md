@@ -33,7 +33,7 @@ helm install mondoo-operator mondoo/mondoo-operator --namespace mondoo-operator 
 kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
 ```
 
-Once the secret is configure, we configure the operator to define the scan targets:
+Once the secret is configured, we configure the operator to define the scan targets:
 
 4. Create `mondoo-config.yaml`
 
@@ -70,7 +70,7 @@ NAME                           CREATED AT
 mondooauditconfigs.k8s.mondoo.com   2022-01-14T14:07:28Z
 ```
 
-Then make sure a configuration for the mondoo client is deployed:
+Then make sure a configuration for the Mondoo Client is deployed:
 
 ```bash
 kubectl get mondooauditconfigs

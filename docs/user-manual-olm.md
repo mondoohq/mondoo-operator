@@ -1,8 +1,8 @@
 # Install Mondoo Operator with olm
 
-The following steps sets up the mondoo operator using kubectl and a manifest file.
+The following steps sets up the Mondoo operator using kubectl and a manifest file.
 
-## Preconditions:
+## Preconditions
 
 - `kubectl` with admin role
 - [`operator-lifecycle-manager`](https://olm.operatorframework.io/) installed in cluster
@@ -81,7 +81,7 @@ NAME                           CREATED AT
 mondooauditconfigs.k8s.mondoo.com   2022-01-14T14:07:28Z
 ```
 
-Then make sure a configuration for the mondoo client is deployed:
+Then make sure a configuration for the Mondoo Client is deployed:
 
 ```bash
 kubectl get mondooauditconfigs -A
@@ -89,9 +89,9 @@ NAME                  AGE
 mondoo-client        2m44s
 ```
 
-**I see the issue that deploymend is marked unschedulable**
+**I see the issue that deployment is marked unschedulable**
 
-For development testing you can resources the allocated resources for the mondoo client:
+For development testing you can resources the allocated resources for the Mondoo Client:
 
 ```
 spec:

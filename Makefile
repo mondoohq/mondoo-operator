@@ -251,3 +251,7 @@ test/fmt:
 .PHONY: test/github-actions
 test/github-actions:
 	act -n --container-architecture linux/amd64 
+
+.PHONY: test/spell-check
+test/spell-check:
+	act -j spelling --container-architecture linux/amd64

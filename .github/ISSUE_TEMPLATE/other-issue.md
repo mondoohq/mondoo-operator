@@ -1,13 +1,13 @@
 ---
 name: Other Issue
-about: Anthing that is not a bug or feature request
+about: Anything that is not a bug or feature request
 title: ''
 labels: ''
 assignees: ''
 
 ---
 
-**What is is not working as you expected it?**
+**What is not working as you expected it?**
 Eg. I cannot find information about x
 
 **Where on the platform does it happen?**
