@@ -37,6 +37,8 @@ type MondooOperatorConfigSpec struct {
 
 	// Metrics controls the enabling/disabling of metrics report of mondoo-operator
 	Metrics Metrics `json:"metrics,omitempty"`
+	// Allows skipping Image resolution from upstream repository
+	SkipContainerResolution bool `json:"skipContainerResolution,omitempty"`
 }
 
 type Metrics struct {

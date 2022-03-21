@@ -38,7 +38,7 @@ const (
 	mondooOperatorTag   = "latest"
 )
 
-func resolveMondooImage(log logr.Logger, userImageName, userImageTag string) (string, error) {
+func resolveMondooImage(log logr.Logger, userImageName, userImageTag string, resolveImage bool) (string, error) {
 	useImage := mondooImage
 	useTag := mondooTag
 	if userImageName != "" {
@@ -48,15 +48,15 @@ func resolveMondooImage(log logr.Logger, userImageName, userImageTag string) (st
 		useTag = userImageTag
 	}
 	mondooContainer := useImage + ":" + useTag
-
-	imageUrl, err := parseReference(log, mondooContainer)
-
-	if err != nil {
-		log.Error(err, "Failed to parse reference")
-		return "", err
+	if !resolveImage {
+		imageUrl, err := parseReference(log, mondooContainer)
+		if err != nil {
+			log.Error(err, "Failed to parse reference")
+			return "", err
+		}
+		return imageUrl, nil
 	}
-
-	return imageUrl, nil
+	return mondooContainer, nil
 }
 
 func resolveMondooOperatorImage(log logr.Logger, userImageName, userImageTag string) (string, error) {
