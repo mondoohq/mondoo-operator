@@ -227,6 +227,10 @@ catalog-push: ## Push a catalog image.
 test/deployment:
 	mondoo scan -t k8s test/deployment-policy.yaml --incognito
 
+.PHONY: test/deployment-uncommon-ns
+test/deployment-uncommon-ns:
+	mondoo scan -t k8s test/deployment-policy.yaml --incognito
+
 HELMIFY = $(shell pwd)/bin/helmify
 helmify:
 	$(call go-get-tool,$(HELMIFY),github.com/arttor/helmify/cmd/helmify@latest)
