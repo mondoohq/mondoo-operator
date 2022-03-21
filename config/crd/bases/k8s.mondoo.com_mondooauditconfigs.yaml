@@ -159,16 +159,13 @@ spec:
             description: MondooAuditConfigStatus defines the observed state of MondooAuditConfig
             properties:
               pods:
-                description: Nodes store the name of the pods which are running mondoo
-                  instances
+                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
+                  of cluster Important: Run "make" to regenerate code after modifying
+                  this file Nodes store the name of the pods which are running mondoo
+                  instances'
                 items:
                   type: string
                 type: array
-              prometheusApiStatus:
-                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
-                  of cluster Important: Run "make" to regenerate code after modifying
-                  this file'
-                type: string
             type: object
         type: object
     served: true

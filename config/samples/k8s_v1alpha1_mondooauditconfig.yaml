@@ -11,7 +11,5 @@ spec:
     enable: true
   webhooks:
     enable: false
-  metrics:
-    enable: true
   mondooSecretRef: mondoo-client
   
