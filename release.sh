@@ -12,4 +12,3 @@ yq -i ".version = \"${CHART_VERSION}\"" charts/mondoo-operator/Chart.yaml
 yq -i ".controllerManager.manager.image.tag = \"v${VERSION}\"" charts/mondoo-operator/values.yaml
 CHART_NAME=charts/mondoo-operator make helm
 make bundle IMG="ghcr.io/mondoohq/mondoo-operator:v${VERSION}" VERSION="${VERSION}"
-# TODO: update controllers/webhook-manifests.yaml
