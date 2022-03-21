@@ -71,7 +71,7 @@ jobs:
           kubectl get clusterrolebinding mondoo-operator-workload -o yaml | yq ".subjects[0].namespace=\"not-mondoo-operator-workload\"" | kubectl apply -f -
           kubectl apply -f config/rbac/service_account_nodes.yaml
           kubectl apply -f config/rbac/service_account_workloads.yaml
-          yq -i ".metadata.namespace= \"mondoo-operator-workload\"" config/samples/k8s_v1alpha1_mondooauditconfig.yaml
+          yq -i ".metadata.namespace= \"not-mondoo-operator\"" config/samples/k8s_v1alpha1_mondooauditconfig.yaml
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
           make test/deployment-uncommon-ns
           make undeploy
