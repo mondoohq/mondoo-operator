@@ -26,16 +26,16 @@ policies:
 queries:
   - uid: namespace-exists
     title: Ensure the namespace exists
-    query: k8s.namespaces.one ( name == "not-mondoo-operator")
+    query: k8s.namespaces.one ( name == "mondoo-operator")
   - uid: crd-created
     title: Ensure the CRD for MondooScanConfig exitsts
     query: k8s.apiResources.one( kind == "MondooAuditConfig")
   - uid: controller-deployed
     title: Ensure the Controller is deployed
-    query: k8s.deployments.one( name == "mondoo-operator-controller-manager" && namespace == "not-mondoo-operator" )
+    query: k8s.deployments.one( name == "mondoo-operator-controller-manager" && namespace == "mondoo-operator" )
   - uid: deployment-exists
     title: Ensure the deployment is configured
-    query: k8s.deployments.one( name == "mondoo-client" && namespace == "not-mondoo-operator" )
+    query: k8s.deployments.one( name == "mondoo-client" && namespace == "mondoo-operator" )
   - uid: daemonset-exists
     title: Ensure the daemonset is configured
-    query: k8s.daemonsets.one( name == "mondoo-client" && namespace == "not-mondoo-operator" )
+    query: k8s.daemonsets.one( name == "mondoo-client" && namespace == "mondoo-operator" )
