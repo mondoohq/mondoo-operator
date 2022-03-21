@@ -229,7 +229,7 @@ test/deployment:
 
 .PHONY: test/deployment-uncommon-ns
 test/deployment-uncommon-ns:
-	mondoo scan -t k8s test/deployment-policy.yaml --incognito
+	mondoo scan -t k8s test/deployment-policy-uncommon-ns.yaml --incognito
 
 HELMIFY = $(shell pwd)/bin/helmify
 helmify:
