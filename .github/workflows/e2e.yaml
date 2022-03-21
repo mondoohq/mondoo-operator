@@ -70,6 +70,7 @@ jobs:
           yq -i ".metadata.namespace= \"not-mondoo-operator\"" config/samples/k8s_v1alpha1_mondooauditconfig.yaml
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
           make test/deployment-uncommon-ns
+          kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
           make undeploy
 
   # Added to summarize the matrix and allow easy branch protection rules setup
