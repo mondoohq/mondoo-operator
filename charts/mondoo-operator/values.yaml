@@ -1,8 +1,4 @@
 controllerManager:
-  kubeRbacProxy:
-    image:
-      repository: gcr.io/kubebuilder/kube-rbac-proxy
-      tag: v0.8.0
   manager:
     image:
       repository: ghcr.io/mondoohq/mondoo-operator
@@ -28,8 +24,8 @@ managerConfig:
       port: 9443
 metricsService:
   ports:
-  - name: https
-    port: 8443
+  - name: metrics
+    port: 8080
     protocol: TCP
-    targetPort: https
+    targetPort: metrics
   type: ClusterIP
