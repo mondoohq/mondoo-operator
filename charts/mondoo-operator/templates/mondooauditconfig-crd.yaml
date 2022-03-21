@@ -99,6 +99,13 @@ spec:
                     type: object
                   enable:
                     type: boolean
+                  image:
+                    properties:
+                      name:
+                        type: string
+                      tag:
+                        type: string
+                    type: object
                 required:
                 - enable
                 type: object
@@ -152,7 +159,7 @@ spec:
             description: MondooAuditConfigStatus defines the observed state of MondooAuditConfig
             properties:
               pods:
-                description: Nodes store the name of the pods which are running mondoo
+                description: Pods store the name of the pods which are running mondoo
                   instances
                 items:
                   type: string
