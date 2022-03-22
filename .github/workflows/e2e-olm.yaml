@@ -47,8 +47,8 @@ jobs:
       - name: Install olm
         run: |
           operator-sdk olm install
-          operator-sdk run bundle '${{ inputs.bundle-img }}' --namespace mondoo-operator
           kubectl create ns mondoo-operator
+          operator-sdk run bundle '${{ inputs.bundle-img }}' --namespace mondoo-operator
           kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.yaml
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
       - name: Install mondoo and run e2e test with olm
