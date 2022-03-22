@@ -77,6 +77,7 @@ And create/modify/delete a Pod in another window:
 2. Update MondooAuditConfig so that the webhook section requests TLS certificates from cert-manager:
 
 ```yaml
+apiVersion: k8s.mondoo.com/v1alpha1
 kind: MondooAuditConfig
 metadata:
   name: mondoo-client
@@ -181,7 +182,7 @@ mondooauditconfigs.k8s.mondoo.com   2022-01-14T14:07:28Z
 Then make sure a configuration for the Mondoo Client is deployed:
 
 ```bash
-kubectl get mondooauditconfigs
+kubectl get mondooauditconfigs -A
 NAME                  AGE
 mondoo-client        2m44s
 ```
