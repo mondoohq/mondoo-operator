@@ -74,12 +74,6 @@ func resolveMondooOperatorImage(log logr.Logger, userImageName, userImageTag str
 		return imageUrl, err
 	}
 	return imageUrl, nil
-
-	if err != nil {
-		log.Error(err, "Failed to parse reference")
-		return "", err
-	}
-	return imageUrl, nil
 }
 
 func skipResolveImage(resolveImage bool, log logr.Logger, mondooContainer string) (string, error) {
