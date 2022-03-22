@@ -73,7 +73,7 @@ mondooauditconfigs.k8s.mondoo.com   2022-01-14T14:07:28Z
 Then make sure a configuration for the Mondoo Client is deployed:
 
 ```bash
-kubectl get mondooauditconfigs
+kubectl get mondooauditconfigs -A
 NAME                  AGE
 mondoo-client   2m44s
 ```
