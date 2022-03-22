@@ -147,7 +147,11 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo: mondoo,
 	}
 
-	ns, _ := getNamespace()
+	ns, err := getNamespace()
+
+	if err != nil {
+		log.Error(err, "Failed to get namespace")
+	}
 
 	if mondoo.Spec.Workloads.ServiceAccount == "" && mondoo.Namespace == ns {
 		mondoo.Spec.Workloads.ServiceAccount = defaultServiceAccount
