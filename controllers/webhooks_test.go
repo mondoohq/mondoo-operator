@@ -25,7 +25,8 @@ import (
 )
 
 const (
-	testNamespace = "mondoo-operator" // from the defaults in webhook-manifests.yaml
+	testNamespace             = "mondoo-operator"
+	testMondooAuditConfigName = "mondoo-client"
 )
 
 func init() {
@@ -216,7 +217,7 @@ func defaultResourcesWhenEnabled() []client.Object {
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mondoo-operator-webhook-service", // from webhook-manifests.yaml
+			Name:      getWebhookServiceName(testMondooAuditConfigName),
 			Namespace: testNamespace,
 		},
 	}
@@ -224,7 +225,7 @@ func defaultResourcesWhenEnabled() []client.Object {
 
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mondoo-operator-webhook-manager", // from webhook-manifests.yaml
+			Name:      getWebhookDeploymentName(testMondooAuditConfigName),
 			Namespace: testNamespace,
 		},
 	}
@@ -232,7 +233,7 @@ func defaultResourcesWhenEnabled() []client.Object {
 
 	vwc := &webhooksv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf(webhookNameTemplate, testNamespace), // from webhook-manifests.yaml
+			Name: getValidatingWebhookName(testMondooAuditConfigName),
 		},
 	}
 	objects = append(objects, vwc)
