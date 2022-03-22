@@ -7,7 +7,7 @@ spec:
   workloads:
     enable: true
   nodes:
-    enable: true
+    enable:  true
   webhooks:
     enable: false
   mondooSecretRef: mondoo-client

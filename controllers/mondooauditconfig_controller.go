@@ -218,6 +218,18 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			return ctrl.Result{}, err
 		}
 	}
+
+	mondoo.Status.OverallStatus = "Healthy"
+	for _, pod := range podList.Items {
+		if *pod.Status.ContainerStatuses[0].Started == false {
+			mondoo.Status.OverallStatus = "Degraded"
+		}
+	}
+	err = r.Status().Update(ctx, mondoo)
+	if err != nil {
+		log.Error(err, "Failed to update mondoo status")
+		return ctrl.Result{}, err
+	}
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
 }
 
