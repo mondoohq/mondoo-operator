@@ -22,6 +22,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/api/apps/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -146,6 +147,20 @@ func (in *MondooAuditConfigStatus) DeepCopyInto(out *MondooAuditConfigStatus) {
 		in, out := &in.Pods, &out.Pods
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.DaemonsetConditions != nil {
+		in, out := &in.DaemonsetConditions, &out.DaemonsetConditions
+		*out = make([]v1.DaemonSetCondition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.DeploymentConditions != nil {
+		in, out := &in.DeploymentConditions, &out.DeploymentConditions
+		*out = make([]v1.DeploymentCondition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 

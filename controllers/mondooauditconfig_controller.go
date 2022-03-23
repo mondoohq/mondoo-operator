@@ -219,17 +219,44 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
+	daemonsetList := &appsv1.DaemonSetList{}
+	listOpts = []client.ListOption{
+		client.InNamespace(mondoo.Namespace),
+		client.MatchingLabels(labelsForMondoo(mondoo.Name)),
+	}
+	if err = r.List(ctx, daemonsetList, listOpts...); err != nil {
+		log.Error(err, "Failed to list daemonsets", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
+		return ctrl.Result{}, err
+	}
 	mondoo.Status.OverallStatus = "Healthy"
-	for _, pod := range podList.Items {
-		if *pod.Status.ContainerStatuses[0].Started == false {
+	for _, daemonset := range daemonsetList.Items {
+		if daemonset.Status.NumberAvailable != daemonset.Status.DesiredNumberScheduled {
 			mondoo.Status.OverallStatus = "Degraded"
 		}
+		mondoo.Status.DaemonsetConditions = append(mondoo.Status.DaemonsetConditions, daemonset.Status.Conditions...)
 	}
+	deploymentsetList := &appsv1.DeploymentList{}
+	listOpts = []client.ListOption{
+		client.InNamespace(mondoo.Namespace),
+		client.MatchingLabels(labelsForMondoo(mondoo.Name)),
+	}
+	if err = r.List(ctx, deploymentsetList, listOpts...); err != nil {
+		log.Error(err, "Failed to list deployments", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
+		return ctrl.Result{}, err
+	}
+	for _, deployment := range deploymentsetList.Items {
+		if deployment.Status.Replicas != deployment.Status.ReadyReplicas {
+			mondoo.Status.OverallStatus = "Degraded"
+		}
+		mondoo.Status.DeploymentConditions = append(mondoo.Status.DeploymentConditions, deployment.Status.Conditions...)
+	}
+
 	err = r.Status().Update(ctx, mondoo)
 	if err != nil {
 		log.Error(err, "Failed to update mondoo status")
 		return ctrl.Result{}, err
 	}
+
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
 }
 

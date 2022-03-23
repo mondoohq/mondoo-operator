@@ -165,6 +165,7 @@ func (n *Nodes) daemonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      m.Name,
 			Namespace: m.Namespace,
+			Labels:    ls,
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{

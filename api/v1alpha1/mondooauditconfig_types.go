@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -85,8 +86,13 @@ type MondooAuditConfigStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Pods store the name of the pods which are running mondoo instances
-	Pods          []string `json:"pods,omitempty"`
-	OverallStatus string   `json:"overallstatus,omitempty"`
+	Pods []string `json:"pods,omitempty"`
+	// OverallStatus store the status of the objects running mondoo instances
+	OverallStatus string `json:"overallstatus,omitempty"`
+	// DaemonsetConditions store the conditions for the mondoo daemonset
+	DaemonsetConditions []appsv1.DaemonSetCondition `json:"daemonsetconditions,omitempty"`
+	// DeploymentConditions store the conditions for the mondoo deployment
+	DeploymentConditions []appsv1.DeploymentCondition `json:"deploymentconditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true
