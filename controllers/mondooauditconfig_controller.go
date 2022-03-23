@@ -201,6 +201,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		log.Error(err, "Failed to list pods", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
 		return ctrl.Result{}, err
 	}
+	podListNames := getPodNames(podList.Items)
+	mondoo.Status.Pods = podListNames.List()
 
 	daemonsetList := &appsv1.DaemonSetList{}
 	listOpts = []client.ListOption{
@@ -216,7 +218,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		if daemonset.Status.NumberAvailable != daemonset.Status.DesiredNumberScheduled {
 			mondoo.Status.OverallStatus = "Degraded"
 		}
-		mondoo.Status.DaemonsetConditions = append(mondoo.Status.DaemonsetConditions, daemonset.Status.Conditions...)
+		mondoo.Status.DaemonsetConditions = daemonset.Status.Conditions
 	}
 	deploymentsetList := &appsv1.DeploymentList{}
 	listOpts = []client.ListOption{
@@ -231,7 +233,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		if deployment.Status.Replicas != deployment.Status.ReadyReplicas {
 			mondoo.Status.OverallStatus = "Degraded"
 		}
-		mondoo.Status.DeploymentConditions = append(mondoo.Status.DeploymentConditions, deployment.Status.Conditions...)
+		mondoo.Status.DeploymentConditions = deployment.Status.Conditions
 	}
 
 	currentStatus := mondoo.DeepCopy().Status

@@ -159,6 +159,8 @@ spec:
             description: MondooAuditConfigStatus defines the observed state of MondooAuditConfig
             properties:
               daemonsetconditions:
+                description: DaemonsetConditions store the conditions for the mondoo
+                  daemonset
                 items:
                   description: DaemonSetCondition describes the state of a DaemonSet
                     at a certain point.
@@ -187,6 +189,8 @@ spec:
                   type: object
                 type: array
               deploymentconditions:
+                description: DeploymentConditions store the conditions for the mondoo
+                  deployment
                 items:
                   description: DeploymentCondition describes the state of a deployment
                     at a certain point.
@@ -218,7 +222,40 @@ spec:
                   - type
                   type: object
                 type: array
+              mondooAuditStatusConditions:
+                items:
+                  properties:
+                    lastProbeTime:
+                      description: LastProbeTime is the last time we probed the condition
+                      format: date-time
+                      type: string
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: Message is a human-readable message indicating
+                        details about the last transition
+                      type: string
+                    reason:
+                      description: Reason is a unique, one-word, CamelCase reason
+                        for the condition's last transition
+                      type: string
+                    status:
+                      description: Status is the status of the condition
+                      type: string
+                    type:
+                      description: Type is the specific type of the condition
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
               overallstatus:
+                description: OverallStatus store the status of the objects running
+                  mondoo instances
                 type: string
               pods:
                 description: Pods store the name of the pods which are running mondoo
