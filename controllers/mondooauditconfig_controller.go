@@ -220,6 +220,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 		mondoo.Status.DaemonsetConditions = daemonset.Status.Conditions
 	}
+	if !mondoo.Spec.Nodes.Enable {
+		mondoo.Status.DeploymentConditions = []appsv1.DeploymentCondition{}
+	}
+
 	deploymentsetList := &appsv1.DeploymentList{}
 	listOpts = []client.ListOption{
 		client.InNamespace(mondoo.Namespace),
@@ -234,6 +238,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			mondoo.Status.OverallStatus = "Degraded"
 		}
 		mondoo.Status.DeploymentConditions = deployment.Status.Conditions
+	}
+
+	if !mondoo.Spec.Workloads.Enable {
+		mondoo.Status.DeploymentConditions = []appsv1.DeploymentCondition{}
 	}
 
 	currentStatus := mondoo.DeepCopy().Status
