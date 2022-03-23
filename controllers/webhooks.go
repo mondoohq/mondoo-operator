@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 )
 
@@ -69,11 +70,12 @@ const (
 var webhookManifestsyaml []byte
 
 type Webhooks struct {
-	Mondoo          *mondoov1alpha1.MondooAuditConfig
-	KubeClient      client.Client
-	TargetNamespace string
-	Scheme          *runtime.Scheme
-	Image           string
+	Mondoo               *mondoov1alpha1.MondooAuditConfig
+	KubeClient           client.Client
+	TargetNamespace      string
+	Scheme               *runtime.Scheme
+	Image                string
+	MondooOperatorConfig v1alpha1.MondooOperatorConfig
 }
 
 // syncValidatingWebhookConfiguration will create/update the ValidatingWebhookConfiguration
@@ -455,7 +457,8 @@ func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
 		if n.Mondoo.Spec.Webhooks.Image.Tag != "" {
 			imageTag = n.Mondoo.Spec.Webhooks.Image.Tag
 		}
-		mondooOperatorImage, err := resolveMondooOperatorImage(webhookLog, n.Mondoo.Spec.Webhooks.Image.Name, imageTag)
+		skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
+		mondooOperatorImage, err := resolveMondooOperatorImage(webhookLog, n.Mondoo.Spec.Webhooks.Image.Name, imageTag, skipResolveImage)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

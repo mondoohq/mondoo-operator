@@ -270,8 +270,8 @@ func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtim
 	log := ctrllog.FromContext(ctx)
 
 	if n.Enable {
-		resolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
-		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag, resolveImage)
+		skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
+		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag, skipResolveImage)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

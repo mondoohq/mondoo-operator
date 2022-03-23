@@ -288,8 +288,8 @@ func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *ru
 	}
 
 	if n.Enable {
-		resolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
-		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag, resolveImage)
+		skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
+		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag, skipResolveImage)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

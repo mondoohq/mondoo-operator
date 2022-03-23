@@ -38,7 +38,7 @@ const (
 	mondooOperatorTag   = "latest"
 )
 
-func resolveMondooImage(log logr.Logger, userImageName, userImageTag string, resolveImage bool) (string, error) {
+func resolveMondooImage(log logr.Logger, userImageName, userImageTag string, skipResolveImage bool) (string, error) {
 	useImage := mondooImage
 	useTag := mondooTag
 	if userImageName != "" {
@@ -48,7 +48,7 @@ func resolveMondooImage(log logr.Logger, userImageName, userImageTag string, res
 		useTag = userImageTag
 	}
 	mondooContainer := useImage + ":" + useTag
-	imageUrl, err := skipResolveImage(resolveImage, log, mondooContainer)
+	imageUrl, err := getImage(skipResolveImage, log, mondooContainer)
 	if err != nil {
 		log.Error(err, "Failed to skip resolving image")
 		return imageUrl, err
@@ -57,7 +57,7 @@ func resolveMondooImage(log logr.Logger, userImageName, userImageTag string, res
 
 }
 
-func resolveMondooOperatorImage(log logr.Logger, userImageName, userImageTag string, resolveImage bool) (string, error) {
+func resolveMondooOperatorImage(log logr.Logger, userImageName, userImageTag string, skipResolveImage bool) (string, error) {
 	useImage := mondooOperatorImage
 	useTag := mondooOperatorTag
 	if userImageName != "" {
@@ -68,7 +68,7 @@ func resolveMondooOperatorImage(log logr.Logger, userImageName, userImageTag str
 	}
 	mondooContainer := useImage + ":" + useTag
 
-	imageUrl, err := skipResolveImage(resolveImage, log, mondooContainer)
+	imageUrl, err := getImage(skipResolveImage, log, mondooContainer)
 	if err != nil {
 		log.Error(err, "Failed to skip resolving image")
 		return imageUrl, err
@@ -76,8 +76,8 @@ func resolveMondooOperatorImage(log logr.Logger, userImageName, userImageTag str
 	return imageUrl, nil
 }
 
-func skipResolveImage(resolveImage bool, log logr.Logger, mondooContainer string) (string, error) {
-	if !resolveImage {
+func getImage(skipResolveImage bool, log logr.Logger, mondooContainer string) (string, error) {
+	if !skipResolveImage {
 		imageUrl, err := parseReference(log, mondooContainer)
 		if err != nil {
 			log.Error(err, "Failed to parse reference")
