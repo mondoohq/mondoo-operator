@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -89,11 +88,45 @@ type MondooAuditConfigStatus struct {
 	Pods []string `json:"pods,omitempty"`
 	// OverallStatus store the status of the objects running mondoo instances
 	OverallStatus string `json:"overallstatus,omitempty"`
-	// DaemonsetConditions store the conditions for the mondoo daemonset
-	DaemonsetConditions []appsv1.DaemonSetCondition `json:"daemonsetconditions,omitempty"`
-	// DeploymentConditions store the conditions for the mondoo deployment
-	DeploymentConditions []appsv1.DeploymentCondition `json:"deploymentconditions,omitempty"`
+	// // DaemonsetConditions store the conditions for the mondoo daemonset
+	// DaemonsetConditions []appsv1.DaemonSetCondition `json:"daemonsetconditions,omitempty"`
+	// // DeploymentConditions store the conditions for the mondoo deployment
+	// DeploymentConditions []appsv1.DeploymentCondition `json:"deploymentconditions,omitempty"`
+	MondooAuditConfigConditions []MondooAuditConfigCondition `json:"mondooAuditStatusConditions,omitempty"`
 }
+
+type MondooAuditConfigCondition struct {
+	// Type is the specific type of the condition
+	// +kubebuilder:validation:Required
+	// +required
+	Type MondooAuditConfigConditionType `json:"type"`
+	// Status is the status of the condition
+	// +kubebuilder:validation:Required
+	// +required
+	Status corev1.ConditionStatus `json:"status"`
+	// LastProbeTime is the last time we probed the condition
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
+	// LastTransitionTime is the last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// Reason is a unique, one-word, CamelCase reason for the condition's last transition
+	Reason string `json:"reason,omitempty"`
+	// Message is a human-readable message indicating details about the last transition
+	Message string `json:"message,omitempty"`
+}
+
+// MondooOperatorConfigConditionType is a valid value for MondooOperatorConfig.Status.Condition[].Type
+type MondooAuditConfigConditionType string
+
+const (
+	// NodeScanningAvailable is used to indicate  NodeScanning is available.
+	NodeScanningAvailable MondooAuditConfigConditionType = "NodeScanningAvailable"
+	// APIScanningAvailable is used to indicate  ApiScanning is available .
+	APIScanningAvailable MondooAuditConfigConditionType = "APIScanningAvailable"
+	// NodeScanningUnAvailable is used to indicate  NodeScanning is Unavailable.
+	NodeScanningUnavailable MondooAuditConfigConditionType = "NodeScanningUnavailable"
+	// APIScanningAvailable is used to indicate  ApiScanning is Unavailable.
+	APIScanningUnavailable MondooAuditConfigConditionType = "APIScanningUnvailable"
+)
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
