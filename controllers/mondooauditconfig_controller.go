@@ -189,7 +189,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if err != nil || result.Requeue {
 		return result, err
 	}
-	currentStatus := mondoo.DeepCopy().Status
+
 	// Update the mondoo status with the pod names only after all pod creation actions are done
 	// List the pods for this mondoo's daemonset and deployment
 	podList := &corev1.PodList{}
@@ -201,15 +201,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		log.Error(err, "Failed to list pods", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
 		return ctrl.Result{}, err
 	}
-	// podListNames := getPodNames(podList.Items)
-	err = r.Get(ctx, req.NamespacedName, mondoo)
-	if err != nil {
-		log.Error(err, "Failed to get mondoo")
-		return ctrl.Result{}, err
-	}
-
-	// Update status.Pods list if needed
-	// statusPodNames := sets.NewString(mondoo.Status.Pods...)
 
 	daemonsetList := &appsv1.DaemonSetList{}
 	listOpts = []client.ListOption{
@@ -243,7 +234,15 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		mondoo.Status.DeploymentConditions = append(mondoo.Status.DeploymentConditions, deployment.Status.Conditions...)
 	}
 
+	currentStatus := mondoo.DeepCopy().Status
+	err = r.Get(ctx, req.NamespacedName, mondoo)
+	if err != nil {
+		log.Error(err, "Failed to get mondoo")
+		return ctrl.Result{}, err
+	}
+
 	if !reflect.DeepEqual(mondoo.Status, currentStatus) {
+		mondoo.Status = *currentStatus.DeepCopy()
 		err := r.Status().Update(ctx, mondoo)
 		if err != nil {
 			log.Error(err, "Failed to update mondoo status")
