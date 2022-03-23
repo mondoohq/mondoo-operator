@@ -215,7 +215,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 	mondoo.Status.OverallStatus = "Healthy"
 	for _, daemonset := range daemonsetList.Items {
-		if daemonset.Status.NumberAvailable != daemonset.Status.DesiredNumberScheduled {
+		if daemonset.Status.NumberReady != daemonset.Status.DesiredNumberScheduled {
 			mondoo.Status.OverallStatus = "Degraded"
 		}
 	}
