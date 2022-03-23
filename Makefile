@@ -250,8 +250,14 @@ test/fmt:
 
 .PHONY: test/github-actions
 test/github-actions:
-	act -n --container-architecture linux/amd64 
+	$(eval TMP_ACT_JSON := $(shell mktemp -t act-json.XXXXX))
+	echo '{ "comment": { "body": "not_nil" } }' > $(TMP_ACT_JSON)
+	act -n --container-architecture linux/amd64 --eventpath $(TMP_ACT_JSON)
+	rm /tmp/act-json.*
 
 .PHONY: test/spell-check
 test/spell-check:
-	act -j spelling --container-architecture linux/amd64
+	$(eval TMP_ACT_JSON := $(shell mktemp -t act-json.XXXXX))
+	echo '{ "comment": { "body": "not_nil" } }' > $(TMP_ACT_JSON)
+	act -j spelling --container-architecture linux/amd64 --eventpath $(TMP_ACT_JSON)
+	rm /tmp/act-json.*
