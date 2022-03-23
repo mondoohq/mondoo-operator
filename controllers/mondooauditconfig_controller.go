@@ -218,10 +218,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		if daemonset.Status.NumberAvailable != daemonset.Status.DesiredNumberScheduled {
 			mondoo.Status.OverallStatus = "Degraded"
 		}
-		mondoo.Status.DaemonsetConditions = daemonset.Status.Conditions
-	}
-	if !mondoo.Spec.Nodes.Enable {
-		mondoo.Status.DeploymentConditions = []appsv1.DeploymentCondition{}
 	}
 
 	deploymentsetList := &appsv1.DeploymentList{}
