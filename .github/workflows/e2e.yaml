@@ -41,21 +41,8 @@ jobs:
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
       - name: Verify Mondoo Operator kustomize manifests
         run: |
-          echo "Wait for Operator"
-          kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator
-          echo "display deployed pods"
-          kubectl describe pods -n mondoo-operator
-          echo "check mondoo status"
-          kubectl exec -q daemonset/mondoo-client --namespace mondoo-operator -- mondoo status
-          kubectl exec -q deployment/mondoo-client --namespace mondoo-operator -- mondoo status 
-          echo "wait for mondoo clients to be ready"
-          kubectl describe pods -n mondoo-operator 
-          kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator --timeout=400s
-          kubectl exec -q daemonset/mondoo-client --namespace mondoo-operator -- mondoo status
-          kubectl exec -q deployment/mondoo-client --namespace mondoo-operator -- mondoo status
-          echo "display deployed pods"
-          kubectl get pods -n mondoo-operator
-          echo "Run Mondoo Tests"
+          kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator 
+          kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator --timeout=600s
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
