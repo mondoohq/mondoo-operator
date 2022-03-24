@@ -268,6 +268,8 @@ func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *ru
 
 	if n.Mondoo.Spec.Workloads.ServiceAccount == "" && n.Mondoo.Namespace == namespace {
 		n.Mondoo.Spec.Workloads.ServiceAccount = defaultServiceAccount
+	} else {
+		log.Info("MondooAuditConfig in different namespace than mondoo-operator requires setting Workloads.ServiceAccount")
 	}
 
 	if n.Enable {
