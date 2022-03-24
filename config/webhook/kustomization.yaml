@@ -3,8 +3,6 @@ kind: Kustomization
 namespace: mondoo-operator
 namePrefix: mondoo-operator-
 resources:
-- deployment.yaml
-- service.yaml
 - manifests.yaml
 images:
 - name: controller
