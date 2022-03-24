@@ -262,7 +262,7 @@ func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *ru
 
 	namespace, err := getNamespace()
 	if err != nil {
-		log.Error(err, "failed to know which namespace to target")
+		log.Error(err, "failed to determine which namespace mondoo-operator is running in")
 		return ctrl.Result{}, err
 	}
 
