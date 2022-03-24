@@ -30,8 +30,9 @@ jobs:
       - name: Deploy to minikube
         run: |
           make deploy
-          echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
-          kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.yaml
+          echo ${{ secrets.MONDOO_CLIENT }} > creds.json
+          kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
+          rm creds.json
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
       - name: Verify Mondoo Operator kustomize manifests
         run: |
