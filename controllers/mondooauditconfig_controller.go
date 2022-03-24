@@ -97,9 +97,9 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 	config := &mondoov1alpha1.MondooOperatorConfig{}
-	if err := r.Get(ctx, types.NamespacedName{Name: "mondoo-operator-config", Namespace: req.Namespace}, config); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: mondoov1alpha1.MondooOperatorConfigName}, config); err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("MondooOperatorConfig no longer exists")
+			log.Info("MondooOperatorConfig not found, using defaults")
 		}
 		log.Info(err.Error())
 	}
