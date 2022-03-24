@@ -32,6 +32,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 )
 
 const (
@@ -95,6 +96,20 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		log.Error(err, "Failed to get mondoo")
 		return ctrl.Result{}, err
 	}
+	config := &mondoov1alpha1.MondooOperatorConfig{}
+	if err := r.Get(ctx, req.NamespacedName, config); err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("MondooOperatorConfig no longer exists")
+			return ctrl.Result{}, nil
+		}
+		log.Error(err, "failed to get MondooOperatorConfig")
+		return ctrl.Result{}, err
+	}
+
+	if config.DeletionTimestamp != nil {
+		// Object being deleted; nothing to do
+		return ctrl.Result{}, nil
+	}
 
 	if mondoo.DeletionTimestamp != nil {
 		log.Info("deleting")
@@ -103,10 +118,11 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// deleted should be called here
 
 		webhooks := Webhooks{
-			Mondoo:          mondoo,
-			KubeClient:      r.Client,
-			TargetNamespace: req.Namespace,
-			Scheme:          r.Scheme,
+			Mondoo:               mondoo,
+			KubeClient:           r.Client,
+			TargetNamespace:      req.Namespace,
+			Scheme:               r.Scheme,
+			MondooOperatorConfig: *config,
 		}
 		result, err := webhooks.Reconcile(ctx)
 		if err != nil {
@@ -130,8 +146,9 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	nodes := Nodes{
-		Enable: mondoo.Spec.Nodes.Enable,
-		Mondoo: mondoo,
+		Enable:               mondoo.Spec.Nodes.Enable,
+		Mondoo:               *mondoo,
+		MondooOperatorConfig: *config,
 	}
 
 	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
@@ -143,8 +160,9 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	workloads := Workloads{
-		Enable: mondoo.Spec.Workloads.Enable,
-		Mondoo: mondoo,
+		Enable:               mondoo.Spec.Workloads.Enable,
+		Mondoo:               *mondoo,
+		MondooOperatorConfig: *config,
 	}
 
 	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
@@ -156,10 +174,11 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	webhooks := Webhooks{
-		Mondoo:          mondoo,
-		KubeClient:      r.Client,
-		TargetNamespace: req.Namespace,
-		Scheme:          r.Scheme,
+		Mondoo:               mondoo,
+		KubeClient:           r.Client,
+		TargetNamespace:      req.Namespace,
+		Scheme:               r.Scheme,
+		MondooOperatorConfig: *config,
 	}
 
 	result, err = webhooks.Reconcile(ctx)
