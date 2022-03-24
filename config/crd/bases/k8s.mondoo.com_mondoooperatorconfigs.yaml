@@ -50,6 +50,9 @@ spec:
                       to apply to the metrics-related resources (eg. ServiceMonitor)
                     type: object
                 type: object
+              skipContainerResolution:
+                description: Allows skipping Image resolution from upstream repository
+                type: boolean
             type: object
           status:
             description: MondooOperatorConfigStatus defines the observed state of

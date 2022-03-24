@@ -23,16 +23,16 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
-
-	"go.mondoo.com/mondoo-operator/api/v1alpha1"
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 )
 
 const (
@@ -97,13 +97,11 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 	config := &mondoov1alpha1.MondooOperatorConfig{}
-	if err := r.Get(ctx, req.NamespacedName, config); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: "mondoo-operator-config", Namespace: req.Namespace}, config); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("MondooOperatorConfig no longer exists")
-			return ctrl.Result{}, nil
 		}
-		log.Error(err, "failed to get MondooOperatorConfig")
-		return ctrl.Result{}, err
+		log.Info(err.Error())
 	}
 
 	if config.DeletionTimestamp != nil {
