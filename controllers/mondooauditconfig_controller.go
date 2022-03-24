@@ -41,7 +41,8 @@ const (
 // MondooAuditConfigReconciler reconciles a MondooAuditConfig object
 type MondooAuditConfigReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme      *runtime.Scheme
+	ImageDigest string
 }
 
 // Embed the Default Inventory for Daemonset and Deployment Configurations
@@ -127,10 +128,18 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			return ctrl.Result{}, err
 		}
 	}
+	if r.ImageDigest == "" {
+		mondooImage, err := resolveMondooImage(log, mondoo.Spec.Nodes.Image.Name, mondoo.Spec.Nodes.Image.Tag)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		r.ImageDigest = mondooImage
+	}
 
 	nodes := Nodes{
 		Enable: mondoo.Spec.Nodes.Enable,
 		Mondoo: *mondoo,
+		Image:  r.ImageDigest,
 	}
 
 	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
@@ -144,6 +153,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	workloads := Workloads{
 		Enable: mondoo.Spec.Workloads.Enable,
 		Mondoo: *mondoo,
+		Image:  r.ImageDigest,
 	}
 
 	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
@@ -198,6 +208,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			return ctrl.Result{}, err
 		}
 	}
+	r.ImageDigest = ""
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
 }
 

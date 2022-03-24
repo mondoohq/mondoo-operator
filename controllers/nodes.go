@@ -256,14 +256,7 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 }
 func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
-	log := ctrllog.FromContext(ctx)
-
 	if n.Enable {
-		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		n.Image = mondooImage
 		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
 		if err != nil || result.Requeue {
 			return result, err

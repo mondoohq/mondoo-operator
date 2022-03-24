@@ -258,15 +258,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 
 func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
-	log := ctrllog.FromContext(ctx)
-
 	if n.Enable {
-		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		n.Image = mondooImage
-
 		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
 		if err != nil || result.Requeue {
 			return result, err
