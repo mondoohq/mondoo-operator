@@ -36,12 +36,12 @@ jobs:
 
       - name: Create and Install Helm chart
         run: |
-          echo ${{ secrets.MONDOO_CLIENT }} > creds.yaml
           kubectl create namespace mondoo-operator
-          kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.yaml 
-          helm install mondoo-operator charts/mondoo-operator --namespace mondoo-operator 
+          helm install mondoo-operator charts/mondoo-operator --namespace mondoo-operator
+          echo ${{ secrets.MONDOO_CLIENT }} > creds.json
+          kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
+          rm creds.json
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
-
       - name: Verify Mondoo Operator Helm Chart
         run: |
           kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator 
@@ -50,7 +50,6 @@ jobs:
           mv mondoo /usr/local/bin/ 
           make test/deployment
           helm uninstall mondoo-operator  --namespace mondoo-operator
-
       - name: Run chart-releaser
         # switch back to helm/chart-releaser-action when #60 is fixed
         # https://github.com/helm/chart-releaser-action/issues/60
