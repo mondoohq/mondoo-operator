@@ -13,4 +13,4 @@ yq -i ".version = \"${VERSION}\"" charts/mondoo-operator/Chart.yaml
 yq -i ".controllerManager.manager.image.tag = \"v${VERSION}\"" charts/mondoo-operator/values.yaml
 CHART_NAME=charts/mondoo-operator make helm
 make bundle IMG="ghcr.io/mondoohq/mondoo-operator:v${VERSION}" VERSION="${VERSION}"
-yq '.spec.replaces' ./bundle/manifests/mondoo-operator.clusterserviceversion.yaml 
+yq -i ".spec.replaces = \"v${PREV_VERSION}\"" ./bundle/manifests/mondoo-operator.clusterserviceversion.yaml 
