@@ -260,6 +260,16 @@ func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *ru
 
 	log := ctrllog.FromContext(ctx)
 
+	namespace, err := getNamespace()
+	if err != nil {
+		log.Error(err, "failed to know which namespace to target")
+		return ctrl.Result{}, err
+	}
+
+	if n.Mondoo.Spec.Workloads.ServiceAccount == "" && n.Mondoo.Namespace == namespace {
+		n.Mondoo.Spec.Workloads.ServiceAccount = defaultServiceAccount
+	}
+
 	if n.Enable {
 		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag)
 		if err != nil {

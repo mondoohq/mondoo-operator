@@ -147,19 +147,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo: mondoo,
 	}
 
-	namespace, err := getNamespace()
-	if err != nil {
-		log.Error(err, "failed to know which namespace to target")
-		return ctrl.Result{}, err
-	}
-	if err != nil {
-		log.Error(err, "Failed to get namespace")
-	}
-
-	if mondoo.Spec.Workloads.ServiceAccount == "" && mondoo.Namespace == namespace {
-		mondoo.Spec.Workloads.ServiceAccount = defaultServiceAccount
-	}
-
 	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
 	if err != nil {
 		log.Error(err, "Failed to declare workloads")
