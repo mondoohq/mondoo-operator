@@ -39,7 +39,6 @@ jobs:
         run: |
           kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator 
           kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator --timeout=300s
-          kubectl get pods -n mondoo-operator
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
