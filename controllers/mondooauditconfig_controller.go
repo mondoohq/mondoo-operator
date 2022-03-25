@@ -35,7 +35,8 @@ import (
 )
 
 const (
-	finalizerString = "k8s.mondoo.com/delete"
+	finalizerString       = "k8s.mondoo.com/delete"
+	defaultServiceAccount = "mondoo-operator-workload"
 )
 
 // MondooAuditConfigReconciler reconciles a MondooAuditConfig object
@@ -130,7 +131,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	nodes := Nodes{
 		Enable: mondoo.Spec.Nodes.Enable,
-		Mondoo: *mondoo,
+		Mondoo: mondoo,
 	}
 
 	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
@@ -143,7 +144,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	workloads := Workloads{
 		Enable: mondoo.Spec.Workloads.Enable,
-		Mondoo: *mondoo,
+		Mondoo: mondoo,
 	}
 
 	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))

@@ -6,7 +6,6 @@ metadata:
 spec:
   workloads:
     enable: true
-    serviceAccount: mondoo-operator-workload
   nodes:
     enable: true
   webhooks:

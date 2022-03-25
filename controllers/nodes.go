@@ -34,7 +34,7 @@ import (
 
 type Nodes struct {
 	Enable  bool
-	Mondoo  v1alpha1.MondooAuditConfig
+	Mondoo  *v1alpha1.MondooAuditConfig
 	Updated bool
 	Image   string
 }
@@ -56,7 +56,7 @@ func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme 
 		found.Data = map[string]string{
 			"inventory": inventory,
 		}
-		if err := ctrl.SetControllerReference(&n.Mondoo, found, scheme); err != nil {
+		if err := ctrl.SetControllerReference(n.Mondoo, found, scheme); err != nil {
 			log.Error(err, "Failed to set ControllerReference", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
 			return ctrl.Result{}, err
 		}
@@ -96,8 +96,8 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
-		declared := n.deamonsetForMondoo(&n.Mondoo, n.Mondoo.Name+"-ds")
-		if err := ctrl.SetControllerReference(&n.Mondoo, declared, scheme); err != nil {
+		declared := n.daemonsetForMondoo(n.Mondoo, n.Mondoo.Name+"-ds")
+		if err := ctrl.SetControllerReference(n.Mondoo, declared, scheme); err != nil {
 			log.Error(err, "Failed to set ControllerReference", "Daemonset.Namespace", declared.Namespace, "Daemonset.Name", declared.Name)
 			return ctrl.Result{}, err
 		}
@@ -158,7 +158,7 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string) *appsv1.DaemonSet {
+func (n *Nodes) daemonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string) *appsv1.DaemonSet {
 	ls := labelsForMondoo(m.Name)
 	dep := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{

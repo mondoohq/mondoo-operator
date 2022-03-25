@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
@@ -34,7 +35,7 @@ import (
 
 type Workloads struct {
 	Enable  bool
-	Mondoo  v1alpha1.MondooAuditConfig
+	Mondoo  *v1alpha1.MondooAuditConfig
 	Updated bool
 	Image   string
 }
@@ -56,7 +57,7 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 		found.Data = map[string]string{
 			"inventory": inventory,
 		}
-		if err := ctrl.SetControllerReference(&n.Mondoo, found, scheme); err != nil {
+		if err := ctrl.SetControllerReference(n.Mondoo, found, scheme); err != nil {
 			log.Error(err, "Failed to set ControllerReference", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
 			return ctrl.Result{}, err
 		}
@@ -95,8 +96,8 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
-		declared := n.deploymentForMondoo(&n.Mondoo, n.Mondoo.Name+"-deploy")
-		if err := ctrl.SetControllerReference(&n.Mondoo, declared, scheme); err != nil {
+		declared := n.deploymentForMondoo(n.Mondoo, n.Mondoo.Name+"-deploy")
+		if err := ctrl.SetControllerReference(n.Mondoo, declared, scheme); err != nil {
 			log.Error(err, "Failed to set ControllerReference", "Deployment.Namespace", declared.Namespace, "Deployment.Name", declared.Name)
 			return ctrl.Result{}, err
 		}
@@ -259,6 +260,21 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 
 	log := ctrllog.FromContext(ctx)
+
+	namespace, err := getNamespace()
+	if err != nil {
+		log.Error(err, "failed to determine which namespace mondoo-operator is running in")
+		return ctrl.Result{}, err
+	}
+
+	if n.Mondoo.Spec.Workloads.ServiceAccount == "" && n.Mondoo.Namespace == namespace {
+		n.Mondoo.Spec.Workloads.ServiceAccount = defaultServiceAccount
+	}
+	if n.Mondoo.Spec.Workloads.ServiceAccount == "" {
+		err := fmt.Errorf("MondooAuditConfig.spec.workloads.serviceAccount cannot be empty when running in a different namespace than mondoo-operator")
+		log.Error(err, "ServiceAccount cannot be empty")
+		return ctrl.Result{}, err
+	}
 
 	if n.Enable {
 		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag)

@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -41,6 +42,9 @@ var _ = Describe("workloads", func() {
 		duration  = time.Second * 10
 		interval  = time.Millisecond * 250
 	)
+	BeforeEach(func() {
+		os.Setenv("MONDOO_OPERATOR_NAMESPACE", "mondoo-operator")
+	})
 	Context("When deploying the operator with workloads enabled", func() {
 		It("Should create a new Deployment", func() {
 			ctx := context.Background()
@@ -63,6 +67,15 @@ var _ = Describe("workloads", func() {
 			}
 			Expect(k8sClient.Create(ctx, secret)).Should(Succeed())
 
+			By("Creating a serviceaccount")
+			serviceaccount := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+			}
+			Expect(k8sClient.Create(ctx, serviceaccount)).Should(Succeed())
+
 			By("Creating the mondoo crd")
 			createdMondoo := &k8sv1alpha1.MondooAuditConfig{
 				ObjectMeta: metav1.ObjectMeta{
@@ -71,7 +84,8 @@ var _ = Describe("workloads", func() {
 				},
 				Spec: k8sv1alpha1.MondooAuditConfigData{
 					Workloads: k8sv1alpha1.Workloads{
-						Enable: true,
+						Enable:         true,
+						ServiceAccount: name,
 					},
 					MondooSecretRef: name,
 				},

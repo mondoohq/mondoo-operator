@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -41,6 +42,10 @@ var _ = Describe("nodes", func() {
 		duration  = time.Second * 10
 		interval  = time.Millisecond * 250
 	)
+	BeforeEach(func() {
+		os.Setenv("MONDOO_OPERATOR_NAMESPACE", "mondoo-operator")
+	})
+
 	Context("When deploying the operator with nodes enabled", func() {
 		It("Should create a new Daemonset", func() {
 			ctx := context.Background()
