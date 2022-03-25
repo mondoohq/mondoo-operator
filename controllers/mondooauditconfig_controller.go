@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
@@ -96,17 +96,18 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		log.Error(err, "Failed to get mondoo")
 		return ctrl.Result{}, err
 	}
-	config := &mondoov1alpha1.MondooOperatorConfig{}
-	if err := r.Get(ctx, types.NamespacedName{Name: mondoov1alpha1.MondooOperatorConfigName}, config); err != nil {
+	config := &v1alpha1.MondooOperatorConfig{}
+	if err := r.Get(ctx, types.NamespacedName{Name: v1alpha1.MondooOperatorConfigName}, config); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("MondooOperatorConfig not found, using defaults")
 		}
-		log.Info(err.Error())
+		log.Error(err, "Failed to MondooOpertorConfig")
+
 	}
 
 	if config.DeletionTimestamp != nil {
-		// Object being deleted; nothing to do
-		return ctrl.Result{}, nil
+		// Going to proceed as if there is no MondooOperatorConfig
+		config = &v1alpha1.MondooOperatorConfig{}
 	}
 
 	if mondoo.DeletionTimestamp != nil {
