@@ -157,7 +157,7 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 	}
 
 	config := n.Mondoo.DeepCopy()
-	updateWorkloadsConditions(&n.Mondoo, found)
+	updateWorkloadsConditions(config, found)
 	if err := UpdateMondooAuditStatus(ctx, clt, &n.Mondoo, config, log); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -369,16 +369,16 @@ func (n *Workloads) deleteExternalResources(ctx context.Context, clt client.Clie
 }
 
 func updateWorkloadsConditions(config *mondoov1alpha1.MondooAuditConfig, found *appsv1.Deployment) {
-	msg := "Prometheus installation detected"
-	reason := "PrometheusFound"
+	msg := "API Scanning is unavailable"
+	reason := "APIScanningUnvailable"
 	status := corev1.ConditionTrue
 	updateCheck := UpdateConditionIfReasonOrMessageChange
-	if found.Status.Replicas != found.Status.ReadyReplicas {
-		msg = "Prometheus installation not detected"
-		reason = "PrometheusMissing"
+	if found.Status.Replicas == found.Status.ReadyReplicas {
+		msg = "API Scanning is available"
+		reason = "APIScanningAvailable"
 		status = corev1.ConditionFalse
 	}
 
-	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha1.APIScanningAvailable, status, reason, msg, updateCheck)
+	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha1.APIScanningDegraded, status, reason, msg, updateCheck)
 
 }

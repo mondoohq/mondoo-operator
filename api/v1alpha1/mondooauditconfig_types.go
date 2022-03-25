@@ -114,14 +114,12 @@ type MondooAuditConfigCondition struct {
 type MondooAuditConfigConditionType string
 
 const (
-	// NodeScanningAvailable is used to indicate  NodeScanning is available.
-	NodeScanningAvailable MondooAuditConfigConditionType = "NodeScanningAvailable"
-	// APIScanningAvailable is used to indicate  ApiScanning is available .
-	APIScanningAvailable MondooAuditConfigConditionType = "APIScanningAvailable"
-	// NodeScanningUnAvailable is used to indicate  NodeScanning is Unavailable.
-	NodeScanningUnavailable MondooAuditConfigConditionType = "NodeScanningUnavailable"
-	// APIScanningAvailable is used to indicate  ApiScanning is Unavailable.
-	APIScanningUnavailable MondooAuditConfigConditionType = "APIScanningUnvailable"
+	// Indicates weather NodeScanning is Degraded
+	NodeScanningDegraded MondooAuditConfigConditionType = "NodeScanningDegraded"
+	// Indicates weather APIScanning is Degraded
+	APIScanningDegraded MondooAuditConfigConditionType = "APIScanningDegraded"
+	// Indicates weather Webhook is Degraded
+	WebhookDegraded MondooAuditConfigConditionType = "WebhookDegraded"
 )
 
 //+kubebuilder:object:root=true
