@@ -18,8 +18,8 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: "${{ env.golang-version }}"
-      # - name: Start minikube
-      #   uses: medyagh/setup-minikube@master
+      - name: Start minikube
+        uses: medyagh/setup-minikube@master
       # - name: Try the cluster !
       #   run: kubectl get pods -A
       # - name: Build image
