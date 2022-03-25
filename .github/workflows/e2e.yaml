@@ -20,25 +20,26 @@ jobs:
           go-version: "${{ env.golang-version }}"
       - name: Start minikube
         uses: medyagh/setup-minikube@master
-      # - name: Try the cluster !
-      #   run: kubectl get pods -A
-      # - name: Build image
-      #   run: |
-      #     export SHELL=/bin/bash
-      #     eval $(minikube -p minikube docker-env)
-      #     make docker-build
+      - name: Try the cluster !
+        run: kubectl get pods -A
+      - name: Build image
+        run: |
+          export SHELL=/bin/bash
+          eval $(minikube -p minikube docker-env)
+          make docker-build
       - name: Deploy to minikube
         run: |
           make deploy
-          echo ${{ secrets.MONDOO_CLIENT }} > creds.json
+          echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > mondoo.json
           kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
           rm creds.json
           kubectl get secret mondoo-client -n mondoo-operator -o yaml
-          # kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
+          kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
       - name: Verify Mondoo Operator kustomize manifests
         run: |
           kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator 
           kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator --timeout=300s
+          kubectl get pods -n mondoo-operator
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
