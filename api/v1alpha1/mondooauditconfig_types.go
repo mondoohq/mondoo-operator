@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -87,14 +86,9 @@ type MondooAuditConfigStatus struct {
 
 	// Pods store the name of the pods which are running mondoo instances
 	Pods []string `json:"pods,omitempty"`
-	// OverallStatus store the status of the objects running mondoo instances
-	OverallStatus string `json:"overallstatus,omitempty"`
-	// DaemonsetConditions store the conditions for the mondoo daemonset
-	DaemonsetConditions []appsv1.DaemonSetCondition `json:"daemonsetconditions,omitempty"`
-	// DeploymentConditions store the conditions for the mondoo deployment
-	DeploymentConditions []appsv1.DeploymentCondition `json:"deploymentconditions,omitempty"`
 
-	MondooAuditConfigConditions []MondooAuditConfigCondition `json:"mondooAuditStatusConditions,omitempty"`
+	// Pods store the name of the pods which are running mondoo instances
+	Conditions []MondooAuditConfigCondition `json:"mondooAuditStatusConditions,omitempty"`
 }
 
 type MondooAuditConfigCondition struct {
@@ -106,8 +100,8 @@ type MondooAuditConfigCondition struct {
 	// +kubebuilder:validation:Required
 	// +required
 	Status corev1.ConditionStatus `json:"status"`
-	// LastProbeTime is the last time we probed the condition
-	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
+	// LastAuditTime is the last time we probed the condition
+	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
 	// LastTransitionTime is the last time the condition transitioned from one status to another.
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
 	// Reason is a unique, one-word, CamelCase reason for the condition's last transition

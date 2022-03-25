@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	_ "embed"
-	"reflect"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -192,69 +191,69 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	// Update the mondoo status with the pod names only after all pod creation actions are done
 	// List the pods for this mondoo's daemonset and deployment
-	podList := &corev1.PodList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(mondoo.Namespace),
-		client.MatchingLabels(labelsForMondoo(mondoo.Name)),
-	}
-	if err = r.List(ctx, podList, listOpts...); err != nil {
-		log.Error(err, "Failed to list pods", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
-		return ctrl.Result{}, err
-	}
-	podListNames := getPodNames(podList.Items)
-	mondoo.Status.Pods = podListNames.List()
+	// podList := &corev1.PodList{}
+	// listOpts := []client.ListOption{
+	// 	client.InNamespace(mondoo.Namespace),
+	// 	client.MatchingLabels(labelsForMondoo(mondoo.Name)),
+	// }
+	// if err = r.List(ctx, podList, listOpts...); err != nil {
+	// 	log.Error(err, "Failed to list pods", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
+	// 	return ctrl.Result{}, err
+	// }
+	// podListNames := getPodNames(podList.Items)
+	// mondoo.Status.Pods = podListNames.List()
 
-	daemonsetList := &appsv1.DaemonSetList{}
-	listOpts = []client.ListOption{
-		client.InNamespace(mondoo.Namespace),
-		client.MatchingLabels(labelsForMondoo(mondoo.Name)),
-	}
-	if err = r.List(ctx, daemonsetList, listOpts...); err != nil {
-		log.Error(err, "Failed to list daemonsets", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
-		return ctrl.Result{}, err
-	}
-	mondoo.Status.OverallStatus = "Healthy"
-	for _, daemonset := range daemonsetList.Items {
-		if daemonset.Status.NumberReady != daemonset.Status.DesiredNumberScheduled {
-			mondoo.Status.OverallStatus = "Degraded"
-		}
-	}
+	// daemonsetList := &appsv1.DaemonSetList{}
+	// listOpts = []client.ListOption{
+	// 	client.InNamespace(mondoo.Namespace),
+	// 	client.MatchingLabels(labelsForMondoo(mondoo.Name)),
+	// }
+	// if err = r.List(ctx, daemonsetList, listOpts...); err != nil {
+	// 	log.Error(err, "Failed to list daemonsets", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
+	// 	return ctrl.Result{}, err
+	// }
+	// mondoo.Status.OverallStatus = "Healthy"
+	// for _, daemonset := range daemonsetList.Items {
+	// 	if daemonset.Status.NumberReady != daemonset.Status.DesiredNumberScheduled {
+	// 		mondoo.Status.OverallStatus = "Degraded"
+	// 	}
+	// }
 
-	deploymentsetList := &appsv1.DeploymentList{}
-	listOpts = []client.ListOption{
-		client.InNamespace(mondoo.Namespace),
-		client.MatchingLabels(labelsForMondoo(mondoo.Name)),
-	}
-	if err = r.List(ctx, deploymentsetList, listOpts...); err != nil {
-		log.Error(err, "Failed to list deployments", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
-		return ctrl.Result{}, err
-	}
-	for _, deployment := range deploymentsetList.Items {
-		if deployment.Status.Replicas != deployment.Status.ReadyReplicas {
-			mondoo.Status.OverallStatus = "Degraded"
-		}
-		mondoo.Status.DeploymentConditions = deployment.Status.Conditions
-	}
+	// deploymentsetList := &appsv1.DeploymentList{}
+	// listOpts = []client.ListOption{
+	// 	client.InNamespace(mondoo.Namespace),
+	// 	client.MatchingLabels(labelsForMondoo(mondoo.Name)),
+	// }
+	// if err = r.List(ctx, deploymentsetList, listOpts...); err != nil {
+	// 	log.Error(err, "Failed to list deployments", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
+	// 	return ctrl.Result{}, err
+	// }
+	// for _, deployment := range deploymentsetList.Items {
+	// 	if deployment.Status.Replicas != deployment.Status.ReadyReplicas {
+	// 		mondoo.Status.OverallStatus = "Degraded"
+	// 	}
+	// 	mondoo.Status.DeploymentConditions = deployment.Status.Conditions
+	// }
 
-	if !mondoo.Spec.Workloads.Enable {
-		mondoo.Status.DeploymentConditions = []appsv1.DeploymentCondition{}
-	}
+	// if !mondoo.Spec.Workloads.Enable {
+	// 	mondoo.Status.DeploymentConditions = []appsv1.DeploymentCondition{}
+	// }
 
-	currentStatus := mondoo.DeepCopy().Status
-	err = r.Get(ctx, req.NamespacedName, mondoo)
-	if err != nil {
-		log.Error(err, "Failed to get mondoo")
-		return ctrl.Result{}, err
-	}
+	// currentStatus := mondoo.DeepCopy().Status
+	// err = r.Get(ctx, req.NamespacedName, mondoo)
+	// if err != nil {
+	// 	log.Error(err, "Failed to get mondoo")
+	// 	return ctrl.Result{}, err
+	// }
 
-	if !reflect.DeepEqual(mondoo.Status, currentStatus) {
-		mondoo.Status = *currentStatus.DeepCopy()
-		err := r.Status().Update(ctx, mondoo)
-		if err != nil {
-			log.Error(err, "Failed to update mondoo status")
-			return ctrl.Result{}, err
-		}
-	}
+	// if !reflect.DeepEqual(mondoo.Status, currentStatus) {
+	// 	mondoo.Status = *currentStatus.DeepCopy()
+	// 	err := r.Status().Update(ctx, mondoo)
+	// 	if err != nil {
+	// 		log.Error(err, "Failed to update mondoo status")
+	// 		return ctrl.Result{}, err
+	// 	}
+	// }
 
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
 }

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -155,6 +156,11 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 		return ctrl.Result{Requeue: true}, err
 	}
 
+	config := n.Mondoo.DeepCopy()
+	updateWorkloadsConditions(&n.Mondoo, found)
+	if err := UpdateMondooAuditStatus(ctx, clt, &n.Mondoo, config, log); err != nil {
+		return ctrl.Result{}, err
+	}
 	return ctrl.Result{}, nil
 }
 
@@ -360,4 +366,19 @@ func (n *Workloads) deleteExternalResources(ctx context.Context, clt client.Clie
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{Requeue: true}, err
+}
+
+func updateWorkloadsConditions(config *mondoov1alpha1.MondooAuditConfig, found *appsv1.Deployment) {
+	msg := "Prometheus installation detected"
+	reason := "PrometheusFound"
+	status := corev1.ConditionTrue
+	updateCheck := UpdateConditionIfReasonOrMessageChange
+	if found.Status.Replicas != found.Status.ReadyReplicas {
+		msg = "Prometheus installation not detected"
+		reason = "PrometheusMissing"
+		status = corev1.ConditionFalse
+	}
+
+	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha1.APIScanningAvailable, status, reason, msg, updateCheck)
+
 }
