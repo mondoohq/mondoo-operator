@@ -180,7 +180,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 					}},
 					Containers: []corev1.Container{{
 						Image:     n.Image,
-						Name:      "mondoo-agent",
+						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
 						Resources: getResourcesRequirements(m.Spec.Workloads.Resources),
 						VolumeMounts: []corev1.VolumeMount{

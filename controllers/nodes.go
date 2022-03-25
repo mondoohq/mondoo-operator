@@ -180,7 +180,7 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 					}},
 					Containers: []corev1.Container{{
 						Image:     n.Image,
-						Name:      "mondoo-agent",
+						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
 						Resources: getResourcesRequirements(m.Spec.Nodes.Resources),
 						VolumeMounts: []corev1.VolumeMount{
