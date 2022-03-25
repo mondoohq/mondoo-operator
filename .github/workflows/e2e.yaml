@@ -3,7 +3,7 @@ on:
   pull_request:
   push:
     branches:
-      - "debug-creds"
+      - "main"
     tags: ["v*.*.*"]
 
 jobs:
