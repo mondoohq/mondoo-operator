@@ -29,7 +29,7 @@ jobs:
       #     make docker-build
       - name: Deploy to minikube
         run: |
-          # make deploy
+          make deploy
           echo ${{ secrets.MONDOO_CLIENT }} > creds.json
           kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
           rm creds.json
