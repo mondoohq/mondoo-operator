@@ -159,8 +159,7 @@ spec:
             description: MondooAuditConfigStatus defines the observed state of MondooAuditConfig
             properties:
               conditions:
-                description: Pods store the name of the pods which are running mondoo
-                  instances
+                description: Conditions includes detailed status for the MondooAuditConfig
                 items:
                   properties:
                     lastTransitionTime:

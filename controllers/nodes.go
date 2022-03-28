@@ -158,7 +158,7 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	}
 	config := n.Mondoo.DeepCopy()
 	updateNodeConditions(config, found)
-	if err := UpdateMondooAuditStatus(ctx, clt, &n.Mondoo, config, log); err != nil {
+	if err := UpdateMondooAuditStatus(ctx, clt, n.Mondoo, config, log); err != nil {
 		return ctrl.Result{}, err
 	}
 
