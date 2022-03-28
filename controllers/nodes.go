@@ -201,7 +201,7 @@ func (n *Nodes) daemonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 							PeriodSeconds:       1800,
 							TimeoutSeconds:      10,
 							SuccessThreshold:    1,
-							FailureThreshold:    1,
+							FailureThreshold:    2,
 						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
