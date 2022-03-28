@@ -58,7 +58,7 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 		found.Data = map[string]string{
 			"inventory": inventory,
 		}
-		if err := ctrl.SetControllerReference(n.Mondoo, found, scheme); err != nil {
+		if err := ctrl.SetControllerReference(&n.Mondoo, found, scheme); err != nil {
 			log.Error(err, "Failed to set ControllerReference", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
 			return ctrl.Result{}, err
 		}
@@ -97,8 +97,8 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
-		declared := n.deploymentForMondoo(n.Mondoo, n.Mondoo.Name+"-deploy")
-		if err := ctrl.SetControllerReference(n.Mondoo, declared, scheme); err != nil {
+		declared := n.deploymentForMondoo(&n.Mondoo, n.Mondoo.Name+"-deploy")
+		if err := ctrl.SetControllerReference(&n.Mondoo, declared, scheme); err != nil {
 			log.Error(err, "Failed to set ControllerReference", "Deployment.Namespace", declared.Namespace, "Deployment.Name", declared.Name)
 			return ctrl.Result{}, err
 		}
