@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -368,7 +367,7 @@ func (n *Workloads) deleteExternalResources(ctx context.Context, clt client.Clie
 	return ctrl.Result{Requeue: true}, err
 }
 
-func updateWorkloadsConditions(config *mondoov1alpha1.MondooAuditConfig, found *appsv1.Deployment) {
+func updateWorkloadsConditions(config *v1alpha1.MondooAuditConfig, found *appsv1.Deployment) {
 	msg := "API Scanning is unavailable"
 	reason := "APIScanningUnvailable"
 	status := corev1.ConditionTrue
@@ -379,6 +378,6 @@ func updateWorkloadsConditions(config *mondoov1alpha1.MondooAuditConfig, found *
 		status = corev1.ConditionFalse
 	}
 
-	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha1.APIScanningDegraded, status, reason, msg, updateCheck)
+	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, v1alpha1.APIScanningDegraded, status, reason, msg, updateCheck)
 
 }
