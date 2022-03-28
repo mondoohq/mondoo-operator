@@ -87,8 +87,8 @@ type MondooAuditConfigStatus struct {
 	// Pods store the name of the pods which are running mondoo instances
 	Pods []string `json:"pods,omitempty"`
 
-	// Pods store the name of the pods which are running mondoo instances
-	Conditions []MondooAuditConfigCondition `json:"mondooAuditStatusConditions,omitempty"`
+	// Conditions includes detailed status for the MondooAuditConfig
+	Conditions []MondooAuditConfigCondition `json:"conditions,omitempty"`
 }
 
 type MondooAuditConfigCondition struct {

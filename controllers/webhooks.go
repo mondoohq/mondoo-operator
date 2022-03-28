@@ -330,6 +330,11 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 			webhookLog.Error(err, "failed to check for existing webhook Deployment")
 		}
 	}
+	config := n.Mondoo.DeepCopy()
+	updateWebhooksConditions(config, deployment)
+	if err := UpdateMondooAuditStatus(ctx, n.KubeClient, n.Mondoo, config, webhookLog); err != nil {
+		return err
+	}
 
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.
@@ -596,4 +601,19 @@ func getWebhookDeploymentName(prefix string) string {
 
 func getValidatingWebhookName(prefix string) string {
 	return prefix + "-mondoo-webhook"
+}
+
+func updateWebhooksConditions(config *mondoov1alpha1.MondooAuditConfig, found *appsv1.Deployment) {
+	msg := "Webhook is unavailable"
+	reason := "WebhookUnvailable"
+	status := corev1.ConditionTrue
+	updateCheck := UpdateConditionIfReasonOrMessageChange
+	if found.Status.Replicas == found.Status.ReadyReplicas {
+		msg = "Webhook is available"
+		reason = "WebhhookAvailable"
+		status = corev1.ConditionFalse
+	}
+
+	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha1.WebhookDegraded, status, reason, msg, updateCheck)
+
 }

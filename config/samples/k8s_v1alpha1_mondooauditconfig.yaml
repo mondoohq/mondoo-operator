@@ -9,6 +9,6 @@ spec:
   nodes:
     enable: true
   webhooks:
-    enable: false
+    enable: true
   mondooSecretRef: mondoo-client
   
