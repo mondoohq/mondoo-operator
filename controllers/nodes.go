@@ -33,10 +33,12 @@ import (
 )
 
 type Nodes struct {
-	Enable  bool
-	Mondoo  v1alpha1.MondooAuditConfig
-	Updated bool
-	Image   string
+	Enable          bool
+	Mondoo          v1alpha1.MondooAuditConfig
+	Updated         bool
+	Image           string
+	ImageDigest     string
+	ImageDigestTime time.Time
 }
 
 func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
@@ -255,7 +257,25 @@ func (n *Nodes) deamonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 	return dep
 }
 func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
-
+	log := ctrllog.FromContext(ctx)
+	if n.ImageDigest == "" {
+		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		n.Image = mondooImage
+		n.ImageDigest = mondooImage
+		n.ImageDigestTime = time.Now()
+	}
+	if time.Since(n.ImageDigestTime).Seconds() > 3600 {
+		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		n.Image = mondooImage
+		n.ImageDigest = mondooImage
+		n.ImageDigestTime = time.Now()
+	}
 	if n.Enable {
 		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
 		if err != nil || result.Requeue {
