@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -57,10 +59,14 @@ type Image struct {
 
 // InjectionStyle is the specified method the cluster uses for automated creation of TLS certificates
 type InjectionStyle string
+type ComponentImageDigest string
 
 const (
-	CertManager InjectionStyle = "cert-manager"
-	OpenShift   InjectionStyle = "openshift"
+	CertManager         InjectionStyle       = "cert-manager"
+	OpenShift           InjectionStyle       = "openshift"
+	WorkloadImageDigest ComponentImageDigest = "workloadImageDigest"
+	NodeImageDigest     ComponentImageDigest = "nodeImageDigest"
+	WebhookImageDigest  ComponentImageDigest = "webhookImageDigest"
 )
 
 type WebhookCertificateConfig struct {
@@ -85,7 +91,14 @@ type MondooAuditConfigStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Pods store the name of the pods which are running mondoo instances
-	Pods []string `json:"pods,omitempty"`
+	Pods           []string       `json:"pods,omitempty"`
+	ImageDigestMap ImageDigestMap `json:"imageDigestMap,omnitempty"`
+}
+type ImageDigestMap map[ComponentImageDigest]ImageDigest
+
+type ImageDigest struct {
+	ImageDigest     string    `json:"imageDigest,omitempty"`
+	DigestFetchTime time.Time `json:"digestFetchTime,omitempty"`
 }
 
 //+kubebuilder:object:root=true
