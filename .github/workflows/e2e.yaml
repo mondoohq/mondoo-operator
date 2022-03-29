@@ -22,8 +22,11 @@ jobs:
           go-version: "${{ env.golang-version }}"
       - name: Start minikube
         uses: medyagh/setup-minikube@master
+        with:
+          memory: 6000m
       - name: Try the cluster !
-        run: kubectl get pods -A
+        run: |
+          kubectl get pods -A
       - name: Build image
         run: |
           export SHELL=/bin/bash
@@ -39,7 +42,7 @@ jobs:
       - name: Verify Mondoo Operator kustomize manifests
         run: |
           kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator 
-          # kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator --timeout=300s
+          kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator --timeout=600s
           kubectl logs deployment/mondoo-client -n mondoo-operator
           kubectl get pods -n mondoo-operator
           curl -sSL http://mondoo.io/download.sh | bash

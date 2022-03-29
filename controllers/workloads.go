@@ -187,7 +187,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
-									Command: []string{"mondoo", "status"},
+									Command: []string{"mondoo", "status", "--config", "/etc/opt/mondoo/mondoo.yml"},
 								},
 							},
 							InitialDelaySeconds: 60,
