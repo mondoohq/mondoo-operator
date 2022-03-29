@@ -39,3 +39,5 @@ sigs
 unschedulable
 validatingwebhookconfiguration
 www
+mrn
+serviceaccounts
