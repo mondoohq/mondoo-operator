@@ -330,11 +330,7 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 			webhookLog.Error(err, "failed to check for existing webhook Deployment")
 		}
 	}
-	config := n.Mondoo.DeepCopy()
-	updateWebhooksConditions(config, deployment)
-	if err := UpdateMondooAuditStatus(ctx, n.KubeClient, n.Mondoo, config, webhookLog); err != nil {
-		return err
-	}
+	updateWebhooksConditions(n.Mondoo, deployment)
 
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.

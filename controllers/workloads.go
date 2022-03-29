@@ -155,11 +155,7 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	config := n.Mondoo.DeepCopy()
-	updateWorkloadsConditions(config, found)
-	if err := UpdateMondooAuditStatus(ctx, clt, n.Mondoo, config, log); err != nil {
-		return ctrl.Result{}, err
-	}
+	updateWorkloadsConditions(n.Mondoo, found)
 	return ctrl.Result{}, nil
 }
 

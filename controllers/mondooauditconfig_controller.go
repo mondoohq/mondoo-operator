@@ -145,6 +145,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
+	config := mondoo.DeepCopy()
 	nodes := Nodes{
 		Enable:               mondoo.Spec.Nodes.Enable,
 		Mondoo:               mondoo,
@@ -201,11 +202,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 	podListNames := getPodNames(podList.Items)
-	err = r.Get(ctx, req.NamespacedName, mondoo)
-	if err != nil {
-		log.Error(err, "Failed to get mondoo")
-		return ctrl.Result{}, err
-	}
 
 	// Update status.Pods list if needed
 	statusPodNames := sets.NewString(mondoo.Status.Pods...)
@@ -217,6 +213,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			log.Error(err, "Failed to update mondoo status")
 			return ctrl.Result{}, err
 		}
+	}
+
+	if err := UpdateMondooAuditStatus(ctx, r.Client, config, mondoo, log); err != nil {
+		return ctrl.Result{}, err
 	}
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
 }
