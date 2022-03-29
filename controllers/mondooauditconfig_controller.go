@@ -101,7 +101,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		if errors.IsNotFound(err) {
 			log.Info("MondooOperatorConfig not found, using defaults")
 		} else {
-			log.Error(err, "Failed to MondooOpertorConfig")
+			log.Error(err, "Failed to check for MondooOpertorConfig")
 			return ctrl.Result{}, err
 		}
 	}
@@ -147,7 +147,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	nodes := Nodes{
 		Enable:               mondoo.Spec.Nodes.Enable,
-		Mondoo:               *mondoo,
+		Mondoo:               mondoo,
 		MondooOperatorConfig: config,
 	}
 
@@ -161,7 +161,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	workloads := Workloads{
 		Enable:               mondoo.Spec.Workloads.Enable,
-		Mondoo:               *mondoo,
+		Mondoo:               mondoo,
 		MondooOperatorConfig: config,
 	}
 

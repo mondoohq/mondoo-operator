@@ -50,7 +50,7 @@ func resolveMondooImage(log logr.Logger, userImageName, userImageTag string, ski
 	mondooContainer := useImage + ":" + useTag
 	imageUrl, err := getImage(skipResolveImage, log, mondooContainer)
 	if err != nil {
-		log.Error(err, "Failed to skip resolving image")
+		log.Error(err, "Failed resolve image")
 		return imageUrl, err
 	}
 	return imageUrl, nil
@@ -70,7 +70,7 @@ func resolveMondooOperatorImage(log logr.Logger, userImageName, userImageTag str
 
 	imageUrl, err := getImage(skipResolveImage, log, mondooContainer)
 	if err != nil {
-		log.Error(err, "Failed to skip resolving image")
+		log.Error(err, "Failed to resolve image")
 		return imageUrl, err
 	}
 	return imageUrl, nil
