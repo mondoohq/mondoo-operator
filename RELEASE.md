@@ -14,6 +14,7 @@ Ensure the following software is installed before running the release script:
 Run the release script:
 
 1. Run the `release.sh` script from the root of the mondoo-operator repo with the version of the operator as the first parameter and the version of the helm chart as the second parameter (without any leading 'v' in the version string). For example:
+
 ```bash
 $ ./release.sh 0.2.0 0.2.0
 ```

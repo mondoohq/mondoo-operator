@@ -24,7 +24,18 @@ kubectl apply -f mondoo-operator-manifests.yaml
 2. Configure the Mondoo Secret:
 
 - Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts)
-- Store the service account json into a local file `creds.json`
+- Store the service account json into a local file `creds.json`. The `creds.json` should look like the following example:
+
+```json
+{
+  "mrn": "//agents.api.mondoo.app/spaces/<space name>/serviceaccounts/<Key ID>",
+  "space_mrn": "//captain.api.mondoo.app/spaces/<space name>",
+  "private_key": "-----BEGIN PRIVATE KEY-----\n....\n-----END PRIVATE KEY-----\n",
+  "certificate": "-----BEGIN CERTIFICATE-----\n....\n-----END CERTIFICATE-----\n",
+  "api_endpoint": "https://api.mondoo.com"
+}
+```
+
 - Store service account as a secret in the mondoo namespace via:
 
 ```bash
@@ -185,4 +196,10 @@ Then make sure a configuration for the Mondoo Client is deployed:
 kubectl get mondooauditconfigs -A
 NAME                  AGE
 mondoo-client        2m44s
+```
+
+**How do I edit an existing operator configuration?**
+
+```bash
+kubectl edit  mondooauditconfigs -n mondoo-operator
 ```
