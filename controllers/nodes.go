@@ -190,18 +190,6 @@ func (n *Nodes) daemonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
 						Resources: getResourcesRequirements(m.Spec.Nodes.Resources),
-						ReadinessProbe: &corev1.Probe{
-							ProbeHandler: corev1.ProbeHandler{
-								Exec: &corev1.ExecAction{
-									Command: []string{"mondoo", "status"},
-								},
-							},
-							InitialDelaySeconds: 30,
-							PeriodSeconds:       1800,
-							TimeoutSeconds:      10,
-							SuccessThreshold:    1,
-							FailureThreshold:    2,
-						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "root",
