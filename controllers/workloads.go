@@ -197,7 +197,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 									Command: []string{"mondoo", "status"},
 								},
 							},
-							InitialDelaySeconds: 1,
+							InitialDelaySeconds: 30,
 							PeriodSeconds:       1800,
 							TimeoutSeconds:      10,
 							SuccessThreshold:    1,
