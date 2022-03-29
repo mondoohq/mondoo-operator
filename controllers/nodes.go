@@ -37,7 +37,7 @@ type Nodes struct {
 	Mondoo               v1alpha1.MondooAuditConfig
 	Updated              bool
 	Image                string
-	MondooOperatorConfig v1alpha1.MondooOperatorConfig
+	MondooOperatorConfig *v1alpha1.MondooOperatorConfig
 }
 
 func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {

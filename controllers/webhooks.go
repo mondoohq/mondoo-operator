@@ -40,7 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 )
 
@@ -75,7 +74,7 @@ type Webhooks struct {
 	TargetNamespace      string
 	Scheme               *runtime.Scheme
 	Image                string
-	MondooOperatorConfig v1alpha1.MondooOperatorConfig
+	MondooOperatorConfig *mondoov1alpha1.MondooOperatorConfig
 }
 
 // syncValidatingWebhookConfiguration will create/update the ValidatingWebhookConfiguration
