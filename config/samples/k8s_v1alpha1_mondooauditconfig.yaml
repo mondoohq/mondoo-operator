@@ -5,7 +5,7 @@ metadata:
   namespace: mondoo-operator
 spec:
   workloads:
-    enable: false
+    enable: true
   nodes:
     enable: true
   webhooks:
