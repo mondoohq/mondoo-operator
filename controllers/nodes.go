@@ -189,7 +189,7 @@ func (n *Nodes) daemonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 									Command: []string{"mondoo", "status", "--config", "/etc/opt/mondoo/mondoo.yml"},
 								},
 							},
-							InitialDelaySeconds: 5,
+							InitialDelaySeconds: 10,
 							PeriodSeconds:       300,
 							TimeoutSeconds:      5,
 						},
