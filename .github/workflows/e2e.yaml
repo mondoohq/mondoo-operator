@@ -42,10 +42,10 @@ jobs:
       - name: Verify Mondoo Operator kustomize manifests
         run: |
           kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator
-          kubectl exec -q daemonset/mondoo-client -- mondoo status --namespace mondoo-operator
+          kubectl exec -q daemonset/mondoo-client --namespace mondoo-operator -- mondoo status 
           kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator --timeout=600s
-          kubectl logs deployment/mondoo-client -n mondoo-operator --namespace mondoo-operator
-          kubectl exec -q daemonset/mondoo-client -- mondoo status
+          kubectl logs deployment/mondoo-client -n mondoo-operator 
+          kubectl exec -q daemonset/mondoo-client --namespace mondoo-operator -- mondoo status 
           kubectl get pods -n mondoo-operator
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
