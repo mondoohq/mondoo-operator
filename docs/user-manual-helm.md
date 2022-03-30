@@ -58,6 +58,13 @@ spec:
 kubectl apply -f mondoo-config.yaml
 ```
 
+## Remove operator 
+
+To remove the operator run: 
+```bash
+helm uninstall mondoo-operator
+```
+
 ## FAQ
 
 **I do not see the service running, only the operator?**

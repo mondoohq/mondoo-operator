@@ -178,6 +178,14 @@ webhooks:
         port: 443
 ```
 
+## Remove operator 
+
+To remove the operator run: 
+```bash
+kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
+make undeploy
+```
+
 ## FAQ
 
 **I do not see the service running, only the operator?**
