@@ -23,7 +23,7 @@ jobs:
       - name: Start minikube
         uses: medyagh/setup-minikube@master
         with:
-          memory: 6000m
+          memory: 4000m
       - name: Try the cluster !
         run: |
           kubectl get pods -A
