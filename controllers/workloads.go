@@ -191,7 +191,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 								},
 							},
 							InitialDelaySeconds: 5,
-							PeriodSeconds:       1800,
+							PeriodSeconds:       300,
 							TimeoutSeconds:      5,
 						},
 						VolumeMounts: []corev1.VolumeMount{
