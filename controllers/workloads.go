@@ -34,10 +34,11 @@ import (
 )
 
 type Workloads struct {
-	Enable  bool
-	Mondoo  *v1alpha1.MondooAuditConfig
-	Updated bool
-	Image   string
+	Enable               bool
+	Mondoo               *v1alpha1.MondooAuditConfig
+	Updated              bool
+	Image                string
+	MondooOperatorConfig *v1alpha1.MondooOperatorConfig
 }
 
 func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
@@ -287,7 +288,8 @@ func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *ru
 	}
 
 	if n.Enable {
-		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag)
+		skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
+		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag, skipResolveImage)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

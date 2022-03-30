@@ -33,10 +33,11 @@ import (
 )
 
 type Nodes struct {
-	Enable  bool
-	Mondoo  *v1alpha1.MondooAuditConfig
-	Updated bool
-	Image   string
+	Enable               bool
+	Mondoo               *v1alpha1.MondooAuditConfig
+	Updated              bool
+	Image                string
+	MondooOperatorConfig *v1alpha1.MondooOperatorConfig
 }
 
 func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
@@ -269,7 +270,8 @@ func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtim
 	log := ctrllog.FromContext(ctx)
 
 	if n.Enable {
-		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag)
+		skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
+		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag, skipResolveImage)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

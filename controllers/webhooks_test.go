@@ -21,6 +21,7 @@ import (
 
 	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 
+	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 )
 
@@ -194,10 +195,11 @@ func TestWebhooksReconcile(t *testing.T) {
 				Spec: test.mondooAuditConfigSpec,
 			}
 			webhooks := &Webhooks{
-				Mondoo:          auditConfig,
-				KubeClient:      fakeClient,
-				TargetNamespace: testNamespace,
-				Scheme:          scheme.Scheme,
+				Mondoo:               auditConfig,
+				KubeClient:           fakeClient,
+				TargetNamespace:      testNamespace,
+				Scheme:               scheme.Scheme,
+				MondooOperatorConfig: &v1alpha1.MondooOperatorConfig{},
 			}
 
 			// Act

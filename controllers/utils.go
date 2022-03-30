@@ -38,7 +38,7 @@ const (
 	mondooOperatorTag   = "latest"
 )
 
-func resolveMondooImage(log logr.Logger, userImageName, userImageTag string) (string, error) {
+func resolveMondooImage(log logr.Logger, userImageName, userImageTag string, skipResolveImage bool) (string, error) {
 	useImage := mondooImage
 	useTag := mondooTag
 	if userImageName != "" {
@@ -48,18 +48,16 @@ func resolveMondooImage(log logr.Logger, userImageName, userImageTag string) (st
 		useTag = userImageTag
 	}
 	mondooContainer := useImage + ":" + useTag
-
-	imageUrl, err := parseReference(log, mondooContainer)
-
+	imageUrl, err := getImage(skipResolveImage, log, mondooContainer)
 	if err != nil {
-		log.Error(err, "Failed to parse reference")
-		return "", err
+		log.Error(err, "Failed resolve image")
+		return imageUrl, err
 	}
-
 	return imageUrl, nil
+
 }
 
-func resolveMondooOperatorImage(log logr.Logger, userImageName, userImageTag string) (string, error) {
+func resolveMondooOperatorImage(log logr.Logger, userImageName, userImageTag string, skipResolveImage bool) (string, error) {
 	useImage := mondooOperatorImage
 	useTag := mondooOperatorTag
 	if userImageName != "" {
@@ -70,13 +68,24 @@ func resolveMondooOperatorImage(log logr.Logger, userImageName, userImageTag str
 	}
 	mondooContainer := useImage + ":" + useTag
 
-	imageUrl, err := parseReference(log, mondooContainer)
-
+	imageUrl, err := getImage(skipResolveImage, log, mondooContainer)
 	if err != nil {
-		log.Error(err, "Failed to parse reference")
-		return "", err
+		log.Error(err, "Failed to resolve image")
+		return imageUrl, err
 	}
 	return imageUrl, nil
+}
+
+func getImage(skipResolveImage bool, log logr.Logger, mondooContainer string) (string, error) {
+	if !skipResolveImage {
+		imageUrl, err := parseReference(log, mondooContainer)
+		if err != nil {
+			log.Error(err, "Failed to parse reference")
+			return "", err
+		}
+		return imageUrl, nil
+	}
+	return mondooContainer, nil
 }
 
 func parseReference(log logr.Logger, container string) (string, error) {
