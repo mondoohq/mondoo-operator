@@ -96,7 +96,7 @@ build: generate fmt vet ## Build manager binary.
 	go build -o bin/webhook pkg/webhooks/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./main.go
+	MONDOO_OPERATOR_NAMESPACE=mondoo-operator go run ./main.go
 
 docker-build: test ## Build docker image with the manager.
 	docker build --build-arg VERSION=${VERSION} -t ${IMG} .

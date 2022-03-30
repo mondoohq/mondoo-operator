@@ -21,7 +21,10 @@ minikube start
 Run the operator:
 
 ```bash
+# configure crd
 make install
+
+# run the operator locally
 make run
 ```
 
@@ -56,7 +59,12 @@ make deploy-olm
 
 Now, we completed the setup for the operator. To start the service, we need to configure the client:
 
-1. Create namespace using `kubectl create namespace mondoo-operator`
+1. Create namespace using
+
+```bash
+kubectl create namespace mondoo-operator
+```
+
 2. Configure the Mondoo secret:
 
 - Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts)
