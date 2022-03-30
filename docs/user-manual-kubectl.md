@@ -182,8 +182,7 @@ webhooks:
 
 To remove the operator run: 
 ```bash
-kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
-make undeploy
+kubectl delete -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml
 ```
 
 ## FAQ
