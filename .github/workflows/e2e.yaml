@@ -3,7 +3,7 @@ on:
   pull_request:
   push:
     paths-ignore:
-      - 'docs/**'
+      - "docs/**"
     branches:
       - "main"
     tags: ["v*.*.*"]
@@ -44,13 +44,15 @@ jobs:
           kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator
           kubectl exec -q daemonset/mondoo-client --namespace mondoo-operator -- mondoo status
           kubectl exec -q deployment/mondoo-client --namespace mondoo-operator -- mondoo status 
-          kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator --timeout=600s
+          kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator --timeout=30s
           kubectl exec -q daemonset/mondoo-client --namespace mondoo-operator -- mondoo status
           kubectl exec -q deployment/mondoo-client --namespace mondoo-operator -- mondoo status 
           kubectl get pods -n mondoo-operator
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
+      - name: Undeploy from minikube
+        run: |
           kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
           make undeploy
 
