@@ -68,6 +68,12 @@ Apply the configuration via:
 ```bash
 kubectl apply -f mondoo-config.yaml
 ```
+## Remove operator 
+
+To remove the operator run: 
+```bash
+operator-sdk olm uninstall mondoo-operator
+```
 
 ## FAQ
 

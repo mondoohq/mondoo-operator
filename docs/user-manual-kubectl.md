@@ -178,6 +178,13 @@ webhooks:
         port: 443
 ```
 
+## Remove operator 
+
+To remove the operator run: 
+```bash
+kubectl delete -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml
+```
+
 ## FAQ
 
 **I do not see the service running, only the operator?**
