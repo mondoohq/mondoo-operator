@@ -63,7 +63,7 @@ jobs:
         run: |
           kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
           kubectl create ns not-mondoo-operator
-          kubectl create secret generic mondoo-client --namespace not-mondoo-operator --from-file=config=creds.yaml
+          kubectl create secret generic mondoo-client --namespace not-mondoo-operator --from-file=config=creds.json
           yq ".metadata.namespace= \"not-mondoo-operator\" | .metadata.name = \"mondoo-operator-nodes\"" config/rbac/service_account_nodes.yaml | kubectl apply -f -
           yq ".metadata.namespace= \"not-mondoo-operator\" | .metadata.name = \"mondoo-operator-workload\"" config/rbac/service_account_workloads.yaml  | kubectl apply -f -
           kubectl get clusterrolebinding mondoo-operator-workload -o yaml | yq ".subjects[0].namespace=\"not-mondoo-operator-workload\"" | kubectl apply -f -
