@@ -145,7 +145,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
-	config := mondoo.DeepCopy()
+	mondooAuditConfigCopy := mondoo.DeepCopy()
 	nodes := Nodes{
 		Enable:               mondoo.Spec.Nodes.Enable,
 		Mondoo:               mondoo,
@@ -215,7 +215,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
-	if err := UpdateMondooAuditStatus(ctx, r.Client, config, mondoo, log); err != nil {
+	if err := UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondoo, log); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
