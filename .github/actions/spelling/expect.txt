@@ -42,3 +42,15 @@ www
 mrn
 serviceaccounts
 uninstall
+authn
+authz
+Clusterrolebinding
+configmaps
+daemonsets
+finalizers
+Plugins
+rbac
+Rolebinding
+serviceaccount
+wiki
+wikipedia
