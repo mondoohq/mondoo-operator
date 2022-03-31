@@ -68,6 +68,7 @@ jobs:
           kubectl get clusterrolebinding mondoo-operator-workload -o yaml | yq ".subjects[0].namespace=\"not-mondoo-operator-workload\"" | kubectl apply -f -
           yq -i ".metadata.namespace= \"not-mondoo-operator\"" config/samples/k8s_v1alpha1_mondooauditconfig.yaml
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
+          kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace not-mondoo-operator --timeout=400s
           make test/deployment-uncommon-ns
       - name: Undeploy from minikube
         run: |
