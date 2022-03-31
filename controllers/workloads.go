@@ -155,6 +155,7 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 		return ctrl.Result{Requeue: true}, err
 	}
 
+	updateWorkloadsConditions(n.Mondoo, found)
 	return ctrl.Result{}, nil
 }
 
@@ -166,6 +167,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      m.Name,
 			Namespace: m.Namespace,
+			Labels:    ls,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
@@ -357,4 +359,19 @@ func (n *Workloads) deleteExternalResources(ctx context.Context, clt client.Clie
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{Requeue: true}, err
+}
+
+func updateWorkloadsConditions(config *v1alpha1.MondooAuditConfig, found *appsv1.Deployment) {
+	msg := "API Scanning is unavailable"
+	reason := "APIScanningUnvailable"
+	status := corev1.ConditionTrue
+	updateCheck := UpdateConditionIfReasonOrMessageChange
+	if found.Status.Replicas == found.Status.ReadyReplicas {
+		msg = "API Scanning is available"
+		reason = "APIScanningAvailable"
+		status = corev1.ConditionFalse
+	}
+
+	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, v1alpha1.APIScanningDegraded, status, reason, msg, updateCheck)
+
 }

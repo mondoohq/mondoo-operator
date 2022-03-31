@@ -86,7 +86,41 @@ type MondooAuditConfigStatus struct {
 
 	// Pods store the name of the pods which are running mondoo instances
 	Pods []string `json:"pods,omitempty"`
+
+	// Conditions includes detailed status for the MondooAuditConfig
+	Conditions []MondooAuditConfigCondition `json:"conditions,omitempty"`
 }
+
+type MondooAuditConfigCondition struct {
+	// Type is the specific type of the condition
+	// +kubebuilder:validation:Required
+	// +required
+	Type MondooAuditConfigConditionType `json:"type"`
+	// Status is the status of the condition
+	// +kubebuilder:validation:Required
+	// +required
+	Status corev1.ConditionStatus `json:"status"`
+	// LastAuditTime is the last time we probed the condition
+	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
+	// LastTransitionTime is the last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// Reason is a unique, one-word, CamelCase reason for the condition's last transition
+	Reason string `json:"reason,omitempty"`
+	// Message is a human-readable message indicating details about the last transition
+	Message string `json:"message,omitempty"`
+}
+
+// MondooOperatorConfigConditionType is a valid value for MondooOperatorConfig.Status.Condition[].Type
+type MondooAuditConfigConditionType string
+
+const (
+	// Indicates weather NodeScanning is Degraded
+	NodeScanningDegraded MondooAuditConfigConditionType = "NodeScanningDegraded"
+	// Indicates weather APIScanning is Degraded
+	APIScanningDegraded MondooAuditConfigConditionType = "APIScanningDegraded"
+	// Indicates weather Webhook is Degraded
+	WebhookDegraded MondooAuditConfigConditionType = "WebhookDegraded"
+)
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status

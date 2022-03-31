@@ -158,6 +158,38 @@ spec:
           status:
             description: MondooAuditConfigStatus defines the observed state of MondooAuditConfig
             properties:
+              conditions:
+                description: Conditions includes detailed status for the MondooAuditConfig
+                items:
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    lastUpdateTime:
+                      description: LastAuditTime is the last time we probed the condition
+                      format: date-time
+                      type: string
+                    message:
+                      description: Message is a human-readable message indicating
+                        details about the last transition
+                      type: string
+                    reason:
+                      description: Reason is a unique, one-word, CamelCase reason
+                        for the condition's last transition
+                      type: string
+                    status:
+                      description: Status is the status of the condition
+                      type: string
+                    type:
+                      description: Type is the specific type of the condition
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
               pods:
                 description: Pods store the name of the pods which are running mondoo
                   instances

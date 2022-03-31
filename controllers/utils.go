@@ -213,3 +213,65 @@ func UpdateMondooOperatorConfigStatus(ctx context.Context, client client.Client,
 	}
 	return nil
 }
+
+func FindMondooAuditConditions(conditions []mondoov1alpha1.MondooAuditConfigCondition, conditionType mondoov1alpha1.MondooAuditConfigConditionType) *mondoov1alpha1.MondooAuditConfigCondition {
+	for i, condition := range conditions {
+		if condition.Type == conditionType {
+			return &conditions[i]
+		}
+	}
+	return nil
+}
+func SetMondooAuditCondition(
+	conditions []mondoov1alpha1.MondooAuditConfigCondition,
+	conditionType mondoov1alpha1.MondooAuditConfigConditionType,
+	status corev1.ConditionStatus,
+	reason string,
+	message string,
+	updateConditionCheck UpdateConditionCheck,
+) []mondoov1alpha1.MondooAuditConfigCondition {
+	now := metav1.Now()
+	existingCondition := FindMondooAuditConditions(conditions, conditionType)
+	if existingCondition == nil {
+		if status == corev1.ConditionTrue {
+			conditions = append(
+				conditions,
+				mondoov1alpha1.MondooAuditConfigCondition{
+					Type:               conditionType,
+					Status:             status,
+					Reason:             reason,
+					Message:            message,
+					LastTransitionTime: now,
+					LastUpdateTime:     now,
+				},
+			)
+		}
+	} else {
+		if shouldUpdateCondition(
+			existingCondition.Status, existingCondition.Reason, existingCondition.Message,
+			status, reason, message,
+			updateConditionCheck,
+		) {
+			if existingCondition.Status != status {
+				existingCondition.LastTransitionTime = now
+			}
+			existingCondition.Status = status
+			existingCondition.Reason = reason
+			existingCondition.Message = message
+			existingCondition.LastUpdateTime = now
+		}
+	}
+	return conditions
+}
+
+func UpdateMondooAuditStatus(ctx context.Context, client client.Client, origMOC, newMOC *mondoov1alpha1.MondooAuditConfig, log logr.Logger) error {
+	if !reflect.DeepEqual(origMOC.Status, newMOC.Status) {
+		log.Info("status has changed, updating")
+		err := client.Status().Update(ctx, newMOC)
+		if err != nil {
+			log.Error(err, "failed to update status")
+			return err
+		}
+	}
+	return nil
+}

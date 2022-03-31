@@ -155,7 +155,7 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 		}
 		return ctrl.Result{Requeue: true}, err
 	}
-
+	updateNodeConditions(n.Mondoo, found)
 	return ctrl.Result{}, nil
 }
 
@@ -165,6 +165,7 @@ func (n *Nodes) daemonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      m.Name,
 			Namespace: m.Namespace,
+			Labels:    ls,
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
@@ -336,4 +337,19 @@ func (n *Nodes) deleteExternalResources(ctx context.Context, clt client.Client, 
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{Requeue: true}, err
+}
+
+func updateNodeConditions(config *v1alpha1.MondooAuditConfig, found *appsv1.DaemonSet) {
+	msg := "Node Scanning is unavailable"
+	reason := "NodeScanningUnvailable"
+	status := corev1.ConditionTrue
+	updateCheck := UpdateConditionIfReasonOrMessageChange
+	if found.Status.NumberReady == found.Status.DesiredNumberScheduled {
+		msg = "Node Scanning is available"
+		reason = "NodeScanningAvailable"
+		status = corev1.ConditionFalse
+	}
+
+	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, v1alpha1.NodeScanningDegraded, status, reason, msg, updateCheck)
+
 }
