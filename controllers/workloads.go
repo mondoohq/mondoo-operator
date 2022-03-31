@@ -187,6 +187,16 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
 						Resources: getResourcesRequirements(m.Spec.Workloads.Resources),
+						ReadinessProbe: &corev1.Probe{
+							ProbeHandler: corev1.ProbeHandler{
+								Exec: &corev1.ExecAction{
+									Command: []string{"mondoo", "status", "--config", "/etc/opt/mondoo/mondoo.yml"},
+								},
+							},
+							InitialDelaySeconds: 10,
+							PeriodSeconds:       300,
+							TimeoutSeconds:      5,
+						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "root",
