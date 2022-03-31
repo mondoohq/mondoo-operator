@@ -80,9 +80,9 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	log := ctrllog.FromContext(ctx)
 
 	// Fetch the Mondoo instance
-	mondoo := &v1alpha1.MondooAuditConfig{}
+	mondooAuditConfig := &v1alpha1.MondooAuditConfig{}
 
-	err := r.Get(ctx, req.NamespacedName, mondoo)
+	err := r.Get(ctx, req.NamespacedName, mondooAuditConfig)
 
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -111,14 +111,14 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		config = &v1alpha1.MondooOperatorConfig{}
 	}
 
-	if mondoo.DeletionTimestamp != nil {
+	if mondooAuditConfig.DeletionTimestamp != nil {
 		log.Info("deleting")
 
 		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
 		// deleted should be called here
 
 		webhooks := Webhooks{
-			Mondoo:               mondoo,
+			Mondoo:               mondooAuditConfig,
 			KubeClient:           r.Client,
 			TargetNamespace:      req.Namespace,
 			Scheme:               r.Scheme,
@@ -130,25 +130,25 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			return result, err
 		}
 
-		removeFinalizer(mondoo)
-		if err := r.Update(ctx, mondoo); err != nil {
+		removeFinalizer(mondooAuditConfig)
+		if err := r.Update(ctx, mondooAuditConfig); err != nil {
 			log.Error(err, "failed to remove finalizer")
 		}
 		return ctrl.Result{}, err
 	} else {
-		if !hasFinalizer(mondoo) {
-			addFinalizer(mondoo)
-			if err := r.Update(ctx, mondoo); err != nil {
+		if !hasFinalizer(mondooAuditConfig) {
+			addFinalizer(mondooAuditConfig)
+			if err := r.Update(ctx, mondooAuditConfig); err != nil {
 				log.Error(err, "failed to set finalizer")
 			}
 			return ctrl.Result{}, err
 		}
 	}
 
-	mondooAuditConfigCopy := mondoo.DeepCopy()
+	mondooAuditConfigCopy := mondooAuditConfig.DeepCopy()
 	nodes := Nodes{
-		Enable:               mondoo.Spec.Nodes.Enable,
-		Mondoo:               mondoo,
+		Enable:               mondooAuditConfig.Spec.Nodes.Enable,
+		Mondoo:               mondooAuditConfig,
 		MondooOperatorConfig: config,
 	}
 
@@ -161,8 +161,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	workloads := Workloads{
-		Enable:               mondoo.Spec.Workloads.Enable,
-		Mondoo:               mondoo,
+		Enable:               mondooAuditConfig.Spec.Workloads.Enable,
+		Mondoo:               mondooAuditConfig,
 		MondooOperatorConfig: config,
 	}
 
@@ -175,7 +175,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	webhooks := Webhooks{
-		Mondoo:               mondoo,
+		Mondoo:               mondooAuditConfig,
 		KubeClient:           r.Client,
 		TargetNamespace:      req.Namespace,
 		Scheme:               r.Scheme,
@@ -194,28 +194,28 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// List the pods for this mondoo's daemonset and deployment
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
-		client.InNamespace(mondoo.Namespace),
-		client.MatchingLabels(labelsForMondoo(mondoo.Name)),
+		client.InNamespace(mondooAuditConfig.Namespace),
+		client.MatchingLabels(labelsForMondoo(mondooAuditConfig.Name)),
 	}
 	if err = r.List(ctx, podList, listOpts...); err != nil {
-		log.Error(err, "Failed to list pods", "Mondoo.Namespace", mondoo.Namespace, "Mondoo.Name", mondoo.Name)
+		log.Error(err, "Failed to list pods", "Mondoo.Namespace", mondooAuditConfig.Namespace, "Mondoo.Name", mondooAuditConfig.Name)
 		return ctrl.Result{}, err
 	}
 	podListNames := getPodNames(podList.Items)
 
 	// Update status.Pods list if needed
-	statusPodNames := sets.NewString(mondoo.Status.Pods...)
+	statusPodNames := sets.NewString(mondooAuditConfig.Status.Pods...)
 
 	if !statusPodNames.Equal(podListNames) {
-		mondoo.Status.Pods = podListNames.List()
-		err := r.Status().Update(ctx, mondoo)
+		mondooAuditConfig.Status.Pods = podListNames.List()
+		err := r.Status().Update(ctx, mondooAuditConfig)
 		if err != nil {
 			log.Error(err, "Failed to update mondoo status")
 			return ctrl.Result{}, err
 		}
 	}
 
-	if err := UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondoo, log); err != nil {
+	if err := UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
