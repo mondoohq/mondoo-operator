@@ -10,7 +10,7 @@ Here is a ready to use manifest of a `ClusterRole` that can be used to start the
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: operator-role
+  name: manager-role
 rules:
 - apiGroups:
   - '*'
@@ -151,9 +151,48 @@ rules:
   - watch
   - list
 ```
-> When `MondooAuditConfig` is created in the same namespace as the operator a service account is added by default. If `MondooAuditConfig` is created in any other namespace a  `Clusterrolebinding` or `Rolebinding` needs to be created. The subject serviceaccout name needs to be added to the `MondooAuditConfig` object.
-> Note: A cluster admin is required to create this `ClusterRole` and create a `ClusterRoleBinding` or `RoleBinding` to the `ServiceAccount` used by the mondoo-scanner `Pod`s. The `ServiceAccount` used by the workload `Pod`s can be specified in the `MondooAuditConfig` object.
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: workload
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: workload
+subjects:
+- kind: ServiceAccount
+  name: workload
+  namespace: system
+```
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workload
+  namespace: system
+```
 
+> When `MondooAuditConfig` is created in the same namespace as the operator a service account is added by default. If `MondooAuditConfig` is created in any other namespace a  `Clusterrolebinding` or `Rolebinding` needs to be created. The subject serviceaccout name needs to be added to the `MondooAuditConfig` object.
+
+> Note: A cluster admin is required to create this `ClusterRole` and create a `ClusterRoleBinding` or `RoleBinding` to the `ServiceAccount` used by the mondoo-client `Pod`s. The `ServiceAccount` used by the workload `Pod`s can be specified in the `MondooAuditConfig` object.
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha1
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  workloads:
+    enable: true
+    serviceAccount: workload
+  nodes:
+    enable: true
+  webhooks:
+    enable: false
+  mondooSecretRef: mondoo-client
+```
 
 ## Node RBAC
 
