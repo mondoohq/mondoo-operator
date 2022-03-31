@@ -129,9 +129,9 @@ rules:
   - update
 ```
 
-## Workload RBAC
+## RBAC rules for Mondoo Workload Scanning
 
-The Mondoo workload-scanner itself accesses the Kubernetes API to discover resources. Therefore a separate `ClusterRole` for the workload-scanner needs to exist.
+To scan the Kubernetes resources, the mondoo-client needs access to the Kubernetes API. Therefore a separate `ClusterRole` for accessing the data needs to exist.
 
 As Mondoo does not modify any Objects in the Kubernetes API, but just reads them it simply requires the `get`, `list`, and `watch` actions.
 
@@ -173,7 +173,7 @@ metadata:
   namespace: system
 ```
 
-> When `MondooAuditConfig` is created in the same namespace as the operator a service account is added by default. If `MondooAuditConfig` is created in any other namespace a  `Clusterrolebinding` or `Rolebinding` needs to be created. The subject serviceaccout name needs to be added to the `MondooAuditConfig` object.
+> When `MondooAuditConfig` is created in the same namespace as the operator a service account is added by default. If `MondooAuditConfig` is created in any other namespace a  `Clusterrolebinding` or `Rolebinding` needs to be created. The subject serviceaccount name needs to be added to the `MondooAuditConfig` object.
 
 > Note: A cluster admin is required to create this `ClusterRole` and create a `ClusterRoleBinding` or `RoleBinding` to the `ServiceAccount` used by the mondoo-client `Pod`s. The `ServiceAccount` used by the workload `Pod`s can be specified in the `MondooAuditConfig` object.
 
@@ -194,9 +194,9 @@ spec:
   mondooSecretRef: mondoo-client
 ```
 
-## Node RBAC
+## RBAC rules for Mondoo Node Scanning
 
-The Mondoo node-scanner does not require access to the Kubernetes API server, thus a default service account with no permissions should suffice.
+To scan the Kubernetes nodes, Mondoo does not does not require access to the Kubernetes API server, thus a default service account with no permissions should suffice.
 
 
 > The `ServiceAccount` used by the node-scanner `Pod`s can be specified in the `MondooAuditConfig` object.
