@@ -94,24 +94,24 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 	found := &appsv1.Deployment{}
+	desiredDeployment := n.deploymentForMondoo(n.Mondoo, n.Mondoo.Name+"-deploy")
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
-		declared := n.deploymentForMondoo(n.Mondoo, n.Mondoo.Name+"-deploy")
-		if err := ctrl.SetControllerReference(n.Mondoo, declared, scheme); err != nil {
-			log.Error(err, "Failed to set ControllerReference", "Deployment.Namespace", declared.Namespace, "Deployment.Name", declared.Name)
+		if err := ctrl.SetControllerReference(n.Mondoo, desiredDeployment, scheme); err != nil {
+			log.Error(err, "Failed to set ControllerReference", "Deployment.Namespace", desiredDeployment.Namespace, "Deployment.Name", desiredDeployment.Name)
 			return ctrl.Result{}, err
 		}
 
-		err := clt.Create(ctx, declared)
+		err := clt.Create(ctx, desiredDeployment)
 		if err != nil {
-			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", declared.Namespace, "Deployment.Name", declared.Name)
+			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", desiredDeployment.Namespace, "Deployment.Name", desiredDeployment.Name)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, err
 
-	} else if err == nil && found.Spec.Template.Spec.Containers[0].Image != n.Image {
-		found.Spec.Template.Spec.Containers[0].Image = n.Image
+	} else if err == nil && n.deploymentNeedsUpdate(desiredDeployment, found) {
+		found.Spec = desiredDeployment.Spec
 		err := clt.Update(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
@@ -122,19 +122,6 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
-	}
-
-	// check that the resource limites are identical
-	expectedResourceRequirements := getResourcesRequirements(n.Mondoo.Spec.Workloads.Resources)
-	if !equalResouceRequirements(found.Spec.Template.Spec.Containers[0].Resources, expectedResourceRequirements) {
-		log.Info("update resource requirements for workload client")
-		found.Spec.Template.Spec.Containers[0].Resources = expectedResourceRequirements
-		err := clt.Update(ctx, found)
-		if err != nil {
-			log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{Requeue: true}, err
 	}
 
 	if n.Updated {
@@ -157,6 +144,22 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 
 	updateWorkloadsConditions(n.Mondoo, found)
 	return ctrl.Result{}, nil
+}
+
+func (n *Workloads) deploymentNeedsUpdate(desired, existing *appsv1.Deployment) bool {
+	if existing.Spec.Template.Spec.Containers[0].Image != desired.Spec.Template.Spec.Containers[0].Image {
+		return true
+	}
+
+	if existing.Spec.Template.Spec.ServiceAccountName != desired.Spec.Template.Spec.ServiceAccountName {
+		return true
+	}
+
+	if !equalResouceRequirements(existing.Spec.Template.Spec.Containers[0].Resources, desired.Spec.Template.Spec.Containers[0].Resources) {
+		return true
+	}
+
+	return false
 }
 
 // deploymentForMondoo returns a Deployment object
