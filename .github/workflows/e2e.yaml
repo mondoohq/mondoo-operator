@@ -59,9 +59,23 @@ jobs:
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
+      - name: Verify Mondoo Operator kustomize manifests in different namespace
+        run: |
+          kubectl create ns not-mondoo-operator
+          echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+          kubectl create secret generic mondoo-client --namespace not-mondoo-operator --from-file=config=creds.json
+          rm creds.json
+          yq ".metadata.namespace= \"not-mondoo-operator\" | .metadata.name = \"mondoo-operator-nodes\"" config/rbac/service_account_nodes.yaml | kubectl apply -f -
+          yq ".metadata.namespace= \"not-mondoo-operator\" | .metadata.name = \"mondoo-operator-workload\"" config/rbac/workload_service_account.yaml  | kubectl apply -f -
+          kubectl get clusterrolebinding mondoo-operator-workload -o yaml | yq '(.subjects) = [ .subjects[] + {"kind": "ServiceAccount", "name": "mondoo-operator-workload", "namespace": "not-mondoo-operator"}]' | kubectl apply -f -
+          yq '.metadata.namespace= "not-mondoo-operator" | .spec.workloads.serviceAccount = "mondoo-operator-workload"' config/samples/k8s_v1alpha1_mondooauditconfig.yaml | kubectl apply -f -
+          kubectl get pods -n not-mondoo-operator
+          make test/deployment-uncommon-ns
       - name: Undeploy from minikube
         run: |
           kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
+          yq '.metadata.namespace = "not-mondoo-operator"' config/samples/k8s_v1alpha1_mondooauditconfig.yaml | kubectl delete -f -
+          kubectl delete namespace not-mondoo-operator
           make undeploy
 
   # Added to summarize the matrix and allow easy branch protection rules setup

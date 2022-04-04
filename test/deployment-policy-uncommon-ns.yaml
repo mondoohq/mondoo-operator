@@ -1,0 +1,33 @@
+policies:
+  - uid: mondoo-operator
+    name: Mondoo Operator Policy
+    version: "1.0.0"
+    authors:
+      - name: Mondoo, Inc
+        email: hello@mondoo.io
+    specs:
+      - title: General
+        asset_filter:
+          query: platform.name == "kubernetes"
+        scoring_queries:
+          # namespace-exists: # deactivated since there is a bug with namespaces
+      - title: Node Scan
+        asset_filter:
+          query: platform.name == "kubernetes"
+        scoring_queries:
+          daemonset-exists:
+      - title: Resource Scan
+        asset_filter:
+          query: platform.name == "kubernetes"
+        scoring_queries:
+          deployment-exists:
+queries:
+  - uid: namespace-exists
+    title: Ensure the namespace exists
+    query: k8s.namespaces.one ( name == "not-mondoo-operator")
+  - uid: deployment-exists
+    title: Ensure the deployment is configured
+    query: k8s.deployments.one( name == "mondoo-client" && namespace == "not-mondoo-operator" )
+  - uid: daemonset-exists
+    title: Ensure the daemonset is configured
+    query: k8s.daemonsets.one( name == "mondoo-client" && namespace == "not-mondoo-operator" )
