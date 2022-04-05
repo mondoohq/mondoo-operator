@@ -342,7 +342,7 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 			webhookLog.Error(err, "failed to check for existing webhook Deployment")
 		}
 	}
-	updateWebhooksConditions(n.Mondoo, deployment)
+	updateWebhooksConditions(n.Mondoo, deployment.Status.Replicas != deployment.Status.ReadyReplicas)
 
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.
@@ -579,6 +579,9 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 
 	}
 
+	// Make sure to clear any degraded status
+	updateWebhooksConditions(n.Mondoo, false)
+
 	return ctrl.Result{}, nil
 }
 
@@ -612,15 +615,15 @@ func getValidatingWebhookName(prefix string) string {
 	return prefix + "-mondoo-webhook"
 }
 
-func updateWebhooksConditions(config *mondoov1alpha1.MondooAuditConfig, found *appsv1.Deployment) {
-	msg := "Webhook is unavailable"
-	reason := "WebhookUnvailable"
-	status := corev1.ConditionTrue
+func updateWebhooksConditions(config *mondoov1alpha1.MondooAuditConfig, degradedStatus bool) {
+	msg := "Webhook is available"
+	reason := "WebhookAailable"
+	status := corev1.ConditionFalse
 	updateCheck := UpdateConditionIfReasonOrMessageChange
-	if found.Status.Replicas == found.Status.ReadyReplicas {
-		msg = "Webhook is available"
-		reason = "WebhhookAvailable"
-		status = corev1.ConditionFalse
+	if degradedStatus {
+		msg = "Webhook is Unavailable"
+		reason = "WebhhookUnvailable"
+		status = corev1.ConditionTrue
 	}
 
 	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha1.WebhookDegraded, status, reason, msg, updateCheck)
