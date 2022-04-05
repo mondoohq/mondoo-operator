@@ -10,5 +10,7 @@ spec:
     enable: true
   webhooks:
     enable: false
+    certificateConfig:
+      injectionStyle: cert-manager # <--- remember to install cert-manager first
   mondooSecretRef: mondoo-client
   
