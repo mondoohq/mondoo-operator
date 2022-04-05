@@ -106,8 +106,16 @@ spec:
                       tag:
                         type: string
                     type: object
-                required:
-                - enable
+                  mode:
+                    description: Mode represents whether the webhook will behave in
+                      a "permissive" mode (the default) which will only scan and report
+                      on k8s resources or "enforcing" mode where depending on the
+                      scan results may reject the k8s resource creation/modification.
+                    enum:
+                    - ""
+                    - permissive
+                    - enforcing
+                    type: string
                 type: object
               workloads:
                 properties:
