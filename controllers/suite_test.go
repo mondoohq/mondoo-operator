@@ -18,10 +18,15 @@ package controllers
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
@@ -54,6 +59,19 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+
+	// Mock the retrieval of the actual image from the remote registry
+	getRemoteImage = func(ref name.Reference, options ...remote.Option) (*remote.Descriptor, error) {
+		h := sha1.New()
+		h.Write([]byte(ref.Identifier()))
+		hash, _ := v1.NewHash(hex.EncodeToString(h.Sum(nil))) // should never fail
+
+		return &remote.Descriptor{
+			Descriptor: v1.Descriptor{
+				Digest: hash,
+			},
+		}, nil
+	}
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
