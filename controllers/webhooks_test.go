@@ -198,6 +198,84 @@ func TestWebhooksReconcile(t *testing.T) {
 				assert.NoError(t, err, "expected cert-manager-generated Secret to still exist")
 			},
 		},
+		{
+			name: "pass webhook mode down to Deployment",
+			mondooAuditConfigSpec: mondoov1alpha1.MondooAuditConfigData{
+				Webhooks: mondoov1alpha1.Webhooks{
+					Enable: true,
+					Mode:   string(mondoov1alpha1.Permissive),
+				},
+			},
+			validate: func(t *testing.T, kubeClient client.Client) {
+				deployment := &appsv1.Deployment{}
+				deploymentKey := types.NamespacedName{Name: getWebhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
+				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
+				require.NoError(t, err, "expected Webhook Deployment to exist")
+
+				// Find and check the value of the webhook mode env var
+				found := false
+				for _, env := range deployment.Spec.Template.Spec.Containers[0].Env {
+					if env.Name == mondoov1alpha1.WebhookModeEnvVar {
+						found = true
+						assert.Equal(t, string(mondoov1alpha1.Permissive), env.Value, "expected Webhook mode to be set to 'permissive'")
+					}
+				}
+				assert.True(t, found, "did not find Webhook Mode environment variable to be defined/set")
+			},
+		},
+		{
+			name: "update webhook Deployment when mode changes",
+			mondooAuditConfigSpec: mondoov1alpha1.MondooAuditConfigData{
+				Webhooks: mondoov1alpha1.Webhooks{
+					Enable: true,
+					Mode:   string(mondoov1alpha1.Permissive),
+				},
+			},
+			existingObjects: func() []client.Object {
+				deployment := &appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      getWebhookDeploymentName(testMondooAuditConfigName),
+						Namespace: testNamespace,
+					},
+					Spec: appsv1.DeploymentSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Env: []corev1.EnvVar{
+											{
+												Name:  mondoov1alpha1.WebhookModeEnvVar,
+												Value: string(mondoov1alpha1.Enforcing),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+
+				return []client.Object{
+					deployment,
+				}
+			}(),
+			validate: func(t *testing.T, kubeClient client.Client) {
+				deployment := &appsv1.Deployment{}
+				deploymentKey := types.NamespacedName{Name: getWebhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
+				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
+				require.NoError(t, err, "expected Webhook Deployment to exist")
+
+				// Find and check the value of the webhook mode env var
+				found := false
+				for _, env := range deployment.Spec.Template.Spec.Containers[0].Env {
+					if env.Name == mondoov1alpha1.WebhookModeEnvVar {
+						found = true
+						assert.Equal(t, string(mondoov1alpha1.Permissive), env.Value, "expected Webhook mode to be updated to 'permissive'")
+					}
+				}
+				assert.True(t, found, "did not find Webhook Mode environment variable to be defined/set")
+			},
+		},
 	}
 
 	for _, test := range tests {

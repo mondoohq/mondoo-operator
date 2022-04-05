@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -27,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	corewebhook "go.mondoo.com/mondoo-operator/pkg/webhooks/core"
 )
 
@@ -51,8 +53,22 @@ func main() {
 	webhookLog.Info("setting up webhook server")
 	hookServer := mgr.GetWebhookServer()
 
+	// Determine whether we are in enforcing or permissive mode
+	mode, exists := os.LookupEnv(mondoov1alpha1.WebhookModeEnvVar)
+	if !exists {
+		mode = string(mondoov1alpha1.Permissive)
+	}
+
+	if !validMode(mode) {
+		err := fmt.Errorf("invalid webhook mode specified")
+		webhookLog.Error(err, "cannot continue webhook initialization")
+		os.Exit(1)
+	}
+
+	webhookLog.Info("running with webhook configuration", "mode", mode)
+
 	webhookLog.Info("registering webhooks to the webhook server")
-	hookServer.Register("/validate-k8s-mondoo-com-core", &webhook.Admission{Handler: &corewebhook.CoreValidator{Client: mgr.GetClient()}})
+	hookServer.Register("/validate-k8s-mondoo-com-core", &webhook.Admission{Handler: &corewebhook.CoreValidator{Client: mgr.GetClient(), Mode: mode}})
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		webhookLog.Error(err, "unable to set up health check")
@@ -67,5 +83,14 @@ func main() {
 	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
 		webhookLog.Error(err, "unable to run manager")
 		os.Exit(1)
+	}
+}
+
+func validMode(mode string) bool {
+	switch mode {
+	case string(mondoov1alpha1.Permissive), string(mondoov1alpha1.Enforcing):
+		return true
+	default:
+		return false
 	}
 }

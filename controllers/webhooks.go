@@ -219,6 +219,12 @@ func (n *Webhooks) webhookServiceNeedsUpdate(desired, existing *corev1.Service) 
 
 func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 
+	// "permissive" by default if Spec.Webhooks.Mode is ""
+	mode := n.Mondoo.Spec.Webhooks.Mode
+	if mode == "" {
+		mode = string(mondoov1alpha1.Permissive)
+	}
+
 	desiredDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getWebhookDeploymentName(n.Mondoo.Name),
@@ -245,6 +251,12 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 						{
 							Command: []string{
 								"/webhook",
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name:  mondoov1alpha1.WebhookModeEnvVar,
+									Value: mode,
+								},
 							},
 							Image:           n.Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
@@ -339,7 +351,8 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 		!reflect.DeepEqual(deployment.Spec.Selector, desiredDeployment.Spec.Selector) ||
 		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].Image, desiredDeployment.Spec.Template.Spec.Containers[0].Image) ||
 		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].Command, desiredDeployment.Spec.Template.Spec.Containers[0].Command) ||
-		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].VolumeMounts, desiredDeployment.Spec.Template.Spec.Containers[0].VolumeMounts) {
+		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].VolumeMounts, desiredDeployment.Spec.Template.Spec.Containers[0].VolumeMounts) ||
+		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].Env, desiredDeployment.Spec.Template.Spec.Containers[0].Env) {
 		deployment.Spec = desiredDeployment.Spec
 		if err := n.KubeClient.Update(ctx, deployment); err != nil {
 			webhookLog.Error(err, "failed to update existing webhook Deployment")
