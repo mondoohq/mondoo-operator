@@ -55,6 +55,9 @@ func TestAPIs(t *testing.T) {
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
+	// Mock the retrieval of the actual image from the remote registry
+	getRemoteImage = fakeGetRemoteImageFunc
+
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	By("bootstrapping test environment")

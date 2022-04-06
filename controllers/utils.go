@@ -38,6 +38,10 @@ const (
 	mondooOperatorTag   = "latest"
 )
 
+type getRemoteImageFunc func(ref name.Reference, options ...remote.Option) (*remote.Descriptor, error)
+
+var getRemoteImage getRemoteImageFunc = remote.Get
+
 func resolveMondooImage(log logr.Logger, userImageName, userImageTag string, skipResolveImage bool) (string, error) {
 	useImage := mondooImage
 	useTag := mondooTag
@@ -95,7 +99,7 @@ func parseReference(log logr.Logger, container string) (string, error) {
 		return "", err
 	}
 
-	desc, err := remote.Get(ref)
+	desc, err := getRemoteImage(ref)
 	if err != nil {
 		log.Error(err, "Failed to get container reference")
 		return "", err
