@@ -2,9 +2,14 @@ package controllers
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"testing"
 
+	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -29,6 +34,19 @@ const (
 	testNamespace             = "mondoo-operator"
 	testMondooAuditConfigName = "mondoo-client"
 )
+
+// A fake implementation of the getImage function that does not query remote container registries.
+var fakeGetRemoteImageFunc = func(ref name.Reference, options ...remote.Option) (*remote.Descriptor, error) {
+	h := sha1.New()
+	h.Write([]byte(ref.Identifier()))
+	hash, _ := v1.NewHash(hex.EncodeToString(h.Sum(nil))) // should never fail
+
+	return &remote.Descriptor{
+		Descriptor: v1.Descriptor{
+			Digest: hash,
+		},
+	}, nil
+}
 
 func init() {
 	utilruntime.Must(mondoov1alpha1.AddToScheme(scheme.Scheme))
@@ -185,6 +203,9 @@ func TestWebhooksReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
+			// Mock the retrieval of the actual image from the remote registry
+			getRemoteImage = fakeGetRemoteImageFunc
+
 			fakeClient := fake.NewClientBuilder().WithObjects(test.existingObjects...).Build()
 
 			auditConfig := &mondoov1alpha1.MondooAuditConfig{
