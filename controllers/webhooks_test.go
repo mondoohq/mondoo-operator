@@ -73,7 +73,7 @@ func TestWebhooksReconcile(t *testing.T) {
 
 				for _, obj := range objects {
 					err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(obj), obj)
-					assert.True(t, errors.IsNotFound(err), "unexpectedly found webhook resource when webhooks disabled: %s", client.ObjectKeyFromObject(obj))
+					assert.False(t, errors.IsNotFound(err), "unexpectedly found webhook resource when webhooks disabled: %s", client.ObjectKeyFromObject(obj))
 				}
 			},
 		},
