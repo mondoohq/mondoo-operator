@@ -32,3 +32,6 @@ mondoo-operator-manifests.yaml
 
 #bundle output
 bundle/*
+
+# Tests JUnit output
+tests.xml
