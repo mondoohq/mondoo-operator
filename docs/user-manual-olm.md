@@ -6,7 +6,7 @@ The following steps sets up the Mondoo operator using kubectl and a manifest fil
 
 - `kubectl` with admin role
 - [`operator-lifecycle-manager`](https://olm.operatorframework.io/) installed in cluster
-- `operator-sdk`
+- [`operator-sdk`](https://sdk.operatorframework.io/docs/installation/) installed locally
 
 ## Deployment of Operator using Manifests
 
