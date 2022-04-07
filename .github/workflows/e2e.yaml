@@ -59,6 +59,8 @@ jobs:
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
+          # Next test runs out of CPU resources if we leave these Pods running, so clean up after ourselves as we exit this test
+          kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml --wait=true
       - name: Verify Mondoo Operator kustomize manifests in different namespace
         run: |
           kubectl create ns not-mondoo-operator
@@ -69,13 +71,19 @@ jobs:
           yq ".metadata.namespace= \"not-mondoo-operator\" | .metadata.name = \"mondoo-operator-workload\"" config/rbac/workload_service_account.yaml  | kubectl apply -f -
           kubectl get clusterrolebinding mondoo-operator-workload -o yaml | yq '(.subjects) = [ .subjects[] + {"kind": "ServiceAccount", "name": "mondoo-operator-workload", "namespace": "not-mondoo-operator"}]' | kubectl apply -f -
           yq '.metadata.namespace= "not-mondoo-operator" | .spec.workloads.serviceAccount = "mondoo-operator-workload"' config/samples/k8s_v1alpha1_mondooauditconfig.yaml | kubectl apply -f -
+          echo "Waiting for Pods to start appearing"
+          export ATTEMPTS=0
+          export PODCOUNT=0
+          until [ $PODCOUNT -gt 0 ] || [ $ATTEMPTS -eq 10 ] ; do ATTEMPTS=$(($ATTEMPTS + 1)); PODCOUNT=$(kubectl get pods -n not-mondoo-operator --selector mondoo_cr=mondoo-client -o yaml | yq '.items | length') ; echo "PODCOUNT: \"${PODCOUNT}\" ATTEMPTS: $ATTEMPTS" ; sleep 2 ; done
+          if [[ $ATTEMPTS -eq 10 ]]; then echo "Waited for Pods that never appeared"; exit 1 ; fi
+          kubectl get pods -n not-mondoo-operator -o yaml
+          kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace not-mondoo-operator --timeout=400s
           kubectl get pods -n not-mondoo-operator
           make test/deployment-uncommon-ns
-      - name: Undeploy from minikube
-        run: |
-          kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
           yq '.metadata.namespace = "not-mondoo-operator"' config/samples/k8s_v1alpha1_mondooauditconfig.yaml | kubectl delete -f -
           kubectl delete namespace not-mondoo-operator
+      - name: Undeploy from minikube
+        run: |
           make undeploy
 
   # Added to summarize the matrix and allow easy branch protection rules setup
