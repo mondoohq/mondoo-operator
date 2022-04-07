@@ -17,8 +17,8 @@ func TestRquriementComparison(t *testing.T) {
 		},
 		// 75% of the limits
 		Requests: corev1.ResourceList{
-			corev1.ResourceMemory: resource.MustParse("750M"),
-			corev1.ResourceCPU:    resource.MustParse("375m"),
+			corev1.ResourceMemory: resource.MustParse("500M"),
+			corev1.ResourceCPU:    resource.MustParse("50m"),
 		},
 	}))
 }
