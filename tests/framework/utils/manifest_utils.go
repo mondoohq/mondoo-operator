@@ -1,0 +1,50 @@
+package utils
+
+import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
+	"path/filepath"
+
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+)
+
+func FindRootFolder() (string, error) {
+	const folderToFind = "tests"
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to find current working directory. %v", err)
+	}
+	parentPath := workingDirectory
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to find user home directory. %v", err)
+	}
+	for parentPath != userHome {
+		fmt.Printf("parent path = %s\n", parentPath)
+		_, err := os.Stat(path.Join(parentPath, folderToFind))
+		if os.IsNotExist(err) {
+			parentPath = filepath.Dir(parentPath)
+			continue
+		}
+		return parentPath, nil
+	}
+
+	return "", fmt.Errorf("Mondoo operator root not found above directory %s", workingDirectory)
+}
+
+func ReadManifest(filename string) string {
+	rootDir, err := FindRootFolder()
+	if err != nil {
+		panic(err)
+	}
+	manifest := path.Join(rootDir, filename)
+	zap.S().Infof("Reading manifest: %s", manifest)
+	contents, err := ioutil.ReadFile(manifest)
+	if err != nil {
+		panic(errors.Wrapf(err, "failed to read manifest at %s", manifest))
+	}
+	return string(contents)
+}
