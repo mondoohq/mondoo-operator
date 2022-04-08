@@ -84,12 +84,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
-func validMode(mode string) bool {
-	switch mode {
-	case string(mondoov1alpha1.Permissive), string(mondoov1alpha1.Enforcing):
-		return true
-	default:
-		return false
-	}
-}

@@ -17,29 +17,29 @@ import (
 
 var corelog = logf.Log.WithName("core-validator")
 
-type CoreValidator struct {
-	Client  client.Client
+type coreValidator struct {
+	client  client.Client
 	decoder *admission.Decoder
 	mode    mondoov1alpha1.WebhookMode
 }
 
 // NewCoreWebhook will initialize a CoreValidator with the provided k8s Client and
 // set it to the provided mode. Returns error if mode is invalid.
-func NewCoreWebhook(client client.Client, mode string) (*CoreValidator, error) {
+func NewCoreWebhook(client client.Client, mode string) (admission.Handler, error) {
 	webhookMode, err := utils.ModeStringToWebhookMode(mode)
 	if err != nil {
 		return nil, err
 	}
 
-	return &CoreValidator{
-		Client: client,
+	return &coreValidator{
+		client: client,
 		mode:   webhookMode,
 	}, nil
 }
 
-var _ admission.Handler = &CoreValidator{}
+var _ admission.Handler = &coreValidator{}
 
-func (a *CoreValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (a *coreValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	corelog.Info("Webhook triggered", "Details", req)
 
 	// TODO: call into Mondoo Scan Service to scan the resource
@@ -61,7 +61,9 @@ func (a *CoreValidator) Handle(ctx context.Context, req admission.Request) admis
 	}
 }
 
-func (a *CoreValidator) InjectDecoder(d *admission.Decoder) error {
+var _ admission.DecoderInjector = &coreValidator{}
+
+func (a *coreValidator) InjectDecoder(d *admission.Decoder) error {
 	a.decoder = d
 	return nil
 }
