@@ -34,16 +34,16 @@ func FindRootFolder() (string, error) {
 	return "", fmt.Errorf("Mondoo operator root not found above directory %s", workingDirectory)
 }
 
-func ReadManifest(filename string) string {
+func ReadFile(filename string) string {
 	rootDir, err := FindRootFolder()
 	if err != nil {
 		panic(err)
 	}
 	manifest := path.Join(rootDir, filename)
-	zap.S().Infof("Reading manifest: %s", manifest)
+	zap.S().Infof("Reading file: %s", manifest)
 	contents, err := ioutil.ReadFile(manifest)
 	if err != nil {
-		panic(errors.Wrapf(err, "failed to read manifest at %s", manifest))
+		panic(errors.Wrapf(err, "failed to read file at %s", manifest))
 	}
 	return string(contents)
 }

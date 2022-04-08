@@ -13,7 +13,7 @@ type E2ESuite struct {
 }
 
 func (s *E2ESuite) SetupSuite() {
-	s.testCluster = StartTestCluster(s.T)
+	s.testCluster = StartTestCluster(installer.NewDefaultSettings(), s.T)
 }
 
 func (s *E2ESuite) TearDownSuite() {

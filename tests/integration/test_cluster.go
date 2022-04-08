@@ -12,13 +12,13 @@ type TestCluster struct {
 	T func() *testing.T
 }
 
-func StartTestCluster(t func() *testing.T) *TestCluster {
+func StartTestCluster(settings installer.Settings, t func() *testing.T) *TestCluster {
 	cfg := zap.NewDevelopmentConfig()
 	logger, _ := cfg.Build()
 	zap.ReplaceGlobals(logger)
 
 	cluster := &TestCluster{
-		MondooInstaller: installer.NewMondooInstaller(t),
+		MondooInstaller: installer.NewMondooInstaller(settings, t),
 		T:               t,
 	}
 

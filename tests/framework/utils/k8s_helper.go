@@ -23,7 +23,7 @@ import (
 const (
 	cmd           = "kubectl"
 	retryInterval = 5
-	retryLoop     = 5
+	retryLoop     = 20
 )
 
 var (
@@ -100,9 +100,9 @@ func (k8sh *K8sHelper) KubectlWithStdin(stdin string, args ...string) (string, e
 	return cmdOut.StdOut, nil
 }
 
-// IsPodInExpectedState waits for a pod to be an expected state
+// IsPodInExpectedState waits for a pod to be in a Ready state
 // If the pod is in expected state within the time retry limit true is returned, if not false
-func (k8sh *K8sHelper) IsPodInExpectedState(labelSelector, namespace, state string) bool {
+func (k8sh *K8sHelper) IsPodReady(labelSelector, namespace string) bool {
 	listOpts, err := LabelSelectorListOptions(labelSelector)
 	if err != nil {
 		return false
@@ -115,9 +115,12 @@ func (k8sh *K8sHelper) IsPodInExpectedState(labelSelector, namespace, state stri
 		if err == nil {
 			if len(podList.Items) >= 1 {
 				for _, pod := range podList.Items {
-					if pod.Status.Phase == v1.PodPhase(state) {
-						return true
+					for _, c := range pod.Status.Conditions {
+						if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+							return true
+						}
 					}
+
 				}
 			}
 		}

@@ -269,11 +269,11 @@ catalog-push: ## Push a catalog image.
 # Verify the operator deployment
 .PHONY: test/deployment
 test/deployment:
-	mondoo scan -t k8s test/deployment-policy.yaml --incognito
+	mondoo scan -t k8s tests/manifests/deployment-policy.yaml --incognito
 
 .PHONY: test/deployment-uncommon-ns
 test/deployment-uncommon-ns:
-	mondoo scan -t k8s test/deployment-policy-uncommon-ns.yaml --incognito
+	mondoo scan -t k8s test/manifests/deployment-policy-uncommon-ns.yaml --incognito
 
 HELMIFY = $(shell pwd)/bin/helmify
 helmify:
