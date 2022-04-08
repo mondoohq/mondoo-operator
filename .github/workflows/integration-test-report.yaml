@@ -1,7 +1,7 @@
-name: 'Test Report'
+name: 'Integration Test Report'
 on:
   workflow_run:
-    workflows: ['Unit Tests']              # runs after Unit Tests workflow
+    workflows: ['Integration Tests']              # runs after Integration Tests workflow
     types:
       - completed
 jobs:
@@ -10,7 +10,7 @@ jobs:
     steps:
     - uses: dorny/test-reporter@v1
       with:
-        artifact: unit-test-results
-        name: Report unit test results
+        artifact: integration-test-results
+        name: Report integration test results
         path: '*.xml'                     # Path to test results (inside artifact .zip)
         reporter: java-junit              # Format of test results

@@ -1,0 +1,16 @@
+name: 'Unit Test Report'
+on:
+  workflow_run:
+    workflows: ['Unit Tests']              # runs after Unit Tests workflow
+    types:
+      - completed
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: dorny/test-reporter@v1
+      with:
+        artifact: unit-test-results
+        name: Report unit test results
+        path: '*.xml'                     # Path to test results (inside artifact .zip)
+        reporter: java-junit              # Format of test results
