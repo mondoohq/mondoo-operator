@@ -55,7 +55,7 @@ func ExecuteCommand(cmdStruct CommandArgs) CommandOut {
 	go func() {
 		for scanner.Scan() {
 			outBuffer.WriteString(scanner.Text())
-			fmt.Printf("%s\n", scanner.Text())
+			fmt.Println(scanner.Text())
 		}
 	}()
 
@@ -75,7 +75,7 @@ func ExecuteCommand(cmdStruct CommandArgs) CommandOut {
 
 			if !strings.Contains(txt, "no buildable Go source files in") {
 				errBuffer.WriteString(txt)
-				fmt.Printf("%s\n", txt)
+				fmt.Println(txt)
 			}
 		}
 	}()
