@@ -53,7 +53,7 @@ jobs:
             unit-tests.xml
             integration-tests.xml
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: test-logs
