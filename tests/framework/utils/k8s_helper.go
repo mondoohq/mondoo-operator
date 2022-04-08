@@ -6,7 +6,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"testing"
 	"time"
 
 	api "go.mondoo.com/mondoo-operator/api/v1alpha1"
@@ -37,13 +36,12 @@ var (
 type K8sHelper struct {
 	Clientset        client.Client
 	RunningInCluster bool
-	T                func() *testing.T
 	executor         *CommandExecutor
 	kubeClient       *kubernetes.Clientset // needed only to retrieve logs
 }
 
 // CreateK8sHelper creates a instance of k8sHelper
-func CreateK8sHelper(t func() *testing.T) (*K8sHelper, error) {
+func CreateK8sHelper() (*K8sHelper, error) {
 	executor := &CommandExecutor{}
 	config, err := config.GetConfig()
 	if err != nil {
@@ -61,7 +59,7 @@ func CreateK8sHelper(t func() *testing.T) (*K8sHelper, error) {
 		return nil, fmt.Errorf("failed to get kubernetes client. %+v", err)
 	}
 
-	h := &K8sHelper{executor: executor, Clientset: clientset, T: t, kubeClient: kubeClient}
+	h := &K8sHelper{executor: executor, Clientset: clientset, kubeClient: kubeClient}
 	if strings.Contains(config.Host, "//10.") {
 		h.RunningInCluster = true
 	}

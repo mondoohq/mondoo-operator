@@ -16,22 +16,20 @@ const (
 )
 
 type MondooInstaller struct {
-	k8sHelper *utils.K8sHelper
-	//Manifests *Manifests
+	k8sHelper   *utils.K8sHelper
 	T           func() *testing.T
 	isInstalled bool
 }
 
 func NewMondooInstaller(t func() *testing.T) *MondooInstaller {
-	k8sHelper, err := utils.CreateK8sHelper(t)
+	k8sHelper, err := utils.CreateK8sHelper()
 	if err != nil {
 		panic("failed to get kubectl client :" + err.Error())
 	}
 
 	return &MondooInstaller{
 		k8sHelper: k8sHelper,
-		//Manifests: &Manifests{},
-		T: t,
+		T:         t,
 	}
 }
 
@@ -61,6 +59,7 @@ func (i *MondooInstaller) InstallOperator() error {
 func (i *MondooInstaller) UninstallOperator() error {
 	// If the operator has not been installed do nothing
 	if !i.isInstalled {
+		zap.S().Warn("Operator not installed. Skip gathering logs...")
 		return nil
 	}
 	i.k8sHelper.GetLogsFromNamespace(MondooNamespace, i.T().Name())
@@ -73,9 +72,6 @@ func (i *MondooInstaller) UninstallOperator() error {
 }
 
 func (i *MondooInstaller) GatherAllMondooLogs(testName string, namespaces ...string) {
-	if !i.T().Failed() {
-		return
-	}
 	zap.S().Infof("gathering all logs from the test")
 	for _, namespace := range namespaces {
 		i.k8sHelper.GetLogsFromNamespace(namespace, testName)

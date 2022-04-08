@@ -12,20 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/pkg/capnslog"
 	"go.uber.org/zap"
 )
-
-// Executor is the main interface for all the exec commands
-type Executor interface {
-	ExecuteCommand(command string, arg ...string) error
-	ExecuteCommandWithEnv(env []string, command string, arg ...string) error
-	ExecuteCommandWithOutput(command string, arg ...string) (string, error)
-	ExecuteCommandWithCombinedOutput(command string, arg ...string) (string, error)
-	ExecuteCommandWithOutputFile(command, outfileArg string, arg ...string) (string, error)
-	ExecuteCommandWithOutputFileTimeout(timeout time.Duration, command, outfileArg string, arg ...string) (string, error)
-	ExecuteCommandWithTimeout(timeout time.Duration, command string, arg ...string) (string, error)
-}
 
 // CommandExecutor is the type of the Executor
 type CommandExecutor struct {
@@ -227,7 +215,7 @@ func startCommand(env []string, command string, arg ...string) (*exec.Cmd, io.Re
 }
 
 // read from reader line by line and write it to the log
-func logFromReader(logger *capnslog.PackageLogger, reader io.ReadCloser) {
+func logFromReader(reader io.ReadCloser) {
 	in := bufio.NewScanner(reader)
 	lastLine := ""
 	for in.Scan() {
@@ -242,19 +230,8 @@ func logOutput(stdout, stderr io.ReadCloser) {
 		return
 	}
 
-	// The child processes should appropriately be outputting at the desired global level.  Therefore,
-	// we always log at INFO level here, so that log statements from child procs at higher levels
-	// (e.g., WARNING) will still be displayed.  We are relying on the child procs to output appropriately.
-	childLogger := capnslog.NewPackageLogger("github.com/rook/rook", "exec")
-	if !childLogger.LevelAt(capnslog.INFO) {
-		rl, err := capnslog.GetRepoLogger("github.com/rook/rook")
-		if err == nil {
-			rl.SetLogLevel(map[string]capnslog.LogLevel{"exec": capnslog.INFO})
-		}
-	}
-
-	go logFromReader(childLogger, stderr)
-	logFromReader(childLogger, stdout)
+	go logFromReader(stderr)
+	logFromReader(stdout)
 }
 
 func runCommandWithOutput(cmd *exec.Cmd, combinedOutput bool) (string, error) {

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 )
 
 type E2ESuite struct {
@@ -17,6 +18,12 @@ func (s *E2ESuite) SetupSuite() {
 
 func (s *E2ESuite) TearDownSuite() {
 	s.testCluster.UninstallOperator()
+}
+
+func (s *E2ESuite) AfterTest(suiteName, testName string) {
+	if !s.T().Failed() {
+		s.testCluster.GatherAllMondooLogs(testName, installer.MondooNamespace)
+	}
 }
 
 func (s *E2ESuite) TestExample() {

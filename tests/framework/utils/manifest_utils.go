@@ -23,7 +23,6 @@ func FindRootFolder() (string, error) {
 		return "", fmt.Errorf("failed to find user home directory. %v", err)
 	}
 	for parentPath != userHome {
-		fmt.Printf("parent path = %s\n", parentPath)
 		_, err := os.Stat(path.Join(parentPath, folderToFind))
 		if os.IsNotExist(err) {
 			parentPath = filepath.Dir(parentPath)
