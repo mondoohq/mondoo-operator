@@ -9,23 +9,27 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	mondoov1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 )
 
 const (
-	OperatorManifest    = "mondoo-operator-manifests.yaml"
-	AuditConfigManifest = "config/samples/k8s_v1alpha1_mondooauditconfig.yaml"
-	MondooClientSecret  = "mondoo-client"
-	MondooCredsFile     = "creds.json"
+	OperatorManifest        = "mondoo-operator-manifests.yaml"
+	AuditConfigManifest     = "config/samples/k8s_v1alpha1_mondooauditconfig.yaml"
+	MondooCredsFile         = "creds.json"
+	MondooClientsLabel      = "mondoo_cr=mondoo-client"
+	MondooClientsNodesLabel = "audit=node"
+	MondooClientsK8sLabel   = "audit=k8s"
 )
 
 type MondooInstaller struct {
 	T           func() *testing.T
 	Settings    Settings
-	k8sHelper   *utils.K8sHelper
+	K8sHelper   *utils.K8sHelper
 	isInstalled bool
+	ctx         context.Context
 }
 
 func NewMondooInstaller(settings Settings, t func() *testing.T) *MondooInstaller {
@@ -37,7 +41,8 @@ func NewMondooInstaller(settings Settings, t func() *testing.T) *MondooInstaller
 	return &MondooInstaller{
 		T:         t,
 		Settings:  settings,
-		k8sHelper: k8sHelper,
+		K8sHelper: k8sHelper,
+		ctx:       context.Background(),
 	}
 }
 
@@ -51,40 +56,29 @@ func (i *MondooInstaller) InstallOperator() error {
 		return errors.Errorf("File %q does not exist. Run %q!", OperatorManifest, "make generate-manifests")
 	}
 
-	_, err = i.k8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.CreateFromStdinArgs...)
+	_, err = i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.CreateFromStdinArgs...)
 	i.isInstalled = true // If the command above has run there is a change things have been partially created.
 	if err != nil {
 		return errors.Errorf("Failed to create mondoo-operator pod: %v ", err)
 	}
 
-	ctx := context.TODO()
 	secret := corev1.Secret{
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{
 			"config": []byte(utils.ReadFile(MondooCredsFile)),
 		},
 	}
-	secret.Name = MondooClientSecret
+	secret.Name = utils.MondooClientSecret
 	secret.Namespace = i.Settings.Namespace
-	if err := i.k8sHelper.Clientset.Create(ctx, &secret); err != nil {
-		return errors.Errorf("Failed to create mondoo secret. %v", err)
+	if err := i.K8sHelper.Clientset.Create(i.ctx, &secret); err != nil {
+		return errors.Errorf("Failed to create Мondoo secret. %v", err)
 	}
-	zap.S().Infof("Created mondoo client secret %q.", MondooClientSecret)
+	zap.S().Infof("Created Мondoo client secret %q.", utils.MondooClientSecret)
 
-	if !i.k8sHelper.IsPodReady("control-plane=controller-manager", i.Settings.Namespace) {
+	if !i.K8sHelper.IsPodReady("control-plane=controller-manager", i.Settings.Namespace) {
 		return errors.Errorf("Mondoo operator is not in a ready state.")
 	}
 	zap.S().Info("Mondoo operator is ready.")
-
-	_, err = i.k8sHelper.KubectlWithStdin(i.readManifestWithNamespace(AuditConfigManifest), utils.CreateFromStdinArgs...)
-	if err != nil {
-		return errors.Errorf("Failed to create audit config crd: %v ", err)
-	}
-
-	if !i.k8sHelper.IsPodReady("mondoo_cr=mondoo-client", i.Settings.Namespace) {
-		return errors.Errorf("Mondoo client is not in a ready state.")
-	}
-	zap.S().Info("Mondoo clients are ready.")
 
 	return nil
 }
@@ -95,22 +89,34 @@ func (i *MondooInstaller) UninstallOperator() error {
 		zap.S().Warn("Operator not installed. Skip gathering logs...")
 		return nil
 	}
-	i.k8sHelper.GetLogsFromNamespace(i.Settings.Namespace, i.T().Name())
+	i.K8sHelper.GetLogsFromNamespace(i.Settings.Namespace, i.T().Name())
 
-	ctx := context.TODO()
+	// Make sure all Mondoo audit configs are deleted so the namespace can be deleted. Leaving
+	// audit configs will result in a stuck namespace.
+	cfgs := &mondoov1.MondooAuditConfigList{}
+	if err := i.K8sHelper.Clientset.List(i.ctx, cfgs); err != nil {
+		return errors.Errorf("Failed to get Mondoo audit configs. %v", err)
+	}
+
+	for _, c := range cfgs.Items {
+		if err := i.K8sHelper.Clientset.Delete(i.ctx, &c); err != nil {
+			return errors.Errorf("Failed to delete Mondoo audit config %s/%s. %v", c.Namespace, c.Name, err)
+		}
+
+		// Wait until the CRs are fully deleted.
+		if err := i.K8sHelper.WaitForResourceDeletion(&c); err != nil {
+			return err
+		}
+	}
+
 	secret := &corev1.Secret{}
-	secret.Name = MondooClientSecret
+	secret.Name = utils.MondooClientSecret
 	secret.Namespace = i.Settings.Namespace
-	if err := i.k8sHelper.Clientset.Delete(ctx, secret); err != nil {
+	if err := i.K8sHelper.Clientset.Delete(i.ctx, secret); err != nil {
 		return errors.Errorf("Failed to delete mondoo-client secret. %v", err)
 	}
 
-	_, err := i.k8sHelper.KubectlWithStdin(i.readManifestWithNamespace(AuditConfigManifest), utils.DeleteFromStdinArgs...)
-	if err != nil {
-		return errors.Errorf("Failed to delete mondoo-operator pod: %v ", err)
-	}
-
-	_, err = i.k8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.DeleteFromStdinArgs...)
+	_, err := i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.DeleteFromStdinArgs...)
 	if err != nil {
 		return errors.Errorf("Failed to delete mondoo-operator pod: %v ", err)
 	}
@@ -120,9 +126,9 @@ func (i *MondooInstaller) UninstallOperator() error {
 func (i *MondooInstaller) GatherAllMondooLogs(testName string, namespaces ...string) {
 	zap.S().Infof("gathering all logs from the test")
 	for _, namespace := range namespaces {
-		i.k8sHelper.GetLogsFromNamespace(namespace, testName)
-		i.k8sHelper.GetPodDescribeFromNamespace(namespace, testName)
-		i.k8sHelper.GetEventsFromNamespace(namespace, testName)
+		i.K8sHelper.GetLogsFromNamespace(namespace, testName)
+		i.K8sHelper.GetPodDescribeFromNamespace(namespace, testName)
+		i.K8sHelper.GetEventsFromNamespace(namespace, testName)
 	}
 }
 

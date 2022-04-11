@@ -161,6 +161,7 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 
 func (n *Nodes) daemonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string) *appsv1.DaemonSet {
 	ls := labelsForMondoo(m.Name)
+	ls["audit"] = "node"
 	dep := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      m.Name,

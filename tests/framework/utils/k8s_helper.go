@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	api "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"go.uber.org/zap"
 	v1 "k8s.io/api/core/v1"
@@ -192,6 +193,28 @@ func (k8sh *K8sHelper) GetEventsFromNamespace(namespace, testName string) {
 	file.WriteString(events) //nolint // ok to ignore this test logging
 }
 
+// WaitForResourceDeletion waits for a resource deletion
+func (k8sh *K8sHelper) WaitForResourceDeletion(r client.Object) error {
+	ctx := context.Background()
+	key := client.ObjectKeyFromObject(r)
+	kind := r.GetObjectKind().GroupVersionKind().String()
+	for i := 0; i < retryLoop; i++ {
+
+		err := k8sh.Clientset.Get(ctx, key, r)
+		if err == nil {
+			zap.S().Infof("Resource %s %s/%s still exists.", kind, key.Namespace, key.Name)
+			time.Sleep(retryInterval * time.Second)
+			continue
+		}
+		if kerrors.IsNotFound(err) {
+			zap.S().Infof("Resource %s %s/%s deleted.", kind, key.Namespace, key.Name)
+			return nil
+		}
+		return err
+	}
+	return errors.Errorf("Gave up deleting %s %s/%s ", kind, key.Namespace, key.Name)
+}
+
 func (k8sh *K8sHelper) appendPodDescribe(file *os.File, namespace, name string) {
 	description := k8sh.getPodDescribe(namespace, name)
 	if description == "" {
@@ -240,6 +263,7 @@ func (k8sh *K8sHelper) createTestLogFile(name, namespace, testName, suffix strin
 			return nil, err
 		}
 	}
+	testName = strings.ReplaceAll(testName, "/", "")
 	fileName := fmt.Sprintf("%s_%s_%s%s_%d.log", testName, namespace, name, suffix, time.Now().Unix())
 	filePath := path.Join(logDir, fileName)
 	file, err := os.Create(filePath)
