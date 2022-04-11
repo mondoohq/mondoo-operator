@@ -35,6 +35,7 @@ import (
 
 const (
 	daemonSetConfigMapNameTemplate = `%s-ds`
+	daemonSetNameTemplate          = `%s-node`
 )
 
 type Nodes struct {
@@ -106,10 +107,10 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	log := ctrllog.FromContext(ctx)
 
 	found := &appsv1.DaemonSet{}
-	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(daemonSetNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
-		declared := n.daemonsetForMondoo(n.Mondoo)
+		declared := n.daemonsetForMondoo()
 		if err := ctrl.SetControllerReference(n.Mondoo, declared, scheme); err != nil {
 			log.Error(err, "Failed to set ControllerReference", "Daemonset.Namespace", declared.Namespace, "Daemonset.Name", declared.Name)
 			return ctrl.Result{}, err
@@ -168,16 +169,19 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 		return ctrl.Result{Requeue: true}, err
 	}
 	updateNodeConditions(n.Mondoo, found.Status.NumberReady != found.Status.DesiredNumberScheduled)
-	return ctrl.Result{}, nil
+
+	err = n.cleanupOldDaemonSet(ctx, clt)
+
+	return ctrl.Result{}, err
 }
 
-func (n *Nodes) daemonsetForMondoo(m *v1alpha1.MondooAuditConfig) *appsv1.DaemonSet {
-	ls := labelsForMondoo(m.Name)
+func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
+	ls := labelsForMondoo(n.Mondoo.Name)
 	ls["audit"] = "node"
 	dep := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      m.Name + "node",
-			Namespace: m.Namespace,
+			Name:      fmt.Sprintf(daemonSetNameTemplate, n.Mondoo.Name),
+			Namespace: n.Mondoo.Namespace,
 			Labels:    ls,
 		},
 		Spec: appsv1.DaemonSetSpec{
@@ -197,7 +201,7 @@ func (n *Nodes) daemonsetForMondoo(m *v1alpha1.MondooAuditConfig) *appsv1.Daemon
 						Image:     n.Image,
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
-						Resources: getResourcesRequirements(m.Spec.Nodes.Resources),
+						Resources: getResourcesRequirements(n.Mondoo.Spec.Nodes.Resources),
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
@@ -260,7 +264,7 @@ func (n *Nodes) daemonsetForMondoo(m *v1alpha1.MondooAuditConfig) *appsv1.Daemon
 										{
 											Secret: &corev1.SecretProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: m.Spec.MondooSecretRef,
+													Name: n.Mondoo.Spec.MondooSecretRef,
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "config",
@@ -308,7 +312,7 @@ func (n *Nodes) down(ctx context.Context, clt client.Client, req ctrl.Request) (
 	log := ctrllog.FromContext(ctx)
 
 	found := &appsv1.DaemonSet{}
-	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(daemonSetNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
 
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil
@@ -325,6 +329,10 @@ func (n *Nodes) down(ctx context.Context, clt client.Client, req ctrl.Request) (
 	if _, err := n.deleteExternalResources(ctx, clt, req, found); err != nil {
 		// if fail to delete the external dependency here, return with error
 		// so that it can be retried
+		return ctrl.Result{}, err
+	}
+
+	if err := n.cleanupOldDaemonSet(ctx, clt); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -368,4 +376,23 @@ func updateNodeConditions(config *v1alpha1.MondooAuditConfig, degradedStatus boo
 
 	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, v1alpha1.NodeScanningDegraded, status, reason, msg, updateCheck)
 
+}
+
+// TODO: this can be removed once we believe enough time has passed where the old-style named
+// DaemonSet has been replaced and removed to keep us from orphaning the old-style DaemonSet.
+func (n *Nodes) cleanupOldDaemonSet(ctx context.Context, kubeClient client.Client) error {
+	log := ctrllog.FromContext(ctx)
+
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: n.Mondoo.Namespace,
+			Name:      n.Mondoo.Name,
+		},
+	}
+
+	err := genericDelete(ctx, kubeClient, ds)
+	if err != nil {
+		log.Error(err, "failed while cleaning up old DaemonSet for nodes")
+	}
+	return err
 }
