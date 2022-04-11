@@ -28,10 +28,12 @@ const (
 )
 
 var (
-	CreateArgs          = []string{"create", "-f"}
-	CreateFromStdinArgs = append(CreateArgs, "-")
-	DeleteArgs          = []string{"delete", "-f"}
-	DeleteFromStdinArgs = append(DeleteArgs, "-")
+	CreateArgs                        = []string{"create", "-f"}
+	CreateFromStdinArgs               = append(CreateArgs, "-")
+	DeleteArgs                        = []string{"delete", "-f"}
+	DeleteArgsIgnoreNotFound          = []string{"delete", "--ignore-not-found=true", "-f"}
+	DeleteFromStdinArgs               = append(DeleteArgs, "-")
+	DeleteIngoreNotFoundFromStdinArgs = append(DeleteArgs, "-")
 )
 
 type K8sHelper struct {

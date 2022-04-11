@@ -116,7 +116,7 @@ func (i *MondooInstaller) UninstallOperator() error {
 		return errors.Errorf("Failed to delete mondoo-client secret. %v", err)
 	}
 
-	_, err := i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.DeleteFromStdinArgs...)
+	_, err := i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.DeleteIngoreNotFoundFromStdinArgs...)
 	if err != nil {
 		return errors.Errorf("Failed to delete mondoo-operator pod: %v ", err)
 	}
