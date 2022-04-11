@@ -142,7 +142,7 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	updateWorkloadsConditions(n.Mondoo, found)
+	updateWorkloadsConditions(n.Mondoo, found.Status.Replicas != found.Status.ReadyReplicas)
 	return ctrl.Result{}, nil
 }
 
@@ -338,6 +338,9 @@ func (n *Workloads) down(ctx context.Context, clt client.Client, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	// Clear any remant status
+	updateWorkloadsConditions(n.Mondoo, false)
+
 	return ctrl.Result{Requeue: true}, err
 }
 
@@ -364,15 +367,15 @@ func (n *Workloads) deleteExternalResources(ctx context.Context, clt client.Clie
 	return ctrl.Result{Requeue: true}, err
 }
 
-func updateWorkloadsConditions(config *v1alpha1.MondooAuditConfig, found *appsv1.Deployment) {
-	msg := "API Scanning is unavailable"
-	reason := "APIScanningUnvailable"
-	status := corev1.ConditionTrue
+func updateWorkloadsConditions(config *v1alpha1.MondooAuditConfig, degradedStatus bool) {
+	msg := "API Scanning is Available"
+	reason := "APIScanningAvailable"
+	status := corev1.ConditionFalse
 	updateCheck := UpdateConditionIfReasonOrMessageChange
-	if found.Status.Replicas == found.Status.ReadyReplicas {
-		msg = "API Scanning is available"
-		reason = "APIScanningAvailable"
-		status = corev1.ConditionFalse
+	if degradedStatus {
+		msg = "API Scanning is Unavailable"
+		reason = "APIScanningUnavailable"
+		status = corev1.ConditionTrue
 	}
 
 	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, v1alpha1.APIScanningDegraded, status, reason, msg, updateCheck)

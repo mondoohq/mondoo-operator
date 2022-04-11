@@ -219,6 +219,12 @@ func (n *Webhooks) webhookServiceNeedsUpdate(desired, existing *corev1.Service) 
 
 func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 
+	// "permissive" by default if Spec.Webhooks.Mode is ""
+	mode := n.Mondoo.Spec.Webhooks.Mode
+	if mode == "" {
+		mode = string(mondoov1alpha1.Permissive)
+	}
+
 	desiredDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getWebhookDeploymentName(n.Mondoo.Name),
@@ -245,6 +251,12 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 						{
 							Command: []string{
 								"/webhook",
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name:  mondoov1alpha1.WebhookModeEnvVar,
+									Value: mode,
+								},
 							},
 							Image:           n.Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
@@ -330,7 +342,7 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 			webhookLog.Error(err, "failed to check for existing webhook Deployment")
 		}
 	}
-	updateWebhooksConditions(n.Mondoo, deployment)
+	updateWebhooksConditions(n.Mondoo, deployment.Status.Replicas != deployment.Status.ReadyReplicas)
 
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.
@@ -339,7 +351,8 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 		!reflect.DeepEqual(deployment.Spec.Selector, desiredDeployment.Spec.Selector) ||
 		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].Image, desiredDeployment.Spec.Template.Spec.Containers[0].Image) ||
 		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].Command, desiredDeployment.Spec.Template.Spec.Containers[0].Command) ||
-		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].VolumeMounts, desiredDeployment.Spec.Template.Spec.Containers[0].VolumeMounts) {
+		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].VolumeMounts, desiredDeployment.Spec.Template.Spec.Containers[0].VolumeMounts) ||
+		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].Env, desiredDeployment.Spec.Template.Spec.Containers[0].Env) {
 		deployment.Spec = desiredDeployment.Spec
 		if err := n.KubeClient.Update(ctx, deployment); err != nil {
 			webhookLog.Error(err, "failed to update existing webhook Deployment")
@@ -566,6 +579,9 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 
 	}
 
+	// Make sure to clear any degraded status
+	updateWebhooksConditions(n.Mondoo, false)
+
 	return ctrl.Result{}, nil
 }
 
@@ -599,15 +615,15 @@ func getValidatingWebhookName(prefix string) string {
 	return prefix + "-mondoo-webhook"
 }
 
-func updateWebhooksConditions(config *mondoov1alpha1.MondooAuditConfig, found *appsv1.Deployment) {
-	msg := "Webhook is unavailable"
-	reason := "WebhookUnvailable"
-	status := corev1.ConditionTrue
+func updateWebhooksConditions(config *mondoov1alpha1.MondooAuditConfig, degradedStatus bool) {
+	msg := "Webhook is available"
+	reason := "WebhookAailable"
+	status := corev1.ConditionFalse
 	updateCheck := UpdateConditionIfReasonOrMessageChange
-	if found.Status.Replicas == found.Status.ReadyReplicas {
-		msg = "Webhook is available"
-		reason = "WebhhookAvailable"
-		status = corev1.ConditionFalse
+	if degradedStatus {
+		msg = "Webhook is Unavailable"
+		reason = "WebhhookUnvailable"
+		status = corev1.ConditionTrue
 	}
 
 	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha1.WebhookDegraded, status, reason, msg, updateCheck)

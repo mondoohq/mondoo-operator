@@ -68,8 +68,16 @@ type WebhookCertificateConfig struct {
 	InjectionStyle string `json:"injectionStyle,omitempty"`
 }
 
+// WebhookMode specifies the allowed modes of operation for the webhook admission controller
+type WebhookMode string
+
+const (
+	Permissive WebhookMode = "permissive"
+	Enforcing  WebhookMode = "enforcing"
+)
+
 type Webhooks struct {
-	Enable bool `json:"enable,omitemmpty"`
+	Enable bool `json:"enable,omitempty"`
 
 	// CertificateConfig allows defining which certificate system to use.
 	// Leaving it as the empty string will mean the user will be responsible
@@ -77,6 +85,11 @@ type Webhooks struct {
 	// into the ValidatingWebhookConfigurations as well.
 	CertificateConfig WebhookCertificateConfig `json:"certificateConfig,omitempty"`
 	Image             Image                    `json:"image,omitempty"`
+	// Mode represents whether the webhook will behave in a "permissive" mode (the default) which
+	// will only scan and report on k8s resources or "enforcing" mode where depending
+	// on the scan results may reject the k8s resource creation/modification.
+	// +kubebuilder:validation:Enum="";permissive;enforcing
+	Mode string `json:"mode,omitempty"`
 }
 
 // MondooAuditConfigStatus defines the observed state of MondooAuditConfig

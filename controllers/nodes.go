@@ -155,7 +155,7 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 		}
 		return ctrl.Result{Requeue: true}, err
 	}
-	updateNodeConditions(n.Mondoo, found)
+	updateNodeConditions(n.Mondoo, found.Status.NumberReady != found.Status.DesiredNumberScheduled)
 	return ctrl.Result{}, nil
 }
 
@@ -315,6 +315,9 @@ func (n *Nodes) down(ctx context.Context, clt client.Client, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
+	// Update any remnant conditions
+	updateNodeConditions(n.Mondoo, false)
+
 	return ctrl.Result{Requeue: true}, err
 }
 
@@ -339,15 +342,15 @@ func (n *Nodes) deleteExternalResources(ctx context.Context, clt client.Client, 
 	return ctrl.Result{Requeue: true}, err
 }
 
-func updateNodeConditions(config *v1alpha1.MondooAuditConfig, found *appsv1.DaemonSet) {
-	msg := "Node Scanning is unavailable"
-	reason := "NodeScanningUnvailable"
-	status := corev1.ConditionTrue
+func updateNodeConditions(config *v1alpha1.MondooAuditConfig, degradedStatus bool) {
+	msg := "Node Scanning is Available"
+	reason := "NodeScanningAvailable"
+	status := corev1.ConditionFalse
 	updateCheck := UpdateConditionIfReasonOrMessageChange
-	if found.Status.NumberReady == found.Status.DesiredNumberScheduled {
-		msg = "Node Scanning is available"
-		reason = "NodeScanningAvailable"
-		status = corev1.ConditionFalse
+	if degradedStatus {
+		msg = "Node Scanning is Unavailable"
+		reason = "NodeScanningUnavailable"
+		status = corev1.ConditionTrue
 	}
 
 	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, v1alpha1.NodeScanningDegraded, status, reason, msg, updateCheck)
