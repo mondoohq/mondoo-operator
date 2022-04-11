@@ -33,6 +33,10 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const (
+	workloadDeploymentConfigMapNameTemplate = `%s-deploy`
+)
+
 type Workloads struct {
 	Enable               bool
 	Mondoo               *v1alpha1.MondooAuditConfig
@@ -44,15 +48,16 @@ type Workloads struct {
 func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
+	configMapName := fmt.Sprintf(workloadDeploymentConfigMapNameTemplate, n.Mondoo.Name)
 	found := &corev1.ConfigMap{}
-	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name + "-deploy", Namespace: n.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: n.Mondoo.Namespace}, found)
 
 	if n.Mondoo.Spec.Workloads.Inventory != "" {
 		inventory = n.Mondoo.Spec.Workloads.Inventory
 	}
 	if err != nil && errors.IsNotFound(err) {
 		found.ObjectMeta = metav1.ObjectMeta{
-			Name:      req.NamespacedName.Name + "-deploy",
+			Name:      configMapName,
 			Namespace: req.NamespacedName.Namespace,
 		}
 		found.Data = map[string]string{
@@ -94,7 +99,7 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 	found := &appsv1.Deployment{}
-	desiredDeployment := n.deploymentForMondoo(n.Mondoo, n.Mondoo.Name+"-deploy")
+	desiredDeployment := n.deploymentForMondoo()
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
@@ -163,13 +168,14 @@ func (n *Workloads) deploymentNeedsUpdate(desired, existing *appsv1.Deployment) 
 }
 
 // deploymentForMondoo returns a Deployment object
-func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName string) *appsv1.Deployment {
-	ls := labelsForMondoo(m.Name)
+func (n *Workloads) deploymentForMondoo() *appsv1.Deployment {
+	ls := labelsForMondoo(n.Mondoo.Name)
 	ls["audit"] = "k8s"
+
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      m.Name,
-			Namespace: m.Namespace,
+			Name:      n.Mondoo.Name,
+			Namespace: n.Mondoo.Namespace,
 			Labels:    ls,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -189,7 +195,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 						Image:     n.Image,
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
-						Resources: getResourcesRequirements(m.Spec.Workloads.Resources),
+						Resources: getResourcesRequirements(n.Mondoo.Spec.Workloads.Resources),
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
@@ -224,7 +230,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 							},
 						},
 					}},
-					ServiceAccountName: m.Spec.Workloads.ServiceAccount,
+					ServiceAccountName: n.Mondoo.Spec.Workloads.ServiceAccount,
 					Volumes: []corev1.Volume{
 						{
 							Name: "root",
@@ -242,7 +248,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 										{
 											ConfigMap: &corev1.ConfigMapProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: cmName,
+													Name: fmt.Sprintf(workloadDeploymentConfigMapNameTemplate, n.Mondoo.Name),
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "inventory",
@@ -253,7 +259,7 @@ func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName st
 										{
 											Secret: &corev1.SecretProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: m.Spec.MondooSecretRef,
+													Name: n.Mondoo.Spec.MondooSecretRef,
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "config",
@@ -351,7 +357,7 @@ func (n *Workloads) down(ctx context.Context, clt client.Client, req ctrl.Reques
 func (n *Workloads) deleteExternalResources(ctx context.Context, clt client.Client, req ctrl.Request, Deployment *appsv1.Deployment) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 	found := &corev1.ConfigMap{}
-	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name + "-deploy", Namespace: n.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(workloadDeploymentConfigMapNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil
 	} else if err != nil {
