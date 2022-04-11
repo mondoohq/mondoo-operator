@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
@@ -32,6 +33,10 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const (
+	daemonSetConfigMapNameTemplate = `%s-ds`
+)
+
 type Nodes struct {
 	Enable               bool
 	Mondoo               *v1alpha1.MondooAuditConfig
@@ -43,15 +48,22 @@ type Nodes struct {
 func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	found := &corev1.ConfigMap{}
-	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name + "-ds", Namespace: n.Mondoo.Namespace}, found)
+	configMapName := fmt.Sprintf(daemonSetConfigMapNameTemplate, n.Mondoo.Name)
+
+	found := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: n.Mondoo.Namespace,
+			Name:      configMapName,
+		},
+	}
+	err := clt.Get(ctx, client.ObjectKeyFromObject(found), found)
 
 	if n.Mondoo.Spec.Nodes.Inventory != "" {
 		inventory = n.Mondoo.Spec.Nodes.Inventory
 	}
 	if err != nil && errors.IsNotFound(err) {
 		found.ObjectMeta = metav1.ObjectMeta{
-			Name:      req.NamespacedName.Name + "-ds",
+			Name:      configMapName,
 			Namespace: req.NamespacedName.Namespace,
 		}
 		found.Data = map[string]string{
@@ -97,7 +109,7 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
-		declared := n.daemonsetForMondoo(n.Mondoo, n.Mondoo.Name+"-ds")
+		declared := n.daemonsetForMondoo(n.Mondoo)
 		if err := ctrl.SetControllerReference(n.Mondoo, declared, scheme); err != nil {
 			log.Error(err, "Failed to set ControllerReference", "Daemonset.Namespace", declared.Namespace, "Daemonset.Name", declared.Name)
 			return ctrl.Result{}, err
@@ -159,12 +171,12 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) daemonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string) *appsv1.DaemonSet {
+func (n *Nodes) daemonsetForMondoo(m *v1alpha1.MondooAuditConfig) *appsv1.DaemonSet {
 	ls := labelsForMondoo(m.Name)
 	ls["audit"] = "node"
 	dep := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      m.Name,
+			Name:      m.Name + "node",
 			Namespace: m.Namespace,
 			Labels:    ls,
 		},
@@ -237,7 +249,7 @@ func (n *Nodes) daemonsetForMondoo(m *v1alpha1.MondooAuditConfig, cmName string)
 										{
 											ConfigMap: &corev1.ConfigMapProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: cmName,
+													Name: fmt.Sprintf(daemonSetConfigMapNameTemplate, n.Mondoo.Name),
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "inventory",
