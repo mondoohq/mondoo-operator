@@ -6,7 +6,7 @@ The following steps setup a development Kubernetes to test the operator locally.
 
 - [Minikube Installation](https://minikube.sigs.k8s.io/docs/start/)
 - kubectl (or use the one bundled with minikube bundled with minikube `alias kubectl="minikube kubectl --"`)
-- optional: `operator-sdk`
+- optional: [`operator-sdk`](https://sdk.operatorframework.io/docs/installation/)
 
 ## Run Operator
 
