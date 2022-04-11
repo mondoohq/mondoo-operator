@@ -82,9 +82,9 @@ func (n *Webhooks) syncValidatingWebhookConfiguration(ctx context.Context,
 	vwc *webhooksv1.ValidatingWebhookConfiguration,
 	annotationKey, annotationValue string) error {
 
-	// Override the default name to allow for multiple MondooAudicConfig resources
+	// Override the default/generic name to allow for multiple MondooAudicConfig resources
 	// to each have their own Webhook
-	vwc.Name = getValidatingWebhookName(n.Mondoo.Name)
+	vwc.Name = getValidatingWebhookName(n.TargetNamespace, n.Mondoo.Name)
 
 	// And update the Webhook entries to point to the right namespace/name for the Service
 	// receiving the webhook calls
@@ -131,7 +131,7 @@ func (n *Webhooks) syncValidatingWebhookConfiguration(ctx context.Context,
 		}
 	}
 
-	return nil
+	return n.cleanupOldWebhook(ctx)
 }
 
 func (n *Webhooks) syncWebhookService(ctx context.Context) error {
@@ -528,6 +528,10 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
+	if err := n.cleanupOldWebhook(ctx); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Cleanup ValidatingWebhooks
 	r := bytes.NewReader(webhookManifestsyaml)
 	yamlDecoder := yamlutil.NewYAMLOrJSONDecoder(r, 4096)
@@ -561,7 +565,7 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 		switch gvk.Kind {
 		case "ValidatingWebhookConfiguration":
 			genericObject, conversionOK = obj.(*webhooksv1.ValidatingWebhookConfiguration)
-			genericObject.SetName(getValidatingWebhookName(n.Mondoo.Name))
+			genericObject.SetName(getValidatingWebhookName(n.TargetNamespace, n.Mondoo.Name))
 		default:
 			err := fmt.Errorf("Unexpected type %s to decode", gvk.Kind)
 			webhookLog.Error(err, "Failed to convert type")
@@ -611,8 +615,8 @@ func getWebhookDeploymentName(prefix string) string {
 	return prefix + "-webhook-manager"
 }
 
-func getValidatingWebhookName(prefix string) string {
-	return prefix + "-mondoo-webhook"
+func getValidatingWebhookName(mondooNamespace, mondooAuditConfigName string) string {
+	return fmt.Sprintf("%s-%s-mondoo", mondooNamespace, mondooAuditConfigName)
 }
 
 func updateWebhooksConditions(config *mondoov1alpha1.MondooAuditConfig, degradedStatus bool) {
@@ -628,4 +632,22 @@ func updateWebhooksConditions(config *mondoov1alpha1.MondooAuditConfig, degraded
 
 	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha1.WebhookDegraded, status, reason, msg, updateCheck)
 
+}
+
+// TODO: This cleanup can be removed afer we are sure no more old-style
+// ValidatingWebhooks exist.
+// With the switch to naming the Webhook from MONDOOAUDIT_CONFIG_NAME-mondoo-webhook
+// to NAMESPACE-NAME-mondoo , we should try to clean up any old Webhooks so that they
+// are not orphaned.
+func (n *Webhooks) cleanupOldWebhook(ctx context.Context) error {
+	oldWebhook := &webhooksv1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: n.Mondoo.Name + "-mondoo-webhook",
+		},
+	}
+	if err := genericDelete(ctx, n.KubeClient, oldWebhook); err != nil {
+		webhookLog.Error(err, "failed trying to clean up old-style webhook")
+		return err
+	}
+	return nil
 }
