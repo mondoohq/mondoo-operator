@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	api "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"go.uber.org/zap"
 	v1 "k8s.io/api/core/v1"
@@ -214,7 +213,7 @@ func (k8sh *K8sHelper) WaitForResourceDeletion(r client.Object) error {
 		}
 		return err
 	}
-	return errors.Errorf("Gave up deleting %s %s/%s ", kind, key.Namespace, key.Name)
+	return fmt.Errorf("Gave up deleting %s %s/%s ", kind, key.Namespace, key.Name)
 }
 
 func (k8sh *K8sHelper) appendPodDescribe(file *os.File, namespace, name string) {

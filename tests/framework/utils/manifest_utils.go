@@ -7,7 +7,6 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -43,7 +42,7 @@ func ReadFile(filename string) string {
 	zap.S().Infof("Reading file: %s", manifest)
 	contents, err := ioutil.ReadFile(manifest)
 	if err != nil {
-		panic(errors.Wrapf(err, "failed to read file at %s", manifest))
+		panic(fmt.Errorf("failed to read file at %s. %v", manifest, err))
 	}
 	return string(contents)
 }
