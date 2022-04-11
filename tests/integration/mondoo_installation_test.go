@@ -24,14 +24,18 @@ func (s *MondooInstallationSuite) SetupSuite() {
 }
 
 func (s *MondooInstallationSuite) TearDownSuite() {
-	s.testCluster.UninstallOperator()
+	if s.testCluster != nil {
+		s.testCluster.UninstallOperator()
+	}
 }
 
 func (s *MondooInstallationSuite) AfterTest(suiteName, testName string) {
-	if !s.T().Failed() {
-		s.testCluster.GatherAllMondooLogs(testName, installer.MondooNamespace)
+	if s.testCluster != nil {
+		if !s.T().Failed() {
+			s.testCluster.GatherAllMondooLogs(testName, installer.MondooNamespace)
+		}
+		s.testCluster.UninstallOperator()
 	}
-	s.testCluster.UninstallOperator()
 }
 
 func (s *MondooInstallationSuite) TestKustomizeInstallation() {

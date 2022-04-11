@@ -265,8 +265,9 @@ func (k8sh *K8sHelper) createTestLogFile(name, namespace, testName, suffix strin
 			return nil, err
 		}
 	}
-	testName = strings.ReplaceAll(testName, "/", "")
+
 	fileName := fmt.Sprintf("%s_%s_%s%s_%d.log", testName, namespace, name, suffix, time.Now().Unix())
+	fileName = strings.ReplaceAll(fileName, "/", "")
 	filePath := path.Join(logDir, fileName)
 	file, err := os.Create(filePath)
 	if err != nil {
