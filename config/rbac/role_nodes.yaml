@@ -3,6 +3,6 @@ kind: Role
 metadata:
   name: nodes
 rules:
-- apiGroups: ["*"] # "" indicates the core API group
+- apiGroups: [""]
   resources: ["pods"]
   verbs: ["get", "watch", "list"]
