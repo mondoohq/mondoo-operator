@@ -35,6 +35,7 @@ import (
 
 const (
 	workloadDeploymentConfigMapNameTemplate = `%s-deploy`
+	workloadDeploymentNameTemplate          = `%s-workload`
 )
 
 type Workloads struct {
@@ -100,7 +101,7 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 	log := ctrllog.FromContext(ctx)
 	found := &appsv1.Deployment{}
 	desiredDeployment := n.deploymentForMondoo()
-	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, client.ObjectKeyFromObject(desiredDeployment), found)
 	if err != nil && errors.IsNotFound(err) {
 
 		if err := ctrl.SetControllerReference(n.Mondoo, desiredDeployment, scheme); err != nil {
@@ -148,7 +149,10 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 	}
 
 	updateWorkloadsConditions(n.Mondoo, found.Status.Replicas != found.Status.ReadyReplicas)
-	return ctrl.Result{}, nil
+
+	err = n.cleanupWorkloadDeployment(ctx, clt)
+
+	return ctrl.Result{}, err
 }
 
 func (n *Workloads) deploymentNeedsUpdate(desired, existing *appsv1.Deployment) bool {
@@ -174,7 +178,7 @@ func (n *Workloads) deploymentForMondoo() *appsv1.Deployment {
 
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      n.Mondoo.Name,
+			Name:      fmt.Sprintf(workloadDeploymentNameTemplate, n.Mondoo.Name),
 			Namespace: n.Mondoo.Namespace,
 			Labels:    ls,
 		},
@@ -324,7 +328,7 @@ func (n *Workloads) down(ctx context.Context, clt client.Client, req ctrl.Reques
 	log := ctrllog.FromContext(ctx)
 
 	found := &appsv1.Deployment{}
-	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name, Namespace: n.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(workloadDeploymentNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
 
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil
@@ -341,6 +345,10 @@ func (n *Workloads) down(ctx context.Context, clt client.Client, req ctrl.Reques
 	if _, err := n.deleteExternalResources(ctx, clt, req, found); err != nil {
 		// if fail to delete the external dependency here, return with error
 		// so that it can be retried
+		return ctrl.Result{}, err
+	}
+
+	if err := n.cleanupWorkloadDeployment(ctx, clt); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -386,4 +394,22 @@ func updateWorkloadsConditions(config *v1alpha1.MondooAuditConfig, degradedStatu
 
 	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, v1alpha1.APIScanningDegraded, status, reason, msg, updateCheck)
 
+}
+
+// TODO: this can be removed once we believe enough time has passed where the old-style named
+// Deployment for workloads has been replaced and removed to keep us from orphaning the old-style Deployment.
+func (n *Workloads) cleanupWorkloadDeployment(ctx context.Context, kubeClient client.Client) error {
+	log := ctrllog.FromContext(ctx)
+
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: n.Mondoo.Namespace,
+			Name:      n.Mondoo.Name,
+		},
+	}
+	err := genericDelete(ctx, kubeClient, dep)
+	if err != nil {
+		log.Error(err, "failed while cleaning up old Deployment for workloads")
+	}
+	return err
 }

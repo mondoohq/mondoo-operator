@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -102,10 +103,11 @@ var _ = Describe("workloads", func() {
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
+			workloadDeploymentName := fmt.Sprintf(workloadDeploymentNameTemplate, name)
 			By("Checking that the deployment is found")
 			foundDeployment := &appsv1.Deployment{}
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundDeployment)
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: workloadDeploymentName, Namespace: namespace}, foundDeployment)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
@@ -119,7 +121,7 @@ var _ = Describe("workloads", func() {
 
 			By("Checking that the deployment is NOT found")
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundDeployment)
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: workloadDeploymentName, Namespace: namespace}, foundDeployment)
 				return err == nil
 			}, timeout, interval).Should(BeFalse())
 
