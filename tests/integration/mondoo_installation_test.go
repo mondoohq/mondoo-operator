@@ -55,14 +55,18 @@ func (s *MondooInstallationSuite) TestKustomizeInstallation_NonDefaultNamespace(
 func (s *MondooInstallationSuite) testMondooInstallation() {
 	zap.S().Info("Create an audit config that enables only workloads scanning.")
 	auditConfig := utils.DefaultAuditConfig(s.testCluster.Settings.Namespace, true, false, false)
-	s.NoError(s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig))
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
+		"Failed to create Mondoo audit config.")
 
 	zap.S().Info("Make sure the Mondoo k8s client is ready.")
 	workloadsLabels := []string{installer.MondooClientsK8sLabel, installer.MondooClientsLabel}
 	workloadsLabelsString := strings.Join(workloadsLabels, ",")
-	s.True(s.testCluster.K8sHelper.IsPodReady(workloadsLabelsString, s.testCluster.Settings.Namespace))
+	s.Truef(
+		s.testCluster.K8sHelper.IsPodReady(workloadsLabelsString, s.testCluster.Settings.Namespace),
+		"Mondoo workloads clients are not in a Ready state.")
 
-	zap.S().Info("Verify the pods are actually created from a DaemonSet.")
+	zap.S().Info("Verify the pods are actually created from a Deployment.")
 	listOpts, err := utils.LabelSelectorListOptions(workloadsLabelsString)
 	s.NoError(err)
 
@@ -71,9 +75,9 @@ func (s *MondooInstallationSuite) testMondooInstallation() {
 
 	// Verify there is just 1 deployment that its name matches the name of the CR and that the
 	// replica size is 1.
-	s.Equal(1, len(deployments.Items))
-	s.Equal(auditConfig.Name, deployments.Items[0].Name)
-	s.Equal(int32(1), *deployments.Items[0].Spec.Replicas)
+	s.Equalf(1, len(deployments.Items), "Deployments count in Mondoo namespace is incorrect.")
+	s.Equalf(auditConfig.Name, deployments.Items[0].Name, "Deployment name does not match audit config name.")
+	s.Equalf(int32(1), *deployments.Items[0].Spec.Replicas, "Deployment does not have 1 replica.")
 
 	zap.S().Info("Enable nodes auditing.")
 	// First retrieve the newest version of the audit config, otherwise we might get errors.
@@ -81,12 +85,16 @@ func (s *MondooInstallationSuite) testMondooInstallation() {
 		s.ctx, client.ObjectKeyFromObject(&auditConfig), &auditConfig))
 
 	auditConfig.Spec.Nodes.Enable = true
-	s.NoError(s.testCluster.K8sHelper.Clientset.Update(s.ctx, &auditConfig))
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Update(s.ctx, &auditConfig),
+		"Failed to update Mondoo audit config.")
 
 	zap.S().Info("Verify the nodes client is ready.")
 	nodesLabels := []string{installer.MondooClientsNodesLabel, installer.MondooClientsLabel}
 	nodesLabelsString := strings.Join(nodesLabels, ",")
-	s.True(s.testCluster.K8sHelper.IsPodReady(nodesLabelsString, s.testCluster.Settings.Namespace))
+	s.Truef(
+		s.testCluster.K8sHelper.IsPodReady(nodesLabelsString, s.testCluster.Settings.Namespace),
+		"Mondoo nodes clients are not in a Ready state.")
 
 	zap.S().Info("Verify the pods are actually created from a DaemonSet.")
 	listOpts, err = utils.LabelSelectorListOptions(nodesLabelsString)
@@ -96,8 +104,8 @@ func (s *MondooInstallationSuite) testMondooInstallation() {
 	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, daemonSets, listOpts))
 
 	// Verify there is just 1 daemon set and that its name matches the name of the CR.
-	s.Equal(1, len(daemonSets.Items))
-	s.Equal(auditConfig.Name, daemonSets.Items[0].Name)
+	s.Equalf(1, len(daemonSets.Items), "DaemonSets count in Mondoo namespace is incorrect.")
+	s.Equalf(auditConfig.Name, daemonSets.Items[0].Name, "DaemonSet name does not match audit config name.")
 }
 
 func TestMondooInstallationSuite(t *testing.T) {
