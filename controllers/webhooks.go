@@ -615,8 +615,8 @@ func getWebhookDeploymentName(prefix string) string {
 	return prefix + "-webhook-manager"
 }
 
-func getValidatingWebhookName(mondooNamespace, mondooAuditConfigName string) string {
-	return fmt.Sprintf("%s-%s-mondoo", mondooNamespace, mondooAuditConfigName)
+func getValidatingWebhookName(mondooAuditConfigNamespace, mondooAuditConfigName string) string {
+	return fmt.Sprintf("%s-%s-mondoo", mondooAuditConfigNamespace, mondooAuditConfigName)
 }
 
 func updateWebhooksConditions(config *mondoov1alpha1.MondooAuditConfig, degradedStatus bool) {
