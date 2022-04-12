@@ -15,10 +15,9 @@ func TestRquriementComparison(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse("1G"),
 			corev1.ResourceCPU:    resource.MustParse("0.5"), // used instead of 500m
 		},
-		// 75% of the limits
 		Requests: corev1.ResourceList{
-			corev1.ResourceMemory: resource.MustParse("500M"),
-			corev1.ResourceCPU:    resource.MustParse("50m"),
+			corev1.ResourceMemory: resource.MustParse("500M"), // 50% of the limit
+			corev1.ResourceCPU:    resource.MustParse("50m"),  // 10% of the limit
 		},
 	}))
 }
