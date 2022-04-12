@@ -2,8 +2,8 @@ package scanner
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,9 +14,12 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+//go:embed testdata/webhook-payload.json
+var webhookPayload []byte
+
 func testServer() *httptest.Server {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/Health/Check", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(healthCheckEndpoint, func(w http.ResponseWriter, r *http.Request) {
 		result := &HealthCheckResponse{
 			Status: "SERVING",
 		}
@@ -28,7 +31,7 @@ func testServer() *httptest.Server {
 		w.Write(data)
 	})
 
-	mux.HandleFunc("/Scan/RunKubernetesManifest", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(scanKubernetesEndpoint, func(w http.ResponseWriter, r *http.Request) {
 		result := &ScanResult{
 			Ok: true,
 			WorstScore: &Score{
@@ -66,12 +69,8 @@ func TestScanner(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, healthResp.Status == "SERVING")
 
-	// Run Manifest Scan
-	data, err := ioutil.ReadFile("./testdata/webhook-payload.json")
-	require.NoError(t, err)
-
 	request := admission.Request{}
-	err = yaml.Unmarshal(data, &request)
+	err = yaml.Unmarshal(webhookPayload, &request)
 	require.NoError(t, err)
 
 	k8sObjectData, err := yaml.Marshal(request.Object)
