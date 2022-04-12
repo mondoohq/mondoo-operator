@@ -1,0 +1,2 @@
+# Integration Test Framework
+The integration test framework that we are using has been taken from [Rook](https://github.com/rook/rook). Obviously, the code has been adjusted for our own needs but the base is thanks to the Rook community.
