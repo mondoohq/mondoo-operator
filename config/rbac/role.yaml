@@ -7,14 +7,6 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - '*'
-  resources:
-  - '*'
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - admissionregistration.k8s.io
   resources:
   - validatingwebhookconfigurations
@@ -100,11 +92,8 @@ rules:
   resources:
   - mondooauditconfigs
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
   - update
   - watch
 - apiGroups:
@@ -127,6 +116,7 @@ rules:
   - mondoooperatorconfigs
   verbs:
   - get
+  - list
   - watch
 - apiGroups:
   - k8s.mondoo.com
