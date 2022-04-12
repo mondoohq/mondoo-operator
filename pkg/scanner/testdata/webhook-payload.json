@@ -1,0 +1,221 @@
+{
+  "uid": "630bd862-8ba2-4ac3-a2c4-fcf6a2bb44f5",
+  "kind": {
+    "group": "",
+    "version": "v1",
+    "kind": "Pod"
+  },
+  "resource": {
+    "group": "",
+    "version": "v1",
+    "resource": "pods"
+  },
+  "requestKind": {
+    "group": "",
+    "version": "v1",
+    "kind": "Pod"
+  },
+  "requestResource": {
+    "group": "",
+    "version": "v1",
+    "resource": "pods"
+  },
+  "name": "memcached-sample-5c8cffd96c-42z72",
+  "namespace": "default",
+  "operation": "CREATE",
+  "userInfo": {
+    "username": "system:serviceaccount:kube-system:replicaset-controller",
+    "uid": "74283194-f3e0-4a16-bef1-ab2b1a33d1c7",
+    "groups": [
+      "system:serviceaccounts",
+      "system:serviceaccounts:kube-system",
+      "system:authenticated"
+    ]
+  },
+  "object": {
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+      "name": "memcached-sample-5c8cffd96c-42z72",
+      "generateName": "memcached-sample-5c8cffd96c-",
+      "namespace": "default",
+      "uid": "a94b5098-731d-4dda-9a0b-d516c1702b53",
+      "creationTimestamp": "2022-02-28T15:09:29Z",
+      "labels": {
+        "app": "memcached",
+        "memcached_cr": "memcached-sample",
+        "pod-template-hash": "5c8cffd96c"
+      },
+      "ownerReferences": [
+        {
+          "apiVersion": "apps/v1",
+          "kind": "ReplicaSet",
+          "name": "memcached-sample-5c8cffd96c",
+          "uid": "833fd5a2-2377-4766-b324-545e5e449a2f",
+          "controller": true,
+          "blockOwnerDeletion": true
+        }
+      ],
+      "managedFields": [
+        {
+          "manager": "kube-controller-manager",
+          "operation": "Update",
+          "apiVersion": "v1",
+          "time": "2022-02-28T15:09:29Z",
+          "fieldsType": "FieldsV1",
+          "fieldsV1": {
+            "f:metadata": {
+              "f:generateName": {},
+              "f:labels": {
+                ".": {},
+                "f:app": {},
+                "f:memcached_cr": {},
+                "f:pod-template-hash": {}
+              },
+              "f:ownerReferences": {
+                ".": {},
+                "k:{\"uid\":\"833fd5a2-2377-4766-b324-545e5e449a2f\"}": {}
+              }
+            },
+            "f:spec": {
+              "f:containers": {
+                "k:{\"name\":\"memcached\"}": {
+                  ".": {},
+                  "f:command": {},
+                  "f:image": {},
+                  "f:imagePullPolicy": {},
+                  "f:name": {},
+                  "f:ports": {
+                    ".": {},
+                    "k:{\"containerPort\":11211,\"protocol\":\"TCP\"}": {
+                      ".": {},
+                      "f:containerPort": {},
+                      "f:name": {},
+                      "f:protocol": {}
+                    }
+                  },
+                  "f:resources": {},
+                  "f:terminationMessagePath": {},
+                  "f:terminationMessagePolicy": {}
+                }
+              },
+              "f:dnsPolicy": {},
+              "f:enableServiceLinks": {},
+              "f:restartPolicy": {},
+              "f:schedulerName": {},
+              "f:securityContext": {},
+              "f:terminationGracePeriodSeconds": {}
+            }
+          }
+        }
+      ]
+    },
+    "spec": {
+      "volumes": [
+        {
+          "name": "kube-api-access-nq2rj",
+          "projected": {
+            "sources": [
+              {
+                "serviceAccountToken": {
+                  "expirationSeconds": 3607,
+                  "path": "token"
+                }
+              },
+              {
+                "configMap": {
+                  "name": "kube-root-ca.crt",
+                  "items": [
+                    {
+                      "key": "ca.crt",
+                      "path": "ca.crt"
+                    }
+                  ]
+                }
+              },
+              {
+                "downwardAPI": {
+                  "items": [
+                    {
+                      "path": "namespace",
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.namespace"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "defaultMode": 420
+          }
+        }
+      ],
+      "containers": [
+        {
+          "name": "memcached",
+          "image": "memcached:1.4.36-alpine",
+          "command": [
+            "memcached",
+            "-m=64",
+            "-o",
+            "modern",
+            "-v"
+          ],
+          "ports": [
+            {
+              "name": "memcached",
+              "containerPort": 11211,
+              "protocol": "TCP"
+            }
+          ],
+          "resources": {},
+          "volumeMounts": [
+            {
+              "name": "kube-api-access-nq2rj",
+              "readOnly": true,
+              "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount"
+            }
+          ],
+          "terminationMessagePath": "/dev/termination-log",
+          "terminationMessagePolicy": "File",
+          "imagePullPolicy": "IfNotPresent"
+        }
+      ],
+      "restartPolicy": "Always",
+      "terminationGracePeriodSeconds": 30,
+      "dnsPolicy": "ClusterFirst",
+      "serviceAccountName": "default",
+      "serviceAccount": "default",
+      "securityContext": {},
+      "schedulerName": "default-scheduler",
+      "tolerations": [
+        {
+          "key": "node.kubernetes.io/not-ready",
+          "operator": "Exists",
+          "effect": "NoExecute",
+          "tolerationSeconds": 300
+        },
+        {
+          "key": "node.kubernetes.io/unreachable",
+          "operator": "Exists",
+          "effect": "NoExecute",
+          "tolerationSeconds": 300
+        }
+      ],
+      "priority": 0,
+      "enableServiceLinks": true,
+      "preemptionPolicy": "PreemptLowerPriority"
+    },
+    "status": {
+      "phase": "Pending",
+      "qosClass": "BestEffort"
+    }
+  },
+  "oldObject": null,
+  "dryRun": false,
+  "options": {
+    "kind": "CreateOptions",
+    "apiVersion": "meta.k8s.io/v1"
+  }
+}
