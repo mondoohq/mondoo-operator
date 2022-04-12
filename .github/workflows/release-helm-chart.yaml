@@ -49,6 +49,7 @@ jobs:
           curl -sSL http://mondoo.io/download.sh | bash
           mv mondoo /usr/local/bin/ 
           make test/deployment
+          kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
           helm uninstall mondoo-operator  --namespace mondoo-operator
       - name: Run chart-releaser
         # switch back to helm/chart-releaser-action when #60 is fixed
