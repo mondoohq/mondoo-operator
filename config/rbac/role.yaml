@@ -94,6 +94,7 @@ rules:
   verbs:
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - k8s.mondoo.com
