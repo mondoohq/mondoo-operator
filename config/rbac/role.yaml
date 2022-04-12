@@ -92,12 +92,8 @@ rules:
   resources:
   - mondooauditconfigs
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - k8s.mondoo.com
@@ -119,6 +115,7 @@ rules:
   - mondoooperatorconfigs
   verbs:
   - get
+  - list
   - watch
 - apiGroups:
   - k8s.mondoo.com
