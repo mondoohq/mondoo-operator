@@ -12,7 +12,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
+const (
+	healthCheckEndpoint        = "/Health/Check"
+	scanKubernetesEndpoint     = "/Scan/RunKubernetesManifest"
 	DefaultHttpTimeout         = 30 * time.Second
 	DefaultIdleConnTimeout     = 30 * time.Second
 	DefaultTLSHandshakeTimeout = 10 * time.Second
@@ -53,7 +55,7 @@ func (s *Scanner) request(ctx context.Context, url string, reqBodyBytes []byte) 
 	header.Set("Authorization", "Bearer "+s.Token)
 
 	reader := bytes.NewReader(reqBodyBytes)
-	req, err := http.NewRequest("POST", url, reader)
+	req, err := http.NewRequest(http.MethodPost, url, reader)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +76,7 @@ func (s *Scanner) request(ctx context.Context, url string, reqBodyBytes []byte) 
 }
 
 func (s *Scanner) HealthCheck(ctx context.Context, in *HealthCheckRequest) (*HealthCheckResponse, error) {
-	url := s.Endpoint + "/Health/Check"
+	url := s.Endpoint + healthCheckEndpoint
 
 	reqBodyBytes, err := json.Marshal(in)
 	if err != nil {
@@ -86,16 +88,16 @@ func (s *Scanner) HealthCheck(ctx context.Context, in *HealthCheckRequest) (*Hea
 		return nil, errors.Wrap(err, "failed to parse response")
 	}
 
-	out := HealthCheckResponse{}
-	if err = json.Unmarshal(respBodyBytes, &out); err != nil {
+	out := &HealthCheckResponse{}
+	if err = json.Unmarshal(respBodyBytes, out); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal proto response")
 	}
 
-	return &out, nil
+	return out, nil
 }
 
 func (s *Scanner) RunKubernetesManifest(ctx context.Context, in *KubernetesManifestJob) (*ScanResult, error) {
-	url := s.Endpoint + "/Scan/RunKubernetesManifest"
+	url := s.Endpoint + scanKubernetesEndpoint
 
 	reqBodyBytes, err := json.Marshal(in)
 	if err != nil {
@@ -107,12 +109,12 @@ func (s *Scanner) RunKubernetesManifest(ctx context.Context, in *KubernetesManif
 		return nil, errors.Wrap(err, "failed to parse response")
 	}
 
-	out := ScanResult{}
-	if err = json.Unmarshal(respBodyBytes, &out); err != nil {
+	out := &ScanResult{}
+	if err = json.Unmarshal(respBodyBytes, out); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal proto response")
 	}
 
-	return &out, nil
+	return out, nil
 }
 
 type KubernetesManifestJob struct {
