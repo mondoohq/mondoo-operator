@@ -293,6 +293,10 @@ func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *ru
 		return ctrl.Result{}, err
 	}
 
+	if !n.Enable {
+		return n.down(ctx, clt, req)
+	}
+
 	if n.Mondoo.Spec.Workloads.ServiceAccount == "" && n.Mondoo.Namespace == namespace {
 		n.Mondoo.Spec.Workloads.ServiceAccount = defaultServiceAccount
 	}
@@ -300,10 +304,6 @@ func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *ru
 		err := fmt.Errorf("MondooAuditConfig.spec.workloads.serviceAccount cannot be empty when running in a different namespace than mondoo-operator")
 		log.Error(err, "ServiceAccount cannot be empty")
 		return ctrl.Result{}, err
-	}
-
-	if !n.Enable {
-		return n.down(ctx, clt, req)
 	}
 
 	skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
