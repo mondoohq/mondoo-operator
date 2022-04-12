@@ -37,6 +37,8 @@ spec:
       labels:
         control-plane: controller-manager
       {{- include "mondoo-operator.selectorLabels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
     spec:
       containers:
       - args:
@@ -47,6 +49,7 @@ spec:
         - /manager
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
+        imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
             path: /healthz
