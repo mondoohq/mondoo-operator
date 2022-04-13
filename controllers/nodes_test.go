@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -92,10 +93,11 @@ var _ = Describe("nodes", func() {
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
+			daemonSetName := fmt.Sprintf(NodeDaemonSetNameTemplate, name)
 			By("Checking that the daemonset is found")
 			foundDaemonset := &appsv1.DaemonSet{}
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundDaemonset)
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: daemonSetName, Namespace: namespace}, foundDaemonset)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
@@ -109,7 +111,7 @@ var _ = Describe("nodes", func() {
 
 			By("Checking that the daemonset is NOT found")
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundDaemonset)
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: daemonSetName, Namespace: namespace}, foundDaemonset)
 				return err == nil
 			}, timeout, interval).Should(BeFalse())
 
