@@ -32,6 +32,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -130,14 +131,14 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			return result, err
 		}
 
-		removeFinalizer(mondooAuditConfig)
+		controllerutil.RemoveFinalizer(mondooAuditConfig, finalizerString)
 		if err := r.Update(ctx, mondooAuditConfig); err != nil {
 			log.Error(err, "failed to remove finalizer")
 		}
 		return ctrl.Result{}, err
 	} else {
-		if !hasFinalizer(mondooAuditConfig) {
-			addFinalizer(mondooAuditConfig)
+		if !controllerutil.ContainsFinalizer(mondooAuditConfig, finalizerString) {
+			controllerutil.AddFinalizer(mondooAuditConfig, finalizerString)
 			if err := r.Update(ctx, mondooAuditConfig); err != nil {
 				log.Error(err, "failed to set finalizer")
 			}
@@ -243,29 +244,4 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.DaemonSet{}).
 		Owns(&appsv1.Deployment{}).
 		Complete(r)
-}
-
-func hasFinalizer(mac *v1alpha1.MondooAuditConfig) bool {
-	for _, f := range mac.Finalizers {
-		if f == finalizerString {
-			return true
-		}
-	}
-	return false
-}
-
-func addFinalizer(mac *v1alpha1.MondooAuditConfig) {
-	finalizerSet := sets.NewString(mac.Finalizers...)
-	finalizerSet.Insert(finalizerString)
-	mac.SetFinalizers(finalizerSet.List())
-
-	return
-}
-
-func removeFinalizer(mac *v1alpha1.MondooAuditConfig) {
-	finalizerSet := sets.NewString(mac.Finalizers...)
-	finalizerSet.Delete(finalizerString)
-	mac.SetFinalizers(finalizerSet.List())
-
-	return
 }
