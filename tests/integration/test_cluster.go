@@ -28,7 +28,9 @@ func StartTestCluster(settings installer.Settings, t func() *testing.T) *TestClu
 			cluster.GatherAllMondooLogs(t().Name(), installer.MondooNamespace)
 		}
 		t().Fail()
-		cluster.UninstallOperator()
+		if err := cluster.UninstallOperator(); err != nil {
+			zap.S().Errorf("Failed to uninstall Mondoo operator. %v", err)
+		}
 		t().FailNow()
 	}
 

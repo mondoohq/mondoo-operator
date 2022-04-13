@@ -1,31 +1,25 @@
----
-name: Spell Checking
-
+name: Lint
 on:
   pull_request:
   push:
+    paths-ignore:
+      - 'docs/**'
     branches:
-      - main
+      - "main"
+    tags: ["v*.*.*"]
 
 jobs:
-  spelling:
-    name: Run spell check
+  lint:
     runs-on: ubuntu-latest
+    name: Lint
     steps:
-      - name: checkout-merge
-        if: "contains(github.event_name, 'pull_request')"
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+      - uses: actions/setup-go@v2
         with:
-          ref: refs/pull/${{github.event.pull_request.number}}/merge
-      - name: checkout
-        if: ${{ github.event_name == 'push' ||
-          (
-          contains(github.event.comment.body, '@check-spelling-bot apply')
-          ) }}
-        uses: actions/checkout@v2
-      - uses: check-spelling/check-spelling@main
-        id: spelling
+          go-version: "${{ env.golang-version }}"
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
         with:
-          post_comment: 0
-          extra_dictionaries: cspell:aws/aws.txt
-            cspell:filetypes/filetypes.txt
+          version: v1.45

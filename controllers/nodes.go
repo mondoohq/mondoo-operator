@@ -271,23 +271,23 @@ func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtim
 
 	log := ctrllog.FromContext(ctx)
 
-	if n.Enable {
-		skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
-		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag, skipResolveImage)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		n.Image = mondooImage
-		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
-		if err != nil || result.Requeue {
-			return result, err
-		}
-		result, err = n.declareDaemonSet(ctx, clt, scheme, req, true)
-		if err != nil || result.Requeue {
-			return result, err
-		}
-	} else {
-		n.down(ctx, clt, req)
+	if !n.Enable {
+		return n.down(ctx, clt, req)
+	}
+
+	skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
+	mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag, skipResolveImage)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	n.Image = mondooImage
+	result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
+	if err != nil || result.Requeue {
+		return result, err
+	}
+	result, err = n.declareDaemonSet(ctx, clt, scheme, req, true)
+	if err != nil || result.Requeue {
+		return result, err
 	}
 	return ctrl.Result{}, nil
 }

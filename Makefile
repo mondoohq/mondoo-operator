@@ -89,6 +89,9 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
+lint: golangci-lint
+	$(GOLANGCI_LINT) run
+
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) --arch=amd64 use $(ENVTEST_K8S_VERSION) -p path)" go test $(UNIT_TEST_PACKAGES) -coverprofile cover.out
 
@@ -177,6 +180,10 @@ envtest: ## Download envtest-setup locally if necessary.
 GOTESTSUM = $(shell pwd)/bin/gotestsum
 gotestsum: ## Download gotestsum locally if necessary.
 	$(call go-get-tool,$(GOTESTSUM),gotest.tools/gotestsum@latest)
+
+GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
+golangci-lint: ## Download golangci-lint locally if necessary.
+	$(call go-get-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
