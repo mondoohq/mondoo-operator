@@ -35,7 +35,7 @@ import (
 
 const (
 	workloadDeploymentConfigMapNameTemplate = `%s-deploy`
-	workloadDeploymentNameTemplate          = `%s-workload`
+	WorkloadDeploymentNameTemplate          = `%s-workload`
 )
 
 type Workloads struct {
@@ -178,7 +178,7 @@ func (n *Workloads) deploymentForMondoo() *appsv1.Deployment {
 
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf(workloadDeploymentNameTemplate, n.Mondoo.Name),
+			Name:      fmt.Sprintf(WorkloadDeploymentNameTemplate, n.Mondoo.Name),
 			Namespace: n.Mondoo.Namespace,
 			Labels:    ls,
 		},
@@ -328,7 +328,7 @@ func (n *Workloads) down(ctx context.Context, clt client.Client, req ctrl.Reques
 	log := ctrllog.FromContext(ctx)
 
 	found := &appsv1.Deployment{}
-	err := clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(workloadDeploymentNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(WorkloadDeploymentNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
 
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil

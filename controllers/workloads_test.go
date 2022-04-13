@@ -103,7 +103,7 @@ var _ = Describe("workloads", func() {
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
-			workloadDeploymentName := fmt.Sprintf(workloadDeploymentNameTemplate, name)
+			workloadDeploymentName := fmt.Sprintf(WorkloadDeploymentNameTemplate, name)
 			By("Checking that the deployment is found")
 			foundDeployment := &appsv1.Deployment{}
 			Eventually(func() bool {

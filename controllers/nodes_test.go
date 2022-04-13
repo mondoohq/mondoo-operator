@@ -93,7 +93,7 @@ var _ = Describe("nodes", func() {
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
-			daemonSetName := fmt.Sprintf(daemonSetNameTemplate, name)
+			daemonSetName := fmt.Sprintf(NodeDaemonSetNameTemplate, name)
 			By("Checking that the daemonset is found")
 			foundDaemonset := &appsv1.DaemonSet{}
 			Eventually(func() bool {

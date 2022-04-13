@@ -35,7 +35,7 @@ import (
 
 const (
 	daemonSetConfigMapNameTemplate = `%s-ds`
-	daemonSetNameTemplate          = `%s-node`
+	NodeDaemonSetNameTemplate      = `%s-node`
 )
 
 type Nodes struct {
@@ -107,7 +107,7 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	log := ctrllog.FromContext(ctx)
 
 	found := &appsv1.DaemonSet{}
-	err := clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(daemonSetNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(NodeDaemonSetNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
 		declared := n.daemonsetForMondoo()
@@ -180,7 +180,7 @@ func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 	ls["audit"] = "node"
 	dep := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf(daemonSetNameTemplate, n.Mondoo.Name),
+			Name:      fmt.Sprintf(NodeDaemonSetNameTemplate, n.Mondoo.Name),
 			Namespace: n.Mondoo.Namespace,
 			Labels:    ls,
 		},
@@ -312,7 +312,7 @@ func (n *Nodes) down(ctx context.Context, clt client.Client, req ctrl.Request) (
 	log := ctrllog.FromContext(ctx)
 
 	found := &appsv1.DaemonSet{}
-	err := clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(daemonSetNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
+	err := clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(NodeDaemonSetNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
 
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil
