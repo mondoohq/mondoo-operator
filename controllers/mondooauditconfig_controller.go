@@ -53,6 +53,8 @@ var dsInventoryyaml []byte
 //go:embed inventory-deploy.yaml
 var deployInventoryyaml []byte
 
+// The update permissions for MondooAuditConfigs are required because having update permissions just for finalizers is insufficient
+// to add finalizers. There is a github issue describing the problem https://github.com/kubernetes-sigs/kubebuilder/issues/2264
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooauditconfigs,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooauditconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooauditconfigs/finalizers,verbs=update
