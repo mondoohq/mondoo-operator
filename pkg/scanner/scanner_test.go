@@ -14,6 +14,11 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const (
+	// A valid result would come back as a '2'
+	validScanResult = uint32(2)
+)
+
 //go:embed testdata/webhook-payload.json
 var webhookPayload []byte
 
@@ -35,7 +40,7 @@ func testServer() *httptest.Server {
 		result := &ScanResult{
 			Ok: true,
 			WorstScore: &Score{
-				Type:  uint32(2),
+				Type:  validScanResult,
 				Value: 100,
 			},
 		}

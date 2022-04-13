@@ -4,38 +4,39 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 const (
 	healthCheckEndpoint        = "/Health/Check"
 	scanKubernetesEndpoint     = "/Scan/RunKubernetesManifest"
-	DefaultHttpTimeout         = 30 * time.Second
-	DefaultIdleConnTimeout     = 30 * time.Second
-	DefaultTLSHandshakeTimeout = 10 * time.Second
+	defaultHttpTimeout         = 30 * time.Second
+	defaultIdleConnTimeout     = 30 * time.Second
+	defaultKeepAlive           = 30 * time.Second
+	defaultTLSHandshakeTimeout = 10 * time.Second
+	maxIdleConnections         = 100
 )
 
 func DefaultHttpClient() *http.Client {
 	tr := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
-			Timeout:   DefaultHttpTimeout,
-			KeepAlive: 30 * time.Second,
+			Timeout:   defaultHttpTimeout,
+			KeepAlive: defaultKeepAlive,
 		}).DialContext,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       DefaultIdleConnTimeout,
-		TLSHandshakeTimeout:   DefaultTLSHandshakeTimeout,
+		MaxIdleConns:          maxIdleConnections,
+		IdleConnTimeout:       defaultIdleConnTimeout,
+		TLSHandshakeTimeout:   defaultTLSHandshakeTimeout,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 
 	httpClient := &http.Client{
 		Transport: tr,
-		Timeout:   DefaultHttpTimeout,
+		Timeout:   defaultHttpTimeout,
 	}
 	return httpClient
 }
@@ -65,7 +66,7 @@ func (s *Scanner) request(ctx context.Context, url string, reqBodyBytes []byte) 
 	// do http call
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to do request")
+		return nil, fmt.Errorf("failed to do request: %v", err)
 	}
 
 	defer func() {
@@ -80,17 +81,17 @@ func (s *Scanner) HealthCheck(ctx context.Context, in *HealthCheckRequest) (*Hea
 
 	reqBodyBytes, err := json.Marshal(in)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal request")
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
 	respBodyBytes, err := s.request(ctx, url, reqBodyBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse response")
+		return nil, fmt.Errorf("failed to parse response: %v", err)
 	}
 
 	out := &HealthCheckResponse{}
 	if err = json.Unmarshal(respBodyBytes, out); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal proto response")
+		return nil, fmt.Errorf("failed to unmarshal proto response: %v", err)
 	}
 
 	return out, nil
@@ -101,17 +102,17 @@ func (s *Scanner) RunKubernetesManifest(ctx context.Context, in *KubernetesManif
 
 	reqBodyBytes, err := json.Marshal(in)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal request")
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
 	respBodyBytes, err := s.request(ctx, url, reqBodyBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse response")
+		return nil, fmt.Errorf("failed to parse response: %v", err)
 	}
 
 	out := &ScanResult{}
 	if err = json.Unmarshal(respBodyBytes, out); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal proto response")
+		return nil, fmt.Errorf("failed to unmarshal proto response: %v", err)
 	}
 
 	return out, nil
