@@ -292,24 +292,24 @@ func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *ru
 		return ctrl.Result{}, err
 	}
 
-	if n.Enable {
-		skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
-		mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag, skipResolveImage)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		n.Image = mondooImage
+	if !n.Enable {
+		return n.down(ctx, clt, req)
+	}
 
-		result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
-		if err != nil || result.Requeue {
-			return result, err
-		}
-		result, err = n.declareDeployment(ctx, clt, scheme, req, true)
-		if err != nil || result.Requeue {
-			return result, err
-		}
-	} else {
-		n.down(ctx, clt, req)
+	skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
+	mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag, skipResolveImage)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	n.Image = mondooImage
+
+	result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
+	if err != nil || result.Requeue {
+		return result, err
+	}
+	result, err = n.declareDeployment(ctx, clt, scheme, req, true)
+	if err != nil || result.Requeue {
+		return result, err
 	}
 	return ctrl.Result{}, nil
 }

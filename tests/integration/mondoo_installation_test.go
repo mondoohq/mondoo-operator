@@ -23,18 +23,12 @@ func (s *MondooInstallationSuite) SetupSuite() {
 	s.ctx = context.Background()
 }
 
-func (s *MondooInstallationSuite) TearDownSuite() {
-	if s.testCluster != nil {
-		s.testCluster.UninstallOperator()
-	}
-}
-
 func (s *MondooInstallationSuite) AfterTest(suiteName, testName string) {
 	if s.testCluster != nil {
 		if !s.T().Failed() {
 			s.testCluster.GatherAllMondooLogs(testName, installer.MondooNamespace)
 		}
-		s.testCluster.UninstallOperator()
+		s.NoError(s.testCluster.UninstallOperator())
 	}
 }
 
@@ -111,7 +105,11 @@ func (s *MondooInstallationSuite) testMondooInstallation() {
 func TestMondooInstallationSuite(t *testing.T) {
 	s := new(MondooInstallationSuite)
 	defer func(s *MondooInstallationSuite) {
-		HandlePanics(recover(), s.TearDownSuite, s.T)
+		HandlePanics(recover(), func() {
+			if err := s.testCluster.UninstallOperator(); err != nil {
+				zap.S().Errorf("Failed to uninstall Mondoo operator. %v", err)
+			}
+		}, s.T)
 	}(s)
 	suite.Run(t, s)
 }

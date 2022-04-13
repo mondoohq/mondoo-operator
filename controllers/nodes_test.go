@@ -39,7 +39,6 @@ var _ = Describe("nodes", func() {
 		name      = "nodes"
 		namespace = "nodes-namespace"
 		timeout   = time.Second * 10
-		duration  = time.Second * 10
 		interval  = time.Millisecond * 250
 	)
 	BeforeEach(func() {
@@ -90,29 +89,20 @@ var _ = Describe("nodes", func() {
 			foundMondoo := &k8sv1alpha1.MondooAuditConfig{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundMondoo)
-				if err != nil {
-					return false
-				}
-				return true
+				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
 			By("Checking that the daemonset is found")
 			foundDaemonset := &appsv1.DaemonSet{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundDaemonset)
-				if err != nil {
-					return false
-				}
-				return true
+				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
 			By("Updating the daemonset to be false")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundMondoo)
-				if err != nil {
-					return false
-				}
-				return true
+				return err == nil
 			}, timeout, interval).Should(BeTrue())
 			foundMondoo.Spec.Nodes.Enable = false
 			Expect(k8sClient.Update(ctx, foundMondoo)).Should(Succeed())
@@ -120,10 +110,7 @@ var _ = Describe("nodes", func() {
 			By("Checking that the daemonset is NOT found")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundDaemonset)
-				if err != nil {
-					return false
-				}
-				return true
+				return err == nil
 			}, timeout, interval).Should(BeFalse())
 
 		})

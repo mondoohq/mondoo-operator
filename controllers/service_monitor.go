@@ -148,7 +148,7 @@ func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, schem
 		}
 	} else {
 		if found {
-			s.down(ctx, clt)
+			return s.down(ctx, clt)
 		}
 	}
 	return ctrl.Result{}, nil

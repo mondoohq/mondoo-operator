@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -75,7 +76,7 @@ func testExamplePod() runtime.RawExtension {
 
 func setupDecoder(t *testing.T) *admission.Decoder {
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	utilruntime.Must(corev1.AddToScheme(scheme))
 	decoder, err := admission.NewDecoder(scheme)
 	require.NoError(t, err, "Failed to setup decoder for testing")
 
