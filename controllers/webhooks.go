@@ -520,6 +520,11 @@ func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
 			return ctrl.Result{}, err
 		}
 		n.Image = mondooOperatorImage
+
+		if err := n.deployScanApi(ctx); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		result, err := n.applyWebhooks(ctx)
 		if err != nil || result.Requeue {
 			return result, err
@@ -541,6 +546,38 @@ func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
 		}
 	}
 	return ctrl.Result{}, nil
+}
+
+func (n *Webhooks) deployScanApi(ctx context.Context) error {
+	deployment := ScanApiDeployment(n.TargetNamespace, n.Mondoo)
+	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment); err != nil {
+		// Return an error for any error different from NotFound.
+		if !errors.IsNotFound(err) {
+			return err
+		}
+
+		// If the deployment was not found, we should create it.
+		deployment = ScanApiDeployment(n.TargetNamespace, n.Mondoo)
+		if err := n.KubeClient.Create(ctx, &deployment); err != nil {
+			return err
+		}
+	}
+
+	service := ScanApiService(n.TargetNamespace)
+	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(&service), &service); err != nil {
+		// Return an error for any error different from NotFound.
+		if !errors.IsNotFound(err) {
+			return err
+		}
+
+		// If the service was not found, we should create it.
+		service = ScanApiService(n.TargetNamespace)
+		if err := n.KubeClient.Create(ctx, &service); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
@@ -569,6 +606,18 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 	}
 	if err := genericDelete(ctx, n.KubeClient, deployment); err != nil {
 		webhookLog.Error(err, "failed to clean up webhook Deployment resource")
+		return ctrl.Result{}, err
+	}
+
+	scanApiDeployment := ScanApiDeployment(n.TargetNamespace, n.Mondoo)
+	if err := genericDelete(ctx, n.KubeClient, &scanApiDeployment); err != nil {
+		webhookLog.Error(err, "failed to clean up scan API Deployment resource")
+		return ctrl.Result{}, err
+	}
+
+	scanApiService := ScanApiService(n.TargetNamespace)
+	if err := genericDelete(ctx, n.KubeClient, &scanApiService); err != nil {
+		webhookLog.Error(err, "failed to clean up scan API Service resource")
 		return ctrl.Result{}, err
 	}
 
