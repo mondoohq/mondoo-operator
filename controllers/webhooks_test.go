@@ -276,6 +276,36 @@ func TestWebhooksReconcile(t *testing.T) {
 				assert.True(t, found, "did not find Webhook Mode environment variable to be defined/set")
 			},
 		},
+		{
+			name: "cleanup old-style webhook",
+			mondooAuditConfigSpec: mondoov1alpha1.MondooAuditConfigData{
+				Webhooks: mondoov1alpha1.Webhooks{
+					Enable: true,
+				},
+			},
+			// existing objects from webhooks being previously enabled
+			existingObjects: func() []client.Object {
+				objects := defaultResourcesWhenEnabled()
+
+				vwc := &webhooksv1.ValidatingWebhookConfiguration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: testMondooAuditConfigName + "-mondoo-webhook",
+					},
+				}
+				objects = append(objects, vwc)
+
+				return objects
+			}(),
+			validate: func(t *testing.T, kubeClient client.Client) {
+				vwc := &webhooksv1.ValidatingWebhookConfiguration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: testMondooAuditConfigName + "-mondoo-webhook",
+					},
+				}
+				err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(vwc), vwc)
+				assert.True(t, errors.IsNotFound(err), "expected old-style named webhook %s to not be orphaned", client.ObjectKeyFromObject(vwc))
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -332,9 +362,20 @@ func defaultResourcesWhenEnabled() []client.Object {
 	}
 	objects = append(objects, dep)
 
+	vwcName, err := getValidatingWebhookName(&mondoov1alpha1.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testMondooAuditConfigName,
+			Namespace: testNamespace,
+		},
+	})
+	// Should never happen...
+	if err != nil {
+		panic(fmt.Errorf("unexpected failure while generating Webhook name: %s", err))
+	}
+
 	vwc := &webhooksv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: getValidatingWebhookName(testMondooAuditConfigName),
+			Name: vwcName,
 		},
 	}
 	objects = append(objects, vwc)
