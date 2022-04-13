@@ -33,7 +33,10 @@ func testServer() *httptest.Server {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		w.Write(data)
+		if _, err = w.Write(data); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 	})
 
 	mux.HandleFunc(scanKubernetesEndpoint, func(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +52,11 @@ func testServer() *httptest.Server {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		w.Write(data)
+		if _, err = w.Write(data); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
 	})
 	return httptest.NewServer(mux)
 }
