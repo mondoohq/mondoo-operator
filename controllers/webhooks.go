@@ -84,7 +84,12 @@ func (n *Webhooks) syncValidatingWebhookConfiguration(ctx context.Context,
 
 	// Override the default/generic name to allow for multiple MondooAudicConfig resources
 	// to each have their own Webhook
-	vwc.Name = getValidatingWebhookName(n.TargetNamespace, n.Mondoo.Name)
+	vwcName, err := getValidatingWebhookName(n.Mondoo)
+	if err != nil {
+		webhookLog.Error(err, "failed to generate Webhook name")
+		return err
+	}
+	vwc.SetName(vwcName)
 
 	// And update the Webhook entries to point to the right namespace/name for the Service
 	// receiving the webhook calls
@@ -537,6 +542,12 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 	yamlDecoder := yamlutil.NewYAMLOrJSONDecoder(r, 4096)
 	objectDecoder := scheme.Codecs.UniversalDeserializer()
 
+	vwcName, err := getValidatingWebhookName(n.Mondoo)
+	if err != nil {
+		webhookLog.Error(err, "failed to generate Webhook name")
+		return ctrl.Result{}, err
+	}
+
 	// Go through each YAML object, convert as needed to Delete()
 	for {
 		// First just read a single YAML object from the list
@@ -565,7 +576,9 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 		switch gvk.Kind {
 		case "ValidatingWebhookConfiguration":
 			genericObject, conversionOK = obj.(*webhooksv1.ValidatingWebhookConfiguration)
-			genericObject.SetName(getValidatingWebhookName(n.TargetNamespace, n.Mondoo.Name))
+			if conversionOK {
+				genericObject.SetName(vwcName)
+			}
 		default:
 			err := fmt.Errorf("Unexpected type %s to decode", gvk.Kind)
 			webhookLog.Error(err, "Failed to convert type")
@@ -615,8 +628,11 @@ func getWebhookDeploymentName(prefix string) string {
 	return prefix + "-webhook-manager"
 }
 
-func getValidatingWebhookName(mondooAuditConfigNamespace, mondooAuditConfigName string) string {
-	return fmt.Sprintf("%s-%s-mondoo", mondooAuditConfigNamespace, mondooAuditConfigName)
+func getValidatingWebhookName(mondooAuditConfig *mondoov1alpha1.MondooAuditConfig) (string, error) {
+	if mondooAuditConfig == nil {
+		return "", fmt.Errorf("cannot generate webhook name from nil MondooAuditConfig")
+	}
+	return fmt.Sprintf("%s-%s-mondoo", mondooAuditConfig.Namespace, mondooAuditConfig.Name), nil
 }
 
 func updateWebhooksConditions(config *mondoov1alpha1.MondooAuditConfig, degradedStatus bool) {

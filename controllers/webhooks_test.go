@@ -362,9 +362,20 @@ func defaultResourcesWhenEnabled() []client.Object {
 	}
 	objects = append(objects, dep)
 
+	vwcName, err := getValidatingWebhookName(&mondoov1alpha1.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testMondooAuditConfigName,
+			Namespace: testNamespace,
+		},
+	})
+	// Should never happen...
+	if err != nil {
+		panic(fmt.Errorf("unexpected failure while generating Webhook name: %s", err))
+	}
+
 	vwc := &webhooksv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: getValidatingWebhookName(testNamespace, testMondooAuditConfigName),
+			Name: vwcName,
 		},
 	}
 	objects = append(objects, vwc)
