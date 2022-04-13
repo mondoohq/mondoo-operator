@@ -1,0 +1,63 @@
+name: Tests
+on:
+  pull_request:
+  push:
+    paths-ignore:
+      - 'docs/**'
+    branches:
+      - "main"
+    tags: ["v*.*.*"]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    name: Unit tests
+    steps:
+      - uses: actions/checkout@v2
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "${{ env.golang-version }}"
+      - run: make test/ci
+      - uses: actions/upload-artifact@v3  # upload test results
+        if: success() || failure()        # run this step even if previous step failed
+        with:
+          name: unit-test-results
+          path: unit-tests.xml
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    if: needs.unit-tests.result == 'success' # run only if unit-tests are successful
+    name: Integration tests
+    steps:
+      - uses: actions/checkout@v2
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+      - name: Start minikube
+        uses: medyagh/setup-minikube@master
+        with:
+          memory: 4000m
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "${{ env.golang-version }}"
+      - name: Store creds
+        run: |
+          echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+      - run: make test/integration/ci
+      - uses: actions/download-artifact@v3 # download the unit test results
+        with:
+          name: unit-test-results
+      - uses: actions/upload-artifact@v3  # upload test results
+        if: success() || failure()        # run this step even if previous step failed
+        with:                             # upload a combined archive with unit and integration test results
+          name: test-results
+          path: |
+            unit-tests.xml
+            integration-tests.xml
+      - name: Upload test logs artifact
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: test-logs
+          path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/

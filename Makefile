@@ -54,6 +54,9 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+# List all packages that contain unit tests. Ignore the integration tests folder.
+UNIT_TEST_PACKAGES=$(shell go list ./... | grep -v /tests/integration)
+
 all: build
 
 ##@ General
@@ -87,10 +90,17 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) --arch=amd64 use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) --arch=amd64 use $(ENVTEST_K8S_VERSION) -p path)" go test $(UNIT_TEST_PACKAGES) -coverprofile cover.out
 
 test/ci: manifests generate fmt vet envtest gotestsum
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) --arch=amd64 use $(ENVTEST_K8S_VERSION) -p path)" $(GOTESTSUM) --junitfile unit-tests.xml -- ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) --arch=amd64 use $(ENVTEST_K8S_VERSION) -p path)" $(GOTESTSUM) --junitfile unit-tests.xml -- $(UNIT_TEST_PACKAGES) -coverprofile cover.out
+
+# Integration tests are run synchronously to avoid race conditions
+test/integration: manifests generate generate-manifests load-minikube
+	go test -v -p 1 ./tests/integration/...
+
+test/integration/ci: manifests generate generate-manifests load-minikube gotestsum
+	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -v -p 1
 
 ##@ Build
 
@@ -101,8 +111,11 @@ build: generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	MONDOO_OPERATOR_NAMESPACE=mondoo-operator go run ./main.go
 
-docker-build: test ## Build docker image with the manager.
+docker-build: ## Build docker image with the manager.
 	docker build --build-arg VERSION=${VERSION} -t ${IMG} .
+
+load-minikube: docker-build ## Build docker image with the manager and load it into minikube.
+	minikube image load ${IMG}
 
 buildah-build: test ## Build container image
 	buildah build -t ${IMG} .
@@ -252,15 +265,6 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
-
-# Verify the operator deployment
-.PHONY: test/deployment
-test/deployment:
-	mondoo scan -t k8s test/deployment-policy.yaml --incognito
-
-.PHONY: test/deployment-uncommon-ns
-test/deployment-uncommon-ns:
-	mondoo scan -t k8s test/deployment-policy-uncommon-ns.yaml --incognito
 
 HELMIFY = $(shell pwd)/bin/helmify
 helmify:

@@ -165,7 +165,7 @@ func (n *Workloads) deploymentNeedsUpdate(desired, existing *appsv1.Deployment) 
 // deploymentForMondoo returns a Deployment object
 func (n *Workloads) deploymentForMondoo(m *v1alpha1.MondooAuditConfig, cmName string) *appsv1.Deployment {
 	ls := labelsForMondoo(m.Name)
-
+	ls["audit"] = "k8s"
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      m.Name,
