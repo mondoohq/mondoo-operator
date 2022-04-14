@@ -390,13 +390,7 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.
-	if len(deployment.Spec.Template.Spec.Containers) != len(desiredDeployment.Spec.Template.Spec.Containers) ||
-		!reflect.DeepEqual(deployment.Spec.Replicas, desiredDeployment.Spec.Replicas) ||
-		!reflect.DeepEqual(deployment.Spec.Selector, desiredDeployment.Spec.Selector) ||
-		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].Image, desiredDeployment.Spec.Template.Spec.Containers[0].Image) ||
-		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].Command, desiredDeployment.Spec.Template.Spec.Containers[0].Command) ||
-		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].VolumeMounts, desiredDeployment.Spec.Template.Spec.Containers[0].VolumeMounts) ||
-		!reflect.DeepEqual(deployment.Spec.Template.Spec.Containers[0].Env, desiredDeployment.Spec.Template.Spec.Containers[0].Env) {
+	if AreDeploymentsDifferent(*deployment, *desiredDeployment) {
 		deployment.Spec = desiredDeployment.Spec
 		if err := n.KubeClient.Update(ctx, deployment); err != nil {
 			webhookLog.Error(err, "failed to update existing webhook Deployment")
@@ -405,7 +399,6 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 	}
 
 	return nil
-
 }
 
 func (n *Webhooks) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1.ValidatingWebhookConfiguration) error {

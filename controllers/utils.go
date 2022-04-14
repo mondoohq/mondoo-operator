@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -109,6 +110,18 @@ func parseReference(log logr.Logger, container string) (string, error) {
 	imageUrl := repoName + "@" + imgDigest
 
 	return imageUrl, nil
+}
+
+// AreDeploymentsDifferent returns a value indicating whether 2 deployments are different. Note that it does not perform a full
+// comparison but checks just some of the properties of a deployment (only the ones we are currently interested at).
+func AreDeploymentsDifferent(a, b appsv1.Deployment) bool {
+	return len(a.Spec.Template.Spec.Containers) != len(b.Spec.Template.Spec.Containers) ||
+		!reflect.DeepEqual(a.Spec.Replicas, b.Spec.Replicas) ||
+		!reflect.DeepEqual(a.Spec.Selector, b.Spec.Selector) ||
+		!reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Image, b.Spec.Template.Spec.Containers[0].Image) ||
+		!reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Command, b.Spec.Template.Spec.Containers[0].Command) ||
+		!reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].VolumeMounts, b.Spec.Template.Spec.Containers[0].VolumeMounts) ||
+		!reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Env, b.Spec.Template.Spec.Containers[0].Env)
 }
 
 // UpdateConditionCheck tests whether a condition should be updated from the

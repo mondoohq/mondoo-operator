@@ -46,9 +46,20 @@ func ScanApiDeployment(ns string, m *v1alpha1.MondooAuditConfig) appsv1.Deployme
 									Port: intstr.FromInt(scanApiPort),
 								},
 							},
-							InitialDelaySeconds: 10,
+							InitialDelaySeconds: 5,
 							PeriodSeconds:       300,
 							TimeoutSeconds:      5,
+						},
+						StartupProbe: &corev1.Probe{
+							ProbeHandler: corev1.ProbeHandler{
+								HTTPGet: &corev1.HTTPGetAction{
+									Path: "/Health/Check",
+									Port: intstr.FromInt(scanApiPort),
+								},
+							},
+							InitialDelaySeconds: 5,
+							PeriodSeconds:       5,
+							FailureThreshold:    5,
 						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
