@@ -116,6 +116,21 @@ func (k8sh *K8sHelper) KubectlWithStdin(stdin string, args ...string) (string, e
 	return cmdOut.StdOut, nil
 }
 
+// DeleteResourceIfExists Deletes the requested resource if it exists. If the resource does not
+// exist, the function does nothing (return no error).
+func (k8sh *K8sHelper) DeleteResourceIfExists(r client.Object) error {
+	ctx := context.Background()
+	if err := k8sh.Clientset.Delete(ctx, r); err != nil && !kerrors.IsNotFound(err) {
+		return fmt.Errorf(
+			"Failed to delete %s %s/%s. %v",
+			r.GetObjectKind().GroupVersionKind().String(),
+			r.GetNamespace(),
+			r.GetName(),
+			err)
+	}
+	return nil
+}
+
 // IsPodInExpectedState waits for a pod to be in a Ready state
 // If the pod is in expected state within the time retry limit true is returned, if not false
 func (k8sh *K8sHelper) IsPodReady(labelSelector, namespace string) bool {

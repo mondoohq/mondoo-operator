@@ -62,18 +62,9 @@ func (i *MondooInstaller) InstallOperator() error {
 		return fmt.Errorf("Failed to create mondoo-operator pod: %v ", err)
 	}
 
-	secret := corev1.Secret{
-		Type: corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			"config": []byte(utils.ReadFile(MondooCredsFile)),
-		},
+	if err := i.CreateClientSecret(i.Settings.Namespace); err != nil {
+		return err
 	}
-	secret.Name = utils.MondooClientSecret
-	secret.Namespace = i.Settings.Namespace
-	if err := i.K8sHelper.Clientset.Create(i.ctx, &secret); err != nil {
-		return fmt.Errorf("Failed to create Мondoo secret. %v", err)
-	}
-	zap.S().Infof("Created Мondoo client secret %q.", utils.MondooClientSecret)
 
 	if !i.K8sHelper.IsPodReady("control-plane=controller-manager", i.Settings.Namespace) {
 		return fmt.Errorf("Mondoo operator is not in a ready state.")
@@ -91,6 +82,25 @@ func (i *MondooInstaller) UninstallOperator() error {
 	}
 	i.K8sHelper.GetLogsFromNamespace(i.Settings.Namespace, i.T().Name())
 
+	if err := i.CleanupAuditConfigs(); err != nil {
+		return err
+	}
+
+	secret := &corev1.Secret{}
+	secret.Name = utils.MondooClientSecret
+	secret.Namespace = i.Settings.Namespace
+	if err := i.K8sHelper.DeleteResourceIfExists(secret); err != nil {
+		return err
+	}
+
+	_, err := i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.DeleteIngoreNotFoundFromStdinArgs...)
+	if err != nil {
+		return fmt.Errorf("Failed to delete mondoo-operator pod: %v ", err)
+	}
+	return nil
+}
+
+func (i *MondooInstaller) CleanupAuditConfigs() error {
 	// Make sure all Mondoo audit configs are deleted so the namespace can be deleted. Leaving
 	// audit configs will result in a stuck namespace.
 	cfgs := &mondoov1.MondooAuditConfigList{}
@@ -108,18 +118,22 @@ func (i *MondooInstaller) UninstallOperator() error {
 			return err
 		}
 	}
+	return nil
+}
 
-	secret := &corev1.Secret{}
+func (i *MondooInstaller) CreateClientSecret(ns string) error {
+	secret := corev1.Secret{
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"config": []byte(utils.ReadFile(MondooCredsFile)),
+		},
+	}
 	secret.Name = utils.MondooClientSecret
-	secret.Namespace = i.Settings.Namespace
-	if err := i.K8sHelper.Clientset.Delete(i.ctx, secret); err != nil {
-		return fmt.Errorf("Failed to delete mondoo-client secret. %v", err)
+	secret.Namespace = ns
+	if err := i.K8sHelper.Clientset.Create(i.ctx, &secret); err != nil {
+		return fmt.Errorf("Failed to create Мondoo secret. %v", err)
 	}
-
-	_, err := i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.DeleteIngoreNotFoundFromStdinArgs...)
-	if err != nil {
-		return fmt.Errorf("Failed to delete mondoo-operator pod: %v ", err)
-	}
+	zap.S().Infof("Created Мondoo client secret %q.", utils.MondooClientSecret)
 	return nil
 }
 
