@@ -1,4 +1,4 @@
-package corewebhook
+package webhookhandler
 
 import (
 	"context"
@@ -14,33 +14,35 @@ import (
 
 // Have kubebuilder generate a ValidatingWebhookConfiguration under the path /validate-k8s-mondoo-com-core that watches Pod creation/updates
 //+kubebuilder:webhook:path=/validate-k8s-mondoo-com-core,mutating=false,failurePolicy=ignore,sideEffects=None,groups="",resources=pods,verbs=create;update,versions=v1,name=core-policy.k8s.mondoo.com,admissionReviewVersions=v1
+// Have kubebuilder generate a ValidatingWebhookConfiguration under the path /validate-k8s-mondoo-com-apps that watches Deployment creation/updates
+//+kubebuilder:webhook:path=/validate-k8s-mondoo-com-apps,mutating=false,failurePolicy=ignore,sideEffects=None,groups=apps,resources=deployments,verbs=create;update,versions=v1,name=apps-policy.k8s.mondoo.com,admissionReviewVersions=v1
 
-var corelog = logf.Log.WithName("core-validator")
+var handlerlog = logf.Log.WithName("webhook-validator")
 
-type coreValidator struct {
+type webhookValidator struct {
 	client  client.Client
 	decoder *admission.Decoder
 	mode    mondoov1alpha1.WebhookMode
 }
 
-// NewCoreWebhook will initialize a CoreValidator with the provided k8s Client and
+// NewWebhookValidator will initialize a CoreValidator with the provided k8s Client and
 // set it to the provided mode. Returns error if mode is invalid.
-func NewCoreWebhook(client client.Client, mode string) (admission.Handler, error) {
+func NewWebhookValidator(client client.Client, mode string) (admission.Handler, error) {
 	webhookMode, err := utils.ModeStringToWebhookMode(mode)
 	if err != nil {
 		return nil, err
 	}
 
-	return &coreValidator{
+	return &webhookValidator{
 		client: client,
 		mode:   webhookMode,
 	}, nil
 }
 
-var _ admission.Handler = &coreValidator{}
+var _ admission.Handler = &webhookValidator{}
 
-func (a *coreValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
-	corelog.Info("Webhook triggered", "Details", req)
+func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
+	handlerlog.Info("Webhook triggered", "Details", req)
 
 	// TODO: call into Mondoo Scan Service to scan the resource
 
@@ -56,14 +58,14 @@ func (a *coreValidator) Handle(ctx context.Context, req admission.Request) admis
 		return admission.Allowed("PASSED")
 	default:
 		err := fmt.Errorf("neither permissive nor enforcing modes defined")
-		corelog.Error(err, "unexpected runtime environment, allowing the resource through")
+		handlerlog.Error(err, "unexpected runtime environment, allowing the resource through")
 		return admission.Allowed("PASSED")
 	}
 }
 
-var _ admission.DecoderInjector = &coreValidator{}
+var _ admission.DecoderInjector = &webhookValidator{}
 
-func (a *coreValidator) InjectDecoder(d *admission.Decoder) error {
+func (a *webhookValidator) InjectDecoder(d *admission.Decoder) error {
 	a.decoder = d
 	return nil
 }
