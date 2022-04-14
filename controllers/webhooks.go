@@ -171,6 +171,10 @@ func deepEqualsValidatingWebhookConfiguration(existing, desired *webhooksv1.Vali
 		if existing.Webhooks[i].ClientConfig.Service != desired.Webhooks[i].ClientConfig.Service {
 			return false
 		}
+
+		if existing.Webhooks[i].Name != desired.Webhooks[i].Name {
+			return false
+		}
 	}
 
 	return true

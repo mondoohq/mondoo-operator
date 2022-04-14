@@ -67,7 +67,7 @@ func main() {
 		webhookLog.Error(err, "failed to setup Core Webhook")
 		os.Exit(1)
 	}
-	hookServer.Register("/validate-k8s-mondoo-com-core", &webhook.Admission{Handler: webhookValidator})
+	hookServer.Register("/validate-k8s-mondoo-com", &webhook.Admission{Handler: webhookValidator})
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		webhookLog.Error(err, "unable to set up health check")
