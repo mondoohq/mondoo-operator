@@ -235,7 +235,6 @@ func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 							},
 						},
 					}},
-					ServiceAccountName: "mondoo-operator-nodes",
 					Volumes: []corev1.Volume{
 						{
 							Name: "root",
