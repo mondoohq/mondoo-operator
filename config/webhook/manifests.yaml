@@ -18,25 +18,6 @@ webhooks:
   rules:
   - apiGroups:
     - ""
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - pods
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-k8s-mondoo-com-apps
-  failurePolicy: Ignore
-  name: apps-policy.k8s.mondoo.com
-  rules:
-  - apiGroups:
     - apps
     apiVersions:
     - v1
@@ -44,5 +25,6 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
+    - pods
     - deployments
   sideEffects: None
