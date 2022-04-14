@@ -59,7 +59,7 @@ func (i *MondooInstaller) InstallOperator() error {
 	_, err = i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.CreateFromStdinArgs...)
 	i.isInstalled = true // If the command above has run there is a change things have been partially created.
 	if err != nil {
-		return fmt.Errorf("Failed to create mondoo-operator pod: %v ", err)
+		return fmt.Errorf("Failed to create mondoo-operator manifest(s): %v ", err)
 	}
 
 	if err := i.CreateClientSecret(i.Settings.Namespace); err != nil {
@@ -95,7 +95,7 @@ func (i *MondooInstaller) UninstallOperator() error {
 
 	_, err := i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.DeleteIngoreNotFoundFromStdinArgs...)
 	if err != nil {
-		return fmt.Errorf("Failed to delete mondoo-operator pod: %v ", err)
+		return fmt.Errorf("Failed to delete mondoo-operator manifest(s): %v ", err)
 	}
 	return nil
 }
