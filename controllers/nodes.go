@@ -178,6 +178,10 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 	ls := labelsForMondoo(n.Mondoo.Name)
 	ls["audit"] = "node"
+
+	// The node scanning does not use the Kubernetes API at all, therefore the service account token
+	// should not be mounted at all.
+	automountServiceAccountToken := false
 	dep := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf(NodeDaemonSetNameTemplate, n.Mondoo.Name),
@@ -197,6 +201,7 @@ func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 						Key:    "node-role.kubernetes.io/master",
 						Effect: corev1.TaintEffect("NoSchedule"),
 					}},
+					AutomountServiceAccountToken: &automountServiceAccountToken,
 					Containers: []corev1.Container{{
 						Image:     n.Image,
 						Name:      "mondoo-client",
