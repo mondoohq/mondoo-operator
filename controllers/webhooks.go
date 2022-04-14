@@ -43,12 +43,6 @@ import (
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 )
 
-var (
-	webhookLog = ctrl.Log.WithName("webhook")
-
-	Version string
-)
-
 const (
 	webhookLabelKey   = "control-plane"
 	webhookLabelValue = "webhook-manager"
@@ -62,6 +56,21 @@ const (
 	// openShiftWebhookAnnotationKey is how we annotate a webhook so that OpenShift
 	// injects the cluster-wide CA data for auto-generated TLS certificates.
 	openShiftWebhookAnnotationKey = "service.beta.openshift.io/inject-cabundle"
+
+	// manualTLSAnnotationKey is for when there is no explicit 'injection-style' defined in
+	// the MondooAuditConfig. We treat this to mean that the user will provide their own certs.
+	manualTLSAnnotationKey = "mondoo.com/tls-mode"
+)
+
+var (
+	webhookLog = ctrl.Log.WithName("webhook")
+
+	Version string
+
+	// webhookAnnotationList is a list of all the possible annotations we could set on a Webhook.
+	// It is needed so we can be sure to clear out any previous annotations in the event the
+	// injection-style has changed during runtime.
+	webhookAnnotationList = []string{certManagerAnnotationKey, openShiftWebhookAnnotationKey, manualTLSAnnotationKey}
 )
 
 // Embed the Service/Desployment/ValidatingWebhookConfiguration payloads
@@ -118,25 +127,53 @@ func (n *Webhooks) syncValidatingWebhookConfiguration(ctx context.Context,
 		}
 	}
 
-	// Doing a DeepEquals comparison of the Webhook is a nightmare. For example: many fields are auto-populated which differ from our
-	// "vanilla" version we generate, and the cert-manager will inject the CA data. The sizes of arrays will be different as well...
-	// So lets just make sure at least the annotation is set and update the object based on that information.
-	// If you want to "force" an update, just change the annotation.
-	if existingVWC.Annotations == nil || existingVWC.Annotations[annotationKey] != annotationValue {
+	if !deepEqualsValidatingWebhookConfiguration(existingVWC, vwc, annotationKey) {
 		existingVWC.Webhooks = vwc.Webhooks
 
 		if existingVWC.Annotations == nil {
 			existingVWC.Annotations = map[string]string{}
 		}
+		// Clear any previously set annotations in case we have changed from one mode to another
+		for _, key := range webhookAnnotationList {
+			delete(existingVWC.Annotations, key)
+		}
+
 		existingVWC.Annotations[annotationKey] = annotationValue
 
 		if err := n.KubeClient.Update(ctx, existingVWC); err != nil {
-			webhookLog.Error(err, "Failed to update existing cert-manager Certificate resource")
+			webhookLog.Error(err, "Failed to update existing ValidatingWebhookConfiguration resource")
 			return err
 		}
 	}
 
 	return n.cleanupOldWebhook(ctx)
+}
+
+// For determining whether there is a meaningful difference between the existing Webhook and our desired configuration,
+// just check the fields that we would care about. For the many auto-populated fields, we'll just ignore the difference between
+// our desired configuration and the actual Webhook fields.
+func deepEqualsValidatingWebhookConfiguration(existing, desired *webhooksv1.ValidatingWebhookConfiguration, annotationKey string) bool {
+
+	// We always set an annotation, so if there is none set, we need to update the existing webhook
+	if existing.Annotations == nil {
+		return false
+	}
+
+	if existing.Annotations[annotationKey] != desired.Annotations[annotationKey] {
+		return false
+	}
+
+	if len(existing.Webhooks) != len(desired.Webhooks) {
+		return false
+	}
+
+	for i := range existing.Webhooks {
+		if existing.Webhooks[i].ClientConfig.Service != desired.Webhooks[i].ClientConfig.Service {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (n *Webhooks) syncWebhookService(ctx context.Context) error {
@@ -399,7 +436,7 @@ func (n *Webhooks) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1
 		// appropriate TLS certificates. Populating the Secret will unblock the Pod and allow it to run.
 		// User also needs to populate the CA data on the webhook.
 		// So just apply the ValidatingWebhookConfiguration as-is
-		annotationKey = "mondoo.com/tls-mode"
+		annotationKey = manualTLSAnnotationKey
 		annotationValue = "manual"
 	}
 
