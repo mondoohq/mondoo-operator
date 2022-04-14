@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"fmt"
+
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -11,23 +13,25 @@ import (
 const (
 	scanApiDeploymentName = "mondoo-scan-api"
 	scanApiServiceName    = "mondoo-scan-api"
+	scanApiPort           = 8080
 )
 
+var scanApiLabels = map[string]string{"app": "mondoo-scan-api"}
+
 func ScanApiDeployment(ns string, m *v1alpha1.MondooAuditConfig) appsv1.Deployment {
-	ls := map[string]string{"app": "mondoo-scan-api"}
 	return appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      scanApiDeploymentName,
 			Namespace: ns,
-			Labels:    ls,
+			Labels:    scanApiLabels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: ls,
+				MatchLabels: scanApiLabels,
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: ls,
+					Labels: scanApiLabels,
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
@@ -39,7 +43,7 @@ func ScanApiDeployment(ns string, m *v1alpha1.MondooAuditConfig) appsv1.Deployme
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{
 									Path: "/Health/Check",
-									Port: intstr.FromInt(8989), // TODO: this fails because currently the API binds to 127.0.0.1
+									Port: intstr.FromInt(scanApiPort),
 								},
 							},
 							InitialDelaySeconds: 10,
@@ -53,16 +57,13 @@ func ScanApiDeployment(ns string, m *v1alpha1.MondooAuditConfig) appsv1.Deployme
 								MountPath: "/etc/opt/",
 							},
 						},
-
+						Ports: []corev1.ContainerPort{
+							{ContainerPort: scanApiPort, Protocol: corev1.ProtocolTCP},
+						},
 						Env: []corev1.EnvVar{
-							{
-								Name:  "DEBUG",
-								Value: "false",
-							},
-							{
-								Name:  "MONDOO_PROCFS",
-								Value: "on",
-							},
+							{Name: "DEBUG", Value: "false"},
+							{Name: "MONDOO_PROCFS", Value: "on"},
+							{Name: "PORT", Value: fmt.Sprintf("%d", scanApiPort)},
 						},
 					}},
 					ServiceAccountName: m.Spec.Workloads.ServiceAccount,
@@ -103,14 +104,12 @@ func ScanApiService(ns string) corev1.Service {
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Port:       int32(8989),
+					Port:       int32(scanApiPort),
 					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(8989),
+					TargetPort: intstr.FromInt(scanApiPort),
 				},
 			},
-			Selector: map[string]string{
-				webhookLabelKey: webhookLabelValue,
-			},
+			Selector: scanApiLabels,
 		},
 	}
 }

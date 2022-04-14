@@ -199,7 +199,7 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 		},
 	}
 
-	// Annotate the Service if the Mondo config is asking for OpenShift-style TLS certificate management.
+	// Annotate the Service if the Mondoo config is asking for OpenShift-style TLS certificate management.
 	if n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) {
 		if desiredService.Annotations == nil {
 			desiredService.Annotations = map[string]string{}
