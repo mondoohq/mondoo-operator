@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
@@ -178,6 +179,7 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 	ls := labelsForMondoo(n.Mondoo.Name)
 	ls["audit"] = "node"
+
 	dep := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf(NodeDaemonSetNameTemplate, n.Mondoo.Name),
@@ -197,6 +199,9 @@ func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 						Key:    "node-role.kubernetes.io/master",
 						Effect: corev1.TaintEffect("NoSchedule"),
 					}},
+					// The node scanning does not use the Kubernetes API at all, therefore the service account token
+					// should not be mounted at all.
+					AutomountServiceAccountToken: pointer.Bool(false),
 					Containers: []corev1.Container{{
 						Image:     n.Image,
 						Name:      "mondoo-client",
@@ -235,7 +240,6 @@ func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 							},
 						},
 					}},
-					ServiceAccountName: "mondoo-operator-nodes",
 					Volumes: []corev1.Volume{
 						{
 							Name: "root",

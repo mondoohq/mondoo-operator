@@ -10,8 +10,11 @@ import (
 	"go.uber.org/zap"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	mondoov1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	mondoocontrollers "go.mondoo.com/mondoo-operator/controllers"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
@@ -19,40 +22,76 @@ import (
 
 type MondooInstallationSuite struct {
 	suite.Suite
-	ctx         context.Context
-	testCluster *TestCluster
+	ctx           context.Context
+	testCluster   *TestCluster
+	objsToCleanup []client.Object
 }
 
 func (s *MondooInstallationSuite) SetupSuite() {
 	s.ctx = context.Background()
+	s.testCluster = StartTestCluster(installer.NewDefaultSettings(), s.T)
+}
+
+func (s *MondooInstallationSuite) TearDownSuite() {
+	s.NoError(s.testCluster.UninstallOperator())
 }
 
 func (s *MondooInstallationSuite) AfterTest(suiteName, testName string) {
 	if s.testCluster != nil {
-		if !s.T().Failed() {
-			s.testCluster.GatherAllMondooLogs(testName, installer.MondooNamespace)
+		s.testCluster.GatherAllMondooLogs(testName, installer.MondooNamespace)
+		s.NoError(s.testCluster.CleanupAuditConfigs())
+
+		for _, o := range s.objsToCleanup {
+			s.NoError(s.testCluster.K8sHelper.DeleteResourceIfExists(o))
 		}
-		s.NoError(s.testCluster.UninstallOperator())
+		s.objsToCleanup = make([]client.Object, 0)
 	}
 }
 
-func (s *MondooInstallationSuite) TestKustomizeInstallation() {
-	s.testCluster = StartTestCluster(installer.NewDefaultSettings(), s.T)
-
-	s.testMondooInstallation()
-}
-
-func (s *MondooInstallationSuite) TestKustomizeInstallation_NonDefaultNamespace() {
-	settings := installer.NewDefaultSettings()
-	settings.Namespace = "some-namespace"
-	s.testCluster = StartTestCluster(settings, s.T)
-
-	s.testMondooInstallation()
-}
-
-func (s *MondooInstallationSuite) testMondooInstallation() {
-	zap.S().Info("Create an audit config that enables only workloads scanning.")
+func (s *MondooInstallationSuite) TestAuditConfigReconcile() {
 	auditConfig := utils.DefaultAuditConfig(s.testCluster.Settings.Namespace, true, false, false)
+	s.testMondooAuditConfig(auditConfig)
+}
+
+func (s *MondooInstallationSuite) TestAuditConfigReconcile_NonDefaultNamespace() {
+	ns := &corev1.Namespace{}
+	ns.Name = "some-namespace"
+	s.Require().NoErrorf(s.testCluster.K8sHelper.Clientset.Create(s.ctx, ns), "Failed to create namespace.")
+	s.objsToCleanup = append(s.objsToCleanup, ns)
+	zap.S().Info("Created test namespace.")
+
+	s.Require().NoErrorf(s.testCluster.CreateClientSecret(ns.Name), "Failed to create client secret.")
+	zap.S().Infof("Created client secret in namespace %q.", ns.Name)
+
+	sa := &corev1.ServiceAccount{}
+	sa.Name = "mondoo-sa"
+	sa.Namespace = ns.Name
+	s.Require().NoErrorf(s.testCluster.K8sHelper.Clientset.Create(s.ctx, sa), "Failed to create service account.")
+	s.objsToCleanup = append(s.objsToCleanup, sa)
+	zap.S().Infof("Created service account %q in namespace %q.", sa.Name, ns.Name)
+
+	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+	clusterRoleBinding.Name = "mondoo-operator-workload2"
+	clusterRoleBinding.RoleRef.APIGroup = rbacv1.GroupName
+	clusterRoleBinding.RoleRef.Kind = "ClusterRole"
+	clusterRoleBinding.RoleRef.Name = "mondoo-operator-workload"
+
+	subject := rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Name: sa.Name, Namespace: sa.Namespace}
+	clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, subject)
+	s.Require().NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, clusterRoleBinding), "Failed to create cluster role binding.")
+	s.objsToCleanup = append(s.objsToCleanup, clusterRoleBinding)
+	zap.S().Infof("Created cluster role binding %q.", clusterRoleBinding.Name)
+
+	auditConfig := utils.DefaultAuditConfig(ns.Name, true, false, false)
+	auditConfig.Spec.Workloads.ServiceAccount = sa.Name
+
+	s.testMondooAuditConfig(auditConfig)
+	s.testCluster.GatherAllMondooLogs(s.T().Name(), auditConfig.Namespace) // Gather the logs from the non-default ns
+}
+
+func (s *MondooInstallationSuite) testMondooAuditConfig(auditConfig mondoov1.MondooAuditConfig) {
+	zap.S().Info("Create an audit config that enables only workloads scanning.")
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
@@ -61,11 +100,12 @@ func (s *MondooInstallationSuite) testMondooInstallation() {
 	workloadsLabels := []string{installer.MondooClientsK8sLabel, installer.MondooClientsLabel}
 	workloadsLabelsString := strings.Join(workloadsLabels, ",")
 	s.Truef(
-		s.testCluster.K8sHelper.IsPodReady(workloadsLabelsString, s.testCluster.Settings.Namespace),
+		s.testCluster.K8sHelper.IsPodReady(workloadsLabelsString, auditConfig.Namespace),
 		"Mondoo workloads clients are not in a Ready state.")
 
 	zap.S().Info("Verify the pods are actually created from a Deployment.")
 	listOpts, err := utils.LabelSelectorListOptions(workloadsLabelsString)
+	listOpts.Namespace = auditConfig.Namespace
 	s.NoError(err)
 
 	deployments := &appsv1.DeploymentList{}
@@ -92,11 +132,12 @@ func (s *MondooInstallationSuite) testMondooInstallation() {
 	nodesLabels := []string{installer.MondooClientsNodesLabel, installer.MondooClientsLabel}
 	nodesLabelsString := strings.Join(nodesLabels, ",")
 	s.Truef(
-		s.testCluster.K8sHelper.IsPodReady(nodesLabelsString, s.testCluster.Settings.Namespace),
+		s.testCluster.K8sHelper.IsPodReady(nodesLabelsString, auditConfig.Namespace),
 		"Mondoo nodes clients are not in a Ready state.")
 
 	zap.S().Info("Verify the pods are actually created from a DaemonSet.")
 	listOpts, err = utils.LabelSelectorListOptions(nodesLabelsString)
+	listOpts.Namespace = auditConfig.Namespace
 	s.NoError(err)
 
 	daemonSets := &appsv1.DaemonSetList{}
