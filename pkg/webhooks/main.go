@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
-	corewebhook "go.mondoo.com/mondoo-operator/pkg/webhooks/core"
+	webhookhandler "go.mondoo.com/mondoo-operator/pkg/webhooks/handler"
 )
 
 func init() {
@@ -62,12 +62,12 @@ func main() {
 
 	webhookLog.Info("registering webhooks to the webhook server")
 
-	coreValidator, err := corewebhook.NewCoreWebhook(mgr.GetClient(), mode)
+	webhookValidator, err := webhookhandler.NewWebhookValidator(mgr.GetClient(), mode)
 	if err != nil {
 		webhookLog.Error(err, "failed to setup Core Webhook")
 		os.Exit(1)
 	}
-	hookServer.Register("/validate-k8s-mondoo-com-core", &webhook.Admission{Handler: coreValidator})
+	hookServer.Register("/validate-k8s-mondoo-com", &webhook.Admission{Handler: webhookValidator})
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		webhookLog.Error(err, "unable to set up health check")

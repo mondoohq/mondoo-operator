@@ -1,4 +1,4 @@
-package corewebhook
+package webhookhandler
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -15,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-func TestCoreValidate(t *testing.T) {
+func TestWebhookValidate(t *testing.T) {
 
 	decoder := setupDecoder(t)
 	tests := []struct {
@@ -30,12 +31,18 @@ func TestCoreValidate(t *testing.T) {
 			expectReason:  "PASSED",
 			object:        testExamplePod(),
 		},
+		{
+			name:          "example Deployment",
+			expectAllowed: true,
+			expectReason:  "PASSED",
+			object:        testExampleDeployment(),
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
-			validator := &coreValidator{
+			validator := &webhookValidator{
 				decoder: decoder,
 			}
 
@@ -71,6 +78,19 @@ func testExamplePod() runtime.RawExtension {
 
 	return runtime.RawExtension{
 		Object: pod,
+	}
+}
+
+func testExampleDeployment() runtime.RawExtension {
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testDeployment",
+			Namespace: "testNamespace",
+		},
+	}
+
+	return runtime.RawExtension{
+		Object: dep,
 	}
 }
 

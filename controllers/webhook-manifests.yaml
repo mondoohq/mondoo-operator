@@ -10,12 +10,13 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-k8s-mondoo-com-core
+      path: /validate-k8s-mondoo-com
   failurePolicy: Ignore
-  name: core-policy.k8s.mondoo.com
+  name: policy.k8s.mondoo.com
   rules:
   - apiGroups:
     - ""
+    - apps
     apiVersions:
     - v1
     operations:
@@ -23,4 +24,5 @@ webhooks:
     - UPDATE
     resources:
     - pods
+    - deployments
   sideEffects: None
