@@ -13,6 +13,7 @@ import (
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -68,6 +69,16 @@ func (i *MondooInstaller) InstallOperator() error {
 
 	if !i.K8sHelper.IsPodReady("control-plane=controller-manager", i.Settings.Namespace) {
 		return fmt.Errorf("Mondoo operator is not in a ready state.")
+	}
+
+	// Create a MondooOperatorConfig with default values
+	operatorConfig := &mondoov1.MondooOperatorConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: mondoov1.MondooOperatorConfigName,
+		},
+	}
+	if err := i.K8sHelper.Clientset.Create(i.ctx, operatorConfig); err != nil {
+		return fmt.Errorf("failed to create default MondooOperatorConfig: %s", err)
 	}
 	zap.S().Info("Mondoo operator is ready.")
 

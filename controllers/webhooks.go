@@ -44,8 +44,8 @@ import (
 )
 
 const (
-	webhookLabelKey   = "control-plane"
-	webhookLabelValue = "webhook-manager"
+	WebhookLabelKey   = "control-plane"
+	WebhookLabelValue = "webhook-manager"
 
 	webhookTLSSecretName = "webhook-server-cert"
 
@@ -196,7 +196,7 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 				},
 			},
 			Selector: map[string]string{
-				webhookLabelKey: webhookLabelValue,
+				WebhookLabelKey: WebhookLabelValue,
 			},
 		},
 	}
@@ -276,20 +276,20 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 			Name:      getWebhookDeploymentName(n.Mondoo.Name),
 			Namespace: n.TargetNamespace,
 			Labels: map[string]string{
-				webhookLabelKey: webhookLabelValue,
+				WebhookLabelKey: WebhookLabelValue,
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: pointer.Int32(1),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					webhookLabelKey: webhookLabelValue,
+					WebhookLabelKey: WebhookLabelValue,
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						webhookLabelKey: webhookLabelValue,
+						WebhookLabelKey: WebhookLabelValue,
 					},
 				},
 				Spec: corev1.PodSpec{
