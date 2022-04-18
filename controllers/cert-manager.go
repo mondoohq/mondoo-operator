@@ -163,7 +163,7 @@ func (c *CertManagerHandler) syncCertManagerCertificate(ctx context.Context) err
 			Kind: "Issuer",
 			Name: certManagerIssuerName,
 		},
-		SecretName: webhookTLSSecretName,
+		SecretName: GetTLSCertificatesSecretName(c.Mondoo.Name),
 	}
 
 	if err := c.KubeClient.Get(ctx, client.ObjectKeyFromObject(certificate), certificate); err != nil {

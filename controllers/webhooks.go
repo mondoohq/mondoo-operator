@@ -47,8 +47,6 @@ const (
 	WebhookLabelKey   = "control-plane"
 	WebhookLabelValue = "webhook-manager"
 
-	webhookTLSSecretName = "webhook-server-cert"
-
 	// openShiftServiceAnnotationKey is how we annotate a Service so that OpenShift
 	// will create TLS certificates for the webhook Service.
 	openShiftServiceAnnotationKey = "service.beta.openshift.io/serving-cert-secret-name"
@@ -208,7 +206,7 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 		}
 
 		// Just set the value to the name of the Secret the webhook Deployment mounts in.
-		desiredService.Annotations[openShiftServiceAnnotationKey] = webhookTLSSecretName
+		desiredService.Annotations[openShiftServiceAnnotationKey] = GetTLSCertificatesSecretName(n.Mondoo.Name)
 	}
 
 	if err := n.setControllerRef(desiredService); err != nil {
@@ -233,7 +231,7 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 			if service.Annotations == nil {
 				service.Annotations = map[string]string{}
 			}
-			service.Annotations[openShiftServiceAnnotationKey] = webhookTLSSecretName
+			service.Annotations[openShiftServiceAnnotationKey] = GetTLSCertificatesSecretName(n.Mondoo.Name)
 		}
 		service.Spec.Ports = desiredService.Spec.Ports
 		service.Spec.Selector = desiredService.Spec.Selector
@@ -255,7 +253,7 @@ func (n *Webhooks) webhookServiceNeedsUpdate(desired, existing *corev1.Service) 
 	}
 
 	if n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) {
-		if existing.Annotations == nil || existing.Annotations[openShiftServiceAnnotationKey] != webhookTLSSecretName {
+		if existing.Annotations == nil || existing.Annotations[openShiftServiceAnnotationKey] != GetTLSCertificatesSecretName(n.Mondoo.Name) {
 			return true
 		}
 	}
@@ -362,7 +360,7 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
 									DefaultMode: pointer.Int32(420),
-									SecretName:  webhookTLSSecretName,
+									SecretName:  GetTLSCertificatesSecretName(n.Mondoo.Name),
 								},
 							},
 						},
@@ -707,4 +705,14 @@ func (n *Webhooks) cleanupOldWebhook(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+// GetTLSCertificatesSecretName takes the name of a MondooAuditConfig resources
+// and returns the expected Secret name where the TLS certs will be stored.
+func GetTLSCertificatesSecretName(mondooAuditConfigName string) string {
+	// webhookTLSSecretNameTemplate is intended to store the MondooAuditConfig Name for Secret
+	// name uniqueness per-Namespace.
+	webhookTLSSecretNameTemplate := `%s-webhook-server-cert`
+
+	return fmt.Sprintf(webhookTLSSecretNameTemplate, mondooAuditConfigName)
 }
