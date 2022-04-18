@@ -46,6 +46,7 @@ jobs:
           chmod +x operator-sdk_${OS}_${ARCH} && sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
       - name: Install olm
         run: |
+          trap 'echo "Saving OLM logs" ; kubectl get pods --namespace mondoo-operator -o yaml >> olm-logs.txt' EXIT
           operator-sdk olm install
           kubectl create ns mondoo-operator
           operator-sdk run bundle '${{ inputs.bundle-img }}' --namespace mondoo-operator --timeout 5m0s
@@ -62,3 +63,9 @@ jobs:
         run: |
           operator-sdk cleanup mondoo-operator --namespace mondoo-operator
           operator-sdk olm uninstall
+      - name: Upload olm logs artifact
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: olm-logs
+          path: /home/runner/work/mondoo-operator/mondoo-operator/olm-logs.txt

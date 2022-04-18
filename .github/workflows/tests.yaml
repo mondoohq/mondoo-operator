@@ -44,6 +44,10 @@ jobs:
       - name: Store creds
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+      - name: Test failure
+        run: |
+          kubectl get pods -n kube-system
+          kubectl get deployments -A
       - run: make test/integration/ci
       - uses: actions/download-artifact@v3 # download the unit test results
         with:
