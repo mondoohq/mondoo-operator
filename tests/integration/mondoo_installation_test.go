@@ -160,114 +160,102 @@ func (s *MondooInstallationSuite) testMondooAuditConfig(auditConfig mondoov1.Mon
 		fmt.Sprintf("%s-webhook-service.%s.svc", auditConfig.Name, auditConfig.Namespace),
 		fmt.Sprintf("%s-webhook-service.%s.svc.cluster.local", auditConfig.Name, auditConfig.Namespace),
 	}
-	caCert, serverCert, serverPrivKey := utils.GenerateWebhookCerts(s.Suite, serviceDNSNames)
+	secretName := "webhook-server-cert"
+	caCert, err := s.testCluster.MondooInstaller.GenerateServiceCerts(&auditConfig, secretName, serviceDNSNames)
 
-	// Save cert/key to the Secret name the Webhook Deployment will expect
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "webhook-server-cert",
-			Namespace: auditConfig.Namespace,
-		},
-		StringData: map[string]string{
-			"ca.crt":  caCert.String(),
-			"tls.crt": serverCert.String(),
-			"tls.key": serverPrivKey.String(),
-		},
+	// Don't bother with further webhook tests if we couldnt' save the certificates
+	if s.NoErrorf(err, "Error while generating/saving certificates for webhook service") {
+		// Disable imageResolution for the webhook image to be runnable.
+		// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
+		// image, and fail because we haven't pushed this image publicly.
+		operatorConfig := &mondoov1.MondooOperatorConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: mondoov1.MondooOperatorConfigName,
+			},
+		}
+		s.Require().NoErrorf(
+			s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(operatorConfig), operatorConfig),
+			"Failed to get existing MondooOperatorConfig")
+
+		operatorConfig.Spec.SkipContainerResolution = true
+		s.Require().NoErrorf(s.testCluster.K8sHelper.Clientset.Update(s.ctx, operatorConfig),
+			"Failed to set SkipContainerResolution on MondooOperatorConfig for webhook test")
+
+		// Enable webhook
+		s.NoError(s.testCluster.K8sHelper.Clientset.Get(
+			s.ctx, client.ObjectKeyFromObject(&auditConfig), &auditConfig))
+
+		auditConfig.Spec.Nodes.Enable = false
+		auditConfig.Spec.Webhooks.Enable = true
+		s.NoErrorf(
+			s.testCluster.K8sHelper.Clientset.Update(s.ctx, &auditConfig),
+			"Failed to update MondooAuditConfig.")
+
+		// Wait for Ready Pod
+		webhookLabels := []string{mondoocontrollers.WebhookLabelKey + "=" + mondoocontrollers.WebhookLabelValue}
+		webhookLabelsString := strings.Join(webhookLabels, ",")
+		s.Truef(
+			s.testCluster.K8sHelper.IsPodReady(webhookLabelsString, auditConfig.Namespace),
+			"Mondoo webhook Pod is not in a Ready state.")
+
+		// Change the webhook from Ignore to Fail to prove that the webhook is active
+		vwc := &webhooksv1.ValidatingWebhookConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				// namespace-name-mondoo
+				Name: fmt.Sprintf("%s-%s-mondoo", auditConfig.Namespace, auditConfig.Name),
+			},
+		}
+		s.NoErrorf(
+			s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(vwc), vwc),
+			"Failed to retrieve ValidatingWebhookConfiguration")
+
+		fail := webhooksv1.Fail
+		for i := range vwc.Webhooks {
+			vwc.Webhooks[i].FailurePolicy = &fail
+		}
+
+		s.NoErrorf(
+			s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
+			"Failed to change Webhook FailurePolicy to Fail")
+
+		// Try and fail to Update() a Deployment
+
+		listOpts, err = utils.LabelSelectorListOptions(webhookLabelsString)
+		s.NoError(err)
+		listOpts.Namespace = auditConfig.Namespace
+
+		deployments = &appsv1.DeploymentList{}
+		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
+
+		s.Equalf(1, len(deployments.Items), "Deployments count for webhook should be precisely one")
+
+		deployments.Items[0].Labels["testLabel"] = "testValue"
+
+		s.Errorf(
+			s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
+			"Expected failed updated of Deployment because certificate setup is incomplete")
+
+		// Now put the CA data into the webhook
+		for i := range vwc.Webhooks {
+			vwc.Webhooks[i].ClientConfig.CABundle = caCert.Bytes()
+		}
+
+		s.NoErrorf(
+			s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
+			"Failed to add CA data to Webhook")
+
+		// Now the Deployment Update() should work
+		s.NoErrorf(
+			s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
+			"Expected update of Deployment to succeed after CA data applied to webhook")
+
+		// Bring back the default image resolution behavior
+		operatorConfig.Spec.SkipContainerResolution = false
+
+		s.NoErrorf(
+			s.testCluster.K8sHelper.Clientset.Update(s.ctx, operatorConfig),
+			"Failed to restore container resolution in MondooOperatorConfig")
 	}
-
-	s.NoError(s.testCluster.K8sHelper.Clientset.Create(s.ctx, secret))
-
-	// Disable imageResolution for the webhook image to be runnable.
-	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
-	// image, and fail because we haven't pushed this image publicly.
-	operatorConfig := &mondoov1.MondooOperatorConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: mondoov1.MondooOperatorConfigName,
-		},
-	}
-	s.Require().NoError(
-		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(operatorConfig), operatorConfig),
-		"Failed to get existing MondooOperatorConfig")
-
-	operatorConfig.Spec.SkipContainerResolution = true
-	s.Require().NoError(s.testCluster.K8sHelper.Clientset.Update(s.ctx, operatorConfig),
-		"Failed to set SkipContainerResolution on MondooOperatorConfig for webhook test")
-
-	// Enable webhook
-	s.NoError(s.testCluster.K8sHelper.Clientset.Get(
-		s.ctx, client.ObjectKeyFromObject(&auditConfig), &auditConfig))
-
-	auditConfig.Spec.Nodes.Enable = false
-	auditConfig.Spec.Webhooks.Enable = true
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Update(s.ctx, &auditConfig),
-		"Failed to update MondooAuditConfig.")
-
-	// Wait for Ready Pod
-	webhookLabels := []string{mondoocontrollers.WebhookLabelKey + "=" + mondoocontrollers.WebhookLabelValue}
-	webhookLabelsString := strings.Join(webhookLabels, ",")
-	s.Truef(
-		s.testCluster.K8sHelper.IsPodReady(webhookLabelsString, auditConfig.Namespace),
-		"Mondoo webhook Pod is not in a Ready state.")
-
-	// Change the webhook from Ignore to Fail to prove that the webhook is active
-	vwc := &webhooksv1.ValidatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			// namespace-name-mondoo
-			Name: fmt.Sprintf("%s-%s-mondoo", auditConfig.Namespace, auditConfig.Name),
-		},
-	}
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(vwc), vwc),
-		"Failed to retrieve ValidatingWebhookConfiguration")
-
-	fail := webhooksv1.Fail
-	for i := range vwc.Webhooks {
-		vwc.Webhooks[i].FailurePolicy = &fail
-	}
-
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
-		"Failed to change Webhook FailurePolicy to Fail")
-
-	// Try and fail to Update() a Deployment
-
-	listOpts, err = utils.LabelSelectorListOptions(webhookLabelsString)
-	s.NoError(err)
-	listOpts.Namespace = auditConfig.Namespace
-
-	deployments = &appsv1.DeploymentList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
-
-	s.Equalf(1, len(deployments.Items), "Deployments count for webhook should be precisely one")
-
-	deployments.Items[0].Labels["testLabel"] = "testValue"
-
-	s.Errorf(
-		s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
-		"Expected failed updated of Deployment because certificate setup is incomplete")
-
-	// Now put the CA data into the webhook
-	for i := range vwc.Webhooks {
-		vwc.Webhooks[i].ClientConfig.CABundle = caCert.Bytes()
-	}
-
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
-		"Failed to add CA data to Webhook")
-
-	// Now the Deployment Update() should work
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
-		"Expected update of Deployment to succeed after CA data applied to webhook")
-
-	// Bring back the default image resolution behavior
-	operatorConfig.Spec.SkipContainerResolution = false
-
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Update(s.ctx, operatorConfig),
-		"Failed to restore container resolution in MondooOperatorConfig")
-
 }
 
 func TestMondooInstallationSuite(t *testing.T) {
