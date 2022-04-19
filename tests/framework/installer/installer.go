@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -68,6 +70,16 @@ func (i *MondooInstaller) InstallOperator() error {
 
 	if !i.K8sHelper.IsPodReady("control-plane=controller-manager", i.Settings.Namespace) {
 		return fmt.Errorf("Mondoo operator is not in a ready state.")
+	}
+
+	// Create a MondooOperatorConfig with default values
+	operatorConfig := &mondoov1.MondooOperatorConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: mondoov1.MondooOperatorConfigName,
+		},
+	}
+	if err := i.K8sHelper.Clientset.Create(i.ctx, operatorConfig); err != nil {
+		return fmt.Errorf("failed to create default MondooOperatorConfig: %s", err)
 	}
 	zap.S().Info("Mondoo operator is ready.")
 
@@ -164,4 +176,36 @@ func (i *MondooInstaller) readManifestWithNamespace(manifest string) string {
 		updatedNamespace,
 		"namespace: mondoo-operator",
 		fmt.Sprintf("namespace: %s", i.Settings.Namespace))
+}
+
+// GenerateServiceCerts will generate a CA along with signed certificates for the provided dnsNames, and save
+// it into secretName. It will return the CA certificate and any error encountered.
+func (i *MondooInstaller) GenerateServiceCerts(auditConfig *mondoov1.MondooAuditConfig, secretName string, serviceDNSNames []string) (*bytes.Buffer, error) {
+	if auditConfig == nil {
+		return nil, fmt.Errorf("cannot generate certificates for a nil MondooAuditConfig")
+	}
+
+	caCert, serverCert, serverPrivKey, err := utils.GenerateTLSCerts(serviceDNSNames)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate certificates: %s", err)
+	}
+
+	// Save cert/key to the Secret name the Webhook Deployment will expect
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: auditConfig.Namespace,
+		},
+		StringData: map[string]string{
+			"ca.crt":  caCert.String(),
+			"tls.crt": serverCert.String(),
+			"tls.key": serverPrivKey.String(),
+		},
+	}
+
+	if err := i.K8sHelper.Clientset.Create(i.ctx, secret); err != nil {
+		return nil, fmt.Errorf("failed to create Secret with certificate data: %s", err)
+	}
+
+	return caCert, nil
 }
