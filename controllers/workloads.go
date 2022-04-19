@@ -387,14 +387,14 @@ func updateWorkloadsConditions(config *v1alpha1.MondooAuditConfig, degradedStatu
 	msg := "API Scanning is Available"
 	reason := "APIScanningAvailable"
 	status := corev1.ConditionFalse
-	updateCheck := UpdateConditionIfReasonOrMessageChange
+	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
 	if degradedStatus {
 		msg = "API Scanning is Unavailable"
 		reason = "APIScanningUnavailable"
 		status = corev1.ConditionTrue
 	}
 
-	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, v1alpha1.APIScanningDegraded, status, reason, msg, updateCheck)
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, v1alpha1.APIScanningDegraded, status, reason, msg, updateCheck)
 
 }
 

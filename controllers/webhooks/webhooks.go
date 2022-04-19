@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package webhooks
 
 import (
 	"bytes"
@@ -79,7 +79,6 @@ type Webhooks struct {
 	Mondoo               *mondoov1alpha1.MondooAuditConfig
 	KubeClient           client.Client
 	TargetNamespace      string
-	Scheme               *runtime.Scheme
 	Image                string
 	MondooOperatorConfig *mondoov1alpha1.MondooOperatorConfig
 }
@@ -381,7 +380,7 @@ func (n *Webhooks) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1
 			KubeClient:      n.KubeClient,
 			TargetNamespace: n.TargetNamespace,
 			Mondoo:          n.Mondoo,
-			Scheme:          n.Scheme,
+			Scheme:          n.KubeClient.Scheme(),
 		}
 
 		var err error
@@ -497,7 +496,7 @@ func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
 			TargetNamespace: n.TargetNamespace,
 			KubeClient:      n.KubeClient,
 			Mondoo:          n.Mondoo,
-			Scheme:          n.Scheme,
+			Scheme:          n.KubeClient.Scheme(),
 		}
 		if err := cm.Cleanup(ctx); err != nil {
 			return ctrl.Result{}, err
@@ -615,7 +614,7 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 }
 
 func (n *Webhooks) setControllerRef(obj client.Object) error {
-	if err := ctrl.SetControllerReference(n.Mondoo, obj, n.Scheme); err != nil {
+	if err := ctrl.SetControllerReference(n.Mondoo, obj, n.KubeClient.Scheme()); err != nil {
 		webhookLog.Error(err, "Failed to set ControllerReference", "Object", obj)
 		return err
 	}
@@ -641,14 +640,14 @@ func updateWebhooksConditions(config *mondoov1alpha1.MondooAuditConfig, degraded
 	msg := "Webhook is available"
 	reason := "WebhookAailable"
 	status := corev1.ConditionFalse
-	updateCheck := UpdateConditionIfReasonOrMessageChange
+	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
 	if degradedStatus {
 		msg = "Webhook is Unavailable"
 		reason = "WebhhookUnvailable"
 		status = corev1.ConditionTrue
 	}
 
-	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha1.WebhookDegraded, status, reason, msg, updateCheck)
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha1.WebhookDegraded, status, reason, msg, updateCheck)
 
 }
 

@@ -1,15 +1,10 @@
-package controllers
+package webhooks
 
 import (
 	"context"
-	"crypto/sha1"
-	"encoding/hex"
 	"fmt"
 	"testing"
 
-	"github.com/google/go-containerregistry/pkg/name"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -29,6 +24,7 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
+	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 )
 
 const (
@@ -36,23 +32,9 @@ const (
 	testMondooAuditConfigName = "mondoo-client"
 )
 
-// A fake implementation of the getImage function that does not query remote container registries.
-var fakeGetRemoteImageFunc = func(ref name.Reference, options ...remote.Option) (*remote.Descriptor, error) {
-	h := sha1.New()
-	h.Write([]byte(ref.Identifier()))
-	hash, _ := v1.NewHash(hex.EncodeToString(h.Sum(nil))) // should never fail
-
-	return &remote.Descriptor{
-		Descriptor: v1.Descriptor{
-			Digest: hash,
-		},
-	}, nil
-}
-
 func init() {
 	utilruntime.Must(mondoov1alpha1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(certmanagerv1.AddToScheme(scheme.Scheme))
-
 }
 
 func TestWebhooksReconcile(t *testing.T) {
@@ -313,7 +295,7 @@ func TestWebhooksReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			// Mock the retrieval of the actual image from the remote registry
-			mondoo.GetRemoteImage = fakeGetRemoteImageFunc
+			mondoo.GetRemoteImage = utils.FakeGetRemoteImageFunc
 
 			fakeClient := fake.NewClientBuilder().WithObjects(test.existingObjects...).Build()
 
@@ -328,7 +310,6 @@ func TestWebhooksReconcile(t *testing.T) {
 				Mondoo:               auditConfig,
 				KubeClient:           fakeClient,
 				TargetNamespace:      testNamespace,
-				Scheme:               scheme.Scheme,
 				MondooOperatorConfig: &v1alpha1.MondooOperatorConfig{},
 			}
 

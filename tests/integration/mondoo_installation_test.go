@@ -18,6 +18,7 @@ import (
 
 	mondoov1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	mondoocontrollers "go.mondoo.com/mondoo-operator/controllers"
+	mondoowebhooks "go.mondoo.com/mondoo-operator/controllers/webhooks"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 )
@@ -192,7 +193,7 @@ func (s *MondooInstallationSuite) testMondooAuditConfig(auditConfig mondoov1.Mon
 			"Failed to update MondooAuditConfig.")
 
 		// Wait for Ready Pod
-		webhookLabels := []string{mondoocontrollers.WebhookLabelKey + "=" + mondoocontrollers.WebhookLabelValue}
+		webhookLabels := []string{mondoowebhooks.WebhookLabelKey + "=" + mondoowebhooks.WebhookLabelValue}
 		webhookLabelsString := strings.Join(webhookLabels, ",")
 		s.Truef(
 			s.testCluster.K8sHelper.IsPodReady(webhookLabelsString, auditConfig.Namespace),

@@ -373,14 +373,15 @@ func updateNodeConditions(config *v1alpha1.MondooAuditConfig, degradedStatus boo
 	msg := "Node Scanning is Available"
 	reason := "NodeScanningAvailable"
 	status := corev1.ConditionFalse
-	updateCheck := UpdateConditionIfReasonOrMessageChange
+	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
 	if degradedStatus {
 		msg = "Node Scanning is Unavailable"
 		reason = "NodeScanningUnavailable"
 		status = corev1.ConditionTrue
 	}
 
-	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, v1alpha1.NodeScanningDegraded, status, reason, msg, updateCheck)
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(
+		config.Status.Conditions, v1alpha1.NodeScanningDegraded, status, reason, msg, updateCheck)
 
 }
 
