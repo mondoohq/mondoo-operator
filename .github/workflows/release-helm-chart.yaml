@@ -36,6 +36,7 @@ jobs:
 
       - name: Create and Install Helm chart
         run: |
+          trap 'echo "Saving Helm logs" ; kubectl get pods --namespace mondoo-operator -o yaml >> helm-logs.txt ; kubectl logs --namespace mondoo-operator deployment/mondoo-operator-controller-manager >> helm-logs.txt' EXIT
           kubectl create namespace mondoo-operator
           helm install mondoo-operator charts/mondoo-operator --namespace mondoo-operator
           echo ${{ secrets.MONDOO_CLIENT }} > creds.json
@@ -44,6 +45,7 @@ jobs:
           kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
       - name: Verify Mondoo Operator Helm Chart
         run: |
+          trap 'echo "Saving Helm logs" ; kubectl get pods --namespace mondoo-operator -o yaml >> helm-logs.txt' EXIT
           kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator 
           kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator --timeout=600s
           curl -sSL http://mondoo.io/download.sh | bash
@@ -57,3 +59,9 @@ jobs:
         uses: luisico/chart-releaser-action@on-tags
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Upload helm logs artifact
+        uses: actions/upload-artifacts@v3
+        if: failure()
+        with:
+          name: helm-logs
+          path: /home/runner/work/mondoo-operator/mondoo-operator/helm-logs.txt
