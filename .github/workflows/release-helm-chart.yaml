@@ -36,7 +36,7 @@ jobs:
 
       - name: Create and Install Helm chart
         run: |
-          trap 'echo "Saving Helm logs" ; kubectl get pods --namespace mondoo-operator -o yaml >> helm-logs.txt' EXIT
+          trap 'echo "Saving Helm logs" ; kubectl get pods --namespace mondoo-operator -o yaml >> helm-logs.txt ; kubectl logs --namespace mondoo-operator deployment/mondoo-operator-controller-manager >> helm-logs.txt' EXIT
           kubectl create namespace mondoo-operator
           helm install mondoo-operator charts/mondoo-operator --namespace mondoo-operator
           echo ${{ secrets.MONDOO_CLIENT }} > creds.json
