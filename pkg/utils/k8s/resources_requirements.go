@@ -1,4 +1,4 @@
-package controllers
+package k8s
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -18,20 +18,9 @@ var defaultMondooClientResources corev1.ResourceRequirements = corev1.ResourceRe
 	},
 }
 
-// equalResouceRequirements compares two different resource requiremetns to be eqal
-func equalResouceRequirements(x corev1.ResourceRequirements, y corev1.ResourceRequirements) bool {
-	if x.Limits.Cpu().Equal(*y.Limits.Cpu()) &&
-		x.Limits.Memory().Equal(*y.Limits.Memory()) &&
-		x.Requests.Cpu().Equal(*y.Requests.Cpu()) &&
-		x.Requests.Memory().Equal(*y.Requests.Memory()) {
-		return true
-	}
-	return false
-}
-
-// getNodeResources will return the ResourceRequirements for the Mondoo container.
-func getResourcesRequirements(m corev1.ResourceRequirements) corev1.ResourceRequirements {
-	// Allow override of resource requirements from Mondoo Object
+// ResourcesRequirementsWithDefaults will return the resource requirements from the parameter if such
+// are specified. If not requirements are specified, default values will be returned.
+func ResourcesRequirementsWithDefaults(m corev1.ResourceRequirements) corev1.ResourceRequirements {
 	if m.Size() != 0 {
 		return m
 	}

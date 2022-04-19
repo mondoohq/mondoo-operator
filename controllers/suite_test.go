@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	k8sv1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -54,7 +55,7 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	// Mock the retrieval of the actual image from the remote registry
-	getRemoteImage = fakeGetRemoteImageFunc
+	mondoo.GetRemoteImage = fakeGetRemoteImageFunc
 
 	ctx, cancel = context.WithCancel(context.TODO())
 

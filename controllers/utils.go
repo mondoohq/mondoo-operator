@@ -21,108 +21,13 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
-	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 )
-
-const (
-	mondooImage         = "docker.io/mondoo/client"
-	mondooTag           = "latest"
-	mondooOperatorImage = "ghcr.io/mondoohq/mondoo-operator"
-	mondooOperatorTag   = "latest"
-)
-
-type getRemoteImageFunc func(ref name.Reference, options ...remote.Option) (*remote.Descriptor, error)
-
-var getRemoteImage getRemoteImageFunc = remote.Get
-
-func resolveMondooImage(log logr.Logger, userImageName, userImageTag string, skipResolveImage bool) (string, error) {
-	useImage := mondooImage
-	useTag := mondooTag
-	if userImageName != "" {
-		useImage = userImageName
-	}
-	if userImageTag != "" {
-		useTag = userImageTag
-	}
-	mondooContainer := useImage + ":" + useTag
-	imageUrl, err := getImage(skipResolveImage, log, mondooContainer)
-	if err != nil {
-		log.Error(err, "Failed resolve image")
-		return imageUrl, err
-	}
-	return imageUrl, nil
-
-}
-
-func resolveMondooOperatorImage(log logr.Logger, userImageName, userImageTag string, skipResolveImage bool) (string, error) {
-	useImage := mondooOperatorImage
-	useTag := mondooOperatorTag
-	if userImageName != "" {
-		useImage = userImageName
-	}
-	if userImageTag != "" {
-		useTag = userImageTag
-	}
-	mondooContainer := useImage + ":" + useTag
-
-	imageUrl, err := getImage(skipResolveImage, log, mondooContainer)
-	if err != nil {
-		log.Error(err, "Failed to resolve image")
-		return imageUrl, err
-	}
-	return imageUrl, nil
-}
-
-func getImage(skipResolveImage bool, log logr.Logger, mondooContainer string) (string, error) {
-	if !skipResolveImage {
-		imageUrl, err := parseReference(log, mondooContainer)
-		if err != nil {
-			log.Error(err, "Failed to parse reference")
-			return "", err
-		}
-		return imageUrl, nil
-	}
-	return mondooContainer, nil
-}
-
-func parseReference(log logr.Logger, container string) (string, error) {
-	ref, err := name.ParseReference(container)
-	if err != nil {
-		log.Error(err, "Failed to parse container reference")
-		return "", err
-	}
-
-	desc, err := getRemoteImage(ref)
-	if err != nil {
-		log.Error(err, "Failed to get container reference")
-		return "", err
-	}
-	imgDigest := desc.Digest.String()
-	repoName := ref.Context().Name()
-	imageUrl := repoName + "@" + imgDigest
-
-	return imageUrl, nil
-}
-
-// AreDeploymentsDifferent returns a value indicating whether 2 deployments are different. Note that it does not perform a full
-// comparison but checks just some of the properties of a deployment (only the ones we are currently interested at).
-func AreDeploymentsDifferent(a, b appsv1.Deployment) bool {
-	return len(a.Spec.Template.Spec.Containers) != len(b.Spec.Template.Spec.Containers) ||
-		!reflect.DeepEqual(a.Spec.Replicas, b.Spec.Replicas) ||
-		!reflect.DeepEqual(a.Spec.Selector, b.Spec.Selector) ||
-		!reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Image, b.Spec.Template.Spec.Containers[0].Image) ||
-		!reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Command, b.Spec.Template.Spec.Containers[0].Command) ||
-		!reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].VolumeMounts, b.Spec.Template.Spec.Containers[0].VolumeMounts) ||
-		!reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Env, b.Spec.Template.Spec.Containers[0].Env)
-}
 
 // UpdateConditionCheck tests whether a condition should be updated from the
 // old condition to the new condition. Returns true if the condition should

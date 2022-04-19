@@ -1,9 +1,11 @@
-package controllers
+package scanapi
 
 import (
 	"fmt"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,7 +20,7 @@ const (
 
 var scanApiLabels = map[string]string{"app": "mondoo-scan-api"}
 
-func ScanApiDeployment(ns string, m *v1alpha1.MondooAuditConfig) appsv1.Deployment {
+func ScanApiDeployment(ns string, m v1alpha1.MondooAuditConfig) appsv1.Deployment {
 	return appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      scanApiDeploymentName,
@@ -35,10 +37,10 @@ func ScanApiDeployment(ns string, m *v1alpha1.MondooAuditConfig) appsv1.Deployme
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image:     mondooImage,
+						Image:     mondoo.MondooImage,
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--api", "--config", "/etc/opt/mondoo/mondoo.yml"},
-						Resources: getResourcesRequirements(m.Spec.Workloads.Resources),
+						Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Workloads.Resources),
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{

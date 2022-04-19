@@ -23,6 +23,7 @@ import (
 	"reflect"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,7 +74,7 @@ func (c *CertManagerHandler) Cleanup(ctx context.Context) error {
 		},
 	}
 
-	if err := genericDelete(ctx, c.KubeClient, certificate); err != nil {
+	if err := k8s.DeleteIfExists(ctx, c.KubeClient, certificate); err != nil {
 		certManagerLog.Error(err, "Failed to clean up cert-manager Certificate resource")
 		return err
 	}
@@ -85,7 +86,7 @@ func (c *CertManagerHandler) Cleanup(ctx context.Context) error {
 		},
 	}
 
-	if err := genericDelete(ctx, c.KubeClient, issuer); err != nil {
+	if err := k8s.DeleteIfExists(ctx, c.KubeClient, issuer); err != nil {
 		certManagerLog.Error(err, "Failed to clean up cert-manager Issuer resource")
 		return err
 	}

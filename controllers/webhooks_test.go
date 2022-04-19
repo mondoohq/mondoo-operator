@@ -28,6 +28,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
 const (
@@ -312,7 +313,7 @@ func TestWebhooksReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			// Mock the retrieval of the actual image from the remote registry
-			getRemoteImage = fakeGetRemoteImageFunc
+			mondoo.GetRemoteImage = fakeGetRemoteImageFunc
 
 			fakeClient := fake.NewClientBuilder().WithObjects(test.existingObjects...).Build()
 
