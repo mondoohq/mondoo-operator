@@ -22,6 +22,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"reflect"
 
 	webhooksv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -102,6 +103,10 @@ func (n *Webhooks) syncValidatingWebhookConfiguration(ctx context.Context,
 	for i := range vwc.Webhooks {
 		vwc.Webhooks[i].ClientConfig.Service.Name = getWebhookServiceName(n.Mondoo.Name)
 		vwc.Webhooks[i].ClientConfig.Service.Namespace = n.Mondoo.Namespace
+
+		if vwc.Webhooks[i].ClientConfig.Service.Port == nil {
+			vwc.Webhooks[i].ClientConfig.Service.Port = pointer.Int32(443)
+		}
 	}
 
 	metav1.SetMetaDataAnnotation(&vwc.ObjectMeta, annotationKey, annotationValue)
@@ -159,7 +164,7 @@ func deepEqualsValidatingWebhookConfiguration(existing, desired *webhooksv1.Vali
 	}
 
 	for i := range existing.Webhooks {
-		if existing.Webhooks[i].ClientConfig.Service != desired.Webhooks[i].ClientConfig.Service {
+		if !reflect.DeepEqual(existing.Webhooks[i].ClientConfig.Service, desired.Webhooks[i].ClientConfig.Service) {
 			return false
 		}
 
