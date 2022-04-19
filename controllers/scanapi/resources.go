@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -47,6 +48,7 @@ func ScanApiDeployment(ns string, m v1alpha1.MondooAuditConfig) appsv1.Deploymen
 			Selector: &metav1.LabelSelector{
 				MatchLabels: scanApiLabels,
 			},
+			Replicas: pointer.Int32(1),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: scanApiLabels,

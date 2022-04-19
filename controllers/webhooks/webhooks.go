@@ -186,6 +186,7 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 					TargetPort: intstr.FromInt(webhook.DefaultPort),
 				},
 			},
+			Type: corev1.ServiceTypeClusterIP,
 			Selector: map[string]string{
 				WebhookLabelKey: WebhookLabelValue,
 			},
@@ -215,8 +216,9 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 	}
 
 	if !k8s.AreServicesEqual(*desiredService, *service) ||
-		!metav1.HasAnnotation(service.ObjectMeta, openShiftServiceAnnotationKey) ||
-		service.Annotations[openShiftServiceAnnotationKey] != webhookTLSSecretName {
+		(n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) &&
+			(!metav1.HasAnnotation(service.ObjectMeta, openShiftServiceAnnotationKey) ||
+				service.Annotations[openShiftServiceAnnotationKey] != webhookTLSSecretName)) {
 		if n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) {
 			metav1.SetMetaDataAnnotation(&service.ObjectMeta, openShiftServiceAnnotationKey, GetTLSCertificatesSecretName(n.Mondoo.Name))
 		}
