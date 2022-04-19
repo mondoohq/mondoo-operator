@@ -8,13 +8,6 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "mondoo-operator.fullname" . }}-nodes
-  labels:
-  {{- include "mondoo-operator.labels" . | nindent 4 }}
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
   name: {{ include "mondoo-operator.fullname" . }}-workload
   labels:
   {{- include "mondoo-operator.labels" . | nindent 4 }}
