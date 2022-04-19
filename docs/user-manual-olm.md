@@ -1,6 +1,6 @@
 # Install Mondoo Operator with olm
 
-The following steps sets up the Mondoo operator using kubectl and a manifest file.
+The following steps sets up the Mondoo operator using [Operator Lifecycle Manager (OLM)].
 
 ## Preconditions
 
@@ -10,9 +10,7 @@ The following steps sets up the Mondoo operator using kubectl and a manifest fil
 
 ## Deployment of Operator using Manifests
 
-1. Install Operator Lifecycle Manager (OLM)
-   `curl -sL https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v0.20.0/install.sh | bash -s v0.20.0`
-
+1. [Install Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/docs/getting-started/) in your Kubernetes cluster.
 2. Verify that operator-lifecycle-manager is up
 
 ```bash
