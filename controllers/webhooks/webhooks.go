@@ -42,6 +42,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
+	"go.mondoo.com/mondoo-operator/pkg/version"
 )
 
 const (
@@ -63,8 +64,6 @@ const (
 
 var (
 	webhookLog = ctrl.Log.WithName("webhook")
-
-	Version string
 
 	// webhookAnnotationList is a list of all the possible annotations we could set on a Webhook.
 	// It is needed so we can be sure to clear out any previous annotations in the event the
@@ -478,7 +477,7 @@ func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
 		// the $VERSION being built (or default to the git SHA). In the event that someone did a manual
 		// build of mondoo-operator and failed to set the Version variable, we will pass an empty string
 		// down to resolve the image which will result in the 'latest' tag being used as a fallback.
-		imageTag := Version
+		imageTag := version.Version
 		// Allow user to override the tag if specified
 		if n.Mondoo.Spec.Webhooks.Image.Tag != "" {
 			imageTag = n.Mondoo.Spec.Webhooks.Image.Tag

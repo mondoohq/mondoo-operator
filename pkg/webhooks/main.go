@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/version"
 	webhookhandler "go.mondoo.com/mondoo-operator/pkg/webhooks/handler"
 )
 
@@ -49,7 +50,7 @@ func main() {
 	}
 
 	// Setup webhooks
-	webhookLog.Info("setting up webhook server")
+	webhookLog.Info("setting up webhook server", "version", version.Version)
 	hookServer := mgr.GetWebhookServer()
 
 	// Determine whether we are in enforcing or permissive mode
