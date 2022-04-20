@@ -186,8 +186,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigWebhooks(auditConfig mondoov
 		vwc.Webhooks[i].ClientConfig.CABundle = caCert.Bytes()
 	}
 
-	//time.Sleep(10 * time.Second)
-
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
 		"Failed to add CA data to Webhook")
