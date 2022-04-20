@@ -219,12 +219,13 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 		return nil
 	}
 
+	tlsSecretName := GetTLSCertificatesSecretName(n.Mondoo.Name)
 	if !k8s.AreServicesEqual(*desiredService, *service) ||
 		(n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) &&
 			(!metav1.HasAnnotation(service.ObjectMeta, openShiftServiceAnnotationKey) ||
-				service.Annotations[openShiftServiceAnnotationKey] != webhookTLSSecretName)) {
+				service.Annotations[openShiftServiceAnnotationKey] != tlsSecretName)) {
 		if n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) {
-			metav1.SetMetaDataAnnotation(&service.ObjectMeta, openShiftServiceAnnotationKey, GetTLSCertificatesSecretName(n.Mondoo.Name))
+			metav1.SetMetaDataAnnotation(&service.ObjectMeta, openShiftServiceAnnotationKey, tlsSecretName)
 		}
 		service.Spec.Ports = desiredService.Spec.Ports
 		service.Spec.Selector = desiredService.Spec.Selector

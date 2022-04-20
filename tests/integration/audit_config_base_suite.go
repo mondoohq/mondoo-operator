@@ -105,7 +105,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigWebhooks(auditConfig mondoov
 		fmt.Sprintf("%s-webhook-service.%s.svc", auditConfig.Name, auditConfig.Namespace),
 		fmt.Sprintf("%s-webhook-service.%s.svc.cluster.local", auditConfig.Name, auditConfig.Namespace),
 	}
-	secretName := mondoocontrollers.GetTLSCertificatesSecretName(auditConfig.Name)
+	secretName := mondoowebhooks.GetTLSCertificatesSecretName(auditConfig.Name)
 	caCert, err := s.testCluster.MondooInstaller.GenerateServiceCerts(&auditConfig, secretName, serviceDNSNames)
 
 	// Don't bother with further webhook tests if we couldnt' save the certificates
