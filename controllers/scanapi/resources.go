@@ -29,26 +29,27 @@ import (
 )
 
 const (
-	scanApiDeploymentSuffix = "-scan-api"
-	scanApiServiceSuffix    = "-scan-api"
-	scanApiPort             = 8080
+	DeploymentSuffix = "-scan-api"
+	ServiceSuffix    = "-scan-api"
+	Port             = 8080
 )
 
 func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.Deployment {
+	labels := DeploymentLabels(m)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      scanApiDeploymentName(m.Name),
+			Name:      DeploymentName(m.Name),
 			Namespace: ns,
-			Labels:    scanApiDeploymentLabels(m),
+			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: scanApiDeploymentLabels(m),
+				MatchLabels: labels,
 			},
 			Replicas: pointer.Int32(1),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: scanApiDeploymentLabels(m),
+					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
@@ -60,7 +61,7 @@ func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.D
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{
 									Path: "/Health/Check",
-									Port: intstr.FromInt(scanApiPort),
+									Port: intstr.FromInt(Port),
 								},
 							},
 							InitialDelaySeconds: 5,
@@ -71,7 +72,7 @@ func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.D
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{
 									Path: "/Health/Check",
-									Port: intstr.FromInt(scanApiPort),
+									Port: intstr.FromInt(Port),
 								},
 							},
 							InitialDelaySeconds: 5,
@@ -86,12 +87,12 @@ func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.D
 							},
 						},
 						Ports: []corev1.ContainerPort{
-							{ContainerPort: scanApiPort, Protocol: corev1.ProtocolTCP},
+							{ContainerPort: Port, Protocol: corev1.ProtocolTCP},
 						},
 						Env: []corev1.EnvVar{
 							{Name: "DEBUG", Value: "false"},
 							{Name: "MONDOO_PROCFS", Value: "on"},
-							{Name: "PORT", Value: fmt.Sprintf("%d", scanApiPort)},
+							{Name: "PORT", Value: fmt.Sprintf("%d", Port)},
 						},
 					}},
 					ServiceAccountName: m.Spec.Workloads.ServiceAccount,
@@ -126,33 +127,34 @@ func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.D
 func ScanApiService(ns string, m v1alpha1.MondooAuditConfig) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      scanApiServiceName(m.Name),
+			Name:      ServiceName(m.Name),
 			Namespace: ns,
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Port:       int32(scanApiPort),
+					Port:       int32(Port),
 					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(scanApiPort),
+					TargetPort: intstr.FromInt(Port),
 				},
 			},
-			Selector: scanApiDeploymentLabels(m),
+			Selector: DeploymentLabels(m),
+			Type:     corev1.ServiceTypeClusterIP,
 		},
 	}
 }
 
-func scanApiServiceName(prefix string) string {
-	return prefix + scanApiServiceSuffix
-}
-
-func scanApiDeploymentName(prefix string) string {
-	return prefix + scanApiDeploymentSuffix
-}
-
-func scanApiDeploymentLabels(m v1alpha1.MondooAuditConfig) map[string]string {
+func DeploymentLabels(m v1alpha1.MondooAuditConfig) map[string]string {
 	return map[string]string{
 		"app":       "mondoo-scan-api",
 		"mondoo_cr": m.Name,
 	}
+}
+
+func ServiceName(prefix string) string {
+	return prefix + ServiceSuffix
+}
+
+func DeploymentName(prefix string) string {
+	return prefix + DeploymentSuffix
 }

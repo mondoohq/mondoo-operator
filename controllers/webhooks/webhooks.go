@@ -53,7 +53,8 @@ type Webhooks struct {
 	Mondoo               *mondoov1alpha1.MondooAuditConfig
 	KubeClient           client.Client
 	TargetNamespace      string
-	Image                string
+	OperatorImage        string
+	ClientImage          string
 	MondooOperatorConfig *mondoov1alpha1.MondooOperatorConfig
 }
 
@@ -201,7 +202,7 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 		mode = string(mondoov1alpha1.Permissive)
 	}
 
-	desiredDeployment := WebhookDeployment(n.TargetNamespace, n.Image, mode, *n.Mondoo)
+	desiredDeployment := WebhookDeployment(n.TargetNamespace, n.OperatorImage, mode, *n.Mondoo)
 	if err := n.setControllerRef(desiredDeployment); err != nil {
 		return err
 	}
@@ -343,9 +344,15 @@ func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		n.Image = mondooOperatorImage
+		n.OperatorImage = mondooOperatorImage
 
-		if err := scanapi.Deploy(ctx, n.KubeClient, n.TargetNamespace, n.Image, *n.Mondoo); err != nil {
+		mondooImage, err := mondoo.ResolveMondooImage(webhookLog, "", "", skipResolveImage)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		n.ClientImage = mondooImage
+
+		if err := scanapi.Deploy(ctx, n.KubeClient, n.TargetNamespace, n.ClientImage, *n.Mondoo); err != nil {
 			return ctrl.Result{}, err
 		}
 

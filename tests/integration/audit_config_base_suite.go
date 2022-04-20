@@ -15,7 +15,9 @@ import (
 
 	mondoov1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	mondoocontrollers "go.mondoo.com/mondoo-operator/controllers"
+	mondooscanapi "go.mondoo.com/mondoo-operator/controllers/scanapi"
 	mondoowebhooks "go.mondoo.com/mondoo-operator/controllers/webhooks"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 )
@@ -139,6 +141,25 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigWebhooks(auditConfig mondoov
 		s.testCluster.K8sHelper.IsPodReady(webhookLabelsString, auditConfig.Namespace),
 		"Mondoo webhook Pod is not in a Ready state.")
 
+	// Verify scan API deployment and service
+	var scanApiLabels []string
+	for k, v := range mondooscanapi.DeploymentLabels(auditConfig) {
+		scanApiLabels = append(scanApiLabels, fmt.Sprintf("%s=%s", k, v))
+	}
+	scanApiLabelsString := strings.Join(scanApiLabels, ",")
+	s.Truef(
+		s.testCluster.K8sHelper.IsPodReady(scanApiLabelsString, auditConfig.Namespace),
+		"Mondoo scan API Pod is not in a Ready state.")
+
+	scanApiService := mondooscanapi.ScanApiService(auditConfig.Namespace, auditConfig)
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(scanApiService), scanApiService),
+		"Failed to get scan API service.")
+
+	s.Truef(
+		k8s.AreServicesEqual(*mondooscanapi.ScanApiService(auditConfig.Namespace, auditConfig), *scanApiService),
+		"Scan API service is not as expected.")
+
 	// Change the webhook from Ignore to Fail to prove that the webhook is active
 	vwc := &webhooksv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
@@ -155,11 +176,9 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigWebhooks(auditConfig mondoov
 		vwc.Webhooks[i].FailurePolicy = &fail
 	}
 
-	test := s.NoErrorf(
+	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
 		"Failed to change Webhook FailurePolicy to Fail")
-
-	zap.S().Infof("%b", test)
 
 	// Try and fail to Update() a Deployment
 	listOpts, err := utils.LabelSelectorListOptions(webhookLabelsString)
