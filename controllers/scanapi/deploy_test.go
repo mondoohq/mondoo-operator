@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -21,12 +22,14 @@ type DeploySuite struct {
 	suite.Suite
 	ctx    context.Context
 	scheme *runtime.Scheme
+	image  string
 }
 
 func (s *DeploySuite) SetupSuite() {
 	s.ctx = context.Background()
 	s.scheme = clientgoscheme.Scheme
 	s.Require().NoError(mondoov1alpha1.AddToScheme(s.scheme))
+	s.image = mondoo.MondooOperatorImage + ":" + mondoo.MondooOperatorTag
 }
 
 func (s *DeploySuite) TestDeploy_Create() {
@@ -35,67 +38,67 @@ func (s *DeploySuite) TestDeploy_Create() {
 
 	client := fake.NewClientBuilder().WithScheme(s.scheme).Build()
 
-	s.NoError(Deploy(s.ctx, client, ns, auditConfig))
+	s.NoError(Deploy(s.ctx, client, ns, s.image, auditConfig))
 
 	ds := &appsv1.DeploymentList{}
 	s.NoError(client.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
-	d := ScanApiDeployment(ns, auditConfig)
+	d := ScanApiDeployment(ns, s.image, auditConfig)
 	d.ResourceVersion = "1" // Needed because the fake client sets it.
-	s.NoError(ctrl.SetControllerReference(&auditConfig, &d, s.scheme))
-	s.Equal(d, ds.Items[0])
+	s.NoError(ctrl.SetControllerReference(&auditConfig, d, s.scheme))
+	s.Equal(*d, ds.Items[0])
 
 	ss := &corev1.ServiceList{}
 	s.NoError(client.List(s.ctx, ss))
 	s.Equal(1, len(ss.Items))
 
-	service := ScanApiService(ns)
+	service := ScanApiService(ns, auditConfig)
 	service.ResourceVersion = "1" // Needed because the fake client sets it.
-	s.NoError(ctrl.SetControllerReference(&auditConfig, &service, s.scheme))
-	s.Equal(service, ss.Items[0])
+	s.NoError(ctrl.SetControllerReference(&auditConfig, service, s.scheme))
+	s.Equal(*service, ss.Items[0])
 }
 
 func (s *DeploySuite) TestDeploy_Update() {
 	ns := "test-ns"
 	auditConfig := utils.DefaultAuditConfig(ns, false, false, true)
-	d := ScanApiDeployment(ns, auditConfig)
+	d := ScanApiDeployment(ns, s.image, auditConfig)
 	d.Spec.Replicas = pointer.Int32(3)
 
-	service := ScanApiService(ns)
+	service := ScanApiService(ns, auditConfig)
 	service.Spec.Ports[0].Port = 1234
 
-	client := fake.NewClientBuilder().WithObjects(&d, &service).WithScheme(s.scheme).Build()
+	client := fake.NewClientBuilder().WithObjects(d, service).WithScheme(s.scheme).Build()
 
-	s.NoError(Deploy(s.ctx, client, ns, auditConfig))
+	s.NoError(Deploy(s.ctx, client, ns, s.image, auditConfig))
 
 	ds := &appsv1.DeploymentList{}
 	s.NoError(client.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
-	d = ScanApiDeployment(ns, auditConfig)
-	s.NoError(ctrl.SetControllerReference(&auditConfig, &d, s.scheme))
+	d = ScanApiDeployment(ns, s.image, auditConfig)
+	s.NoError(ctrl.SetControllerReference(&auditConfig, d, s.scheme))
 	d.ResourceVersion = "1000" // Needed because the fake client sets it.
 
-	s.Equal(d, ds.Items[0])
+	s.Equal(*d, ds.Items[0])
 
 	ss := &corev1.ServiceList{}
 	s.NoError(client.List(s.ctx, ss))
 	s.Equal(1, len(ss.Items))
 
-	service = ScanApiService(ns)
-	s.NoError(ctrl.SetControllerReference(&auditConfig, &service, s.scheme))
+	service = ScanApiService(ns, auditConfig)
+	s.NoError(ctrl.SetControllerReference(&auditConfig, service, s.scheme))
 	service.ResourceVersion = "1000" // Needed because the fake client sets it.
 
-	s.Equal(service, ss.Items[0])
+	s.Equal(*service, ss.Items[0])
 }
 
 func (s *DeploySuite) TestCleanup() {
 	ns := "test-ns"
 	auditConfig := utils.DefaultAuditConfig(ns, false, false, true)
-	d := ScanApiDeployment(ns, auditConfig)
-	service := ScanApiService(ns)
-	client := fake.NewClientBuilder().WithObjects(&d, &service).Build()
+	d := ScanApiDeployment(ns, s.image, auditConfig)
+	service := ScanApiService(ns, auditConfig)
+	client := fake.NewClientBuilder().WithObjects(d, service).Build()
 
 	s.NoError(Cleanup(s.ctx, client, ns, auditConfig))
 

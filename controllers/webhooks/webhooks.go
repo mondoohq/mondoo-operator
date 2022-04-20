@@ -64,7 +64,7 @@ func (n *Webhooks) syncValidatingWebhookConfiguration(ctx context.Context,
 
 	// Override the default/generic name to allow for multiple MondooAudicConfig resources
 	// to each have their own Webhook
-	vwcName, err := getValidatingWebhookName(n.Mondoo)
+	vwcName, err := validatingWebhookName(n.Mondoo)
 	if err != nil {
 		webhookLog.Error(err, "failed to generate Webhook name")
 		return err
@@ -74,7 +74,7 @@ func (n *Webhooks) syncValidatingWebhookConfiguration(ctx context.Context,
 	// And update the Webhook entries to point to the right namespace/name for the Service
 	// receiving the webhook calls
 	for i := range vwc.Webhooks {
-		vwc.Webhooks[i].ClientConfig.Service.Name = getWebhookServiceName(n.Mondoo.Name)
+		vwc.Webhooks[i].ClientConfig.Service.Name = webhookServiceName(n.Mondoo.Name)
 		vwc.Webhooks[i].ClientConfig.Service.Namespace = n.Mondoo.Namespace
 
 		if vwc.Webhooks[i].ClientConfig.Service.Port == nil {
@@ -345,7 +345,7 @@ func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
 		}
 		n.Image = mondooOperatorImage
 
-		if err := scanapi.Deploy(ctx, n.KubeClient, n.TargetNamespace, *n.Mondoo); err != nil {
+		if err := scanapi.Deploy(ctx, n.KubeClient, n.TargetNamespace, n.Image, *n.Mondoo); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -381,7 +381,7 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getWebhookServiceName(n.Mondoo.Name),
+			Name:      webhookServiceName(n.Mondoo.Name),
 			Namespace: n.TargetNamespace,
 		},
 	}
@@ -392,7 +392,7 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getWebhookDeploymentName(n.Mondoo.Name),
+			Name:      webhookDeploymentName(n.Mondoo.Name),
 			Namespace: n.TargetNamespace,
 		},
 	}
@@ -415,7 +415,7 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 	yamlDecoder := yamlutil.NewYAMLOrJSONDecoder(r, 4096)
 	objectDecoder := scheme.Codecs.UniversalDeserializer()
 
-	vwcName, err := getValidatingWebhookName(n.Mondoo)
+	vwcName, err := validatingWebhookName(n.Mondoo)
 	if err != nil {
 		webhookLog.Error(err, "failed to generate Webhook name")
 		return ctrl.Result{}, err

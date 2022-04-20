@@ -68,6 +68,8 @@ func TestWebhooksReconcile(t *testing.T) {
 				},
 			},
 			validate: func(t *testing.T, kubeClient client.Client) {
+				list := &corev1.ServiceList{}
+				assert.NoError(t, kubeClient.List(context.TODO(), list))
 				objects := defaultResourcesWhenEnabled()
 				for _, obj := range objects {
 					err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(obj), obj)
@@ -191,7 +193,7 @@ func TestWebhooksReconcile(t *testing.T) {
 			},
 			validate: func(t *testing.T, kubeClient client.Client) {
 				deployment := &appsv1.Deployment{}
-				deploymentKey := types.NamespacedName{Name: getWebhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
+				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Webhook Deployment to exist")
 
@@ -217,7 +219,7 @@ func TestWebhooksReconcile(t *testing.T) {
 			existingObjects: func() []client.Object {
 				deployment := &appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      getWebhookDeploymentName(testMondooAuditConfigName),
+						Name:      webhookDeploymentName(testMondooAuditConfigName),
 						Namespace: testNamespace,
 					},
 					Spec: appsv1.DeploymentSpec{
@@ -244,7 +246,7 @@ func TestWebhooksReconcile(t *testing.T) {
 			}(),
 			validate: func(t *testing.T, kubeClient client.Client) {
 				deployment := &appsv1.Deployment{}
-				deploymentKey := types.NamespacedName{Name: getWebhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
+				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Webhook Deployment to exist")
 
@@ -330,7 +332,7 @@ func defaultResourcesWhenEnabled() []client.Object {
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getWebhookServiceName(testMondooAuditConfigName),
+			Name:      webhookServiceName(testMondooAuditConfigName),
 			Namespace: testNamespace,
 		},
 	}
@@ -338,13 +340,13 @@ func defaultResourcesWhenEnabled() []client.Object {
 
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getWebhookDeploymentName(testMondooAuditConfigName),
+			Name:      webhookDeploymentName(testMondooAuditConfigName),
 			Namespace: testNamespace,
 		},
 	}
 	objects = append(objects, dep)
 
-	vwcName, err := getValidatingWebhookName(&mondoov1alpha1.MondooAuditConfig{
+	vwcName, err := validatingWebhookName(&mondoov1alpha1.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testMondooAuditConfigName,
 			Namespace: testNamespace,

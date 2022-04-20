@@ -48,7 +48,7 @@ func GetTLSCertificatesSecretName(mondooAuditConfigName string) string {
 func WebhookDeployment(ns, image, mode string, m mondoov1alpha1.MondooAuditConfig) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getWebhookDeploymentName(m.Name),
+			Name:      webhookDeploymentName(m.Name),
 			Namespace: ns,
 			Labels: map[string]string{
 				WebhookLabelKey: WebhookLabelValue,
@@ -151,7 +151,7 @@ func WebhookDeployment(ns, image, mode string, m mondoov1alpha1.MondooAuditConfi
 func WebhookService(ns string, m mondoov1alpha1.MondooAuditConfig) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getWebhookServiceName(m.Name),
+			Name:      webhookServiceName(m.Name),
 			Namespace: ns,
 		},
 		Spec: corev1.ServiceSpec{
@@ -170,15 +170,15 @@ func WebhookService(ns string, m mondoov1alpha1.MondooAuditConfig) *corev1.Servi
 	}
 }
 
-func getWebhookServiceName(prefix string) string {
+func webhookServiceName(prefix string) string {
 	return prefix + "-webhook-service"
 }
 
-func getWebhookDeploymentName(prefix string) string {
+func webhookDeploymentName(prefix string) string {
 	return prefix + "-webhook-manager"
 }
 
-func getValidatingWebhookName(mondooAuditConfig *mondoov1alpha1.MondooAuditConfig) (string, error) {
+func validatingWebhookName(mondooAuditConfig *mondoov1alpha1.MondooAuditConfig) (string, error) {
 	if mondooAuditConfig == nil {
 		return "", fmt.Errorf("cannot generate webhook name from nil MondooAuditConfig")
 	}

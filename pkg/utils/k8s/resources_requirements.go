@@ -6,7 +6,7 @@ import (
 )
 
 // defaultMondooClientResources for Mondoo Client container
-var defaultMondooClientResources corev1.ResourceRequirements = corev1.ResourceRequirements{
+var DefaultMondooClientResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
 		corev1.ResourceMemory: resource.MustParse("1G"),
 		corev1.ResourceCPU:    resource.MustParse("500m"),
@@ -26,5 +26,5 @@ func ResourcesRequirementsWithDefaults(m corev1.ResourceRequirements) corev1.Res
 	}
 
 	// Default values for Mondoo resources requirements.
-	return defaultMondooClientResources
+	return DefaultMondooClientResources
 }

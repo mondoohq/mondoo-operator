@@ -21,7 +21,6 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
-	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,35 +29,33 @@ import (
 )
 
 const (
-	scanApiDeploymentName = "mondoo-scan-api"
-	scanApiServiceName    = "mondoo-scan-api"
-	scanApiPort           = 8080
+	scanApiDeploymentSuffix = "-scan-api"
+	scanApiServiceSuffix    = "-scan-api"
+	scanApiPort             = 8080
 )
 
-var scanApiLabels = map[string]string{"app": "mondoo-scan-api"}
-
-func ScanApiDeployment(ns string, m v1alpha1.MondooAuditConfig) appsv1.Deployment {
-	return appsv1.Deployment{
+func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.Deployment {
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      scanApiDeploymentName,
+			Name:      scanApiDeploymentName(m.Name),
 			Namespace: ns,
-			Labels:    scanApiLabels,
+			Labels:    scanApiDeploymentLabels(m),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: scanApiLabels,
+				MatchLabels: scanApiDeploymentLabels(m),
 			},
 			Replicas: pointer.Int32(1),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: scanApiLabels,
+					Labels: scanApiDeploymentLabels(m),
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image:     mondoo.MondooImage,
+						Image:     image,
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--api", "--config", "/etc/opt/mondoo/mondoo.yml"},
-						Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Workloads.Resources),
+						Resources: k8s.DefaultMondooClientResources,
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{
@@ -126,10 +123,10 @@ func ScanApiDeployment(ns string, m v1alpha1.MondooAuditConfig) appsv1.Deploymen
 	}
 }
 
-func ScanApiService(ns string) corev1.Service {
-	return corev1.Service{
+func ScanApiService(ns string, m v1alpha1.MondooAuditConfig) *corev1.Service {
+	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      scanApiServiceName,
+			Name:      scanApiServiceName(m.Name),
 			Namespace: ns,
 		},
 		Spec: corev1.ServiceSpec{
@@ -140,7 +137,22 @@ func ScanApiService(ns string) corev1.Service {
 					TargetPort: intstr.FromInt(scanApiPort),
 				},
 			},
-			Selector: scanApiLabels,
+			Selector: scanApiDeploymentLabels(m),
 		},
+	}
+}
+
+func scanApiServiceName(prefix string) string {
+	return prefix + scanApiServiceSuffix
+}
+
+func scanApiDeploymentName(prefix string) string {
+	return prefix + scanApiDeploymentSuffix
+}
+
+func scanApiDeploymentLabels(m v1alpha1.MondooAuditConfig) map[string]string {
+	return map[string]string{
+		"app":       "mondoo-scan-api",
+		"mondoo_cr": m.Name,
 	}
 }

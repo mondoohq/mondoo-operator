@@ -157,8 +157,8 @@ func (c *CertManagerHandler) syncCertManagerCertificate(ctx context.Context) err
 
 	certificateSpec := certmanagerv1.CertificateSpec{
 		DNSNames: []string{
-			fmt.Sprintf("%s.%s.svc", getWebhookServiceName(c.Mondoo.Name), c.TargetNamespace),
-			fmt.Sprintf("%s.%s.svc.cluster.local", getWebhookServiceName(c.Mondoo.Name), c.TargetNamespace),
+			fmt.Sprintf("%s.%s.svc", webhookServiceName(c.Mondoo.Name), c.TargetNamespace),
+			fmt.Sprintf("%s.%s.svc.cluster.local", webhookServiceName(c.Mondoo.Name), c.TargetNamespace),
 		},
 		IssuerRef: certmanagerrefv1.ObjectReference{
 			Kind: "Issuer",

@@ -33,8 +33,8 @@ var logger = ctrl.Log.WithName("scan-api-deploy")
 
 // Deploy deploys the scan API for a given MondooAuditConfig. The function checks if the scan API is already deployed.
 // If that is the case, the existing resources are compared with the ones that are desired and the necessary updates are applied.
-func Deploy(ctx context.Context, kubeClient client.Client, ns string, mondoo mondoov1alpha1.MondooAuditConfig) error {
-	if err := createDeployment(ctx, kubeClient, ns, mondoo); err != nil {
+func Deploy(ctx context.Context, kubeClient client.Client, ns, image string, mondoo mondoov1alpha1.MondooAuditConfig) error {
+	if err := createDeployment(ctx, kubeClient, ns, image, mondoo); err != nil {
 		return err
 	}
 	return createService(ctx, kubeClient, ns, mondoo)
@@ -43,27 +43,27 @@ func Deploy(ctx context.Context, kubeClient client.Client, ns string, mondoo mon
 // Cleanup cleans up the scan API for a given MondooAuditConfig. The function returns no errors if the scan API is already
 // deleted.
 func Cleanup(ctx context.Context, kubeClient client.Client, ns string, mondoo mondoov1alpha1.MondooAuditConfig) error {
-	scanApiDeployment := ScanApiDeployment(ns, mondoo)
-	if err := k8s.DeleteIfExists(ctx, kubeClient, &scanApiDeployment); err != nil {
+	scanApiDeployment := ScanApiDeployment(ns, "", mondoo) // Image is not relevant when deleting.
+	if err := k8s.DeleteIfExists(ctx, kubeClient, scanApiDeployment); err != nil {
 		logger.Error(err, "failed to clean up scan API Deployment resource")
 		return err
 	}
 
-	scanApiService := ScanApiService(ns)
-	if err := k8s.DeleteIfExists(ctx, kubeClient, &scanApiService); err != nil {
+	scanApiService := ScanApiService(ns, mondoo)
+	if err := k8s.DeleteIfExists(ctx, kubeClient, scanApiService); err != nil {
 		logger.Error(err, "failed to clean up scan API Service resource")
 		return err
 	}
 	return nil
 }
 
-func createDeployment(ctx context.Context, kubeClient client.Client, ns string, mondoo mondoov1alpha1.MondooAuditConfig) error {
-	deployment := ScanApiDeployment(ns, mondoo)
-	if err := ctrl.SetControllerReference(&mondoo, &deployment, kubeClient.Scheme()); err != nil {
+func createDeployment(ctx context.Context, kubeClient client.Client, ns, image string, mondoo mondoov1alpha1.MondooAuditConfig) error {
+	deployment := ScanApiDeployment(ns, image, mondoo)
+	if err := ctrl.SetControllerReference(&mondoo, deployment, kubeClient.Scheme()); err != nil {
 		return err
 	}
 	existingDeployment := appsv1.Deployment{}
-	created, err := k8s.CreateIfNotExist(ctx, kubeClient, &existingDeployment, &deployment)
+	created, err := k8s.CreateIfNotExist(ctx, kubeClient, &existingDeployment, deployment)
 	if err != nil {
 		logger.Error(err, "Failed to create Deployment for scan API")
 		return err
@@ -71,9 +71,9 @@ func createDeployment(ctx context.Context, kubeClient client.Client, ns string, 
 
 	if created {
 		logger.Info("Created Deployment for scan API")
-	} else if !k8s.AreDeploymentsEqual(deployment, existingDeployment) {
+	} else if !k8s.AreDeploymentsEqual(*deployment, existingDeployment) {
 		// If the deployment exists but it is different from what we actually want it to be, then update.
-		if err := kubeClient.Update(ctx, &deployment); err != nil {
+		if err := kubeClient.Update(ctx, deployment); err != nil {
 			return err
 		}
 	}
@@ -81,12 +81,12 @@ func createDeployment(ctx context.Context, kubeClient client.Client, ns string, 
 }
 
 func createService(ctx context.Context, kubeClient client.Client, ns string, mondoo mondoov1alpha1.MondooAuditConfig) error {
-	service := ScanApiService(ns)
-	if err := ctrl.SetControllerReference(&mondoo, &service, kubeClient.Scheme()); err != nil {
+	service := ScanApiService(ns, mondoo)
+	if err := ctrl.SetControllerReference(&mondoo, service, kubeClient.Scheme()); err != nil {
 		return err
 	}
 	existingService := corev1.Service{}
-	created, err := k8s.CreateIfNotExist(ctx, kubeClient, &existingService, &service)
+	created, err := k8s.CreateIfNotExist(ctx, kubeClient, &existingService, service)
 	if err != nil {
 		logger.Error(err, "Failed to create Service for scan API")
 		return err
@@ -94,9 +94,9 @@ func createService(ctx context.Context, kubeClient client.Client, ns string, mon
 
 	if created {
 		logger.Info("Created Service for scan API")
-	} else if !k8s.AreServicesEqual(service, existingService) {
+	} else if !k8s.AreServicesEqual(*service, existingService) {
 		// If the service exists but it is different from what we actually want it to be, then update.
-		if err := kubeClient.Update(ctx, &service); err != nil {
+		if err := kubeClient.Update(ctx, service); err != nil {
 			return err
 		}
 	}
