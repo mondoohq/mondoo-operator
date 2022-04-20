@@ -53,7 +53,9 @@ func (s *Scanner) request(ctx context.Context, url string, reqBodyBytes []byte) 
 	header := make(http.Header)
 	header.Set("Accept", "application/json")
 	header.Set("Content-Type", "application/json")
-	header.Set("Authorization", "Bearer "+s.Token)
+	if s.Token != "" {
+		header.Set("Authorization", "Bearer "+s.Token)
+	}
 
 	reader := bytes.NewReader(reqBodyBytes)
 	req, err := http.NewRequest(http.MethodPost, url, reader)
