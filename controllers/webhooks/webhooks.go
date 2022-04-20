@@ -27,16 +27,13 @@ import (
 	webhooksv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
@@ -45,35 +42,12 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/version"
 )
 
-const (
-	WebhookLabelKey   = "control-plane"
-	WebhookLabelValue = "webhook-manager"
-
-	// openShiftServiceAnnotationKey is how we annotate a Service so that OpenShift
-	// will create TLS certificates for the webhook Service.
-	openShiftServiceAnnotationKey = "service.beta.openshift.io/serving-cert-secret-name"
-
-	// openShiftWebhookAnnotationKey is how we annotate a webhook so that OpenShift
-	// injects the cluster-wide CA data for auto-generated TLS certificates.
-	openShiftWebhookAnnotationKey = "service.beta.openshift.io/inject-cabundle"
-
-	// manualTLSAnnotationKey is for when there is no explicit 'injection-style' defined in
-	// the MondooAuditConfig. We treat this to mean that the user will provide their own certs.
-	manualTLSAnnotationKey = "mondoo.com/tls-mode"
-)
-
 var (
 	webhookLog = ctrl.Log.WithName("webhook")
-
-	// webhookAnnotationList is a list of all the possible annotations we could set on a Webhook.
-	// It is needed so we can be sure to clear out any previous annotations in the event the
-	// injection-style has changed during runtime.
-	webhookAnnotationList = []string{certManagerAnnotationKey, openShiftWebhookAnnotationKey, manualTLSAnnotationKey}
+	// Embed the Service/Desployment/ValidatingWebhookConfiguration payloads
+	//go:embed webhook-manifests.yaml
+	webhookManifestsyaml []byte
 )
-
-// Embed the Service/Desployment/ValidatingWebhookConfiguration payloads
-//go:embed webhook-manifests.yaml
-var webhookManifestsyaml []byte
 
 type Webhooks struct {
 	Mondoo               *mondoov1alpha1.MondooAuditConfig
@@ -176,26 +150,7 @@ func deepEqualsValidatingWebhookConfiguration(existing, desired *webhooksv1.Vali
 }
 
 func (n *Webhooks) syncWebhookService(ctx context.Context) error {
-
-	desiredService := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      getWebhookServiceName(n.Mondoo.Name),
-			Namespace: n.TargetNamespace,
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Port:       int32(443),
-					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(webhook.DefaultPort),
-				},
-			},
-			Type: corev1.ServiceTypeClusterIP,
-			Selector: map[string]string{
-				WebhookLabelKey: WebhookLabelValue,
-			},
-		},
-	}
+	desiredService := WebhookService(n.TargetNamespace, *n.Mondoo)
 
 	// Annotate the Service if the Mondoo config is asking for OpenShift-style TLS certificate management.
 	if n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) {
@@ -246,107 +201,7 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 		mode = string(mondoov1alpha1.Permissive)
 	}
 
-	desiredDeployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      getWebhookDeploymentName(n.Mondoo.Name),
-			Namespace: n.TargetNamespace,
-			Labels: map[string]string{
-				WebhookLabelKey: WebhookLabelValue,
-			},
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: pointer.Int32(1),
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					WebhookLabelKey: WebhookLabelValue,
-				},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						WebhookLabelKey: WebhookLabelValue,
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Command: []string{
-								"/webhook",
-							},
-							Env: []corev1.EnvVar{
-								{
-									Name:  mondoov1alpha1.WebhookModeEnvVar,
-									Value: mode,
-								},
-							},
-							Image:           n.Image,
-							ImagePullPolicy: corev1.PullIfNotPresent,
-							LivenessProbe: &corev1.Probe{
-								ProbeHandler: corev1.ProbeHandler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/healthz",
-										Port: intstr.FromInt(8081),
-									},
-								},
-								InitialDelaySeconds: int32(15),
-								PeriodSeconds:       int32(20),
-							},
-							Name: "webhook",
-							ReadinessProbe: &corev1.Probe{
-								ProbeHandler: corev1.ProbeHandler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/readyz",
-										Port: intstr.FromInt(8081),
-									},
-								},
-								InitialDelaySeconds: int32(5),
-								PeriodSeconds:       int32(10),
-							},
-							Resources: corev1.ResourceRequirements{
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("200m"),
-									corev1.ResourceMemory: resource.MustParse("100Mi"),
-								},
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("100m"),
-									corev1.ResourceMemory: resource.MustParse("20Mi"),
-								},
-							},
-							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: pointer.Bool(false),
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									// This is just the default path if no specific mountpoint is set.
-									// It is not exported anywhere in controller-manager.
-									// https://github.com/kubernetes-sigs/controller-runtime/blob/master/pkg/webhook/server.go
-									MountPath: "/tmp/k8s-webhook-server/serving-certs",
-									Name:      "cert",
-									ReadOnly:  true,
-								},
-							},
-						},
-					},
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: pointer.Bool(true),
-					},
-					TerminationGracePeriodSeconds: pointer.Int64(10),
-					Volumes: []corev1.Volume{
-						{
-							Name: "cert",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									DefaultMode: pointer.Int32(420),
-									SecretName:  GetTLSCertificatesSecretName(n.Mondoo.Name),
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
+	desiredDeployment := WebhookDeployment(n.TargetNamespace, n.Image, mode, *n.Mondoo)
 	if err := n.setControllerRef(desiredDeployment); err != nil {
 		return err
 	}
@@ -628,36 +483,6 @@ func (n *Webhooks) setControllerRef(obj client.Object) error {
 	return nil
 }
 
-func getWebhookServiceName(prefix string) string {
-	return prefix + "-webhook-service"
-}
-
-func getWebhookDeploymentName(prefix string) string {
-	return prefix + "-webhook-manager"
-}
-
-func getValidatingWebhookName(mondooAuditConfig *mondoov1alpha1.MondooAuditConfig) (string, error) {
-	if mondooAuditConfig == nil {
-		return "", fmt.Errorf("cannot generate webhook name from nil MondooAuditConfig")
-	}
-	return fmt.Sprintf("%s-%s-mondoo", mondooAuditConfig.Namespace, mondooAuditConfig.Name), nil
-}
-
-func updateWebhooksConditions(config *mondoov1alpha1.MondooAuditConfig, degradedStatus bool) {
-	msg := "Webhook is available"
-	reason := "WebhookAailable"
-	status := corev1.ConditionFalse
-	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
-	if degradedStatus {
-		msg = "Webhook is Unavailable"
-		reason = "WebhhookUnvailable"
-		status = corev1.ConditionTrue
-	}
-
-	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha1.WebhookDegraded, status, reason, msg, updateCheck)
-
-}
-
 // TODO: This cleanup can be removed afer we are sure no more old-style
 // ValidatingWebhooks exist.
 // With the switch to naming the Webhook from MONDOOAUDIT_CONFIG_NAME-mondoo-webhook
@@ -674,14 +499,4 @@ func (n *Webhooks) cleanupOldWebhook(ctx context.Context) error {
 		return err
 	}
 	return nil
-}
-
-// GetTLSCertificatesSecretName takes the name of a MondooAuditConfig resources
-// and returns the expected Secret name where the TLS certs will be stored.
-func GetTLSCertificatesSecretName(mondooAuditConfigName string) string {
-	// webhookTLSSecretNameTemplate is intended to store the MondooAuditConfig Name for Secret
-	// name uniqueness per-Namespace.
-	webhookTLSSecretNameTemplate := `%s-webhook-server-cert`
-
-	return fmt.Sprintf(webhookTLSSecretNameTemplate, mondooAuditConfigName)
 }
