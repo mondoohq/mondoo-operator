@@ -73,7 +73,7 @@ func createDeployment(ctx context.Context, kubeClient client.Client, ns, image s
 		logger.Info("Created Deployment for scan API")
 	} else if !k8s.AreDeploymentsEqual(*deployment, existingDeployment) {
 		// If the deployment exists but it is different from what we actually want it to be, then update.
-		k8s.UpdateDeployment(&existingDeployment, deployment)
+		k8s.UpdateDeployment(&existingDeployment, *deployment)
 		if err := kubeClient.Update(ctx, &existingDeployment); err != nil {
 			return err
 		}
@@ -96,7 +96,7 @@ func createService(ctx context.Context, kubeClient client.Client, ns string, mon
 	if created {
 		logger.Info("Created Service for scan API")
 	} else if !k8s.AreServicesEqual(*service, existingService) {
-		k8s.UpdateService(&existingService, service)
+		k8s.UpdateService(&existingService, *service)
 		// If the service exists but it is different from what we actually want it to be, then update.
 		if err := kubeClient.Update(ctx, &existingService); err != nil {
 			return err

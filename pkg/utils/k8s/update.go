@@ -7,7 +7,7 @@ import (
 
 // UpdateService updates a service such that it matches a desired state. The function does not
 // replace all fields but only a set of fields that we are interested at.
-func UpdateService(current, desired *corev1.Service) {
+func UpdateService(current *corev1.Service, desired corev1.Service) {
 	current.Spec.Ports = desired.Spec.Ports
 	current.Spec.Selector = desired.Spec.Selector
 	current.Spec.Type = desired.Spec.Type
@@ -16,7 +16,7 @@ func UpdateService(current, desired *corev1.Service) {
 
 // UpdateDeployment updates a deployment such that it matches a desired state. The function does
 // not replace all fields but only a set of fields that we are interested at.
-func UpdateDeployment(current, desired *appsv1.Deployment) {
+func UpdateDeployment(current *appsv1.Deployment, desired appsv1.Deployment) {
 	current.Spec = desired.Spec
 	current.SetOwnerReferences(desired.GetOwnerReferences())
 }
