@@ -185,6 +185,7 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 		}
 		service.Spec.Ports = desiredService.Spec.Ports
 		service.Spec.Selector = desiredService.Spec.Selector
+		service.SetOwnerReferences(desiredService.GetOwnerReferences())
 		if err := n.KubeClient.Update(ctx, service); err != nil {
 			webhookLog.Error(err, "failed to update existing webhook Service")
 			return err
@@ -224,6 +225,7 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 	// if an Update() is needed.
 	if !k8s.AreDeploymentsEqual(*deployment, *desiredDeployment) {
 		deployment.Spec = desiredDeployment.Spec
+		deployment.SetOwnerReferences(desiredDeployment.GetOwnerReferences())
 		if err := n.KubeClient.Update(ctx, deployment); err != nil {
 			webhookLog.Error(err, "failed to update existing webhook Deployment")
 			return err

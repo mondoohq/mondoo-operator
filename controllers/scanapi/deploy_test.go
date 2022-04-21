@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -80,7 +81,7 @@ func (s *DeploySuite) TestDeploy_Update() {
 	s.NoError(ctrl.SetControllerReference(&auditConfig, d, s.scheme))
 	d.ResourceVersion = "1000" // Needed because the fake client sets it.
 
-	s.Equal(*d, ds.Items[0])
+	s.True(k8s.AreDeploymentsEqual(*d, ds.Items[0]))
 
 	ss := &corev1.ServiceList{}
 	s.NoError(client.List(s.ctx, ss))
@@ -90,7 +91,7 @@ func (s *DeploySuite) TestDeploy_Update() {
 	s.NoError(ctrl.SetControllerReference(&auditConfig, service, s.scheme))
 	service.ResourceVersion = "1000" // Needed because the fake client sets it.
 
-	s.Equal(*service, ss.Items[0])
+	s.True(k8s.AreServicesEqual(*service, ss.Items[0]))
 }
 
 func (s *DeploySuite) TestCleanup() {

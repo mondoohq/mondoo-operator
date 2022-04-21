@@ -16,7 +16,8 @@ func AreDeploymentsEqual(a, b appsv1.Deployment) bool {
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Image, b.Spec.Template.Spec.Containers[0].Image) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Command, b.Spec.Template.Spec.Containers[0].Command) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].VolumeMounts, b.Spec.Template.Spec.Containers[0].VolumeMounts) &&
-		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Env, b.Spec.Template.Spec.Containers[0].Env)
+		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Env, b.Spec.Template.Spec.Containers[0].Env) &&
+		reflect.DeepEqual(a.GetOwnerReferences(), b.GetOwnerReferences())
 }
 
 // AreServicesEqual return a value indicating whether 2 services are equal. Note that it
@@ -25,6 +26,7 @@ func AreDeploymentsEqual(a, b appsv1.Deployment) bool {
 func AreServicesEqual(a, b corev1.Service) bool {
 	return reflect.DeepEqual(a.Spec.Ports, b.Spec.Ports) &&
 		reflect.DeepEqual(a.Spec.Selector, b.Spec.Selector) &&
+		reflect.DeepEqual(a.GetOwnerReferences(), b.GetOwnerReferences()) &&
 		a.Spec.Type == b.Spec.Type
 }
 
