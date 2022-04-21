@@ -96,9 +96,11 @@ func TestScanner(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	assert.NotNil(t, result)
+	require.NotNil(t, result)
 
 	// check if the scan passed
-	passed := result.WorstScore.Type == 2 && result.WorstScore.Value == 100
-	assert.True(t, passed)
+	if assert.NotNil(t, result.WorstScore, "nil WorstScore") {
+		passed := result.WorstScore.Type == 2 && result.WorstScore.Value == 100
+		assert.True(t, passed)
+	}
 }
