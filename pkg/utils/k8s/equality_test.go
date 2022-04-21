@@ -194,7 +194,7 @@ func TestAreDeploymentsEqual(t *testing.T) {
 			name: "should not be equal when owner references differ",
 			createB: func(a appsv1.Deployment) appsv1.Deployment {
 				b := *a.DeepCopy()
-				ctrl.SetControllerReference(&a, &b, scheme.Scheme)
+				assert.NoError(t, ctrl.SetControllerReference(&a, &b, scheme.Scheme))
 				return b
 			},
 			shouldBeEqual: false,
@@ -274,7 +274,7 @@ func TestAreServicesEqual(t *testing.T) {
 			name: "should not be equal when owner references differ",
 			createB: func(a corev1.Service) corev1.Service {
 				b := *a.DeepCopy()
-				ctrl.SetControllerReference(&a, &b, scheme.Scheme)
+				assert.NoError(t, ctrl.SetControllerReference(&a, &b, scheme.Scheme))
 				return b
 			},
 			shouldBeEqual: false,
