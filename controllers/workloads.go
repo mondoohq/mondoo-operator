@@ -21,9 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"go.mondoo.com/mondoo-operator/api/v1alpha1"
-	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
-	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +30,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+
+	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
 const (
@@ -294,7 +295,7 @@ func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *ru
 
 	log := ctrllog.FromContext(ctx)
 
-	namespace, err := getNamespace()
+	namespace, err := k8s.GetRunningNamespace()
 	if err != nil {
 		log.Error(err, "failed to determine which namespace mondoo-operator is running in")
 		return ctrl.Result{}, err
