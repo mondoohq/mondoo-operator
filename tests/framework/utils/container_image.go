@@ -2,7 +2,7 @@ package utils
 
 import (
 	"crypto/sha1"
-	"encoding/hex"
+	"fmt"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -13,11 +13,13 @@ import (
 var FakeGetRemoteImageFunc = func(ref name.Reference, options ...remote.Option) (*remote.Descriptor, error) {
 	h := sha1.New()
 	h.Write([]byte(ref.Identifier()))
-	hash, _ := v1.NewHash(hex.EncodeToString(h.Sum(nil))) // should never fail
 
 	return &remote.Descriptor{
 		Descriptor: v1.Descriptor{
-			Digest: hash,
+			Digest: v1.Hash{
+				Algorithm: "sha256",
+				Hex:       fmt.Sprintf("%x\n", h.Sum(nil)),
+			},
 		},
 	}, nil
 }

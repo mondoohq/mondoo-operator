@@ -183,9 +183,7 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 		if n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) {
 			metav1.SetMetaDataAnnotation(&service.ObjectMeta, openShiftServiceAnnotationKey, tlsSecretName)
 		}
-		service.Spec.Ports = desiredService.Spec.Ports
-		service.Spec.Selector = desiredService.Spec.Selector
-		service.SetOwnerReferences(desiredService.GetOwnerReferences())
+		k8s.UpdateService(service, desiredService)
 		if err := n.KubeClient.Update(ctx, service); err != nil {
 			webhookLog.Error(err, "failed to update existing webhook Service")
 			return err
@@ -224,8 +222,7 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.
 	if !k8s.AreDeploymentsEqual(*deployment, *desiredDeployment) {
-		deployment.Spec = desiredDeployment.Spec
-		deployment.SetOwnerReferences(desiredDeployment.GetOwnerReferences())
+		k8s.UpdateDeployment(deployment, desiredDeployment)
 		if err := n.KubeClient.Update(ctx, deployment); err != nil {
 			webhookLog.Error(err, "failed to update existing webhook Deployment")
 			return err

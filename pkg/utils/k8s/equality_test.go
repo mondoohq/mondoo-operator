@@ -292,7 +292,7 @@ func TestAreServicesEqual(t *testing.T) {
 	}
 }
 
-func TestRquriementComparison(t *testing.T) {
+func TestAreResouceRequirementsEqual(t *testing.T) {
 	r := corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse("1G"),
