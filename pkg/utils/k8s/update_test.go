@@ -8,8 +8,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -75,7 +75,7 @@ func TestUpdateService(t *testing.T) {
 			name: "should update owner references",
 			desired: func() corev1.Service {
 				s := current.DeepCopy()
-				ctrl.SetControllerReference(&current, s, runtime.NewScheme())
+				assert.NoError(t, ctrl.SetControllerReference(&current, s, scheme.Scheme))
 				return *s
 			}(),
 			validation: func(t *testing.T, a, b corev1.Service) {
@@ -224,7 +224,7 @@ func TestUpdateDeployment(t *testing.T) {
 			name: "should update owner references",
 			desired: func() appsv1.Deployment {
 				d := current.DeepCopy()
-				ctrl.SetControllerReference(&current, d, runtime.NewScheme())
+				assert.NoError(t, ctrl.SetControllerReference(&current, d, scheme.Scheme))
 				return *d
 			}(),
 			validation: func(t *testing.T, a, b appsv1.Deployment) {
