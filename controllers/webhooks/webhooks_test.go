@@ -23,6 +23,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 )
@@ -37,7 +38,7 @@ func init() {
 	utilruntime.Must(certmanagerv1.AddToScheme(scheme.Scheme))
 }
 
-func TestWebhooksReconcile(t *testing.T) {
+func TestReconcile(t *testing.T) {
 	tests := []struct {
 		name                  string
 		mondooAuditConfigSpec mondoov1alpha1.MondooAuditConfigData
@@ -345,6 +346,22 @@ func defaultResourcesWhenEnabled() []client.Object {
 		},
 	}
 	objects = append(objects, dep)
+
+	scanApiService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanapi.ServiceName(testMondooAuditConfigName),
+			Namespace: testNamespace,
+		},
+	}
+	objects = append(objects, scanApiService)
+
+	scanApiDep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanapi.DeploymentName(testMondooAuditConfigName),
+			Namespace: testNamespace,
+		},
+	}
+	objects = append(objects, scanApiDep)
 
 	vwcName, err := validatingWebhookName(&mondoov1alpha1.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{
