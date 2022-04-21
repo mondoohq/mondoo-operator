@@ -197,10 +197,22 @@ func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 					Labels: ls,
 				},
 				Spec: corev1.PodSpec{
-					Tolerations: []corev1.Toleration{{
-						Key:    "node-role.kubernetes.io/master",
-						Effect: corev1.TaintEffect("NoSchedule"),
-					}},
+					Tolerations: []corev1.Toleration{
+						{
+							Key:    "node-role.kubernetes.io/master",
+							Effect: corev1.TaintEffect("NoSchedule"),
+						},
+						{
+							Key:    "node-role.kubernetes.io/etcd",
+							Effect: corev1.TaintEffect("NoSchedule"),
+							Value:  "true",
+						},
+						{
+							Key:    "node-role.kubernetes.io/controlplane",
+							Effect: corev1.TaintEffect("NoSchedule"),
+							Value:  "true",
+						},
+					},
 					// The node scanning does not use the Kubernetes API at all, therefore the service account token
 					// should not be mounted at all.
 					AutomountServiceAccountToken: pointer.Bool(false),
