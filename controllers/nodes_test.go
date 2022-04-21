@@ -43,7 +43,7 @@ var _ = Describe("nodes", func() {
 		interval  = time.Millisecond * 250
 	)
 	BeforeEach(func() {
-		os.Setenv("MONDOO_OPERATOR_NAMESPACE", "mondoo-operator")
+		os.Setenv("MONDOO_NAMESPACE_OVERRIDE", "mondoo-operator")
 	})
 
 	Context("When deploying the operator with nodes enabled", func() {

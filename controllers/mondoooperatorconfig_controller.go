@@ -19,8 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"os"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
 // MondooOperatorConfigReconciler reconciles a MondooOperatorConfig object
@@ -68,7 +67,7 @@ func (r *MondooOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl
 		return ctrl.Result{}, nil
 	}
 
-	namespace, err := getNamespace()
+	namespace, err := k8s.GetRunningNamespace()
 	if err != nil {
 		configLog.Error(err, "failed to know which namespace to target")
 		return ctrl.Result{}, err
@@ -93,21 +92,4 @@ func (r *MondooOperatorConfigReconciler) SetupWithManager(mgr ctrl.Manager) erro
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&mondoov1alpha1.MondooOperatorConfig{}).
 		Complete(r)
-}
-
-func getNamespace() (string, error) {
-	// To allow running the controller locally, we should be able to set a namespace
-	// without relying on a serviceaccount being mounted in.
-	env, exists := os.LookupEnv("MONDOO_OPERATOR_NAMESPACE")
-	if exists {
-		return env, nil
-	}
-	// Else, check the namespace of the ServiceAccount the mondoo-operator Pod is
-	// using.
-	namespaceBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-	if err != nil {
-		return "", err
-	}
-
-	return string(namespaceBytes), nil
 }
