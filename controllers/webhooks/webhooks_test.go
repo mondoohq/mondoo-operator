@@ -1,15 +1,10 @@
-package controllers
+package webhooks
 
 import (
 	"context"
-	"crypto/sha1"
-	"encoding/hex"
 	"fmt"
 	"testing"
 
-	"github.com/google/go-containerregistry/pkg/name"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -28,6 +23,8 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
+	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 )
 
 const (
@@ -35,23 +32,9 @@ const (
 	testMondooAuditConfigName = "mondoo-client"
 )
 
-// A fake implementation of the getImage function that does not query remote container registries.
-var fakeGetRemoteImageFunc = func(ref name.Reference, options ...remote.Option) (*remote.Descriptor, error) {
-	h := sha1.New()
-	h.Write([]byte(ref.Identifier()))
-	hash, _ := v1.NewHash(hex.EncodeToString(h.Sum(nil))) // should never fail
-
-	return &remote.Descriptor{
-		Descriptor: v1.Descriptor{
-			Digest: hash,
-		},
-	}, nil
-}
-
 func init() {
 	utilruntime.Must(mondoov1alpha1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(certmanagerv1.AddToScheme(scheme.Scheme))
-
 }
 
 func TestWebhooksReconcile(t *testing.T) {
@@ -85,6 +68,8 @@ func TestWebhooksReconcile(t *testing.T) {
 				},
 			},
 			validate: func(t *testing.T, kubeClient client.Client) {
+				list := &corev1.ServiceList{}
+				assert.NoError(t, kubeClient.List(context.TODO(), list))
 				objects := defaultResourcesWhenEnabled()
 				for _, obj := range objects {
 					err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(obj), obj)
@@ -208,7 +193,7 @@ func TestWebhooksReconcile(t *testing.T) {
 			},
 			validate: func(t *testing.T, kubeClient client.Client) {
 				deployment := &appsv1.Deployment{}
-				deploymentKey := types.NamespacedName{Name: getWebhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
+				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Webhook Deployment to exist")
 
@@ -234,7 +219,7 @@ func TestWebhooksReconcile(t *testing.T) {
 			existingObjects: func() []client.Object {
 				deployment := &appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      getWebhookDeploymentName(testMondooAuditConfigName),
+						Name:      webhookDeploymentName(testMondooAuditConfigName),
 						Namespace: testNamespace,
 					},
 					Spec: appsv1.DeploymentSpec{
@@ -261,7 +246,7 @@ func TestWebhooksReconcile(t *testing.T) {
 			}(),
 			validate: func(t *testing.T, kubeClient client.Client) {
 				deployment := &appsv1.Deployment{}
-				deploymentKey := types.NamespacedName{Name: getWebhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
+				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Webhook Deployment to exist")
 
@@ -312,7 +297,7 @@ func TestWebhooksReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			// Mock the retrieval of the actual image from the remote registry
-			getRemoteImage = fakeGetRemoteImageFunc
+			mondoo.GetRemoteImage = utils.FakeGetRemoteImageFunc
 
 			fakeClient := fake.NewClientBuilder().WithObjects(test.existingObjects...).Build()
 
@@ -327,7 +312,6 @@ func TestWebhooksReconcile(t *testing.T) {
 				Mondoo:               auditConfig,
 				KubeClient:           fakeClient,
 				TargetNamespace:      testNamespace,
-				Scheme:               scheme.Scheme,
 				MondooOperatorConfig: &v1alpha1.MondooOperatorConfig{},
 			}
 
@@ -348,7 +332,7 @@ func defaultResourcesWhenEnabled() []client.Object {
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getWebhookServiceName(testMondooAuditConfigName),
+			Name:      webhookServiceName(testMondooAuditConfigName),
 			Namespace: testNamespace,
 		},
 	}
@@ -356,13 +340,13 @@ func defaultResourcesWhenEnabled() []client.Object {
 
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getWebhookDeploymentName(testMondooAuditConfigName),
+			Name:      webhookDeploymentName(testMondooAuditConfigName),
 			Namespace: testNamespace,
 		},
 	}
 	objects = append(objects, dep)
 
-	vwcName, err := getValidatingWebhookName(&mondoov1alpha1.MondooAuditConfig{
+	vwcName, err := validatingWebhookName(&mondoov1alpha1.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testMondooAuditConfigName,
 			Namespace: testNamespace,

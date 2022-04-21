@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -140,8 +142,8 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	}
 
 	// check that the resource limites are identical
-	expectedResourceRequirements := getResourcesRequirements(n.Mondoo.Spec.Nodes.Resources)
-	if !equalResouceRequirements(found.Spec.Template.Spec.Containers[0].Resources, expectedResourceRequirements) {
+	expectedResourceRequirements := k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Nodes.Resources)
+	if !k8s.AreResouceRequirementsEqual(found.Spec.Template.Spec.Containers[0].Resources, expectedResourceRequirements) {
 		log.Info("update resource requirements for nodes client")
 		found.Spec.Template.Spec.Containers[0].Resources = expectedResourceRequirements
 		err := clt.Update(ctx, found)
@@ -206,7 +208,7 @@ func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 						Image:     n.Image,
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
-						Resources: getResourcesRequirements(n.Mondoo.Spec.Nodes.Resources),
+						Resources: k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Nodes.Resources),
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
@@ -296,7 +298,7 @@ func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtim
 	}
 
 	skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
-	mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag, skipResolveImage)
+	mondooImage, err := mondoo.ResolveMondooImage(log, n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag, skipResolveImage)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -371,14 +373,15 @@ func updateNodeConditions(config *v1alpha1.MondooAuditConfig, degradedStatus boo
 	msg := "Node Scanning is Available"
 	reason := "NodeScanningAvailable"
 	status := corev1.ConditionFalse
-	updateCheck := UpdateConditionIfReasonOrMessageChange
+	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
 	if degradedStatus {
 		msg = "Node Scanning is Unavailable"
 		reason = "NodeScanningUnavailable"
 		status = corev1.ConditionTrue
 	}
 
-	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, v1alpha1.NodeScanningDegraded, status, reason, msg, updateCheck)
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(
+		config.Status.Conditions, v1alpha1.NodeScanningDegraded, status, reason, msg, updateCheck)
 
 }
 
@@ -394,7 +397,7 @@ func (n *Nodes) cleanupOldDaemonSet(ctx context.Context, kubeClient client.Clien
 		},
 	}
 
-	err := genericDelete(ctx, kubeClient, ds)
+	err := k8s.DeleteIfExists(ctx, kubeClient, ds)
 	if err != nil {
 		log.Error(err, "failed while cleaning up old DaemonSet for nodes")
 	}

@@ -36,6 +36,7 @@ import (
 
 	k8sv1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"go.mondoo.com/mondoo-operator/controllers"
+	"go.mondoo.com/mondoo-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -109,7 +110,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager")
+	setupLog.Info("starting manager", "version", version.Version)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)

@@ -29,6 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/controllers/webhooks"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -120,11 +122,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
 		// deleted should be called here
 
-		webhooks := Webhooks{
+		webhooks := webhooks.Webhooks{
 			Mondoo:               mondooAuditConfig,
 			KubeClient:           r.Client,
 			TargetNamespace:      req.Namespace,
-			Scheme:               r.Scheme,
 			MondooOperatorConfig: config,
 		}
 		result, err := webhooks.Reconcile(ctx)
@@ -177,11 +178,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return result, err
 	}
 
-	webhooks := Webhooks{
+	webhooks := webhooks.Webhooks{
 		Mondoo:               mondooAuditConfig,
 		KubeClient:           r.Client,
 		TargetNamespace:      req.Namespace,
-		Scheme:               r.Scheme,
 		MondooOperatorConfig: config,
 	}
 
@@ -218,7 +218,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
-	if err := UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log); err != nil {
+	if err := mondoo.UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil

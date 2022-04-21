@@ -5,11 +5,13 @@ metadata:
   namespace: mondoo-operator
 spec:
   workloads:
-    enable: true
-  nodes:
-    enable: true
-  webhooks:
     enable: false
+  nodes:
+    enable: false
+  webhooks:
+    enable: true
+    image:
+      tag: latest
     certificateConfig:
       injectionStyle: cert-manager # <--- remember to install cert-manager first
   mondooSecretRef: mondoo-client

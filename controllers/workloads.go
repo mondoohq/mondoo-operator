@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -164,7 +166,7 @@ func (n *Workloads) deploymentNeedsUpdate(desired, existing *appsv1.Deployment) 
 		return true
 	}
 
-	if !equalResouceRequirements(existing.Spec.Template.Spec.Containers[0].Resources, desired.Spec.Template.Spec.Containers[0].Resources) {
+	if !k8s.AreResouceRequirementsEqual(existing.Spec.Template.Spec.Containers[0].Resources, desired.Spec.Template.Spec.Containers[0].Resources) {
 		return true
 	}
 
@@ -199,7 +201,7 @@ func (n *Workloads) deploymentForMondoo() *appsv1.Deployment {
 						Image:     n.Image,
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
-						Resources: getResourcesRequirements(n.Mondoo.Spec.Workloads.Resources),
+						Resources: k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Workloads.Resources),
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
@@ -307,7 +309,7 @@ func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *ru
 	}
 
 	skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
-	mondooImage, err := resolveMondooImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag, skipResolveImage)
+	mondooImage, err := mondoo.ResolveMondooImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag, skipResolveImage)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -385,14 +387,14 @@ func updateWorkloadsConditions(config *v1alpha1.MondooAuditConfig, degradedStatu
 	msg := "API Scanning is Available"
 	reason := "APIScanningAvailable"
 	status := corev1.ConditionFalse
-	updateCheck := UpdateConditionIfReasonOrMessageChange
+	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
 	if degradedStatus {
 		msg = "API Scanning is Unavailable"
 		reason = "APIScanningUnavailable"
 		status = corev1.ConditionTrue
 	}
 
-	config.Status.Conditions = SetMondooAuditCondition(config.Status.Conditions, v1alpha1.APIScanningDegraded, status, reason, msg, updateCheck)
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, v1alpha1.APIScanningDegraded, status, reason, msg, updateCheck)
 
 }
 
@@ -407,7 +409,7 @@ func (n *Workloads) cleanupWorkloadDeployment(ctx context.Context, kubeClient cl
 			Name:      n.Mondoo.Name,
 		},
 	}
-	err := genericDelete(ctx, kubeClient, dep)
+	err := k8s.DeleteIfExists(ctx, kubeClient, dep)
 	if err != nil {
 		log.Error(err, "failed while cleaning up old Deployment for workloads")
 	}
