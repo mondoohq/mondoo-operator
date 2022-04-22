@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,13 +19,17 @@ import (
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha1"
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/controllers/scanapi"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const (
@@ -37,11 +42,11 @@ func init() {
 	utilruntime.Must(certmanagerv1.AddToScheme(scheme.Scheme))
 }
 
-func TestWebhooksReconcile(t *testing.T) {
+func TestReconcile(t *testing.T) {
 	tests := []struct {
 		name                  string
 		mondooAuditConfigSpec mondoov1alpha1.MondooAuditConfigData
-		existingObjects       []client.Object
+		existingObjects       func(mondoov1alpha1.MondooAuditConfig) []client.Object
 		validate              func(*testing.T, client.Client)
 	}{
 		{
@@ -120,7 +125,7 @@ func TestWebhooksReconcile(t *testing.T) {
 				},
 			},
 			// existing objects from webhooks being previously enabled
-			existingObjects: func() []client.Object {
+			existingObjects: func(m mondoov1alpha1.MondooAuditConfig) []client.Object {
 				objects := defaultResourcesWhenEnabled()
 
 				issuer := &certmanagerv1.Issuer{
@@ -148,7 +153,7 @@ func TestWebhooksReconcile(t *testing.T) {
 				objects = append(objects, secret)
 
 				return objects
-			}(),
+			},
 			validate: func(t *testing.T, kubeClient client.Client) {
 				objects := defaultResourcesWhenEnabled()
 				for _, obj := range objects {
@@ -216,7 +221,7 @@ func TestWebhooksReconcile(t *testing.T) {
 					Mode:   string(mondoov1alpha1.Permissive),
 				},
 			},
-			existingObjects: func() []client.Object {
+			existingObjects: func(m mondoov1alpha1.MondooAuditConfig) []client.Object {
 				deployment := &appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      webhookDeploymentName(testMondooAuditConfigName),
@@ -240,10 +245,8 @@ func TestWebhooksReconcile(t *testing.T) {
 					},
 				}
 
-				return []client.Object{
-					deployment,
-				}
-			}(),
+				return []client.Object{deployment}
+			},
 			validate: func(t *testing.T, kubeClient client.Client) {
 				deployment := &appsv1.Deployment{}
 				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
@@ -262,6 +265,124 @@ func TestWebhooksReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "update webhook Deployment when changed externally",
+			mondooAuditConfigSpec: mondoov1alpha1.MondooAuditConfigData{
+				Webhooks: mondoov1alpha1.Webhooks{
+					Enable: true,
+				},
+			},
+			existingObjects: func(m mondoov1alpha1.MondooAuditConfig) []client.Object {
+				deployment := WebhookDeployment(testNamespace, "wrong", "test", m)
+				return []client.Object{deployment}
+			},
+			validate: func(t *testing.T, kubeClient client.Client) {
+				deployment := &appsv1.Deployment{}
+				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
+				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
+				require.NoError(t, err, "expected Webhook Deployment to exist")
+
+				auditConfig := &mondoov1alpha1.MondooAuditConfig{}
+				auditConfig.Name = testMondooAuditConfigName
+				auditConfig.Namespace = testNamespace
+				require.NoError(
+					t, kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(auditConfig), auditConfig), "failed to retrieve mondoo audit config")
+
+				img, err := mondoo.ResolveMondooOperatorImage(logr.New(log.NullLogSink{}), "", "", false)
+				require.NoErrorf(t, err, "failed to get mondoo operator image.")
+				expectedDeployment := WebhookDeployment(testNamespace, img, string(mondoov1alpha1.Permissive), *auditConfig)
+				require.NoError(t, ctrl.SetControllerReference(auditConfig, expectedDeployment, kubeClient.Scheme()))
+				assert.Truef(t, k8s.AreDeploymentsEqual(*deployment, *expectedDeployment), "deployment has not been updated")
+			},
+		},
+		{
+			name: "update webhook Service when changed externally",
+			mondooAuditConfigSpec: mondoov1alpha1.MondooAuditConfigData{
+				Webhooks: mondoov1alpha1.Webhooks{
+					Enable: true,
+				},
+			},
+			existingObjects: func(m mondoov1alpha1.MondooAuditConfig) []client.Object {
+				service := WebhookService(testNamespace, m)
+				service.Spec.Type = corev1.ServiceTypeExternalName
+				return []client.Object{service}
+			},
+			validate: func(t *testing.T, kubeClient client.Client) {
+				service := &corev1.Service{}
+				serviceKey := types.NamespacedName{Name: webhookServiceName(testMondooAuditConfigName), Namespace: testNamespace}
+				err := kubeClient.Get(context.TODO(), serviceKey, service)
+				require.NoError(t, err, "expected Webhook Service to exist")
+
+				auditConfig := &mondoov1alpha1.MondooAuditConfig{}
+				auditConfig.Name = testMondooAuditConfigName
+				auditConfig.Namespace = testNamespace
+				require.NoError(
+					t, kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(auditConfig), auditConfig), "failed to retrieve mondoo audit config")
+
+				expectedService := WebhookService(testNamespace, *auditConfig)
+				require.NoError(t, ctrl.SetControllerReference(auditConfig, expectedService, kubeClient.Scheme()))
+				assert.Truef(t, k8s.AreServicesEqual(*service, *expectedService), "service has not been updated")
+			},
+		},
+		{
+			name: "update scan API Deployment when changed externally",
+			mondooAuditConfigSpec: mondoov1alpha1.MondooAuditConfigData{
+				Webhooks: mondoov1alpha1.Webhooks{
+					Enable: true,
+				},
+			},
+			existingObjects: func(m mondoov1alpha1.MondooAuditConfig) []client.Object {
+				deployment := scanapi.ScanApiDeployment(testNamespace, "wrong", m)
+				return []client.Object{deployment}
+			},
+			validate: func(t *testing.T, kubeClient client.Client) {
+				deployment := &appsv1.Deployment{}
+				deploymentKey := types.NamespacedName{Name: scanapi.DeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
+				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
+				require.NoError(t, err, "expected scan API Deployment to exist")
+
+				auditConfig := &mondoov1alpha1.MondooAuditConfig{}
+				auditConfig.Name = testMondooAuditConfigName
+				auditConfig.Namespace = testNamespace
+				require.NoError(
+					t, kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(auditConfig), auditConfig), "failed to retrieve mondoo audit config")
+
+				img, err := mondoo.ResolveMondooImage(logr.New(log.NullLogSink{}), "", "", false)
+				require.NoErrorf(t, err, "failed to get mondoo operator image.")
+				expectedDeployment := scanapi.ScanApiDeployment(testNamespace, img, *auditConfig)
+				require.NoError(t, ctrl.SetControllerReference(auditConfig, expectedDeployment, kubeClient.Scheme()))
+				assert.Truef(t, k8s.AreDeploymentsEqual(*deployment, *expectedDeployment), "deployment has not been updated")
+			},
+		},
+		{
+			name: "update scan API Service when changed externally",
+			mondooAuditConfigSpec: mondoov1alpha1.MondooAuditConfigData{
+				Webhooks: mondoov1alpha1.Webhooks{
+					Enable: true,
+				},
+			},
+			existingObjects: func(m mondoov1alpha1.MondooAuditConfig) []client.Object {
+				service := scanapi.ScanApiService(testNamespace, m)
+				service.Spec.Type = corev1.ServiceTypeExternalName
+				return []client.Object{service}
+			},
+			validate: func(t *testing.T, kubeClient client.Client) {
+				service := &corev1.Service{}
+				serviceKey := types.NamespacedName{Name: scanapi.ServiceName(testMondooAuditConfigName), Namespace: testNamespace}
+				err := kubeClient.Get(context.TODO(), serviceKey, service)
+				require.NoError(t, err, "expected scan API Service to exist")
+
+				auditConfig := &mondoov1alpha1.MondooAuditConfig{}
+				auditConfig.Name = testMondooAuditConfigName
+				auditConfig.Namespace = testNamespace
+				require.NoError(
+					t, kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(auditConfig), auditConfig), "failed to retrieve mondoo audit config")
+
+				expectedService := scanapi.ScanApiService(testNamespace, *auditConfig)
+				require.NoError(t, ctrl.SetControllerReference(auditConfig, expectedService, kubeClient.Scheme()))
+				assert.Truef(t, k8s.AreServicesEqual(*service, *expectedService), "service has not been updated")
+			},
+		},
+		{
 			name: "cleanup old-style webhook",
 			mondooAuditConfigSpec: mondoov1alpha1.MondooAuditConfigData{
 				Webhooks: mondoov1alpha1.Webhooks{
@@ -269,7 +390,7 @@ func TestWebhooksReconcile(t *testing.T) {
 				},
 			},
 			// existing objects from webhooks being previously enabled
-			existingObjects: func() []client.Object {
+			existingObjects: func(m mondoov1alpha1.MondooAuditConfig) []client.Object {
 				objects := defaultResourcesWhenEnabled()
 
 				vwc := &webhooksv1.ValidatingWebhookConfiguration{
@@ -280,7 +401,7 @@ func TestWebhooksReconcile(t *testing.T) {
 				objects = append(objects, vwc)
 
 				return objects
-			}(),
+			},
 			validate: func(t *testing.T, kubeClient client.Client) {
 				vwc := &webhooksv1.ValidatingWebhookConfiguration{
 					ObjectMeta: metav1.ObjectMeta{
@@ -299,8 +420,6 @@ func TestWebhooksReconcile(t *testing.T) {
 			// Mock the retrieval of the actual image from the remote registry
 			mondoo.GetRemoteImage = utils.FakeGetRemoteImageFunc
 
-			fakeClient := fake.NewClientBuilder().WithObjects(test.existingObjects...).Build()
-
 			auditConfig := &mondoov1alpha1.MondooAuditConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testMondooAuditConfigName,
@@ -308,6 +427,12 @@ func TestWebhooksReconcile(t *testing.T) {
 				},
 				Spec: test.mondooAuditConfigSpec,
 			}
+			existingObj := []client.Object{auditConfig}
+			if test.existingObjects != nil {
+				existingObj = append(existingObj, test.existingObjects(*auditConfig)...)
+			}
+			fakeClient := fake.NewClientBuilder().WithObjects(existingObj...).Build()
+
 			webhooks := &Webhooks{
 				Mondoo:               auditConfig,
 				KubeClient:           fakeClient,
@@ -345,6 +470,22 @@ func defaultResourcesWhenEnabled() []client.Object {
 		},
 	}
 	objects = append(objects, dep)
+
+	scanApiService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanapi.ServiceName(testMondooAuditConfigName),
+			Namespace: testNamespace,
+		},
+	}
+	objects = append(objects, scanApiService)
+
+	scanApiDep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanapi.DeploymentName(testMondooAuditConfigName),
+			Namespace: testNamespace,
+		},
+	}
+	objects = append(objects, scanApiDep)
 
 	vwcName, err := validatingWebhookName(&mondoov1alpha1.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{
