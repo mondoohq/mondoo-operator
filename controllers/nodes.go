@@ -200,16 +200,20 @@ func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 					Tolerations: []corev1.Toleration{
 						{
 							Key:    "node-role.kubernetes.io/master",
-							Effect: corev1.TaintEffect("NoSchedule"),
+							Effect: corev1.TaintEffectNoSchedule,
 						},
 						{
+							// Rancher etcd node
+							// https://rancher.com/docs/rke/latest/en/config-options/nodes/#etcd
 							Key:    "node-role.kubernetes.io/etcd",
-							Effect: corev1.TaintEffect("NoSchedule"),
+							Effect: corev1.TaintEffectNoExecute,
 							Value:  "true",
 						},
 						{
+							// Rancher controlplaen node
+							// https://rancher.com/docs/rke/latest/en/config-options/nodes/#controlplane
 							Key:    "node-role.kubernetes.io/controlplane",
-							Effect: corev1.TaintEffect("NoSchedule"),
+							Effect: corev1.TaintEffectNoSchedule,
 							Value:  "true",
 						},
 					},
