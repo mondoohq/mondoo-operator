@@ -99,7 +99,7 @@ func (s *ContainerImageResolverSuite) TestMondooClientImage_SkipImageResolution(
 	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
 }
 
-func (s *ContainerImageResolverSuite) MondooOperatorImage() {
+func (s *ContainerImageResolverSuite) TestMondooOperatorImage() {
 	image := "ghcr.io/mondoo/testimage"
 	res, err := s.resolver.MondooOperatorImage(image, "testtag", false)
 	s.NoError(err)
@@ -108,7 +108,7 @@ func (s *ContainerImageResolverSuite) MondooOperatorImage() {
 	s.Equalf(1, s.remoteCallsCount, "remote call has not been performed")
 }
 
-func (s *ContainerImageResolverSuite) MondooOperatorImage_Cached() {
+func (s *ContainerImageResolverSuite) TestMondooOperatorImage_Cached() {
 	image := "ghcr.io/mondoo/testimage"
 	tag := "testtag"
 	cachedDigest := "testDigest"
@@ -121,7 +121,7 @@ func (s *ContainerImageResolverSuite) MondooOperatorImage_Cached() {
 	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
 }
 
-func (s *ContainerImageResolverSuite) MondooOperatorImage_Defaults() {
+func (s *ContainerImageResolverSuite) TestMondooOperatorImage_Defaults() {
 	res, err := s.resolver.MondooOperatorImage("", "", true)
 	s.NoError(err)
 
@@ -129,7 +129,7 @@ func (s *ContainerImageResolverSuite) MondooOperatorImage_Defaults() {
 	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
 }
 
-func (s *ContainerImageResolverSuite) MondooOperatorImage_SkipImageResolution() {
+func (s *ContainerImageResolverSuite) TestMondooOperatorImage_SkipImageResolution() {
 	image := "ghcr.io/mondoo/testimage"
 	tag := "testtag"
 
