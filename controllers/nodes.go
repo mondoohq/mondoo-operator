@@ -197,10 +197,26 @@ func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 					Labels: ls,
 				},
 				Spec: corev1.PodSpec{
-					Tolerations: []corev1.Toleration{{
-						Key:    "node-role.kubernetes.io/master",
-						Effect: corev1.TaintEffect("NoSchedule"),
-					}},
+					Tolerations: []corev1.Toleration{
+						{
+							Key:    "node-role.kubernetes.io/master",
+							Effect: corev1.TaintEffectNoSchedule,
+						},
+						{
+							// Rancher etcd node
+							// https://rancher.com/docs/rke/latest/en/config-options/nodes/#etcd
+							Key:    "node-role.kubernetes.io/etcd",
+							Effect: corev1.TaintEffectNoExecute,
+							Value:  "true",
+						},
+						{
+							// Rancher controlplane node
+							// https://rancher.com/docs/rke/latest/en/config-options/nodes/#controlplane
+							Key:    "node-role.kubernetes.io/controlplane",
+							Effect: corev1.TaintEffectNoSchedule,
+							Value:  "true",
+						},
+					},
 					// The node scanning does not use the Kubernetes API at all, therefore the service account token
 					// should not be mounted at all.
 					AutomountServiceAccountToken: pointer.Bool(false),
