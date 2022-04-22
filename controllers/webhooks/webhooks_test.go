@@ -201,15 +201,7 @@ func TestReconcile(t *testing.T) {
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Webhook Deployment to exist")
 
-				// Find and check the value of the webhook mode env var
-				found := false
-				for _, env := range deployment.Spec.Template.Spec.Containers[0].Env {
-					if env.Name == mondoov1alpha1.WebhookModeEnvVar {
-						found = true
-						assert.Equal(t, string(mondoov1alpha1.Permissive), env.Value, "expected Webhook mode to be set to 'permissive'")
-					}
-				}
-				assert.True(t, found, "did not find Webhook Mode environment variable to be defined/set")
+				assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, string(mondoov1alpha1.Permissive), "expected Webhook mode to be set to 'permissive'")
 			},
 		},
 		{
@@ -231,11 +223,9 @@ func TestReconcile(t *testing.T) {
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
 									{
-										Env: []corev1.EnvVar{
-											{
-												Name:  mondoov1alpha1.WebhookModeEnvVar,
-												Value: string(mondoov1alpha1.Enforcing),
-											},
+										Args: []string{
+											"--enforcement-mode",
+											string(mondoov1alpha1.Enforcing),
 										},
 									},
 								},
@@ -252,15 +242,7 @@ func TestReconcile(t *testing.T) {
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Webhook Deployment to exist")
 
-				// Find and check the value of the webhook mode env var
-				found := false
-				for _, env := range deployment.Spec.Template.Spec.Containers[0].Env {
-					if env.Name == mondoov1alpha1.WebhookModeEnvVar {
-						found = true
-						assert.Equal(t, string(mondoov1alpha1.Permissive), env.Value, "expected Webhook mode to be updated to 'permissive'")
-					}
-				}
-				assert.True(t, found, "did not find Webhook Mode environment variable to be defined/set")
+				assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, string(mondoov1alpha1.Permissive), "expected Webhook mode to be updated to 'permissive'")
 			},
 		},
 		{

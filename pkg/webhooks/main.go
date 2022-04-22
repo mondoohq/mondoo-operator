@@ -17,7 +17,11 @@ limitations under the License.
 package main
 
 import (
+	"flag"
+	"fmt"
+	"io/ioutil"
 	"os"
+	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -39,6 +43,31 @@ func init() {
 func main() {
 	webhookLog := log.Log.WithName("webhook")
 
+	var scanURL string
+	var webhookMode string
+	var tokenFilePath string
+	flag.StringVar(&scanURL, "scan-url", "", "The URL of the Service to send scan requests to.")
+	flag.StringVar(&tokenFilePath, "token-file-path", "", "Path to file containing token to use when making scan requests.")
+	flag.StringVar(&webhookMode, "enforcement-mode", string(mondoov1alpha1.Permissive), "What action to take on a failed scan.")
+
+	flag.Parse()
+
+	if scanURL == "" {
+		webhookLog.Error(fmt.Errorf("--scan-url must be provided"), "Missing parameter")
+		os.Exit(1)
+	}
+	if tokenFilePath == "" {
+		webhookLog.Error(fmt.Errorf("--token must be provided"), "Missing parameter")
+		os.Exit(1)
+	}
+
+	tokenBytes, err := ioutil.ReadFile(tokenFilePath)
+	if err != nil {
+		webhookLog.Error(err, "Failed to read in file with token content")
+		os.Exit(1)
+	}
+	token := strings.TrimSuffix(string(tokenBytes), "\n")
+
 	// Setup a Manager
 	webhookLog.Info("setting up manager")
 	mgr, err := manager.New(config.GetConfigOrDie(), manager.Options{
@@ -53,17 +82,9 @@ func main() {
 	webhookLog.Info("setting up webhook server", "version", version.Version)
 	hookServer := mgr.GetWebhookServer()
 
-	// Determine whether we are in enforcing or permissive mode
-	mode, exists := os.LookupEnv(mondoov1alpha1.WebhookModeEnvVar)
-	if !exists {
-		mode = string(mondoov1alpha1.Permissive)
-	}
-
-	webhookLog.Info("running with webhook configuration", "mode", mode)
-
 	webhookLog.Info("registering webhooks to the webhook server")
 
-	webhookValidator, err := webhookhandler.NewWebhookValidator(mgr.GetClient(), mode)
+	webhookValidator, err := webhookhandler.NewWebhookValidator(mgr.GetClient(), webhookMode, scanURL, token)
 	if err != nil {
 		webhookLog.Error(err, "failed to setup Core Webhook")
 		os.Exit(1)

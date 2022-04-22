@@ -12,13 +12,15 @@ import (
 )
 
 const (
-	healthCheckEndpoint        = "/Health/Check"
-	scanKubernetesEndpoint     = "/Scan/RunKubernetesManifest"
+	HealthCheckEndpoint        = "/Health/Check"
+	ScanKubernetesEndpoint     = "/Scan/RunKubernetesManifest"
 	defaultHttpTimeout         = 30 * time.Second
 	defaultIdleConnTimeout     = 30 * time.Second
 	defaultKeepAlive           = 30 * time.Second
 	defaultTLSHandshakeTimeout = 10 * time.Second
 	maxIdleConnections         = 100
+	// A valid result would come back as a '2'
+	ValidScanResult = uint32(2)
 )
 
 func DefaultHttpClient() *http.Client {
@@ -79,7 +81,7 @@ func (s *Scanner) request(ctx context.Context, url string, reqBodyBytes []byte) 
 }
 
 func (s *Scanner) HealthCheck(ctx context.Context, in *HealthCheckRequest) (*HealthCheckResponse, error) {
-	url := s.Endpoint + healthCheckEndpoint
+	url := s.Endpoint + HealthCheckEndpoint
 
 	reqBodyBytes, err := json.Marshal(in)
 	if err != nil {
@@ -100,7 +102,7 @@ func (s *Scanner) HealthCheck(ctx context.Context, in *HealthCheckRequest) (*Hea
 }
 
 func (s *Scanner) RunKubernetesManifest(ctx context.Context, in *KubernetesManifestJob) (*ScanResult, error) {
-	url := s.Endpoint + scanKubernetesEndpoint
+	url := s.Endpoint + ScanKubernetesEndpoint
 
 	reqBodyBytes, err := json.Marshal(in)
 	if err != nil {
@@ -121,7 +123,8 @@ func (s *Scanner) RunKubernetesManifest(ctx context.Context, in *KubernetesManif
 }
 
 type KubernetesManifestJob struct {
-	Files []*File `json:"files,omitempty"`
+	Files  []*File           `json:"files,omitempty"`
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 type File struct {
