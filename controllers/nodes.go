@@ -210,7 +210,7 @@ func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 							Value:  "true",
 						},
 						{
-							// Rancher controlplaen node
+							// Rancher controlplane node
 							// https://rancher.com/docs/rke/latest/en/config-options/nodes/#controlplane
 							Key:    "node-role.kubernetes.io/controlplane",
 							Effect: corev1.TaintEffectNoSchedule,
