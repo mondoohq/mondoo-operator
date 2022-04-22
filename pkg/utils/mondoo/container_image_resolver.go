@@ -59,7 +59,10 @@ type containerImageResolver struct {
 }
 
 func NewContainerImageResolver() ContainerImageResolver {
-	return &containerImageResolver{logger: ctrl.Log.WithName("container-image-resolver")}
+	return &containerImageResolver{
+		imageCache: make(map[string]string),
+		logger:     ctrl.Log.WithName("container-image-resolver"),
+	}
 }
 
 func (c *containerImageResolver) MondooClientImage(userImage, userTag string, skipResolveImage bool) (string, error) {
