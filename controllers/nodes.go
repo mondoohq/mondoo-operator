@@ -42,11 +42,11 @@ const (
 )
 
 type Nodes struct {
-	Enable               bool
-	Mondoo               *v1alpha1.MondooAuditConfig
-	Updated              bool
-	Image                string
-	MondooOperatorConfig *v1alpha1.MondooOperatorConfig
+	Enable                 bool
+	Mondoo                 *v1alpha1.MondooAuditConfig
+	Updated                bool
+	ContainerImageResolver mondoo.ContainerImageResolver
+	MondooOperatorConfig   *v1alpha1.MondooOperatorConfig
 }
 
 func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
@@ -109,11 +109,17 @@ func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme 
 func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
+	mondooClientImage, err := n.ContainerImageResolver.MondooClientImage(
+		n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	found := &appsv1.DaemonSet{}
-	err := clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(NodeDaemonSetNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
+	err = clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(NodeDaemonSetNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 
-		declared := n.daemonsetForMondoo()
+		declared := n.daemonsetForMondoo(mondooClientImage)
 		if err := ctrl.SetControllerReference(n.Mondoo, declared, scheme); err != nil {
 			log.Error(err, "Failed to set ControllerReference", "Daemonset.Namespace", declared.Namespace, "Daemonset.Name", declared.Name)
 			return ctrl.Result{}, err
@@ -127,8 +133,8 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 
 		return ctrl.Result{Requeue: true}, err
 
-	} else if err == nil && found.Spec.Template.Spec.Containers[0].Image != n.Image {
-		found.Spec.Template.Spec.Containers[0].Image = n.Image
+	} else if err == nil && found.Spec.Template.Spec.Containers[0].Image != mondooClientImage {
+		found.Spec.Template.Spec.Containers[0].Image = mondooClientImage
 		err := clt.Update(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to update Daemonset", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
@@ -178,7 +184,7 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	return ctrl.Result{}, err
 }
 
-func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
+func (n *Nodes) daemonsetForMondoo(image string) *appsv1.DaemonSet {
 	ls := labelsForMondoo(n.Mondoo.Name)
 	ls["audit"] = "node"
 
@@ -205,7 +211,7 @@ func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 					// should not be mounted at all.
 					AutomountServiceAccountToken: pointer.Bool(false),
 					Containers: []corev1.Container{{
-						Image:     n.Image,
+						Image:     image,
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
 						Resources: k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Nodes.Resources),
@@ -290,19 +296,10 @@ func (n *Nodes) daemonsetForMondoo() *appsv1.DaemonSet {
 	return dep
 }
 func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
-
-	log := ctrllog.FromContext(ctx)
-
 	if !n.Enable {
 		return n.down(ctx, clt, req)
 	}
 
-	skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
-	mondooImage, err := mondoo.ResolveMondooImage(log, n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag, skipResolveImage)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	n.Image = mondooImage
 	result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
 	if err != nil || result.Requeue {
 		return result, err

@@ -41,11 +41,11 @@ const (
 )
 
 type Workloads struct {
-	Enable               bool
-	Mondoo               *v1alpha1.MondooAuditConfig
-	Updated              bool
-	Image                string
-	MondooOperatorConfig *v1alpha1.MondooOperatorConfig
+	Enable                 bool
+	Mondoo                 *v1alpha1.MondooAuditConfig
+	Updated                bool
+	ContainerImageResolver mondoo.ContainerImageResolver
+	MondooOperatorConfig   *v1alpha1.MondooOperatorConfig
 }
 
 func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
@@ -102,8 +102,13 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 	found := &appsv1.Deployment{}
-	desiredDeployment := n.deploymentForMondoo()
-	err := clt.Get(ctx, client.ObjectKeyFromObject(desiredDeployment), found)
+	mondooClientImage, err := n.ContainerImageResolver.MondooClientImage(
+		n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	desiredDeployment := n.deploymentForMondoo(mondooClientImage)
+	err = clt.Get(ctx, client.ObjectKeyFromObject(desiredDeployment), found)
 	if err != nil && errors.IsNotFound(err) {
 
 		if err := ctrl.SetControllerReference(n.Mondoo, desiredDeployment, scheme); err != nil {
@@ -174,7 +179,7 @@ func (n *Workloads) deploymentNeedsUpdate(desired, existing *appsv1.Deployment) 
 }
 
 // deploymentForMondoo returns a Deployment object
-func (n *Workloads) deploymentForMondoo() *appsv1.Deployment {
+func (n *Workloads) deploymentForMondoo(image string) *appsv1.Deployment {
 	ls := labelsForMondoo(n.Mondoo.Name)
 	ls["audit"] = "k8s"
 
@@ -198,7 +203,7 @@ func (n *Workloads) deploymentForMondoo() *appsv1.Deployment {
 						Effect: corev1.TaintEffect("NoSchedule"),
 					}},
 					Containers: []corev1.Container{{
-						Image:     n.Image,
+						Image:     image,
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
 						Resources: k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Workloads.Resources),
@@ -307,13 +312,6 @@ func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *ru
 		log.Error(err, "ServiceAccount cannot be empty")
 		return ctrl.Result{}, err
 	}
-
-	skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
-	mondooImage, err := mondoo.ResolveMondooImage(log, n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag, skipResolveImage)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	n.Image = mondooImage
 
 	result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
 	if err != nil || result.Requeue {

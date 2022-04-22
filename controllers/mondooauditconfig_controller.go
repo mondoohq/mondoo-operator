@@ -50,11 +50,16 @@ type MondooAuditConfigReconciler struct {
 }
 
 // Embed the Default Inventory for Daemonset and Deployment Configurations
-//go:embed inventory-ds.yaml
-var dsInventoryyaml []byte
+var (
+	//go:embed inventory-ds.yaml
+	dsInventoryyaml []byte
 
-//go:embed inventory-deploy.yaml
-var deployInventoryyaml []byte
+	//go:embed inventory-deploy.yaml
+	deployInventoryyaml []byte
+
+	// Defined as a var so we can easily mock this in tests.
+	createContainerImageResolver = mondoo.NewContainerImageResolver
+)
 
 // The update permissions for MondooAuditConfigs are required because having update permissions just for finalizers is insufficient
 // to add finalizers. There is a github issue describing the problem https://github.com/kubernetes-sigs/kubebuilder/issues/2264
@@ -111,6 +116,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
+	// Have on container image resolver for the whole reconcile cycle. This will make sure that the same image is
+	// not resolved multiple times during a single reconcile.
+	containerImageResolver := createContainerImageResolver()
+
 	if config.DeletionTimestamp != nil {
 		// Going to proceed as if there is no MondooOperatorConfig
 		config = &v1alpha1.MondooOperatorConfig{}
@@ -123,10 +132,11 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// deleted should be called here
 
 		webhooks := webhooks.Webhooks{
-			Mondoo:               mondooAuditConfig,
-			KubeClient:           r.Client,
-			TargetNamespace:      req.Namespace,
-			MondooOperatorConfig: config,
+			Mondoo:                 mondooAuditConfig,
+			KubeClient:             r.Client,
+			TargetNamespace:        req.Namespace,
+			MondooOperatorConfig:   config,
+			ContainerImageResolver: containerImageResolver,
 		}
 		result, err := webhooks.Reconcile(ctx)
 		if err != nil {
@@ -151,9 +161,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	mondooAuditConfigCopy := mondooAuditConfig.DeepCopy()
 	nodes := Nodes{
-		Enable:               mondooAuditConfig.Spec.Nodes.Enable,
-		Mondoo:               mondooAuditConfig,
-		MondooOperatorConfig: config,
+		Enable:                 mondooAuditConfig.Spec.Nodes.Enable,
+		Mondoo:                 mondooAuditConfig,
+		MondooOperatorConfig:   config,
+		ContainerImageResolver: containerImageResolver,
 	}
 
 	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
@@ -165,9 +176,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	workloads := Workloads{
-		Enable:               mondooAuditConfig.Spec.Workloads.Enable,
-		Mondoo:               mondooAuditConfig,
-		MondooOperatorConfig: config,
+		Enable:                 mondooAuditConfig.Spec.Workloads.Enable,
+		Mondoo:                 mondooAuditConfig,
+		MondooOperatorConfig:   config,
+		ContainerImageResolver: containerImageResolver,
 	}
 
 	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
@@ -179,10 +191,11 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	webhooks := webhooks.Webhooks{
-		Mondoo:               mondooAuditConfig,
-		KubeClient:           r.Client,
-		TargetNamespace:      req.Namespace,
-		MondooOperatorConfig: config,
+		Mondoo:                 mondooAuditConfig,
+		KubeClient:             r.Client,
+		TargetNamespace:        req.Namespace,
+		MondooOperatorConfig:   config,
+		ContainerImageResolver: containerImageResolver,
 	}
 
 	result, err = webhooks.Reconcile(ctx)

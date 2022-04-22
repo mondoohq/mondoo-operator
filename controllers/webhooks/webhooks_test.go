@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -19,7 +18,6 @@ import (
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 
@@ -27,8 +25,7 @@ import (
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
-	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
-	"go.mondoo.com/mondoo-operator/tests/framework/utils"
+	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -43,6 +40,8 @@ func init() {
 }
 
 func TestReconcile(t *testing.T) {
+	containerImageResolver := fakeMondoo.NewNoOpContainerImageResolver()
+
 	tests := []struct {
 		name                  string
 		mondooAuditConfigSpec mondoov1alpha1.MondooAuditConfigData
@@ -287,7 +286,7 @@ func TestReconcile(t *testing.T) {
 				require.NoError(
 					t, kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(auditConfig), auditConfig), "failed to retrieve mondoo audit config")
 
-				img, err := mondoo.ResolveMondooOperatorImage(logr.New(log.NullLogSink{}), "", "", false)
+				img, err := containerImageResolver.MondooOperatorImage("", "", false)
 				require.NoErrorf(t, err, "failed to get mondoo operator image.")
 				expectedDeployment := WebhookDeployment(testNamespace, img, string(mondoov1alpha1.Permissive), *auditConfig)
 				require.NoError(t, ctrl.SetControllerReference(auditConfig, expectedDeployment, kubeClient.Scheme()))
@@ -346,7 +345,7 @@ func TestReconcile(t *testing.T) {
 				require.NoError(
 					t, kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(auditConfig), auditConfig), "failed to retrieve mondoo audit config")
 
-				img, err := mondoo.ResolveMondooImage(logr.New(log.NullLogSink{}), "", "", false)
+				img, err := containerImageResolver.MondooClientImage("", "", false)
 				require.NoErrorf(t, err, "failed to get mondoo operator image.")
 				expectedDeployment := scanapi.ScanApiDeployment(testNamespace, img, *auditConfig)
 				require.NoError(t, ctrl.SetControllerReference(auditConfig, expectedDeployment, kubeClient.Scheme()))
@@ -417,9 +416,6 @@ func TestReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
-			// Mock the retrieval of the actual image from the remote registry
-			mondoo.GetRemoteImage = utils.FakeGetRemoteImageFunc
-
 			auditConfig := &mondoov1alpha1.MondooAuditConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testMondooAuditConfigName,
@@ -434,10 +430,11 @@ func TestReconcile(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithObjects(existingObj...).Build()
 
 			webhooks := &Webhooks{
-				Mondoo:               auditConfig,
-				KubeClient:           fakeClient,
-				TargetNamespace:      testNamespace,
-				MondooOperatorConfig: &v1alpha1.MondooOperatorConfig{},
+				Mondoo:                 auditConfig,
+				KubeClient:             fakeClient,
+				TargetNamespace:        testNamespace,
+				MondooOperatorConfig:   &v1alpha1.MondooOperatorConfig{},
+				ContainerImageResolver: containerImageResolver,
 			}
 
 			// Act
