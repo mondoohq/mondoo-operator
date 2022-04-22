@@ -1,6 +1,6 @@
 # Mondoo Operator for Kubernetes
 
-![CI](https://github.com/mondoohq/mondoo-operator/actions/workflows/e2e.yaml/badge.svg)
+![CI](https://github.com/mondoohq/mondoo-operator/actions/workflows/tests.yaml/badge.svg)
 ![License](https://img.shields.io/github/license/mondoohq/mondoo-operator)
 
 > **Project Status**: This project is currently in Early-Access. The API and CRD may change.
