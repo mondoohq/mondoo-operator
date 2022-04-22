@@ -78,6 +78,13 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+- apiGroups:
+  - ""
+  resources:
   - services
   verbs:
   - create
