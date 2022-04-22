@@ -40,43 +40,44 @@ var MondooOperatorTag = version.Version
 
 type getRemoteImageFunc func(ref name.Reference, options ...remote.Option) (*remote.Descriptor, error)
 
-// Used only for testing purposes, so we can test the code without actually querying a remote container registry.
-var getRemoteImage getRemoteImageFunc = remote.Get
-
 type ContainerImageResolver interface {
 	// MondooClientImage return the Mondoo client image. If skipResolveImage is false, then the image tag is replaced
 	// by a digest. If userImage or userTag are empty strings, default values are used.
-	MondooClientImage(userImage, userTag string, skipResolveImage bool) (string, error)
+	MondooClientImage(userImage, userTag string, skipImageResolution bool) (string, error)
 
 	// MondooOperatorImage return the Mondoo operator image. If skipResolveImage is false, then the image tag is replaced
 	// by a digest. If userImage or userTag are empty strings, default values are used.
-	MondooOperatorImage(userImage, userTag string, skipResolveImage bool) (string, error)
+	MondooOperatorImage(userImage, userTag string, skipImageResolution bool) (string, error)
 }
 
 type containerImageResolver struct {
 	imageCache map[string]string
 	logger     logr.Logger
+
+	// Used only for testing purposes, so we can test the code without actually querying a remote container registry.
+	getRemoteImage getRemoteImageFunc
 }
 
 func NewContainerImageResolver() ContainerImageResolver {
 	return &containerImageResolver{
-		imageCache: make(map[string]string),
-		logger:     ctrl.Log.WithName("container-image-resolver"),
+		imageCache:     make(map[string]string),
+		logger:         ctrl.Log.WithName("container-image-resolver"),
+		getRemoteImage: remote.Get,
 	}
 }
 
-func (c *containerImageResolver) MondooClientImage(userImage, userTag string, skipResolveImage bool) (string, error) {
+func (c *containerImageResolver) MondooClientImage(userImage, userTag string, skipImageResolution bool) (string, error) {
 	image := userImageOrDefault(MondooClientImage, MondooClientTag, userImage, userTag)
-	return c.resolveImage(image, skipResolveImage)
+	return c.resolveImage(image, skipImageResolution)
 }
 
-func (c *containerImageResolver) MondooOperatorImage(userImage, userTag string, skipResolveImage bool) (string, error) {
+func (c *containerImageResolver) MondooOperatorImage(userImage, userTag string, skipImageResolution bool) (string, error) {
 	image := userImageOrDefault(MondooOperatorImage, MondooOperatorTag, userImage, userTag)
-	return c.resolveImage(image, skipResolveImage)
+	return c.resolveImage(image, skipImageResolution)
 }
 
-func (c *containerImageResolver) resolveImage(image string, skipResolveImage bool) (string, error) {
-	if skipResolveImage {
+func (c *containerImageResolver) resolveImage(image string, skipImageResolution bool) (string, error) {
+	if skipImageResolution {
 		return image, nil
 	}
 
@@ -102,7 +103,7 @@ func (c *containerImageResolver) getImageWithDigest(image string) (string, error
 		return "", err
 	}
 
-	desc, err := getRemoteImage(ref)
+	desc, err := c.getRemoteImage(ref)
 	if err != nil {
 		c.logger.Error(err, "Failed to get remote container reference")
 		return "", err
