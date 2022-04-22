@@ -19,20 +19,40 @@ package scanapi
 import (
 	"fmt"
 
-	"go.mondoo.com/mondoo-operator/api/v1alpha1"
-	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"github.com/google/uuid"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
+
+	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
 const (
 	DeploymentSuffix = "-scan-api"
 	ServiceSuffix    = "-scan-api"
+	SecretSuffix     = "-scan-api-token"
 	Port             = 8080
 )
+
+func ScanApiSecret(mondoo v1alpha1.MondooAuditConfig) *corev1.Secret {
+
+	// Generate a token. It will only be saved on initial Secret creation.
+	token := uuid.New()
+
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      SecretName(mondoo.Name),
+			Namespace: mondoo.Namespace,
+		},
+		StringData: map[string]string{
+			"token": token.String(),
+		},
+	}
+}
 
 func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.Deployment {
 	labels := DeploymentLabels(m)
@@ -55,7 +75,7 @@ func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.D
 					Containers: []corev1.Container{{
 						Image:     image,
 						Name:      "mondoo-client",
-						Command:   []string{"mondoo", "serve", "--api", "--config", "/etc/opt/mondoo/mondoo.yml"},
+						Command:   []string{"mondoo", "serve", "--api", "--config", "/etc/opt/mondoo/config/mondoo.yml", "--token-file-path", "/etc/opt/mondoo/token/token"},
 						Resources: k8s.DefaultMondooClientResources,
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
@@ -83,7 +103,12 @@ func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.D
 							{
 								Name:      "config",
 								ReadOnly:  true,
-								MountPath: "/etc/opt/",
+								MountPath: "/etc/opt/mondoo/config",
+							},
+							{
+								Name:      "token",
+								ReadOnly:  true,
+								MountPath: "/etc/opt/mondoo/token",
 							},
 						},
 						Ports: []corev1.ContainerPort{
@@ -109,11 +134,35 @@ func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.D
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "config",
-													Path: "mondoo/mondoo.yml",
+													Path: "mondoo.yml",
 												}},
 											},
 										},
 									},
+									DefaultMode: pointer.Int32(0444),
+								},
+							},
+						},
+						{
+							Name: "token",
+							VolumeSource: corev1.VolumeSource{
+								Projected: &corev1.ProjectedVolumeSource{
+									Sources: []corev1.VolumeProjection{
+										{
+											Secret: &corev1.SecretProjection{
+												LocalObjectReference: corev1.LocalObjectReference{
+													Name: SecretName(m.Name),
+												},
+												Items: []corev1.KeyToPath{
+													{
+														Key:  "token",
+														Path: "token",
+													},
+												},
+											},
+										},
+									},
+									DefaultMode: pointer.Int32(0444),
 								},
 							},
 						},
@@ -157,4 +206,8 @@ func ServiceName(prefix string) string {
 
 func DeploymentName(prefix string) string {
 	return prefix + DeploymentSuffix
+}
+
+func SecretName(prefix string) string {
+	return prefix + SecretSuffix
 }
