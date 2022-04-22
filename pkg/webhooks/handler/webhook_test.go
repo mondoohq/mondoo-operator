@@ -14,6 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/scanner"
+	"go.mondoo.com/mondoo-operator/pkg/scanner/fakescanapi"
 )
 
 func TestWebhookValidate(t *testing.T) {
@@ -21,6 +25,7 @@ func TestWebhookValidate(t *testing.T) {
 	decoder := setupDecoder(t)
 	tests := []struct {
 		name          string
+		mode          mondoov1alpha1.WebhookMode
 		expectAllowed bool
 		expectReason  string
 		object        runtime.RawExtension
@@ -28,13 +33,13 @@ func TestWebhookValidate(t *testing.T) {
 		{
 			name:          "example test",
 			expectAllowed: true,
-			expectReason:  "PASSED",
+			expectReason:  "PASSED MONDOO SCAN",
 			object:        testExamplePod(),
 		},
 		{
 			name:          "example Deployment",
 			expectAllowed: true,
-			expectReason:  "PASSED",
+			expectReason:  "PASSED MONDOO SCAN",
 			object:        testExampleDeployment(),
 		},
 	}
@@ -42,8 +47,17 @@ func TestWebhookValidate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
+			if test.mode == "" {
+				test.mode = mondoov1alpha1.Permissive
+			}
+
+			testserver := fakescanapi.FakeServer()
 			validator := &webhookValidator{
 				decoder: decoder,
+				mode:    test.mode,
+				scanner: &scanner.Scanner{
+					Endpoint: testserver.URL,
+				},
 			}
 
 			request := admission.Request{

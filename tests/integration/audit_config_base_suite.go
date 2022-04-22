@@ -104,7 +104,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov1.M
 func (s *AuditConfigBaseSuite) testMondooAuditConfigWebhooks(auditConfig mondoov1.MondooAuditConfig) {
 	// Generate certificates manually
 	serviceDNSNames := []string{
-		// DNS names will take the form of ServiceName-ServiceNamespace.svc and .svc.cluster.local
+		// DNS names will take the form of ServiceName.ServiceNamespace.svc and .svc.cluster.local
 		fmt.Sprintf("%s-webhook-service.%s.svc", auditConfig.Name, auditConfig.Namespace),
 		fmt.Sprintf("%s-webhook-service.%s.svc.cluster.local", auditConfig.Name, auditConfig.Namespace),
 	}
