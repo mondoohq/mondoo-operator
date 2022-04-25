@@ -22,6 +22,28 @@ import (
 
 var handlerlog = logf.Log.WithName("webhook-validator")
 
+const (
+	// defaultScanPass is our default Allowed result in the event that we never even made it to the scan
+	defaultScanPass = "DEFAULT MONDOO PASSED"
+	// passedScan is the Allowed result when the sacn came back with a passing result
+	passedScan = "PASSED MONDOO SCAN"
+	// failedScanPermitted is the Allowed result when in Permissive mode but the scan result was a failing result
+	failedScanPermitted = "PERMITTING FAILED SCAN"
+	// failedScan is the Denied result when in Enforcing mode and the scan result was a failing result
+	failedScan = "FAILED MONDOO SCAN"
+
+	mondooLabelPrefix    = "k8s.mondoo.com/"
+	mondooNamespaceLabel = mondooLabelPrefix + "namespace"
+	mondooUIDLabel       = mondooLabelPrefix + "uid"
+	mondooNameLabel      = mondooLabelPrefix + "name"
+	mondooKindLabel      = mondooLabelPrefix + "kind"
+	mondooOwnerNameLabel = mondooLabelPrefix + "owner-name"
+	mondooOwnerKindLabel = mondooLabelPrefix + "owner-kind"
+	mondooOwnerUIDLabel  = mondooLabelPrefix + "owner-uid"
+	mondooAuthorLabel    = mondooLabelPrefix + "author"
+	mondooOperationLabel = mondooLabelPrefix + "operation"
+)
+
 type webhookValidator struct {
 	client  client.Client
 	decoder *admission.Decoder
@@ -54,7 +76,7 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 	handlerlog.Info("Webhook triggered", "kind", req.Kind.Kind, "resource", resource)
 
 	// the default/safe response
-	response = admission.Allowed("DEFAULT MONDOO PASSED")
+	response = admission.Allowed(defaultScanPass)
 
 	// Call into Mondoo Scan Service to scan the resource
 	k8sObjectData, err := yaml.Marshal(req.Object)
@@ -63,13 +85,11 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		return
 	}
 
-	k8sLabels, err := generateLabels(k8sObjectData)
+	k8sLabels, err := generateLabels(req)
 	if err != nil {
 		handlerlog.Error(err, "failed to extract labels from incoming request")
 		return
 	}
-	k8sLabels["k8s.mondoo.com/author"] = req.UserInfo.Username
-	k8sLabels["k8s.mondoo.com/operator"] = string(req.Operation)
 
 	result, err := a.scanner.RunKubernetesManifest(ctx, &scanner.KubernetesManifestJob{
 		Files: []*scanner.File{
@@ -95,12 +115,16 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 	// or allow/deny based on the scan result
 	switch a.mode {
 	case mondoov1alpha1.Permissive:
-		response = admission.Allowed("PASSED MONDOO SCAN")
+		if passed {
+			response = admission.Allowed(passedScan)
+		} else {
+			response = admission.Allowed(failedScanPermitted)
+		}
 	case mondoov1alpha1.Enforcing:
 		if passed {
-			response = admission.Allowed("PASSED MONDOO SCAN")
+			response = admission.Allowed(passedScan)
 		} else {
-			response = admission.Denied("FAILED MONDOO SCAN")
+			response = admission.Denied(failedScan)
 		}
 	default:
 		err := fmt.Errorf("neither permissive nor enforcing modes defined")
@@ -116,14 +140,22 @@ func (a *webhookValidator) InjectDecoder(d *admission.Decoder) error {
 	return nil
 }
 
+// customObjectMeta allows us to decode the raw k8s Object to unmarshal
+// the Type and Object fields we use to generate labels from.
 type customObjectMeta struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 }
 
-func generateLabels(k8sObject []byte) (map[string]string, error) {
+func generateLabels(req admission.Request) (map[string]string, error) {
 
-	r := bytes.NewReader(k8sObject)
+	k8sObjectData, err := yaml.Marshal(req.Object)
+	if err != nil {
+		handlerlog.Error(err, "failed to marshal incoming request")
+		return nil, err
+	}
+
+	r := bytes.NewReader(k8sObjectData)
 	objMeta := &customObjectMeta{}
 
 	yamlDecoder := yamlutil.NewYAMLOrJSONDecoder(r, 4096)
@@ -133,18 +165,19 @@ func generateLabels(k8sObject []byte) (map[string]string, error) {
 	}
 
 	labels := map[string]string{
-		"k8s.mondoo.com/namespace": objMeta.Namespace,
-		"k8s.mondoo.com/uid":       string(objMeta.UID),
-		"k8s.mondoo.com/name":      objMeta.Name,
-		"k8s.mondoo.com/kind":      objMeta.Kind,
+		mondooNamespaceLabel: objMeta.Namespace,
+		mondooUIDLabel:       string(objMeta.UID),
+		mondooNameLabel:      objMeta.Name,
+		mondooKindLabel:      objMeta.Kind,
+		mondooAuthorLabel:    req.UserInfo.Username,
+		mondooOperationLabel: string(req.Operation),
 	}
 
-	for _, or := range objMeta.GetOwnerReferences() {
-		if or.Controller != nil && *or.Controller == true {
-			labels["k8s.mondoo.com/owner-name"] = or.Name
-			labels["k8s.mondoo.com/owner-kind"] = or.Kind
-			labels["k8s.mondoo.com/owner-uid"] = string(or.UID)
-		}
+	controllerRef := metav1.GetControllerOf(objMeta)
+	if controllerRef != nil {
+		labels[mondooOwnerNameLabel] = controllerRef.Name
+		labels[mondooOwnerKindLabel] = controllerRef.Kind
+		labels[mondooOwnerUIDLabel] = string(controllerRef.UID)
 	}
 
 	return labels, nil

@@ -43,17 +43,17 @@ func init() {
 func main() {
 	webhookLog := log.Log.WithName("webhook")
 
-	var scanURL string
+	var scanAPIURL string
 	var webhookMode string
 	var tokenFilePath string
-	flag.StringVar(&scanURL, "scan-url", "", "The URL of the Service to send scan requests to.")
+	flag.StringVar(&scanAPIURL, "scan-api-url", "", "The URL of the Service to send scan requests to.")
 	flag.StringVar(&tokenFilePath, "token-file-path", "", "Path to file containing token to use when making scan requests.")
-	flag.StringVar(&webhookMode, "enforcement-mode", string(mondoov1alpha1.Permissive), "What action to take on a failed scan.")
+	flag.StringVar(&webhookMode, "enforcement-mode", string(mondoov1alpha1.Permissive), "Mode 'permissive' allows resources that had a failing scan result pass, and mode 'enforcing' will deny resources with failed scanning result.")
 
 	flag.Parse()
 
-	if scanURL == "" {
-		webhookLog.Error(fmt.Errorf("--scan-url must be provided"), "Missing parameter")
+	if scanAPIURL == "" {
+		webhookLog.Error(fmt.Errorf("--scan-api-url must be provided"), "Missing parameter")
 		os.Exit(1)
 	}
 	if tokenFilePath == "" {
@@ -84,7 +84,7 @@ func main() {
 
 	webhookLog.Info("registering webhooks to the webhook server")
 
-	webhookValidator, err := webhookhandler.NewWebhookValidator(mgr.GetClient(), webhookMode, scanURL, token)
+	webhookValidator, err := webhookhandler.NewWebhookValidator(mgr.GetClient(), webhookMode, scanAPIURL, token)
 	if err != nil {
 		webhookLog.Error(err, "failed to setup Core Webhook")
 		os.Exit(1)

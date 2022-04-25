@@ -38,6 +38,7 @@ func TestAreDeploymentsEqual(t *testing.T) {
 						Image:     "test-image:latest",
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--api", "--config", "/etc/opt/mondoo/mondoo.yml"},
+						Args:      []string{"argA", "argB", "argC"},
 						Resources: DefaultMondooClientResources,
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
@@ -195,6 +196,24 @@ func TestAreDeploymentsEqual(t *testing.T) {
 			createB: func(a appsv1.Deployment) appsv1.Deployment {
 				b := *a.DeepCopy()
 				assert.NoError(t, ctrl.SetControllerReference(&a, &b, scheme.Scheme))
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when container args differ",
+			createB: func(a appsv1.Deployment) appsv1.Deployment {
+				b := *a.DeepCopy()
+				b.Spec.Template.Spec.Containers[0].Args = []string{"some", "different", "args"}
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when Pod volume definition(s) differ",
+			createB: func(a appsv1.Deployment) appsv1.Deployment {
+				b := *a.DeepCopy()
+				b.Spec.Template.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.Items[0].Key = "differentkey"
 				return b
 			},
 			shouldBeEqual: false,
