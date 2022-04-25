@@ -107,7 +107,7 @@ func TestLabelGeneratorForPod(t *testing.T) {
 	req := admission.Request{}
 	require.NoError(t, yaml.Unmarshal(webhookPayload, &req), "failed to unmarshal webhook payload")
 
-	labels, err := generateLabels(req)
+	labels, err := generateLabelsFromAdmissionRequest(req)
 	require.NoError(t, err, "Unexpected error while generating labels")
 
 	// string literals being compared to are taken from example webhook payload json
