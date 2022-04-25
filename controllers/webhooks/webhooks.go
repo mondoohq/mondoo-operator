@@ -39,7 +39,6 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
-	"go.mondoo.com/mondoo-operator/pkg/version"
 )
 
 var (
@@ -50,12 +49,11 @@ var (
 )
 
 type Webhooks struct {
-	Mondoo               *mondoov1alpha1.MondooAuditConfig
-	KubeClient           client.Client
-	TargetNamespace      string
-	OperatorImage        string
-	ClientImage          string
-	MondooOperatorConfig *mondoov1alpha1.MondooOperatorConfig
+	Mondoo                 *mondoov1alpha1.MondooAuditConfig
+	KubeClient             client.Client
+	TargetNamespace        string
+	ContainerImageResolver mondoo.ContainerImageResolver
+	MondooOperatorConfig   *mondoov1alpha1.MondooOperatorConfig
 }
 
 // syncValidatingWebhookConfiguration will create/update the ValidatingWebhookConfiguration
@@ -201,7 +199,13 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 		mode = string(mondoov1alpha1.Permissive)
 	}
 
-	desiredDeployment := WebhookDeployment(n.TargetNamespace, n.OperatorImage, mode, *n.Mondoo)
+	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(
+		n.Mondoo.Spec.Webhooks.Image.Name, n.Mondoo.Spec.Webhooks.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	if err != nil {
+		return err
+	}
+
+	desiredDeployment := WebhookDeployment(n.TargetNamespace, mondooOperatorImage, mode, *n.Mondoo)
 	if err := n.setControllerRef(desiredDeployment); err != nil {
 		return err
 	}
@@ -329,29 +333,12 @@ func (n *Webhooks) applyWebhooks(ctx context.Context) (ctrl.Result, error) {
 
 func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	if n.Mondoo.Spec.Webhooks.Enable && n.Mondoo.DeletionTimestamp == nil {
-		// On a normal mondoo-operator build, the Version variable will be set at build time to match
-		// the $VERSION being built (or default to the git SHA). In the event that someone did a manual
-		// build of mondoo-operator and failed to set the Version variable, we will pass an empty string
-		// down to resolve the image which will result in the 'latest' tag being used as a fallback.
-		imageTag := version.Version
-		// Allow user to override the tag if specified
-		if n.Mondoo.Spec.Webhooks.Image.Tag != "" {
-			imageTag = n.Mondoo.Spec.Webhooks.Image.Tag
-		}
-		skipResolveImage := n.MondooOperatorConfig.Spec.SkipContainerResolution
-		mondooOperatorImage, err := mondoo.ResolveMondooOperatorImage(webhookLog, n.Mondoo.Spec.Webhooks.Image.Name, imageTag, skipResolveImage)
+		mondooClientImage, err := n.ContainerImageResolver.MondooClientImage("", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		n.OperatorImage = mondooOperatorImage
 
-		mondooImage, err := mondoo.ResolveMondooImage(webhookLog, "", "", skipResolveImage)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		n.ClientImage = mondooImage
-
-		if err := scanapi.Deploy(ctx, n.KubeClient, n.TargetNamespace, n.ClientImage, *n.Mondoo); err != nil {
+		if err := scanapi.Deploy(ctx, n.KubeClient, n.TargetNamespace, mondooClientImage, *n.Mondoo); err != nil {
 			return ctrl.Result{}, err
 		}
 
