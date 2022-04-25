@@ -32,6 +32,7 @@ import (
 const (
 	testNamespace             = "mondoo-operator"
 	testMondooAuditConfigName = "mondoo-client"
+	testClusterID             = "abcd-1234"
 )
 
 func init() {
@@ -205,6 +206,23 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "pass ClusterID mode down to Deployment",
+			mondooAuditConfigSpec: mondoov1alpha1.MondooAuditConfigData{
+				Webhooks: mondoov1alpha1.Webhooks{
+					Enable: true,
+					Mode:   string(mondoov1alpha1.Permissive),
+				},
+			},
+			validate: func(t *testing.T, kubeClient client.Client) {
+				deployment := &appsv1.Deployment{}
+				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
+				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
+				require.NoError(t, err, "expected Webhook Deployment to exist")
+
+				assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, testClusterID, "expected Webhook mode to be set to 'permissive'")
+			},
+		},
+		{
 			name: "update webhook Deployment when mode changes",
 			mondooAuditConfigSpec: mondoov1alpha1.MondooAuditConfigData{
 				Webhooks: mondoov1alpha1.Webhooks{
@@ -253,7 +271,7 @@ func TestReconcile(t *testing.T) {
 				},
 			},
 			existingObjects: func(m mondoov1alpha1.MondooAuditConfig) []client.Object {
-				deployment := WebhookDeployment(testNamespace, "wrong", "test", m)
+				deployment := WebhookDeployment(testNamespace, "wrong", "test", m, testClusterID)
 				return []client.Object{deployment}
 			},
 			validate: func(t *testing.T, kubeClient client.Client) {
@@ -270,7 +288,7 @@ func TestReconcile(t *testing.T) {
 
 				img, err := containerImageResolver.MondooOperatorImage("", "", false)
 				require.NoErrorf(t, err, "failed to get mondoo operator image.")
-				expectedDeployment := WebhookDeployment(testNamespace, img, string(mondoov1alpha1.Permissive), *auditConfig)
+				expectedDeployment := WebhookDeployment(testNamespace, img, string(mondoov1alpha1.Permissive), *auditConfig, testClusterID)
 				require.NoError(t, ctrl.SetControllerReference(auditConfig, expectedDeployment, kubeClient.Scheme()))
 				assert.Truef(t, k8s.AreDeploymentsEqual(*deployment, *expectedDeployment), "deployment has not been updated")
 			},
@@ -405,7 +423,13 @@ func TestReconcile(t *testing.T) {
 				},
 				Spec: test.mondooAuditConfigSpec,
 			}
-			existingObj := []client.Object{auditConfig}
+			kubeSystemNamespace := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "kube-system",
+					UID:  types.UID(testClusterID),
+				},
+			}
+			existingObj := []client.Object{auditConfig, kubeSystemNamespace}
 			if test.existingObjects != nil {
 				existingObj = append(existingObj, test.existingObjects(*auditConfig)...)
 			}

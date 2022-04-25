@@ -42,18 +42,20 @@ const (
 	mondooOwnerUIDLabel  = mondooLabelPrefix + "owner-uid"
 	mondooAuthorLabel    = mondooLabelPrefix + "author"
 	mondooOperationLabel = mondooLabelPrefix + "operation"
+	mondooClusterIDLabel = mondooLabelPrefix + "cluster-id"
 )
 
 type webhookValidator struct {
-	client  client.Client
-	decoder *admission.Decoder
-	mode    mondoov1alpha1.WebhookMode
-	scanner *scanner.Scanner
+	client    client.Client
+	decoder   *admission.Decoder
+	mode      mondoov1alpha1.WebhookMode
+	scanner   *scanner.Scanner
+	clusterID string
 }
 
 // NewWebhookValidator will initialize a CoreValidator with the provided k8s Client and
 // set it to the provided mode. Returns error if mode is invalid.
-func NewWebhookValidator(client client.Client, mode, scanURL, token string) (admission.Handler, error) {
+func NewWebhookValidator(client client.Client, mode, scanURL, token, clusterID string) (admission.Handler, error) {
 	webhookMode, err := utils.ModeStringToWebhookMode(mode)
 	if err != nil {
 		return nil, err
@@ -66,6 +68,7 @@ func NewWebhookValidator(client client.Client, mode, scanURL, token string) (adm
 			Endpoint: scanURL,
 			Token:    token,
 		},
+		clusterID: clusterID,
 	}, nil
 }
 
@@ -85,11 +88,12 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		return
 	}
 
-	k8sLabels, err := generateLabels(req)
+	k8sLabels, err := generateLabelsFromAdmissionRequest(req)
 	if err != nil {
 		handlerlog.Error(err, "failed to extract labels from incoming request")
 		return
 	}
+	k8sLabels[mondooClusterIDLabel] = a.clusterID
 
 	result, err := a.scanner.RunKubernetesManifest(ctx, &scanner.KubernetesManifestJob{
 		Files: []*scanner.File{
@@ -147,7 +151,7 @@ type customObjectMeta struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 }
 
-func generateLabels(req admission.Request) (map[string]string, error) {
+func generateLabelsFromAdmissionRequest(req admission.Request) (map[string]string, error) {
 
 	k8sObjectData, err := yaml.Marshal(req.Object)
 	if err != nil {

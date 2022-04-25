@@ -46,9 +46,11 @@ func main() {
 	var scanAPIURL string
 	var webhookMode string
 	var tokenFilePath string
+	var clusterID string
 	flag.StringVar(&scanAPIURL, "scan-api-url", "", "The URL of the Service to send scan requests to.")
 	flag.StringVar(&tokenFilePath, "token-file-path", "", "Path to file containing token to use when making scan requests.")
 	flag.StringVar(&webhookMode, "enforcement-mode", string(mondoov1alpha1.Permissive), "Mode 'permissive' allows resources that had a failing scan result pass, and mode 'enforcing' will deny resources with failed scanning result.")
+	flag.StringVar(&clusterID, "cluster-id", "", "A cluster-unique ID for associating the webhook payloads with the underlying cluster.")
 
 	flag.Parse()
 
@@ -84,7 +86,7 @@ func main() {
 
 	webhookLog.Info("registering webhooks to the webhook server")
 
-	webhookValidator, err := webhookhandler.NewWebhookValidator(mgr.GetClient(), webhookMode, scanAPIURL, token)
+	webhookValidator, err := webhookhandler.NewWebhookValidator(mgr.GetClient(), webhookMode, scanAPIURL, token, clusterID)
 	if err != nil {
 		webhookLog.Error(err, "failed to setup Core Webhook")
 		os.Exit(1)
