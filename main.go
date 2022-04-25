@@ -35,6 +35,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	k8sv1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
@@ -49,6 +50,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(k8sv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(k8sv1alpha2.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 
 	utilruntime.Must(certmanagerv1.AddToScheme(scheme))
@@ -99,6 +101,10 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "MondooOperatorConfig")
 		os.Exit(1)
 	}
+	// if err = (&k8sv1alpha2.MondooAuditConfig{}).SetupWebhookWithManager(mgr); err != nil {
+	// 	setupLog.Error(err, "unable to create webhook", "webhook", "MondooAuditConfig")
+	// 	os.Exit(1)
+	// }
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
