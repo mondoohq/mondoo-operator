@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
-	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
@@ -43,10 +43,10 @@ const (
 
 type Workloads struct {
 	Enable                 bool
-	Mondoo                 *v1alpha1.MondooAuditConfig
+	Mondoo                 *v1alpha2.MondooAuditConfig
 	Updated                bool
 	ContainerImageResolver mondoo.ContainerImageResolver
-	MondooOperatorConfig   *v1alpha1.MondooOperatorConfig
+	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
 }
 
 func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
@@ -56,9 +56,6 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 	found := &corev1.ConfigMap{}
 	err := clt.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: n.Mondoo.Namespace}, found)
 
-	if n.Mondoo.Spec.Workloads.Inventory != "" {
-		inventory = n.Mondoo.Spec.Workloads.Inventory
-	}
 	if err != nil && errors.IsNotFound(err) {
 		found.ObjectMeta = metav1.ObjectMeta{
 			Name:      configMapName,
@@ -104,7 +101,7 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 	log := ctrllog.FromContext(ctx)
 	found := &appsv1.Deployment{}
 	mondooClientImage, err := n.ContainerImageResolver.MondooClientImage(
-		n.Mondoo.Spec.Workloads.Image.Name, n.Mondoo.Spec.Workloads.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -207,7 +204,7 @@ func (n *Workloads) deploymentForMondoo(image string) *appsv1.Deployment {
 						Image:     image,
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
-						Resources: k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Workloads.Resources),
+						Resources: k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Scanner.Resources),
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
@@ -242,7 +239,7 @@ func (n *Workloads) deploymentForMondoo(image string) *appsv1.Deployment {
 							},
 						},
 					}},
-					ServiceAccountName: n.Mondoo.Spec.Workloads.ServiceAccount,
+					ServiceAccountName: n.Mondoo.Spec.Scanner.ServiceAccountName,
 					Volumes: []corev1.Volume{
 						{
 							Name: "root",
@@ -271,7 +268,7 @@ func (n *Workloads) deploymentForMondoo(image string) *appsv1.Deployment {
 										{
 											Secret: &corev1.SecretProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: n.Mondoo.Spec.MondooSecretRef,
+													Name: n.Mondoo.Spec.Scanner.MondooCredsSecretRef,
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "config",
@@ -305,11 +302,11 @@ func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *ru
 		return n.down(ctx, clt, req)
 	}
 
-	if n.Mondoo.Spec.Workloads.ServiceAccount == "" && n.Mondoo.Namespace == namespace {
-		n.Mondoo.Spec.Workloads.ServiceAccount = defaultServiceAccount
+	if n.Mondoo.Spec.Scanner.ServiceAccountName == "" && n.Mondoo.Namespace == namespace {
+		n.Mondoo.Spec.Scanner.ServiceAccountName = defaultServiceAccount
 	}
-	if n.Mondoo.Spec.Workloads.ServiceAccount == "" {
-		err := fmt.Errorf("MondooAuditConfig.spec.workloads.serviceAccount cannot be empty when running in a different namespace than mondoo-operator")
+	if n.Mondoo.Spec.Scanner.ServiceAccountName == "" {
+		err := fmt.Errorf("MondooAuditConfig.spec.scanner.serviceAccountName cannot be empty when running in a different namespace than mondoo-operator")
 		log.Error(err, "ServiceAccount cannot be empty")
 		return ctrl.Result{}, err
 	}
@@ -382,7 +379,7 @@ func (n *Workloads) deleteExternalResources(ctx context.Context, clt client.Clie
 	return ctrl.Result{Requeue: true}, err
 }
 
-func updateWorkloadsConditions(config *v1alpha1.MondooAuditConfig, degradedStatus bool) {
+func updateWorkloadsConditions(config *v1alpha2.MondooAuditConfig, degradedStatus bool) {
 	msg := "API Scanning is Available"
 	reason := "APIScanningAvailable"
 	status := corev1.ConditionFalse
@@ -393,7 +390,7 @@ func updateWorkloadsConditions(config *v1alpha1.MondooAuditConfig, degradedStatu
 		status = corev1.ConditionTrue
 	}
 
-	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, v1alpha1.APIScanningDegraded, status, reason, msg, updateCheck)
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, v1alpha2.APIScanningDegraded, status, reason, msg, updateCheck)
 
 }
 

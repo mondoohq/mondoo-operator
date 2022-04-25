@@ -257,6 +257,7 @@ spec:
                   mondooauditconfig_types.go to remove/update
                 properties:
                   mode:
+                    default: manual
                     description: CertificateProvisioningMode is the specified method
                       the cluster uses for provisioning TLS certificates
                     enum:
@@ -278,6 +279,9 @@ spec:
                     type: boolean
                 type: object
               scanner:
+                description: Scanner defines the settings for the Mondoo scanner that
+                  will be running in the cluster. The same scanner is used for scanning
+                  the Kubernetes API, the nodes and for serving the admission controller.
                 properties:
                   image:
                     properties:

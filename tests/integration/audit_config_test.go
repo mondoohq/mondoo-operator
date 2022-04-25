@@ -25,7 +25,7 @@ func (s *AuditConfigSuite) TestReconcile_Nodes() {
 
 func (s *AuditConfigSuite) TestReconcile_Webhooks() {
 	auditConfig := utils.DefaultAuditConfig(s.testCluster.Settings.Namespace, false, false, true)
-	s.testMondooAuditConfigWebhooks(auditConfig)
+	s.testMondooAuditConfigAdmission(auditConfig)
 }
 
 func TestAuditConfigSuite(t *testing.T) {

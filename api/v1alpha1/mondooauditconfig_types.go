@@ -153,6 +153,8 @@ type MondooAuditConfig struct {
 func (src *MondooAuditConfig) ConvertTo(dstRaw conversion.Hub) error {
 	dst := dstRaw.(*v1alpha2.MondooAuditConfig)
 
+	dst.ObjectMeta = src.ObjectMeta
+
 	dst.Spec.CertificateProvisioning.Mode =
 		v1alpha2.CertificateProvisioningMode(src.Spec.Webhooks.CertificateConfig.InjectionStyle)
 
@@ -186,12 +188,16 @@ func (src *MondooAuditConfig) ConvertTo(dstRaw conversion.Hub) error {
 	dst.Spec.Admission.Image.Name = src.Spec.Webhooks.Image.Name
 	dst.Spec.Admission.Image.Tag = src.Spec.Webhooks.Image.Tag
 
+	// TODO: add status
+
 	return nil
 }
 
 // ConvertFrom converts from the Hub version (v1alpha2) to this version.
 func (dst *MondooAuditConfig) ConvertFrom(srcRaw conversion.Hub) error {
 	src := srcRaw.(*v1alpha2.MondooAuditConfig)
+
+	dst.ObjectMeta = src.ObjectMeta
 
 	dst.Spec.MondooSecretRef = src.Spec.Scanner.MondooCredsSecretRef
 
@@ -215,6 +221,8 @@ func (dst *MondooAuditConfig) ConvertFrom(srcRaw conversion.Hub) error {
 	dst.Spec.Nodes.Resources = src.Spec.Scanner.Resources
 	dst.Spec.Nodes.Image.Name = src.Spec.Scanner.Image.Name
 	dst.Spec.Nodes.Image.Tag = src.Spec.Scanner.Image.Tag
+
+	// TODO: add status
 
 	return nil
 }

@@ -35,6 +35,7 @@ type MondooAuditConfigData struct {
 
 // CertificateProvisioning defines the certificate provisioning configuration within the cluster.
 type CertificateProvisioning struct {
+	// +kubebuilder:default=manual
 	// +kubebuilder:validation:Enum=cert-manager;openshift;manual
 	Mode CertificateProvisioningMode `json:"mode"`
 }

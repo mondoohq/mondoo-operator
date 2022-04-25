@@ -7,4 +7,4 @@ resources:
 images:
 - name: controller
   newName: ghcr.io/mondoohq/mondoo-operator
-  newTag: sha256-0221c743e368dbb651f097beaf0a21bcb36acd3b.sig
+  newTag: sha256-9f788131a82233e93d301ed61bbaf16a6521c438.sig

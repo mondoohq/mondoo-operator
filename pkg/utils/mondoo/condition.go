@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 )
 
 // UpdateConditionCheck tests whether a condition should be updated from the
@@ -54,7 +54,7 @@ func UpdateConditionNever(_, _, _, _ string) bool {
 
 // FindMondooOperatorConfigCondition iterates all conditions on a MondooOperatorConfig looking for the
 // specified condition type. If none exists nil will be returned.
-func FindMondooOperatorConfigCondition(conditions []mondoov1alpha1.MondooOperatorConfigCondition, conditionType mondoov1alpha1.MondooOperatorConfigConditionType) *mondoov1alpha1.MondooOperatorConfigCondition {
+func FindMondooOperatorConfigCondition(conditions []mondoov1alpha2.MondooOperatorConfigCondition, conditionType mondoov1alpha2.MondooOperatorConfigConditionType) *mondoov1alpha2.MondooOperatorConfigCondition {
 	for i, condition := range conditions {
 		if condition.Type == conditionType {
 			return &conditions[i]
@@ -83,20 +83,20 @@ func shouldUpdateCondition(
 // 1) Requested status is different than existing status.
 // 2) The updateConditionCheck function returns true.
 func SetMondooOperatorConfigCondition(
-	conditions []mondoov1alpha1.MondooOperatorConfigCondition,
-	conditionType mondoov1alpha1.MondooOperatorConfigConditionType,
+	conditions []mondoov1alpha2.MondooOperatorConfigCondition,
+	conditionType mondoov1alpha2.MondooOperatorConfigConditionType,
 	status corev1.ConditionStatus,
 	reason string,
 	message string,
 	updateConditionCheck UpdateConditionCheck,
-) []mondoov1alpha1.MondooOperatorConfigCondition {
+) []mondoov1alpha2.MondooOperatorConfigCondition {
 	now := metav1.Now()
 	existingCondition := FindMondooOperatorConfigCondition(conditions, conditionType)
 	if existingCondition == nil {
 		if status == corev1.ConditionTrue {
 			conditions = append(
 				conditions,
-				mondoov1alpha1.MondooOperatorConfigCondition{
+				mondoov1alpha2.MondooOperatorConfigCondition{
 					Type:               conditionType,
 					Status:             status,
 					Reason:             reason,
@@ -124,7 +124,7 @@ func SetMondooOperatorConfigCondition(
 	return conditions
 }
 
-func UpdateMondooOperatorConfigStatus(ctx context.Context, client client.Client, origMOC, newMOC *mondoov1alpha1.MondooOperatorConfig, log logr.Logger) error {
+func UpdateMondooOperatorConfigStatus(ctx context.Context, client client.Client, origMOC, newMOC *mondoov1alpha2.MondooOperatorConfig, log logr.Logger) error {
 	if !reflect.DeepEqual(origMOC.Status, newMOC.Status) {
 		log.Info("status has changed, updating")
 		err := client.Status().Update(ctx, newMOC)
@@ -136,7 +136,7 @@ func UpdateMondooOperatorConfigStatus(ctx context.Context, client client.Client,
 	return nil
 }
 
-func FindMondooAuditConditions(conditions []mondoov1alpha1.MondooAuditConfigCondition, conditionType mondoov1alpha1.MondooAuditConfigConditionType) *mondoov1alpha1.MondooAuditConfigCondition {
+func FindMondooAuditConditions(conditions []mondoov1alpha2.MondooAuditConfigCondition, conditionType mondoov1alpha2.MondooAuditConfigConditionType) *mondoov1alpha2.MondooAuditConfigCondition {
 	for i, condition := range conditions {
 		if condition.Type == conditionType {
 			return &conditions[i]
@@ -145,20 +145,20 @@ func FindMondooAuditConditions(conditions []mondoov1alpha1.MondooAuditConfigCond
 	return nil
 }
 func SetMondooAuditCondition(
-	conditions []mondoov1alpha1.MondooAuditConfigCondition,
-	conditionType mondoov1alpha1.MondooAuditConfigConditionType,
+	conditions []mondoov1alpha2.MondooAuditConfigCondition,
+	conditionType mondoov1alpha2.MondooAuditConfigConditionType,
 	status corev1.ConditionStatus,
 	reason string,
 	message string,
 	updateConditionCheck UpdateConditionCheck,
-) []mondoov1alpha1.MondooAuditConfigCondition {
+) []mondoov1alpha2.MondooAuditConfigCondition {
 	now := metav1.Now()
 	existingCondition := FindMondooAuditConditions(conditions, conditionType)
 	if existingCondition == nil {
 		if status == corev1.ConditionTrue {
 			conditions = append(
 				conditions,
-				mondoov1alpha1.MondooAuditConfigCondition{
+				mondoov1alpha2.MondooAuditConfigCondition{
 					Type:               conditionType,
 					Status:             status,
 					Reason:             reason,
@@ -186,7 +186,7 @@ func SetMondooAuditCondition(
 	return conditions
 }
 
-func UpdateMondooAuditStatus(ctx context.Context, client client.Client, origMOC, newMOC *mondoov1alpha1.MondooAuditConfig, log logr.Logger) error {
+func UpdateMondooAuditStatus(ctx context.Context, client client.Client, origMOC, newMOC *mondoov1alpha2.MondooAuditConfig, log logr.Logger) error {
 	if !reflect.DeepEqual(origMOC.Status, newMOC.Status) {
 		log.Info("status has changed, updating")
 		err := client.Status().Update(ctx, newMOC)

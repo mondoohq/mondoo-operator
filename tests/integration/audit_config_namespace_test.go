@@ -70,20 +70,20 @@ func (s *AuditConfigCustomNamespaceSuite) TearDownSuite() {
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Workloads() {
 	auditConfig := utils.DefaultAuditConfig(s.ns.Name, true, false, false)
-	auditConfig.Spec.Workloads.ServiceAccount = s.sa.Name
+	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigWorkloads(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes() {
 	auditConfig := utils.DefaultAuditConfig(s.ns.Name, false, true, false)
-	auditConfig.Spec.Workloads.ServiceAccount = s.sa.Name
+	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigNodes(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Webhooks() {
 	auditConfig := utils.DefaultAuditConfig(s.ns.Name, false, false, true)
-	auditConfig.Spec.Workloads.ServiceAccount = s.sa.Name
-	s.testMondooAuditConfigWebhooks(auditConfig)
+	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
+	s.testMondooAuditConfigAdmission(auditConfig)
 }
 
 func TestAuditConfigCustomNamespaceSuite(t *testing.T) {

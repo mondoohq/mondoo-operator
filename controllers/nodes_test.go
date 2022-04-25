@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	k8sv1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	appsv1 "k8s.io/api/apps/v1"
 )
 
@@ -69,16 +69,22 @@ var _ = Describe("nodes", func() {
 			Expect(k8sClient.Create(ctx, secret)).Should(Succeed())
 
 			By("Creating the mondoo crd")
-			createdMondoo := &k8sv1alpha1.MondooAuditConfig{
+			createdMondoo := &k8sv1alpha2.MondooAuditConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: k8sv1alpha1.MondooAuditConfigData{
-					Nodes: k8sv1alpha1.Nodes{
+				Spec: k8sv1alpha2.MondooAuditConfigData{
+					CertificateProvisioning: k8sv1alpha2.CertificateProvisioning{
+						Mode: k8sv1alpha2.ManualProvisioning,
+					},
+					Scanner: k8sv1alpha2.Scanner{
+						MondooCredsSecretRef: name,
+					},
+					Nodes: k8sv1alpha2.Nodes{
 						Enable: true,
 					},
-					MondooSecretRef: name},
+				},
 			}
 			Expect(k8sClient.Create(ctx, createdMondoo)).Should(Succeed())
 			defer func() {
@@ -87,7 +93,7 @@ var _ = Describe("nodes", func() {
 			}()
 
 			By("Checking that the mondoo crd is found")
-			foundMondoo := &k8sv1alpha1.MondooAuditConfig{}
+			foundMondoo := &k8sv1alpha2.MondooAuditConfig{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundMondoo)
 				return err == nil

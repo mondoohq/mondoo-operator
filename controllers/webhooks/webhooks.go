@@ -35,7 +35,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -49,11 +49,11 @@ var (
 )
 
 type Webhooks struct {
-	Mondoo                 *mondoov1alpha1.MondooAuditConfig
+	Mondoo                 *mondoov1alpha2.MondooAuditConfig
 	KubeClient             client.Client
 	TargetNamespace        string
 	ContainerImageResolver mondoo.ContainerImageResolver
-	MondooOperatorConfig   *mondoov1alpha1.MondooOperatorConfig
+	MondooOperatorConfig   *mondoov1alpha2.MondooOperatorConfig
 }
 
 // syncValidatingWebhookConfiguration will create/update the ValidatingWebhookConfiguration
@@ -152,7 +152,7 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 	desiredService := WebhookService(n.TargetNamespace, *n.Mondoo)
 
 	// Annotate the Service if the Mondoo config is asking for OpenShift-style TLS certificate management.
-	if n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) {
+	if n.Mondoo.Spec.CertificateProvisioning.Mode == mondoov1alpha2.OpenShiftProvisioning {
 		// Just set the value to the name of the Secret the webhook Deployment mounts in.
 		metav1.SetMetaDataAnnotation(&desiredService.ObjectMeta, openShiftServiceAnnotationKey, GetTLSCertificatesSecretName(n.Mondoo.Name))
 	}
@@ -175,10 +175,10 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 
 	tlsSecretName := GetTLSCertificatesSecretName(n.Mondoo.Name)
 	if !k8s.AreServicesEqual(*desiredService, *service) ||
-		(n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) &&
+		(n.Mondoo.Spec.CertificateProvisioning.Mode == mondoov1alpha2.OpenShiftProvisioning &&
 			(!metav1.HasAnnotation(service.ObjectMeta, openShiftServiceAnnotationKey) ||
 				service.Annotations[openShiftServiceAnnotationKey] != tlsSecretName)) {
-		if n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) {
+		if n.Mondoo.Spec.CertificateProvisioning.Mode == mondoov1alpha2.OpenShiftProvisioning {
 			metav1.SetMetaDataAnnotation(&service.ObjectMeta, openShiftServiceAnnotationKey, tlsSecretName)
 		}
 		k8s.UpdateService(service, *desiredService)
@@ -205,13 +205,13 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 	clusterID := string(namespace.UID)
 
 	// "permissive" by default if Spec.Webhooks.Mode is ""
-	mode := n.Mondoo.Spec.Webhooks.Mode
+	mode := n.Mondoo.Spec.Admission.Mode
 	if mode == "" {
-		mode = string(mondoov1alpha1.Permissive)
+		mode = mondoov1alpha2.Permissive
 	}
 
 	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(
-		n.Mondoo.Spec.Webhooks.Image.Name, n.Mondoo.Spec.Webhooks.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+		n.Mondoo.Spec.Admission.Image.Name, n.Mondoo.Spec.Admission.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		return err
 	}
@@ -251,8 +251,8 @@ func (n *Webhooks) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1
 
 	var annotationKey, annotationValue string
 
-	switch n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle {
-	case string(mondoov1alpha1.CertManager):
+	switch n.Mondoo.Spec.CertificateProvisioning.Mode {
+	case mondoov1alpha2.CertManagerProvisioning:
 		cm := &CertManagerHandler{
 			KubeClient:      n.KubeClient,
 			TargetNamespace: n.TargetNamespace,
@@ -266,7 +266,7 @@ func (n *Webhooks) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1
 			return err
 		}
 
-	case string(mondoov1alpha1.OpenShift):
+	case mondoov1alpha2.OpenShiftProvisioning:
 		// For OpenShift we just annotate the webhook so that the necessary CA data is injected
 		// into the webhook.
 		annotationKey = openShiftWebhookAnnotationKey
@@ -343,7 +343,7 @@ func (n *Webhooks) applyWebhooks(ctx context.Context) (ctrl.Result, error) {
 }
 
 func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
-	if n.Mondoo.Spec.Webhooks.Enable && n.Mondoo.DeletionTimestamp == nil {
+	if n.Mondoo.Spec.Admission.Enable && n.Mondoo.DeletionTimestamp == nil {
 		mondooClientImage, err := n.ContainerImageResolver.MondooClientImage("", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
 		if err != nil {
 			return ctrl.Result{}, err

@@ -13,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	mondoov1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	mondoocontrollers "go.mondoo.com/mondoo-operator/controllers"
 	mondooscanapi "go.mondoo.com/mondoo-operator/controllers/scanapi"
 	mondoowebhooks "go.mondoo.com/mondoo-operator/controllers/webhooks"
@@ -45,7 +45,7 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 	}
 }
 
-func (s *AuditConfigBaseSuite) testMondooAuditConfigWorkloads(auditConfig mondoov1.MondooAuditConfig) {
+func (s *AuditConfigBaseSuite) testMondooAuditConfigWorkloads(auditConfig mondoov2.MondooAuditConfig) {
 	zap.S().Info("Create an audit config that enables only workloads scanning.")
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
@@ -74,7 +74,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigWorkloads(auditConfig mondoo
 	s.Equalf(int32(1), *deployments.Items[0].Spec.Replicas, "Deployment does not have 1 replica.")
 }
 
-func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov1.MondooAuditConfig) {
+func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
 	zap.S().Info("Create an audit config that enables only nodes scanning.")
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
@@ -101,7 +101,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov1.M
 	s.Equalf(expectedDaemonSetName, daemonSets.Items[0].Name, "DaemonSet name does not match expected name based from audit config name.")
 }
 
-func (s *AuditConfigBaseSuite) testMondooAuditConfigWebhooks(auditConfig mondoov1.MondooAuditConfig) {
+func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
 	// Generate certificates manually
 	serviceDNSNames := []string{
 		// DNS names will take the form of ServiceName.ServiceNamespace.svc and .svc.cluster.local
@@ -116,9 +116,9 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigWebhooks(auditConfig mondoov
 	// Disable imageResolution for the webhook image to be runnable.
 	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
 	// image, and fail because we haven't pushed this image publicly.
-	operatorConfig := &mondoov1.MondooOperatorConfig{
+	operatorConfig := &mondoov2.MondooOperatorConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: mondoov1.MondooOperatorConfigName,
+			Name: mondoov2.MondooOperatorConfigName,
 		},
 	}
 	s.Require().NoErrorf(

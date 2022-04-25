@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	k8sv1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -77,17 +78,22 @@ var _ = Describe("workloads", func() {
 			Expect(k8sClient.Create(ctx, serviceaccount)).Should(Succeed())
 
 			By("Creating the mondoo crd")
-			createdMondoo := &k8sv1alpha1.MondooAuditConfig{
+			createdMondoo := &k8sv1alpha2.MondooAuditConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: k8sv1alpha1.MondooAuditConfigData{
-					Workloads: k8sv1alpha1.Workloads{
-						Enable:         true,
-						ServiceAccount: name,
+				Spec: k8sv1alpha2.MondooAuditConfigData{
+					CertificateProvisioning: k8sv1alpha2.CertificateProvisioning{
+						Mode: k8sv1alpha2.ManualProvisioning,
 					},
-					MondooSecretRef: name,
+					Scanner: k8sv1alpha2.Scanner{
+						ServiceAccountName:   name,
+						MondooCredsSecretRef: name,
+					},
+					KubernetesResources: k8sv1alpha2.KubernetesResources{
+						Enable: true,
+					},
 				},
 			}
 			Expect(k8sClient.Create(ctx, createdMondoo)).Should(Succeed())

@@ -1,0 +1,6 @@
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooOperatorConfig
+metadata:
+  name: mondoooperatorconfig-sample
+spec:
+  # TODO(user): Add fields here
