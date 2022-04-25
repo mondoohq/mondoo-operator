@@ -2,7 +2,7 @@ package scanner_test
 
 import (
 	"context"
-	_ "embed"
+	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,8 +15,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/scanner/fakescanapi"
 )
 
-//go:embed testdata/webhook-payload.json
-var webhookPayload []byte
+var webhookPayload = mustRead("../../tests/data/webhook-payload.json")
 
 func TestScanner(t *testing.T) {
 	testserver := fakescanapi.FakeServer()
@@ -65,4 +64,12 @@ func TestScanner(t *testing.T) {
 		passed := result.WorstScore.Type == 2 && result.WorstScore.Value == 100
 		assert.True(t, passed)
 	}
+}
+
+func mustRead(file string) []byte {
+	bytes, err := ioutil.ReadFile(file)
+	if err != nil {
+		panic("couldn't read in file")
+	}
+	return bytes
 }

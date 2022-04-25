@@ -72,6 +72,8 @@ func createSecret(ctx context.Context, kubeClient client.Client, mondoo mondoov1
 		return err
 	}
 
+	// Doing a direct Create() so that we don't have to do the Get()->IfNotExists->Create() dance
+	// which lets us avoid asking for Get/List on Secrets across all Namespaces.
 	err := kubeClient.Create(ctx, scanApiTokenSecret)
 	if err == nil {
 		logger.Info("Created token Secret for scan API")
@@ -80,7 +82,7 @@ func createSecret(ctx context.Context, kubeClient client.Client, mondoo mondoov1
 		logger.Info("Token Secret for scan API already exists")
 		return nil
 	} else {
-		logger.Error(err, "Failed to create/check for existence of token Secret for scan API")
+		logger.Error(err, "Faled to create/check for existence of token Secret for scan API")
 		return err
 	}
 }
