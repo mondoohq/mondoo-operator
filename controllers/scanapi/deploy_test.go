@@ -50,7 +50,9 @@ func (s *DeploySuite) TestDeploy_Create() {
 		},
 	}
 	s.NoError(kubeClient.Get(s.ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret), "Error checking for token secret")
-	s.Contains(tokenSecret.Data, "token")
+	// This really should be checking tokenSecret.Data, but the fake kubeClient just takes and stores the objects given to it
+	// and our code populates the Secret through Secret.StringData["token"]
+	s.Contains(tokenSecret.StringData, "token")
 
 	ds := &appsv1.DeploymentList{}
 	s.NoError(kubeClient.List(s.ctx, ds))
