@@ -73,8 +73,7 @@ func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.D
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						// Image:     image,
-						Image:     "docker.io/mondoohq/client:testing", // FIXME: Override for local testing until we have a public build with --token-file-path
+						Image:     image,
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--api", "--config", "/etc/opt/mondoo/config/mondoo.yml", "--token-file-path", "/etc/opt/mondoo/token/token"},
 						Resources: k8s.DefaultMondooClientResources,
