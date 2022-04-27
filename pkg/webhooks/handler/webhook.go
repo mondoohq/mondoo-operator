@@ -32,17 +32,18 @@ const (
 	// failedScan is the Denied result when in Enforcing mode and the scan result was a failing result
 	failedScan = "FAILED MONDOO SCAN"
 
-	mondooLabelPrefix    = "k8s.mondoo.com/"
-	mondooNamespaceLabel = mondooLabelPrefix + "namespace"
-	mondooUIDLabel       = mondooLabelPrefix + "uid"
-	mondooNameLabel      = mondooLabelPrefix + "name"
-	mondooKindLabel      = mondooLabelPrefix + "kind"
-	mondooOwnerNameLabel = mondooLabelPrefix + "owner-name"
-	mondooOwnerKindLabel = mondooLabelPrefix + "owner-kind"
-	mondooOwnerUIDLabel  = mondooLabelPrefix + "owner-uid"
-	mondooAuthorLabel    = mondooLabelPrefix + "author"
-	mondooOperationLabel = mondooLabelPrefix + "operation"
-	mondooClusterIDLabel = mondooLabelPrefix + "cluster-id"
+	mondooLabelPrefix          = "k8s.mondoo.com/"
+	mondooNamespaceLabel       = mondooLabelPrefix + "namespace"
+	mondooUIDLabel             = mondooLabelPrefix + "uid"
+	mondooResourceVersionLabel = mondooLabelPrefix + "resource-version"
+	mondooNameLabel            = mondooLabelPrefix + "name"
+	mondooKindLabel            = mondooLabelPrefix + "kind"
+	mondooOwnerNameLabel       = mondooLabelPrefix + "owner-name"
+	mondooOwnerKindLabel       = mondooLabelPrefix + "owner-kind"
+	mondooOwnerUIDLabel        = mondooLabelPrefix + "owner-uid"
+	mondooAuthorLabel          = mondooLabelPrefix + "author"
+	mondooOperationLabel       = mondooLabelPrefix + "operation"
+	mondooClusterIDLabel       = mondooLabelPrefix + "cluster-id"
 )
 
 type webhookValidator struct {
@@ -169,12 +170,13 @@ func generateLabelsFromAdmissionRequest(req admission.Request) (map[string]strin
 	}
 
 	labels := map[string]string{
-		mondooNamespaceLabel: objMeta.Namespace,
-		mondooUIDLabel:       string(objMeta.UID),
-		mondooNameLabel:      objMeta.Name,
-		mondooKindLabel:      objMeta.Kind,
-		mondooAuthorLabel:    req.UserInfo.Username,
-		mondooOperationLabel: string(req.Operation),
+		mondooNamespaceLabel:       objMeta.Namespace,
+		mondooUIDLabel:             string(objMeta.UID),
+		mondooResourceVersionLabel: objMeta.ResourceVersion,
+		mondooNameLabel:            objMeta.Name,
+		mondooKindLabel:            objMeta.Kind,
+		mondooAuthorLabel:          req.UserInfo.Username,
+		mondooOperationLabel:       string(req.Operation),
 	}
 
 	controllerRef := metav1.GetControllerOf(objMeta)

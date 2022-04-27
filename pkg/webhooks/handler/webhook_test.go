@@ -127,6 +127,8 @@ func TestLabelGeneratorForPod(t *testing.T) {
 	require.Equal(t, "833fd5a2-2377-4766-b324-545e5e449a2f", labels[mondooOwnerUIDLabel])
 	require.Contains(t, labels, mondooOperationLabel, "Operation label missing")
 	require.Equal(t, "CREATE", labels[mondooOperationLabel])
+	require.Contains(t, labels, mondooResourceVersionLabel, "ResourceVersion label missing")
+	require.Equal(t, "", labels[mondooResourceVersionLabel], "Expect empty value for a CREATE webhook")
 
 }
 
