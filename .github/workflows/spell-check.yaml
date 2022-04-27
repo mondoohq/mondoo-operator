@@ -27,5 +27,7 @@ jobs:
         id: spelling
         with:
           post_comment: 0
-          extra_dictionaries: cspell:aws/aws.txt
+          extra_dictionaries:
+            cspell:aws/aws.txt
             cspell:filetypes/filetypes.txt
+            cspell:software-terms/softwareTerms.txt
