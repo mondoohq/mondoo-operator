@@ -120,6 +120,10 @@ func (s *DeploySuite) TestCleanup() {
 	s.NoError(client.List(s.ctx, ds))
 	s.Equal(0, len(ds.Items))
 
+	sec := &corev1.SecretList{}
+	s.NoError(client.List(s.ctx, sec))
+	s.Equal(0, len(sec.Items))
+
 	ss := &corev1.ServiceList{}
 	s.NoError(client.List(s.ctx, ss))
 	s.Equal(0, len(ss.Items))
