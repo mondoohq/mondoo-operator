@@ -31,6 +31,10 @@ jobs:
       id-token: write
 
     steps:
+      - name: extract tag/version
+        id: get_version
+        run: echo ::set-output name=VERSION::$(echo ${GITHUB_REF##refs/tags/})
+
       - name: Checkout repository
         uses: actions/checkout@v2
 
@@ -79,6 +83,8 @@ jobs:
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
+          build_args: |
+            VERSION=${{ steps.get_version.outputs.VERSION }}
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
