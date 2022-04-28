@@ -16,7 +16,10 @@ spec:
     singular: mondoooperatorconfig
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - deprecated: true
+    deprecationWarning: k8s.mondoo.com/v1alpha1 is deprecated. The CRD will be automatically
+      converted to v1alpha2
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: MondooOperatorConfig is the Schema for the mondoooperatorconfigs

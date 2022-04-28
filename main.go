@@ -101,11 +101,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "MondooOperatorConfig")
 		os.Exit(1)
 	}
-	// if err = (&k8sv1alpha2.MondooAuditConfig{}).SetupWebhookWithManager(mgr); err != nil {
-	// 	setupLog.Error(err, "unable to create webhook", "webhook", "MondooAuditConfig")
-	// 	os.Exit(1)
-	// }
-	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

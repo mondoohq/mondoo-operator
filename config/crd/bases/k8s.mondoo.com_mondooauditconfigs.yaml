@@ -16,7 +16,10 @@ spec:
     singular: mondooauditconfig
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - deprecated: true
+    deprecationWarning: k8s.mondoo.com/v1alpha1 is deprecated. The CRD will be automatically
+      converted to v1alpha2
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: MondooAuditConfig is the Schema for the mondooauditconfigs API
@@ -321,11 +324,7 @@ spec:
                     type: object
                   serviceAccountName:
                     type: string
-                required:
-                - mondooCredsSecretRef
                 type: object
-            required:
-            - scanner
             type: object
           status:
             description: MondooAuditConfigStatus defines the observed state of MondooAuditConfig

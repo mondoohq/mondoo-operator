@@ -91,6 +91,8 @@ const (
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:scope=Cluster
+//+kubebuilder:deprecatedversion
+//+kubebuilder:deprecatedversion:warning="k8s.mondoo.com/v1alpha1 is deprecated. The CRD will be automatically converted to v1alpha2"
 
 // MondooOperatorConfig is the Schema for the mondoooperatorconfigs API
 type MondooOperatorConfig struct {

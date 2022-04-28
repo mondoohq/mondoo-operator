@@ -139,6 +139,8 @@ const (
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:deprecatedversion
+//+kubebuilder:deprecatedversion:warning="k8s.mondoo.com/v1alpha1 is deprecated. The CRD will be automatically converted to v1alpha2"
 
 // MondooAuditConfig is the Schema for the mondooauditconfigs API
 type MondooAuditConfig struct {
@@ -153,10 +155,13 @@ type MondooAuditConfig struct {
 func (src *MondooAuditConfig) ConvertTo(dstRaw conversion.Hub) error {
 	dst := dstRaw.(*v1alpha2.MondooAuditConfig)
 
-	dst.ObjectMeta = src.ObjectMeta
+	dst.ObjectMeta = *src.ObjectMeta.DeepCopy()
 
 	dst.Spec.CertificateProvisioning.Mode =
 		v1alpha2.CertificateProvisioningMode(src.Spec.Webhooks.CertificateConfig.InjectionStyle)
+	if dst.Spec.CertificateProvisioning.Mode == "" {
+		dst.Spec.CertificateProvisioning.Mode = v1alpha2.ManualProvisioning
+	}
 
 	dst.Spec.Scanner.ServiceAccountName = src.Spec.Workloads.ServiceAccount
 	dst.Spec.Scanner.MondooCredsSecretRef = src.Spec.MondooSecretRef

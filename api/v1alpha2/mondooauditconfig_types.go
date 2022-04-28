@@ -27,7 +27,7 @@ type MondooAuditConfigData struct {
 
 	// Config is an example field of MondooAuditConfig. Edit mondooauditconfig_types.go to remove/update
 	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
-	Scanner                 Scanner                 `json:"scanner"`
+	Scanner                 Scanner                 `json:"scanner,omitempty"`
 	KubernetesResources     KubernetesResources     `json:"kubernetesResources,omitempty"`
 	Nodes                   Nodes                   `json:"nodes,omitempty"`
 	Admission               Admission               `json:"admission,omitempty"`
@@ -43,10 +43,12 @@ type CertificateProvisioning struct {
 // Scanner defines the settings for the Mondoo scanner that will be running in the cluster. The same scanner
 // is used for scanning the Kubernetes API, the nodes and for serving the admission controller.
 type Scanner struct {
-	MondooCredsSecretRef string                      `json:"mondooCredsSecretRef"`
-	ServiceAccountName   string                      `json:"serviceAccountName,omitempty"`
-	Image                Image                       `json:"image,omitempty"`
-	Resources            corev1.ResourceRequirements `json:"resources,omitempty"`
+	//+kubebuilder:validation:Optional
+	MondooCredsSecretRef string `json:"mondooCredsSecretRef,omitempty"`
+	//+kubebuilder:validation:Optional
+	ServiceAccountName string                      `json:"serviceAccountName,omitempty"`
+	Image              Image                       `json:"image,omitempty"`
+	Resources          corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type KubernetesResources struct {
