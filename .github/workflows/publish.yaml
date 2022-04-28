@@ -138,21 +138,9 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Push multi-platform virtual tag
-        run: |
-          image = ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          for tag in ${{ steps.meta.outputs.tags }}; do
-            # Create manifest to join all images under one virtual tag
-            docker manifest create -a "$image:$tag" \
-                    "$image:$tag-amd64" \
-                    "$image:$tag-arm64" \
-                    "$image:$tag-arm" \
-
-            # Annotate to set which image is build for which CPU architecture
-            for arch in $CPU_ARCHS; do
-              docker manifest annotate --arch "$arch" "$image:$tag" "$image:$tag-$arch"
-            done
-            docker manifest push "$image:$tag"
-          done
+        run: .github/workflows/scripts/push-virtual-tag.sh
+        env:
+          CPU_ARCHS: amd64 arm64 arm
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
