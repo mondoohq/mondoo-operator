@@ -4,7 +4,8 @@ set -e
 set -o pipefail
 
 IMAGE=${REGISTRY}/${IMAGE_NAME}
-echo "Creating multi-platform virtual tag for $IMAGE"
+echo "Creating multi-platform virtual tag for $IMAGE..."
+echo "Tags: ${TAGS}"
 for tag in ${TAGS}; do
     # Create manifest to join all images under one virtual tag
     docker manifest create -a "$IMAGE:$tag" \
@@ -17,5 +18,7 @@ for tag in ${TAGS}; do
     for arch in ${CPU_ARCHS}; do
         docker manifest annotate --arch "$arch" "$IMAGE:$tag" "$image:$tag-$arch"
     done
+    echo "Pushing manifest $IMAGE:$tag..."
     docker manifest push "$IMAGE:$tag"
+    echo "Pushed manifest $IMAGE:$tag"
 done
