@@ -4,13 +4,14 @@ set -e
 set -o pipefail
 
 echo "Creating multi-platform virtual tag for $TAGS..."
+export DOCKER_CLI_EXPERIMENTAL=enabled
 for tag in ${TAGS}; do
     echo "Creating manifest list $tag..."
     # Create manifest to join all images under one virtual tag
     docker manifest create -a "$tag" \
             "$tag-amd64" \
             "$tag-arm64" \
-            "$tag-arm" \
+            "$tag-arm"
     echo "Created manifest list $tag"
 
     # Annotate to set which image is build for which CPU architecture
