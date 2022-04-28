@@ -1,68 +1,24 @@
-package scanner
+package scanner_test
 
 import (
 	"context"
-	_ "embed"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
+	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/yaml"
+
+	"go.mondoo.com/mondoo-operator/pkg/scanner"
+	"go.mondoo.com/mondoo-operator/pkg/scanner/fakescanapi"
 )
 
-const (
-	// A valid result would come back as a '2'
-	validScanResult = uint32(2)
-)
-
-//go:embed testdata/webhook-payload.json
-var webhookPayload []byte
-
-func testServer() *httptest.Server {
-	mux := http.NewServeMux()
-	mux.HandleFunc(healthCheckEndpoint, func(w http.ResponseWriter, r *http.Request) {
-		result := &HealthCheckResponse{
-			Status: "SERVING",
-		}
-		data, err := json.Marshal(result)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		if _, err = w.Write(data); err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-	})
-
-	mux.HandleFunc(scanKubernetesEndpoint, func(w http.ResponseWriter, r *http.Request) {
-		result := &ScanResult{
-			Ok: true,
-			WorstScore: &Score{
-				Type:  validScanResult,
-				Value: 100,
-			},
-		}
-		data, err := json.Marshal(result)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		if _, err = w.Write(data); err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-
-	})
-	return httptest.NewServer(mux)
-}
+var webhookPayload = mustRead("../../tests/data/webhook-payload.json")
 
 func TestScanner(t *testing.T) {
-	testserver := testServer()
+	testserver := fakescanapi.FakeServer()
 	url := testserver.URL
 	token := ""
 
@@ -71,13 +27,13 @@ func TestScanner(t *testing.T) {
 	// token := "<token here>"
 
 	// do client request
-	s := &Scanner{
+	s := &scanner.Scanner{
 		Endpoint: url,
 		Token:    token,
 	}
 
 	// Run Health Check
-	healthResp, err := s.HealthCheck(context.Background(), &HealthCheckRequest{})
+	healthResp, err := s.HealthCheck(context.Background(), &scanner.HealthCheckRequest{})
 	require.NoError(t, err)
 	assert.True(t, healthResp.Status == "SERVING")
 
@@ -88,11 +44,16 @@ func TestScanner(t *testing.T) {
 	k8sObjectData, err := yaml.Marshal(request.Object)
 	require.NoError(t, err)
 
-	result, err := s.RunKubernetesManifest(context.Background(), &KubernetesManifestJob{
-		Files: []*File{
+	result, err := s.RunKubernetesManifest(context.Background(), &scanner.KubernetesManifestJob{
+		Files: []*scanner.File{
 			{
 				Data: k8sObjectData,
 			},
+			{},
+		},
+		Labels: map[string]string{
+			"k8s.mondoo.com/author":    request.UserInfo.Username,
+			"k8s.mondoo.com/operation": string(request.Operation),
 		},
 	})
 	require.NoError(t, err)
@@ -103,4 +64,12 @@ func TestScanner(t *testing.T) {
 		passed := result.WorstScore.Type == 2 && result.WorstScore.Value == 100
 		assert.True(t, passed)
 	}
+}
+
+func mustRead(file string) []byte {
+	bytes, err := ioutil.ReadFile(file)
+	if err != nil {
+		panic("couldn't read in file")
+	}
+	return bytes
 }

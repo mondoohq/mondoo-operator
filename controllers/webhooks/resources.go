@@ -3,7 +3,6 @@ package webhooks
 import (
 	"fmt"
 
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -11,6 +10,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 )
 
 const (
@@ -45,7 +47,10 @@ func GetTLSCertificatesSecretName(mondooAuditConfigName string) string {
 	return fmt.Sprintf(webhookTLSSecretNameTemplate, mondooAuditConfigName)
 }
 
-func WebhookDeployment(ns, image, mode string, m mondoov1alpha1.MondooAuditConfig) *appsv1.Deployment {
+func WebhookDeployment(ns, image, mode string, m mondoov1alpha1.MondooAuditConfig, clusterID string) *appsv1.Deployment {
+	// The URL to communicate with will be http://ScanAPIServiceName-ScanAPIServiceNamespace.svc:ScanAPIPort
+	scanAPIURL := fmt.Sprintf("http://%s.%s.svc:%d", scanapi.ServiceName(m.Name), m.Namespace, scanapi.Port)
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      webhookDeploymentName(m.Name),
@@ -73,11 +78,15 @@ func WebhookDeployment(ns, image, mode string, m mondoov1alpha1.MondooAuditConfi
 							Command: []string{
 								"/webhook",
 							},
-							Env: []corev1.EnvVar{
-								{
-									Name:  mondoov1alpha1.WebhookModeEnvVar,
-									Value: mode,
-								},
+							Args: []string{
+								"--token-file-path",
+								"/etc/webhook/token",
+								"--enforcement-mode",
+								mode,
+								"--scan-api-url",
+								scanAPIURL,
+								"--cluster-id",
+								clusterID,
 							},
 							Image:           image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
@@ -124,6 +133,11 @@ func WebhookDeployment(ns, image, mode string, m mondoov1alpha1.MondooAuditConfi
 									Name:      "cert",
 									ReadOnly:  true,
 								},
+								{
+									Name:      "token",
+									MountPath: "/etc/webhook",
+									ReadOnly:  true,
+								},
 							},
 						},
 					},
@@ -138,6 +152,15 @@ func WebhookDeployment(ns, image, mode string, m mondoov1alpha1.MondooAuditConfi
 								Secret: &corev1.SecretVolumeSource{
 									DefaultMode: pointer.Int32(420),
 									SecretName:  GetTLSCertificatesSecretName(m.Name),
+								},
+							},
+						},
+						{
+							Name: "token",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									DefaultMode: pointer.Int32(0444),
+									SecretName:  scanapi.SecretName(m.Name),
 								},
 							},
 						},

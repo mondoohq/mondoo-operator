@@ -8,11 +8,13 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
@@ -37,12 +39,23 @@ func (s *DeploySuite) TestDeploy_Create() {
 	ns := "test-ns"
 	auditConfig := utils.DefaultAuditConfig(ns, false, false, true)
 
-	client := fake.NewClientBuilder().WithScheme(s.scheme).Build()
+	kubeClient := fake.NewClientBuilder().WithScheme(s.scheme).Build()
 
-	s.NoError(Deploy(s.ctx, client, ns, s.image, auditConfig))
+	s.NoError(Deploy(s.ctx, kubeClient, ns, s.image, auditConfig))
+
+	tokenSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: auditConfig.Namespace,
+			Name:      SecretName(auditConfig.Name),
+		},
+	}
+	s.NoError(kubeClient.Get(s.ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret), "Error checking for token secret")
+	// This really should be checking tokenSecret.Data, but the fake kubeClient just takes and stores the objects given to it
+	// and our code populates the Secret through Secret.StringData["token"]
+	s.Contains(tokenSecret.StringData, "token")
 
 	ds := &appsv1.DeploymentList{}
-	s.NoError(client.List(s.ctx, ds))
+	s.NoError(kubeClient.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
 	d := ScanApiDeployment(ns, s.image, auditConfig)
@@ -51,7 +64,7 @@ func (s *DeploySuite) TestDeploy_Create() {
 	s.Equal(*d, ds.Items[0])
 
 	ss := &corev1.ServiceList{}
-	s.NoError(client.List(s.ctx, ss))
+	s.NoError(kubeClient.List(s.ctx, ss))
 	s.Equal(1, len(ss.Items))
 
 	service := ScanApiService(ns, auditConfig)
@@ -106,6 +119,10 @@ func (s *DeploySuite) TestCleanup() {
 	ds := &appsv1.DeploymentList{}
 	s.NoError(client.List(s.ctx, ds))
 	s.Equal(0, len(ds.Items))
+
+	sec := &corev1.SecretList{}
+	s.NoError(client.List(s.ctx, sec))
+	s.Equal(0, len(sec.Items))
 
 	ss := &corev1.ServiceList{}
 	s.NoError(client.List(s.ctx, ss))

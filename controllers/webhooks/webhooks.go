@@ -193,6 +193,17 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 
 func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-system",
+		},
+	}
+	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(namespace), namespace); err != nil {
+		webhookLog.Error(err, "Failed to get cluster ID from kube-system Namespace")
+		return err
+	}
+	clusterID := string(namespace.UID)
+
 	// "permissive" by default if Spec.Webhooks.Mode is ""
 	mode := n.Mondoo.Spec.Webhooks.Mode
 	if mode == "" {
@@ -205,7 +216,7 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 		return err
 	}
 
-	desiredDeployment := WebhookDeployment(n.TargetNamespace, mondooOperatorImage, mode, *n.Mondoo)
+	desiredDeployment := WebhookDeployment(n.TargetNamespace, mondooOperatorImage, mode, *n.Mondoo, clusterID)
 	if err := n.setControllerRef(desiredDeployment); err != nil {
 		return err
 	}

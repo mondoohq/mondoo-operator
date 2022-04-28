@@ -16,8 +16,10 @@ func AreDeploymentsEqual(a, b appsv1.Deployment) bool {
 		a.Spec.Template.Spec.ServiceAccountName == b.Spec.Template.Spec.ServiceAccountName &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Image, b.Spec.Template.Spec.Containers[0].Image) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Command, b.Spec.Template.Spec.Containers[0].Command) &&
+		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Args, b.Spec.Template.Spec.Containers[0].Args) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].VolumeMounts, b.Spec.Template.Spec.Containers[0].VolumeMounts) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Env, b.Spec.Template.Spec.Containers[0].Env) &&
+		reflect.DeepEqual(a.Spec.Template.Spec.Volumes, b.Spec.Template.Spec.Volumes) &&
 		reflect.DeepEqual(a.GetOwnerReferences(), b.GetOwnerReferences())
 }
 
