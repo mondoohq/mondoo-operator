@@ -141,7 +141,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Push multi-platform virtual tag
-        run: sh scripts/push-virtual-tag.sh
+        run: bash scripts/push-virtual-tag.sh
         env:
           CPU_ARCHS: amd64 arm64 arm
 
