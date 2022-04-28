@@ -143,6 +143,7 @@ jobs:
       - name: Push multi-platform virtual tag
         run: bash scripts/push-virtual-tag.sh
         env:
+          TAGS: ${{ steps.meta.outputs.tags }}
           CPU_ARCHS: amd64 arm64 arm
 
       # Sign the resulting Docker image digest except on PRs.
