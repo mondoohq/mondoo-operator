@@ -22,6 +22,7 @@ env:
 
 jobs:
   build-operator:
+    name: Build operator binaries
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -101,6 +102,7 @@ jobs:
         run: cosign sign ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push-operator.outputs.digest }}
 
   push-virtual-tag:
+    name: Push multi-platform virtual tag
     runs-on: ubuntu-latest
     needs:
       - build-operator

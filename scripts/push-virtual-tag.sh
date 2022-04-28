@@ -5,6 +5,7 @@ set -o pipefail
 
 echo "Creating multi-platform virtual tag for $TAGS..."
 for tag in ${TAGS}; do
+    echo "Creating manifest list $tag..."
     # Create manifest to join all images under one virtual tag
     docker manifest create -a "$tag" \
             "$tag-amd64" \
