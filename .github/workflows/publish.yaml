@@ -70,6 +70,8 @@ jobs:
         uses: docker/metadata-action@v3
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            suffix=-${{ matrix.arch }},onlatest=true
 
       - name: Build binaries
         run: VERSION=${{ steps.get_version.outputs.VERSION }} TARGET_OS=${{ matrix.os }} TARGET_ARCH=${{ matrix.arch }} make build
@@ -98,10 +100,76 @@ jobs:
         # against the sigstore community Fulcio instance.
         run: cosign sign ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push-operator.outputs.digest }}
 
+  push-virtual-tag:
+    runs-on: ubuntu-latest
+    needs:
+      - build-operator
+
+    permissions:
+      contents: read
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+
+    steps:
+      # Install the cosign tool except on PR
+      # https://github.com/sigstore/cosign-installer
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v2.3.0
+        with:
+          cosign-release: "v1.8.0"
+
+      # Login against a Docker registry except on PR
+      # https://github.com/docker/login-action
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Extract metadata (tags, labels) for Docker
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Push multi-platform virtual tag
+        run: |
+          image = ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          for tag in ${{ steps.meta.outputs.tags }}; do
+            # Create manifest to join all images under one virtual tag
+            docker manifest create -a "$image:$tag" \
+                    "$image:$tag-amd64" \
+                    "$image:$tag-arm64" \
+                    "$image:$tag-arm" \
+
+            # Annotate to set which image is build for which CPU architecture
+            for arch in $CPU_ARCHS; do
+              docker manifest annotate --arch "$arch" "$image:$tag" "$image:$tag-$arch"
+            done
+            docker manifest push "$image:$tag"
+          done
+
+      # Sign the resulting Docker image digest except on PRs.
+      # This will only write to the public Rekor transparency log when the Docker
+      # repository is public to avoid leaking data.  If you would like to publish
+      # transparency data even for private images, pass --force to cosign below.
+      # https://github.com/sigstore/cosign
+      - name: Sign the published Docker image
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+        # This step uses the identity token to provision an ephemeral certificate
+        # against the sigstore community Fulcio instance.
+        run: cosign sign ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push-operator.outputs.digest }}
+
   build-bundle:
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
-      - build-operator
+      - push-virtual-tag
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -195,11 +263,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/release-manifests.yaml
     needs:
-      - build-operator
+      - push-virtual-tag
 
   # publish helm chart after the release of container images is complete
   run-release-helm:
     if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/release-helm-chart.yaml
     needs:
-      - build-operator
+      - push-virtual-tag
