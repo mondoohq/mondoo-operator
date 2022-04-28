@@ -9,7 +9,7 @@ on:
   schedule:
     - cron: "43 9 * * *"
   push:
-    branches: [main]
+    branches: [main,simplify-release-workflow] # TODO: remove 
     # Publish semver tags as releases.
     tags: ["v*.*.*"]
 
@@ -29,6 +29,11 @@ jobs:
       # This is used to complete the identity challenge
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
+    
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [amd64, arm64, arm]
 
     steps:
       - name: extract tag/version
@@ -38,27 +43,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "${{ env.golang-version }}"
+
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
       - name: Install cosign
-        uses: sigstore/cosign-installer@1e95c1de343b5b0c23352d6417ee3e48d5bcd422
+        uses: sigstore/cosign-installer@v2
         with:
-          cosign-release: "v1.4.0"
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-        with:
-          image: tonistiigi/binfmt:latest
-          platforms: amd64,arm
-
-      # Workaround: https://github.com/docker/build-push-action/issues/461
-      - name: Setup Docker buildx
-        uses: docker/setup-buildx-action@79abd3f86f79a9d68a23c75a09a9a85889262adf
+          cosign-release: "v1.8.0"
 
       # Login against a Docker registry except on PR
       # https://github.com/docker/login-action
       - name: Log into registry ${{ env.REGISTRY }}
-        uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
+        uses: docker/login-action@v1
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -68,23 +67,24 @@ jobs:
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        uses: docker/metadata-action@v3
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Build binaries
+        run: VERSION=${{ steps.get_version.outputs.VERSION }} TARGET_OS=${{ matrix.os }} TARGET_ARCH=${{ matrix.arch }} make build
 
       # Build and push Docker image with Buildx
       # https://github.com/docker/build-push-action
       - name: Build and push operator image
         id: build-and-push-operator
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        uses: docker/build-push-action@v2
         with:
           context: .
-          platforms: linux/amd64,linux/arm/v7,linux/arm64
+          platforms: ${{ matrix.os }}/${{ matrix.arch }}
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
-          build_args: |
-            VERSION=${{ steps.get_version.outputs.VERSION }}
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
@@ -121,24 +121,14 @@ jobs:
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
       - name: Install cosign
-        uses: sigstore/cosign-installer@1e95c1de343b5b0c23352d6417ee3e48d5bcd422
+        uses: sigstore/cosign-installer@v2
         with:
-          cosign-release: "v1.4.0"
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-        with:
-          image: tonistiigi/binfmt:latest
-          platforms: amd64,arm
-
-      # Workaround: https://github.com/docker/build-push-action/issues/461
-      - name: Setup Docker buildx
-        uses: docker/setup-buildx-action@79abd3f86f79a9d68a23c75a09a9a85889262adf
+          cosign-release: "v1.8.0"
 
       # Login against a Docker registry except on PR
       # https://github.com/docker/login-action
       - name: Log into registry ${{ env.REGISTRY }}
-        uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
+        uses: docker/login-action@v1
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -163,14 +153,14 @@ jobs:
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta-bundle
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        uses: docker/metadata-action@v3
         with:
           images: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle"
 
       # Build and push Docker image bundle with Buildx
       - name: Build and push bundle image
         id: build-and-push-bundle
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        uses: docker/build-push-action@v2
         with:
           context: .
           file: bundle.Dockerfile
