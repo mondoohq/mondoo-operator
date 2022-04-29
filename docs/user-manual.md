@@ -324,4 +324,4 @@ Each of the CRDs in the list needs to be manually edited and mapped to the new v
 kubectl edit mondooauditconfigs.v1alpha1.k8s.mondoo.com mondoo-client -n mondoo-operator
 ```
 
-The mapping from `v1alpha1` to `v1alpha2` can be found [here](../api/v1alpha1/mondooauditconfig_types.go#155-199).
+The mapping from `v1alpha1` to `v1alpha2` can be found [here](../api/v1alpha1/mondooauditconfig_types.go#L155-L199).
