@@ -68,3 +68,5 @@ wikipedia
 workflow
 www
 yaml
+mondoooperatorconfigs
+uninstalling
