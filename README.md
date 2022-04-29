@@ -50,9 +50,7 @@ It is backed by Mondoo's powerful Policy-as-Code the Mondoo Query Language (MQL)
 
 The **Mondoo Operator** can be installed via different methods depending on your Kubernetes workflow:
 
-- [kubectl](docs/user-manual-kubectl.md)
-- [helm chart](docs/user-manual-helm.md)
-- [operatorhub.io / olm](docs/user-manual-olm.md)
+- [User manual](docs/user-manual.md)
 
 ## Tested Kubernetes Environments
 

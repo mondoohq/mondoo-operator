@@ -33,17 +33,15 @@ Create `Mondoo Secret` and add the `MondooAuditConfig`:
 ```bash
 kubectl create namespace mondoo-operator
 kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
-kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
+kubectl apply -f config/samples/k8s_v1alpha2_mondooauditconfig_minimal.yaml
 ```
 
 ### Docker Build
 
-As preparation you need to build the operator container image for deployment in Kubernetes. The easiest way is to use the docker environment included in minikube. This ensures that the latest image is available in the cluster.
+As preparation you need to build the operator container image for deployment in Kubernetes. This ensures that the latest image is available in the cluster.
 
 ```bash
-# build the operator image in minikube
-eval $(minikube docker-env)
-make docker-build
+make load-minikube
 ```
 
 Next let us deploy the operator application:
@@ -80,7 +78,7 @@ kubectl create secret generic mondoo-client --namespace mondoo-operator --from-f
 Then apply the configuration:
 
 ```bash
-kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
+kubectl apply -f config/samples/k8s_v1alpha2_mondooauditconfig_minimal.yaml
 ```
 
 Validate that everything is running:
@@ -95,7 +93,7 @@ mondoo-operator-controller-manager-556c7d4b56-qqsqh   2/2     Running   0       
 To delete the client configuration, run:
 
 ```bash
-kubectl delete -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
+kubectl delete -f config/samples/k8s_v1alpha2_mondooauditconfig_minimal.yaml
 ```
 
 ## FAQ
