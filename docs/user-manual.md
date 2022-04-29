@@ -264,8 +264,7 @@ operator-sdk olm uninstall mondoo-operator
 
 ## FAQ
 
-**I do not see the service running, only the operator?**
-
+### I do not see the service running, only the operator?
 First check that the CRD is properly registered with the operator:
 
 ```bash
@@ -282,14 +281,12 @@ NAME                  AGE
 mondoo-client        2m44s
 ```
 
-**How do I edit an existing operator configuration?**
-
+### How do I edit an existing operator configuration?
 ```bash
 kubectl edit  mondooauditconfigs -n mondoo-operator
 ```
 
-**I see the issue that deployment is marked unschedulable**
-
+### Why is there a deployment marked as unschedulable?
 For development testing you can resources the allocated resources for the Mondoo Client:
 
 ```yaml
@@ -315,3 +312,16 @@ spec:
         memory: 20Mi
   mondooSecretRef: mondoo-client
 ```
+
+### I had a `MondooAuditConfig` in my cluster with version `v1alpha1` and now I can no longer access it?
+We recently upgraded our CRDs version to `v1alpha2` and currently manual migration steps need to be executed. You can list the CRDs with the old version by running:
+```bash
+kubectl get mondooauditconfigs.v1alpha1.k8s.mondoo.com -A
+```
+
+Each of the CRDs in the list needs to be manually edited and mapped to the new version. As an example, to edit a CRD called `mondoo-client` in namespace `mondoo-operator` the following command should be executed:
+```bash
+kubectl edit mondooauditconfigs.v1alpha1.k8s.mondoo.com mondoo-client -n mondoo-operator
+```
+
+The mapping from `v1alpha1` to `v1alpha2` can be found [here](../api/v1alpha1/mondooauditconfig_types.go#155-199).
