@@ -92,10 +92,13 @@ jobs:
       - name: Store creds
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
-      - name: Test failure
-        run: |
-          kubectl get pods -n kube-system
-          kubectl get deployments -A
+
+      # Now that dependencies are cached the tests start almost immediately after minikube has started
+      # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
+      # before the test execution starts.
+      - name: Wait a bit for the runner to become more stable
+        run: sleep 20
+
       - run: make test/integration/ci
       - uses: actions/download-artifact@v3 # download the unit test results
         with:
