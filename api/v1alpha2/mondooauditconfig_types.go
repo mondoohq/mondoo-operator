@@ -22,7 +22,7 @@ import (
 )
 
 // MondooAuditConfigSpec defines the desired state of MondooAuditConfig
-type MondooAuditConfigData struct {
+type MondooAuditConfigSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Config is an example field of MondooAuditConfig. Edit mondooauditconfig_types.go to remove/update
@@ -142,7 +142,7 @@ type MondooAuditConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MondooAuditConfigData   `json:"spec,omitempty"`
+	Spec   MondooAuditConfigSpec   `json:"spec,omitempty"`
 	Status MondooAuditConfigStatus `json:"status,omitempty"`
 }
 

@@ -44,13 +44,13 @@ func TestReconcile(t *testing.T) {
 
 	tests := []struct {
 		name                  string
-		mondooAuditConfigSpec mondoov1alpha2.MondooAuditConfigData
+		mondooAuditConfigSpec mondoov1alpha2.MondooAuditConfigSpec
 		existingObjects       func(mondoov1alpha2.MondooAuditConfig) []client.Object
 		validate              func(*testing.T, client.Client)
 	}{
 		{
 			name: "admission disabled",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
+			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
 				Admission: mondoov1alpha2.Admission{Enable: false},
 			},
 			validate: func(t *testing.T, kubeClient client.Client) {
@@ -64,7 +64,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "admission enabled",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
+			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
 				Admission: mondoov1alpha2.Admission{Enable: true},
 			},
 			validate: func(t *testing.T, kubeClient client.Client) {
@@ -79,7 +79,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "admission enabled with cert-manager",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
+			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
 				Admission: mondoov1alpha2.Admission{
 					Enable: true,
 					CertificateProvisioning: mondoov1alpha2.CertificateProvisioning{
@@ -114,7 +114,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "cleanup when admission change to disabled",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
+			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
 				Admission: mondoov1alpha2.Admission{Enable: false},
 			},
 			// existing objects from admission being previously enabled
@@ -183,7 +183,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "pass admission mode down to Deployment",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
+			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
 				Admission: mondoov1alpha2.Admission{
 					Enable: true,
 					Mode:   mondoov1alpha2.Permissive,
@@ -200,7 +200,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "pass ClusterID mode down to Deployment",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
+			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
 				Admission: mondoov1alpha2.Admission{
 					Enable: true,
 					Mode:   mondoov1alpha2.Permissive,
@@ -217,7 +217,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "update admission Deployment when mode changes",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
+			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
 				Admission: mondoov1alpha2.Admission{
 					Enable: true,
 					Mode:   mondoov1alpha2.Permissive,
@@ -258,7 +258,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "update webhook Deployment when changed externally",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
+			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
 				Admission: mondoov1alpha2.Admission{
 					Enable: true,
 					Mode:   mondoov1alpha2.Enforcing,
@@ -289,7 +289,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "update webhook Service when changed externally",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
+			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
 				Admission: mondoov1alpha2.Admission{Enable: true},
 			},
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
@@ -316,7 +316,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "update scan API Deployment when changed externally",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
+			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
 				Admission: mondoov1alpha2.Admission{Enable: true},
 			},
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
@@ -344,7 +344,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "update scan API Service when changed externally",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
+			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
 				Admission: mondoov1alpha2.Admission{Enable: true},
 			},
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
@@ -371,7 +371,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "cleanup old-style admission",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
+			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
 				Admission: mondoov1alpha2.Admission{Enable: true},
 			},
 			// existing objects from webhooks being previously enabled

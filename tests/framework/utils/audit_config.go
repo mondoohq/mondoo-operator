@@ -15,7 +15,7 @@ func DefaultAuditConfig(ns string, workloads, nodes, admission bool) mondoov2.Mo
 			Name:      "mondoo-client",
 			Namespace: ns,
 		},
-		Spec: mondoov2.MondooAuditConfigData{
+		Spec: mondoov2.MondooAuditConfigSpec{
 			KubernetesResources: mondoov2.KubernetesResources{Enable: workloads},
 			Nodes:               mondoov2.Nodes{Enable: nodes},
 			Admission:           mondoov2.Admission{Enable: admission},
