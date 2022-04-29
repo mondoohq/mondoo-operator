@@ -57,6 +57,10 @@ SHELL = /usr/bin/env bash -o pipefail
 # List all packages that contain unit tests. Ignore the integration tests folder.
 UNIT_TEST_PACKAGES=$(shell go list ./... | grep -v /tests/integration)
 
+# The target architecture for the binaries to be built.
+TARGET_ARCH?=$(shell go env GOARCH)
+TARGET_OS?=$(shell go env GOOS)
+
 all: build
 
 ##@ General
@@ -108,14 +112,15 @@ test/integration/ci: manifests generate generate-manifests load-minikube gotests
 ##@ Build
 
 build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager -ldflags "-s -w -X go.mondoo.com/mondoo-operator/pkg/version.Version=${VERSION}" main.go
-	go build -o bin/webhook pkg/webhooks/main.go
+	CGO_ENABLED=0 GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build -o bin/manager -ldflags "-s -w -X go.mondoo.com/mondoo-operator/pkg/version.Version=${VERSION}" main.go
+	CGO_ENABLED=0 GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build -o bin/webhook pkg/webhooks/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	MONDOO_OPERATOR_NAMESPACE=mondoo-operator go run ./main.go
 
-docker-build: ## Build docker image with the manager.
-	docker build --build-arg VERSION=${VERSION} -t ${IMG} .
+docker-build: TARGET_OS=linux
+docker-build: build ## Build docker image with the manager.
+	docker build --platform=$(TARGET_ARCH) -t ${IMG} .
 
 load-minikube: docker-build ## Build docker image with the manager and load it into minikube.
 	minikube image load ${IMG}
