@@ -292,7 +292,7 @@ kubectl edit  mondooauditconfigs -n mondoo-operator
 
 For development testing you can resources the allocated resources for the Mondoo Client:
 
-```
+```yaml
 spec:
   workloads:
     enable: true
