@@ -37,7 +37,7 @@ import (
 const (
 	cmd           = "kubectl"
 	retryInterval = 5
-	retryLoop     = 25
+	retryLoop     = 30
 )
 
 var (
