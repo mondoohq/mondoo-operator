@@ -1,11 +1,9 @@
 apiVersion: k8s.mondoo.com/v1alpha2
 kind: MondooAuditConfig
 metadata:
-  name: mondooauditconfig-sample
+  name: mondoo-client
+  namespace: mondoo-operator
 spec:
-  certificateProvisioning:
-    # Could be "cert-manager", "openshift" or "manual"
-    mode: cert-manager
   scanner:
     serviceAccountName: mondoo-client
     mondooCredsSecretRef: mondoo-client
@@ -21,6 +19,9 @@ spec:
     enable: true
   admission:
     enable: true
+    certificateProvisioning:
+    # Could be "cert-manager", "openshift" or "manual"
+      mode: cert-manager
     image:
       name: ghcr.io/mondoo/mondoo-operator
       tag: latest

@@ -35,4 +35,12 @@ resources:
   webhooks:
     conversion: true
     webhookVersion: v1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: mondoo.com
+  group: k8s
+  kind: MondooOperatorConfig
+  path: go.mondoo.com/mondoo-operator/api/v1alpha2
+  version: v1alpha2
 version: "3"

@@ -1,0 +1,16 @@
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  kubernetesResources:
+    enable: true
+  nodes:
+    enable: true
+  admission:
+    enable: true
+    certificateProvisioning:
+      # Could be "cert-manager", "openshift" or "manual"
+      mode: cert-manager
+  

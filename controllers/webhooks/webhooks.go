@@ -152,7 +152,7 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 	desiredService := WebhookService(n.TargetNamespace, *n.Mondoo)
 
 	// Annotate the Service if the Mondoo config is asking for OpenShift-style TLS certificate management.
-	if n.Mondoo.Spec.CertificateProvisioning.Mode == mondoov1alpha2.OpenShiftProvisioning {
+	if n.Mondoo.Spec.Admission.CertificateProvisioning.Mode == mondoov1alpha2.OpenShiftProvisioning {
 		// Just set the value to the name of the Secret the webhook Deployment mounts in.
 		metav1.SetMetaDataAnnotation(&desiredService.ObjectMeta, openShiftServiceAnnotationKey, GetTLSCertificatesSecretName(n.Mondoo.Name))
 	}
@@ -175,10 +175,10 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 
 	tlsSecretName := GetTLSCertificatesSecretName(n.Mondoo.Name)
 	if !k8s.AreServicesEqual(*desiredService, *service) ||
-		(n.Mondoo.Spec.CertificateProvisioning.Mode == mondoov1alpha2.OpenShiftProvisioning &&
+		(n.Mondoo.Spec.Admission.CertificateProvisioning.Mode == mondoov1alpha2.OpenShiftProvisioning &&
 			(!metav1.HasAnnotation(service.ObjectMeta, openShiftServiceAnnotationKey) ||
 				service.Annotations[openShiftServiceAnnotationKey] != tlsSecretName)) {
-		if n.Mondoo.Spec.CertificateProvisioning.Mode == mondoov1alpha2.OpenShiftProvisioning {
+		if n.Mondoo.Spec.Admission.CertificateProvisioning.Mode == mondoov1alpha2.OpenShiftProvisioning {
 			metav1.SetMetaDataAnnotation(&service.ObjectMeta, openShiftServiceAnnotationKey, tlsSecretName)
 		}
 		k8s.UpdateService(service, *desiredService)
@@ -204,19 +204,13 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 	}
 	clusterID := string(namespace.UID)
 
-	// "permissive" by default if Spec.Webhooks.Mode is ""
-	mode := n.Mondoo.Spec.Admission.Mode
-	if mode == "" {
-		mode = mondoov1alpha2.Permissive
-	}
-
 	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(
 		n.Mondoo.Spec.Admission.Image.Name, n.Mondoo.Spec.Admission.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		return err
 	}
 
-	desiredDeployment := WebhookDeployment(n.TargetNamespace, mondooOperatorImage, mode, *n.Mondoo, clusterID)
+	desiredDeployment := WebhookDeployment(n.TargetNamespace, mondooOperatorImage, *n.Mondoo, clusterID)
 	if err := n.setControllerRef(desiredDeployment); err != nil {
 		return err
 	}
@@ -251,7 +245,7 @@ func (n *Webhooks) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1
 
 	var annotationKey, annotationValue string
 
-	switch n.Mondoo.Spec.CertificateProvisioning.Mode {
+	switch n.Mondoo.Spec.Admission.CertificateProvisioning.Mode {
 	case mondoov1alpha2.CertManagerProvisioning:
 		cm := &CertManagerHandler{
 			KubeClient:      n.KubeClient,

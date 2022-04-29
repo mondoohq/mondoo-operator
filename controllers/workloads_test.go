@@ -84,15 +84,17 @@ var _ = Describe("workloads", func() {
 					Namespace: namespace,
 				},
 				Spec: k8sv1alpha2.MondooAuditConfigData{
-					CertificateProvisioning: k8sv1alpha2.CertificateProvisioning{
-						Mode: k8sv1alpha2.ManualProvisioning,
-					},
 					Scanner: k8sv1alpha2.Scanner{
 						ServiceAccountName:   name,
 						MondooCredsSecretRef: name,
 					},
 					KubernetesResources: k8sv1alpha2.KubernetesResources{
 						Enable: true,
+					},
+					Admission: k8sv1alpha2.Admission{
+						CertificateProvisioning: k8sv1alpha2.CertificateProvisioning{
+							Mode: k8sv1alpha2.ManualProvisioning,
+						},
 					},
 				},
 			}

@@ -235,6 +235,20 @@ spec:
             properties:
               admission:
                 properties:
+                  certificateProvisioning:
+                    description: CertificateProvisioning defines the certificate provisioning
+                      configuration within the cluster.
+                    properties:
+                      mode:
+                        default: manual
+                        description: CertificateProvisioningMode is the specified
+                          method the cluster uses for provisioning TLS certificates
+                        enum:
+                        - cert-manager
+                        - openshift
+                        - manual
+                        type: string
+                    type: object
                   enable:
                     type: boolean
                   image:
@@ -245,31 +259,15 @@ spec:
                         type: string
                     type: object
                   mode:
+                    default: permissive
                     description: Mode represents whether the webhook will behave in
                       a "permissive" mode (the default) which will only scan and report
                       on k8s resources or "enforcing" mode where depending on the
                       scan results may reject the k8s resource creation/modification.
                     enum:
-                    - ""
                     - permissive
                     - enforcing
                     type: string
-                type: object
-              certificateProvisioning:
-                description: Config is an example field of MondooAuditConfig. Edit
-                  mondooauditconfig_types.go to remove/update
-                properties:
-                  mode:
-                    default: manual
-                    description: CertificateProvisioningMode is the specified method
-                      the cluster uses for provisioning TLS certificates
-                    enum:
-                    - cert-manager
-                    - openshift
-                    - manual
-                    type: string
-                required:
-                - mode
                 type: object
               kubernetesResources:
                 properties:
@@ -282,9 +280,8 @@ spec:
                     type: boolean
                 type: object
               scanner:
-                description: Scanner defines the settings for the Mondoo scanner that
-                  will be running in the cluster. The same scanner is used for scanning
-                  the Kubernetes API, the nodes and for serving the admission controller.
+                description: Config is an example field of MondooAuditConfig. Edit
+                  mondooauditconfig_types.go to remove/update
                 properties:
                   image:
                     properties:

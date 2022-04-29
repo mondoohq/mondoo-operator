@@ -26,29 +26,26 @@ type MondooAuditConfigData struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Config is an example field of MondooAuditConfig. Edit mondooauditconfig_types.go to remove/update
-	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
-	Scanner                 Scanner                 `json:"scanner,omitempty"`
-	KubernetesResources     KubernetesResources     `json:"kubernetesResources,omitempty"`
-	Nodes                   Nodes                   `json:"nodes,omitempty"`
-	Admission               Admission               `json:"admission,omitempty"`
+	Scanner             Scanner             `json:"scanner,omitempty"`
+	KubernetesResources KubernetesResources `json:"kubernetesResources,omitempty"`
+	Nodes               Nodes               `json:"nodes,omitempty"`
+	Admission           Admission           `json:"admission,omitempty"`
 }
 
 // CertificateProvisioning defines the certificate provisioning configuration within the cluster.
 type CertificateProvisioning struct {
-	// +kubebuilder:default=manual
 	// +kubebuilder:validation:Enum=cert-manager;openshift;manual
-	Mode CertificateProvisioningMode `json:"mode"`
+	// +kubebuilder:default=manual
+	Mode CertificateProvisioningMode `json:"mode,omitempty"`
 }
 
 // Scanner defines the settings for the Mondoo scanner that will be running in the cluster. The same scanner
 // is used for scanning the Kubernetes API, the nodes and for serving the admission controller.
 type Scanner struct {
-	//+kubebuilder:validation:Optional
-	MondooCredsSecretRef string `json:"mondooCredsSecretRef,omitempty"`
-	//+kubebuilder:validation:Optional
-	ServiceAccountName string                      `json:"serviceAccountName,omitempty"`
-	Image              Image                       `json:"image,omitempty"`
-	Resources          corev1.ResourceRequirements `json:"resources,omitempty"`
+	MondooCredsSecretRef string                      `json:"mondooCredsSecretRef,omitempty"`
+	ServiceAccountName   string                      `json:"serviceAccountName,omitempty"`
+	Image                Image                       `json:"image,omitempty"`
+	Resources            corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type KubernetesResources struct {
@@ -65,8 +62,11 @@ type Admission struct {
 	// Mode represents whether the webhook will behave in a "permissive" mode (the default) which
 	// will only scan and report on k8s resources or "enforcing" mode where depending
 	// on the scan results may reject the k8s resource creation/modification.
-	// +kubebuilder:validation:Enum="";permissive;enforcing
+	// +kubebuilder:validation:Enum=permissive;enforcing
+	// +kubebuilder:default=permissive
 	Mode AdmissionMode `json:"mode,omitempty"`
+
+	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
 }
 
 type Image struct {

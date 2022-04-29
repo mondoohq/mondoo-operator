@@ -157,10 +157,10 @@ func (src *MondooAuditConfig) ConvertTo(dstRaw conversion.Hub) error {
 
 	dst.ObjectMeta = *src.ObjectMeta.DeepCopy()
 
-	dst.Spec.CertificateProvisioning.Mode =
+	dst.Spec.Admission.CertificateProvisioning.Mode =
 		v1alpha2.CertificateProvisioningMode(src.Spec.Webhooks.CertificateConfig.InjectionStyle)
-	if dst.Spec.CertificateProvisioning.Mode == "" {
-		dst.Spec.CertificateProvisioning.Mode = v1alpha2.ManualProvisioning
+	if dst.Spec.Admission.CertificateProvisioning.Mode == "" {
+		dst.Spec.Admission.CertificateProvisioning.Mode = v1alpha2.ManualProvisioning
 	}
 
 	dst.Spec.Scanner.ServiceAccountName = src.Spec.Workloads.ServiceAccount
@@ -207,7 +207,7 @@ func (dst *MondooAuditConfig) ConvertFrom(srcRaw conversion.Hub) error {
 	dst.Spec.MondooSecretRef = src.Spec.Scanner.MondooCredsSecretRef
 
 	dst.Spec.Webhooks.Enable = src.Spec.Admission.Enable
-	dst.Spec.Webhooks.CertificateConfig.InjectionStyle = string(src.Spec.CertificateProvisioning.Mode)
+	dst.Spec.Webhooks.CertificateConfig.InjectionStyle = string(src.Spec.Admission.CertificateProvisioning.Mode)
 	if dst.Spec.Webhooks.CertificateConfig.InjectionStyle == string(v1alpha2.ManualProvisioning) {
 		// The equivalent of manual provisioning in the old version is an empty string
 		dst.Spec.Webhooks.CertificateConfig.InjectionStyle = ""

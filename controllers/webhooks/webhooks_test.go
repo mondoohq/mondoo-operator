@@ -80,10 +80,12 @@ func TestReconcile(t *testing.T) {
 		{
 			name: "admission enabled with cert-manager",
 			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
-				CertificateProvisioning: mondoov1alpha2.CertificateProvisioning{
-					Mode: mondoov1alpha2.CertManagerProvisioning,
+				Admission: mondoov1alpha2.Admission{
+					Enable: true,
+					CertificateProvisioning: mondoov1alpha2.CertificateProvisioning{
+						Mode: mondoov1alpha2.CertManagerProvisioning,
+					},
 				},
-				Admission: mondoov1alpha2.Admission{Enable: true},
 			},
 			validate: func(t *testing.T, kubeClient client.Client) {
 				objects := defaultResourcesWhenEnabled()
@@ -257,10 +259,13 @@ func TestReconcile(t *testing.T) {
 		{
 			name: "update webhook Deployment when changed externally",
 			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigData{
-				Admission: mondoov1alpha2.Admission{Enable: true},
+				Admission: mondoov1alpha2.Admission{
+					Enable: true,
+					Mode:   mondoov1alpha2.Enforcing,
+				},
 			},
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
-				deployment := WebhookDeployment(testNamespace, "wrong", "test", m, testClusterID)
+				deployment := WebhookDeployment(testNamespace, "wrong", m, testClusterID)
 				return []client.Object{deployment}
 			},
 			validate: func(t *testing.T, kubeClient client.Client) {
@@ -277,7 +282,7 @@ func TestReconcile(t *testing.T) {
 
 				img, err := containerImageResolver.MondooOperatorImage("", "", false)
 				require.NoErrorf(t, err, "failed to get mondoo operator image.")
-				expectedDeployment := WebhookDeployment(testNamespace, img, mondoov1alpha2.Permissive, *auditConfig, testClusterID)
+				expectedDeployment := WebhookDeployment(testNamespace, img, *auditConfig, testClusterID)
 				require.NoError(t, ctrl.SetControllerReference(auditConfig, expectedDeployment, kubeClient.Scheme()))
 				assert.Truef(t, k8s.AreDeploymentsEqual(*deployment, *expectedDeployment), "deployment has not been updated")
 			},

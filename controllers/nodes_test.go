@@ -75,14 +75,16 @@ var _ = Describe("nodes", func() {
 					Namespace: namespace,
 				},
 				Spec: k8sv1alpha2.MondooAuditConfigData{
-					CertificateProvisioning: k8sv1alpha2.CertificateProvisioning{
-						Mode: k8sv1alpha2.ManualProvisioning,
-					},
 					Scanner: k8sv1alpha2.Scanner{
 						MondooCredsSecretRef: name,
 					},
 					Nodes: k8sv1alpha2.Nodes{
 						Enable: true,
+					},
+					Admission: k8sv1alpha2.Admission{
+						CertificateProvisioning: k8sv1alpha2.CertificateProvisioning{
+							Mode: k8sv1alpha2.ManualProvisioning,
+						},
 					},
 				},
 			}
