@@ -118,10 +118,10 @@ build: generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	MONDOO_OPERATOR_NAMESPACE=mondoo-operator go run ./main.go
 
+docker-build: TARGET_OS=linux
 docker-build: build ## Build docker image with the manager.
 	docker build --platform=$(TARGET_ARCH) -t ${IMG} .
 
-load-minikube: TARGET_OS=linux
 load-minikube: docker-build ## Build docker image with the manager and load it into minikube.
 	minikube image load ${IMG}
 
