@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -209,6 +210,10 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
 		"Failed to add CA data to Webhook")
+
+	// Some time is needed before the webhook starts working. Might be a better way to check this but
+	// will have to do with a sleep for now.
+	time.Sleep(4 * time.Second)
 
 	// Now the Deployment Update() should work
 	s.NoErrorf(
