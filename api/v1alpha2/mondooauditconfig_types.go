@@ -43,6 +43,7 @@ type CertificateProvisioning struct {
 // Scanner defines the settings for the Mondoo scanner that will be running in the cluster. The same scanner
 // is used for scanning the Kubernetes API, the nodes and for serving the admission controller.
 type Scanner struct {
+	// +kubebuilder:default=mondoo-operator-workload
 	ServiceAccountName string                      `json:"serviceAccountName,omitempty"`
 	Image              Image                       `json:"image,omitempty"`
 	Resources          corev1.ResourceRequirements `json:"resources,omitempty"`

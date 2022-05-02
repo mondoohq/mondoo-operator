@@ -323,6 +323,7 @@ spec:
                         type: object
                     type: object
                   serviceAccountName:
+                    default: mondoo-operator-workload
                     type: string
                 type: object
             type: object

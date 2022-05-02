@@ -38,10 +38,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const (
-	finalizerString       = "k8s.mondoo.com/delete"
-	defaultServiceAccount = "mondoo-operator-workload"
-)
+const finalizerString = "k8s.mondoo.com/delete"
 
 // MondooAuditConfigReconciler reconciles a MondooAuditConfig object
 type MondooAuditConfigReconciler struct {

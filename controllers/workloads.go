@@ -289,26 +289,8 @@ func (n *Workloads) deploymentForMondoo(image string) *appsv1.Deployment {
 }
 
 func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
-
-	log := ctrllog.FromContext(ctx)
-
-	namespace, err := k8s.GetRunningNamespace()
-	if err != nil {
-		log.Error(err, "failed to determine which namespace mondoo-operator is running in")
-		return ctrl.Result{}, err
-	}
-
 	if !n.Enable {
 		return n.down(ctx, clt, req)
-	}
-
-	if n.Mondoo.Spec.Scanner.ServiceAccountName == "" && n.Mondoo.Namespace == namespace {
-		n.Mondoo.Spec.Scanner.ServiceAccountName = defaultServiceAccount
-	}
-	if n.Mondoo.Spec.Scanner.ServiceAccountName == "" {
-		err := fmt.Errorf("MondooAuditConfig.spec.scanner.serviceAccountName cannot be empty when running in a different namespace than mondoo-operator")
-		log.Error(err, "ServiceAccount cannot be empty")
-		return ctrl.Result{}, err
 	}
 
 	result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
