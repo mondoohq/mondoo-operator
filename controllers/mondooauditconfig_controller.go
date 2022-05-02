@@ -40,6 +40,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/admission"
+	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -56,9 +57,6 @@ type MondooAuditConfigReconciler struct {
 
 // Embed the Default Inventory for Daemonset and Deployment Configurations
 var (
-	//go:embed inventory-ds.yaml
-	dsInventoryyaml []byte
-
 	//go:embed inventory-deploy.yaml
 	deployInventoryyaml []byte
 
@@ -181,14 +179,14 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	nodes := Nodes{
+	nodes := nodes.Nodes{
 		Enable:                 mondooAuditConfig.Spec.Nodes.Enable,
 		Mondoo:                 mondooAuditConfig,
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: containerImageResolver,
 	}
 
-	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
+	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req)
 	if err != nil {
 		log.Error(err, "Failed to declare nodes")
 	}

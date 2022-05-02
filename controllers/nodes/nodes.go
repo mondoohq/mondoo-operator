@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package nodes
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"time"
 
@@ -38,7 +39,12 @@ import (
 
 const (
 	daemonSetConfigMapNameTemplate = `%s-ds`
-	NodeDaemonSetNameTemplate      = `%s-node`
+	OldNodeDaemonSetNameTemplate   = `%s-node`
+)
+
+var (
+	//go:embed inventory-ds.yaml
+	dsInventoryyaml []byte
 )
 
 type Nodes struct {
@@ -182,7 +188,7 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 }
 
 func (n *Nodes) daemonsetForMondoo(image string) *appsv1.DaemonSet {
-	ls := labelsForMondoo(n.Mondoo.Name)
+	ls := CronJobLabels(*n.Mondoo)
 	ls["audit"] = "node"
 
 	dep := &appsv1.DaemonSet{
@@ -306,10 +312,12 @@ func (n *Nodes) daemonsetForMondoo(image string) *appsv1.DaemonSet {
 	}
 	return dep
 }
-func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
+func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
 	if !n.Enable {
 		return n.down(ctx, clt, req)
 	}
+
+	inventory := string(dsInventoryyaml)
 
 	result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
 	if err != nil || result.Requeue {

@@ -17,6 +17,7 @@ import (
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	mondoocontrollers "go.mondoo.com/mondoo-operator/controllers"
 	mondooadmission "go.mondoo.com/mondoo-operator/controllers/admission"
+	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	mondooscanapi "go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
@@ -98,7 +99,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 
 	// Verify there is just 1 daemon set and that its name matches the name of the CR.
 	s.Equalf(1, len(daemonSets.Items), "DaemonSets count in Mondoo namespace is incorrect.")
-	expectedDaemonSetName := fmt.Sprintf(mondoocontrollers.NodeDaemonSetNameTemplate, auditConfig.Name)
+	expectedDaemonSetName := fmt.Sprintf(nodes.NodeDaemonSetNameTemplate, auditConfig.Name)
 	s.Equalf(expectedDaemonSetName, daemonSets.Items[0].Name, "DaemonSet name does not match expected name based from audit config name.")
 }
 
