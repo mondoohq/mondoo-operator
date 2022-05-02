@@ -113,7 +113,7 @@ Once the secret is configured, we configure the operator to define the scan targ
 ## Deploying the Admission controller
 K8s webhooks require TLS certs to establish the trust between the Certificate Authority listed in the `ValidatingWebhookConfiguration.Webhooks[].ClientConfig.CABundle` and the TLS certificates presented when connecting to the HTTPS endpoint specified in the webhook.
 
-You can choose to install and use cert-manager to automate the creation and updating of the TLS certs, or you can create (and rotate) your own TLS certificates manually.
+You can choose to install and use cert-manager to automate the creation and updating of the TLS certs, or you can use the OpenShift certificate creation/rotation features, or you can create (and rotate) your own TLS certificates manually.
 
 A working setup should show the Pods being created/modified/deleted being processed by the webhook Pod.
 

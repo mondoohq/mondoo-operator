@@ -1,6 +1,8 @@
 apiVersion: k8s.mondoo.com/v1alpha2
 kind: MondooOperatorConfig
 metadata:
-  name: mondoooperatorconfig-sample
+  name: mondoo-operator-config
 spec:
-  # TODO(user): Add fields here
+  metrics:
+    enable: false
+  skipContainerResolution: false

@@ -127,10 +127,10 @@ type MondooAuditConfigConditionType string
 const (
 	// Indicates weather NodeScanning is Degraded
 	NodeScanningDegraded MondooAuditConfigConditionType = "NodeScanningDegraded"
-	// Indicates weather APIScanning is Degraded
-	APIScanningDegraded MondooAuditConfigConditionType = "APIScanningDegraded"
-	// Indicates weather Webhook is Degraded
-	WebhookDegraded MondooAuditConfigConditionType = "WebhookDegraded"
+	// Indicates weather Kubernetes resources scanning is Degraded
+	K8sResourcesScanningDegraded MondooAuditConfigConditionType = "K8sResourcesScanningDegraded"
+	// Indicates weather Admission controller is Degraded
+	AdmissionDegraded MondooAuditConfigConditionType = "AdmissionDegraded"
 )
 
 //+kubebuilder:object:root=true

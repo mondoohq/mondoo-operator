@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -140,7 +142,7 @@ const (
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:deprecatedversion
-//+kubebuilder:deprecatedversion:warning="k8s.mondoo.com/v1alpha1 is deprecated. The CRD will be automatically converted to v1alpha2"
+//+kubebuilder:deprecatedversion:warning="k8s.mondoo.com/v1alpha1 is deprecated. The CRD has to be manually converted to v1alpha2"
 
 // MondooAuditConfig is the Schema for the mondooauditconfigs API
 type MondooAuditConfig struct {
@@ -193,7 +195,33 @@ func (src *MondooAuditConfig) ConvertTo(dstRaw conversion.Hub) error {
 	dst.Spec.Admission.Image.Name = src.Spec.Webhooks.Image.Name
 	dst.Spec.Admission.Image.Tag = src.Spec.Webhooks.Image.Tag
 
-	// TODO: add status
+	dst.Status.Pods = src.Status.Pods
+	for _, c := range src.Status.Conditions {
+		var cType v1alpha2.MondooAuditConfigConditionType
+		switch c.Type {
+		case NodeScanningDegraded:
+			cType = v1alpha2.NodeScanningDegraded
+			break
+		case APIScanningDegraded:
+			cType = v1alpha2.K8sResourcesScanningDegraded
+			break
+		case WebhookDegraded:
+			cType = v1alpha2.AdmissionDegraded
+			break
+		default:
+			return fmt.Errorf("Unknown condition type %s", c.Type)
+		}
+
+		alpha2C := v1alpha2.MondooAuditConfigCondition{
+			Type:               cType,
+			Status:             c.Status,
+			LastUpdateTime:     c.LastUpdateTime,
+			LastTransitionTime: c.LastTransitionTime,
+			Reason:             c.Reason,
+			Message:            c.Message,
+		}
+		dst.Status.Conditions = append(dst.Status.Conditions, alpha2C)
+	}
 
 	return nil
 }
@@ -227,7 +255,33 @@ func (dst *MondooAuditConfig) ConvertFrom(srcRaw conversion.Hub) error {
 	dst.Spec.Nodes.Image.Name = src.Spec.Scanner.Image.Name
 	dst.Spec.Nodes.Image.Tag = src.Spec.Scanner.Image.Tag
 
-	// TODO: add status
+	dst.Status.Pods = src.Status.Pods
+	for _, c := range src.Status.Conditions {
+		var cType MondooAuditConfigConditionType
+		switch c.Type {
+		case v1alpha2.NodeScanningDegraded:
+			cType = NodeScanningDegraded
+			break
+		case v1alpha2.K8sResourcesScanningDegraded:
+			cType = APIScanningDegraded
+			break
+		case v1alpha2.AdmissionDegraded:
+			cType = WebhookDegraded
+			break
+		default:
+			return fmt.Errorf("Unknown condition type %s", c.Type)
+		}
+
+		alpha2C := MondooAuditConfigCondition{
+			Type:               cType,
+			Status:             c.Status,
+			LastUpdateTime:     c.LastUpdateTime,
+			LastTransitionTime: c.LastTransitionTime,
+			Reason:             c.Reason,
+			Message:            c.Message,
+		}
+		dst.Status.Conditions = append(dst.Status.Conditions, alpha2C)
+	}
 
 	return nil
 }
