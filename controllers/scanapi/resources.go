@@ -130,7 +130,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 										{
 											Secret: &corev1.SecretProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: m.Spec.Scanner.MondooCredsSecretRef,
+													Name: m.Spec.MondooCredsSecretRef,
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "config",

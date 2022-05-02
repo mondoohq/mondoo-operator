@@ -16,12 +16,10 @@ func DefaultAuditConfig(ns string, workloads, nodes, admission bool) mondoov2.Mo
 			Namespace: ns,
 		},
 		Spec: mondoov2.MondooAuditConfigSpec{
-			KubernetesResources: mondoov2.KubernetesResources{Enable: workloads},
-			Nodes:               mondoov2.Nodes{Enable: nodes},
-			Admission:           mondoov2.Admission{Enable: admission},
-			Scanner: mondoov2.Scanner{
-				MondooCredsSecretRef: MondooClientSecret,
-			},
+			MondooCredsSecretRef: MondooClientSecret,
+			KubernetesResources:  mondoov2.KubernetesResources{Enable: workloads},
+			Nodes:                mondoov2.Nodes{Enable: nodes},
+			Admission:            mondoov2.Admission{Enable: admission},
 		},
 	}
 }

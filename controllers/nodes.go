@@ -289,7 +289,7 @@ func (n *Nodes) daemonsetForMondoo(image string) *appsv1.DaemonSet {
 										{
 											Secret: &corev1.SecretProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: n.Mondoo.Spec.Scanner.MondooCredsSecretRef,
+													Name: n.Mondoo.Spec.MondooCredsSecretRef,
 												},
 												Items: []corev1.KeyToPath{{
 													Key:  "config",

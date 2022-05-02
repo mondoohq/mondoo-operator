@@ -75,9 +75,7 @@ var _ = Describe("nodes", func() {
 					Namespace: namespace,
 				},
 				Spec: k8sv1alpha2.MondooAuditConfigSpec{
-					Scanner: k8sv1alpha2.Scanner{
-						MondooCredsSecretRef: name,
-					},
+					MondooCredsSecretRef: name,
 					Nodes: k8sv1alpha2.Nodes{
 						Enable: true,
 					},

@@ -159,6 +159,8 @@ func (src *MondooAuditConfig) ConvertTo(dstRaw conversion.Hub) error {
 
 	dst.ObjectMeta = *src.ObjectMeta.DeepCopy()
 
+	dst.Spec.MondooCredsSecretRef = src.Spec.MondooSecretRef
+
 	dst.Spec.Admission.CertificateProvisioning.Mode =
 		v1alpha2.CertificateProvisioningMode(src.Spec.Webhooks.CertificateConfig.InjectionStyle)
 	if dst.Spec.Admission.CertificateProvisioning.Mode == "" {
@@ -166,7 +168,6 @@ func (src *MondooAuditConfig) ConvertTo(dstRaw conversion.Hub) error {
 	}
 
 	dst.Spec.Scanner.ServiceAccountName = src.Spec.Workloads.ServiceAccount
-	dst.Spec.Scanner.MondooCredsSecretRef = src.Spec.MondooSecretRef
 
 	// Try to set the image to the image for nodes. If such is not specified attempt to take the
 	// image from workloads.
@@ -229,7 +230,7 @@ func (dst *MondooAuditConfig) ConvertFrom(srcRaw conversion.Hub) error {
 
 	dst.ObjectMeta = src.ObjectMeta
 
-	dst.Spec.MondooSecretRef = src.Spec.Scanner.MondooCredsSecretRef
+	dst.Spec.MondooSecretRef = src.Spec.MondooCredsSecretRef
 
 	dst.Spec.Webhooks.Enable = src.Spec.Admission.Enable
 	dst.Spec.Webhooks.CertificateConfig.InjectionStyle = string(src.Spec.Admission.CertificateProvisioning.Mode)

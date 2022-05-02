@@ -17,7 +17,7 @@ spec:
   scope: Namespaced
   versions:
   - deprecated: true
-    deprecationWarning: k8s.mondoo.com/v1alpha1 is deprecated. The CRD will be automatically
+    deprecationWarning: k8s.mondoo.com/v1alpha1 is deprecated. The CRD has to be manually
       converted to v1alpha2
     name: v1alpha1
     schema:
@@ -274,14 +274,19 @@ spec:
                   enable:
                     type: boolean
                 type: object
+              mondooCredsSecretRef:
+                description: Config is an example field of MondooAuditConfig. Edit
+                  mondooauditconfig_types.go to remove/update
+                type: string
               nodes:
                 properties:
                   enable:
                     type: boolean
                 type: object
               scanner:
-                description: Config is an example field of MondooAuditConfig. Edit
-                  mondooauditconfig_types.go to remove/update
+                description: Scanner defines the settings for the Mondoo scanner that
+                  will be running in the cluster. The same scanner is used for scanning
+                  the Kubernetes API, the nodes and for serving the admission controller.
                 properties:
                   image:
                     properties:
@@ -290,8 +295,6 @@ spec:
                       tag:
                         type: string
                     type: object
-                  mondooCredsSecretRef:
-                    type: string
                   resources:
                     description: ResourceRequirements describes the compute resource
                       requirements.
