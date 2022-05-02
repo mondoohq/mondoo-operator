@@ -104,10 +104,10 @@ test/ci: manifests generate fmt vet envtest gotestsum
 
 # Integration tests are run synchronously to avoid race conditions
 test/integration: manifests generate generate-manifests load-minikube
-	go test -v -p 1 ./tests/integration/...
+	go test -v -timeout 975s -p 1 ./tests/integration/...
 
 test/integration/ci: manifests generate generate-manifests load-minikube gotestsum
-	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -v -p 1
+	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -v -timeout 975s -p 1
 
 ##@ Build
 
