@@ -1,4 +1,4 @@
-package webhooks
+package admission
 
 import (
 	"context"
@@ -421,7 +421,7 @@ func TestReconcile(t *testing.T) {
 			}
 			fakeClient := fake.NewClientBuilder().WithObjects(existingObj...).Build()
 
-			webhooks := &Webhooks{
+			webhooks := &AdmissionHandler{
 				Mondoo:                 auditConfig,
 				KubeClient:             fakeClient,
 				TargetNamespace:        testNamespace,

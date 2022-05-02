@@ -68,7 +68,7 @@ func (s *AuditConfigCustomNamespaceSuite) TearDownSuite() {
 	s.AuditConfigBaseSuite.TearDownSuite()
 }
 
-func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Workloads() {
+func (s *AuditConfigCustomNamespaceSuite) TestReconcile_KubernetesResources() {
 	auditConfig := utils.DefaultAuditConfig(s.ns.Name, true, false, false)
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigWorkloads(auditConfig)
@@ -80,7 +80,7 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes() {
 	s.testMondooAuditConfigNodes(auditConfig)
 }
 
-func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Webhooks() {
+func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Admission() {
 	auditConfig := utils.DefaultAuditConfig(s.ns.Name, false, false, true)
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigAdmission(auditConfig)

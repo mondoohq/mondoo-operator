@@ -1,4 +1,4 @@
-package webhooks
+package admission
 
 import (
 	"fmt"

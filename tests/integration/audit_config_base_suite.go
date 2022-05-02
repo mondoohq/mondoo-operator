@@ -15,8 +15,8 @@ import (
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	mondoocontrollers "go.mondoo.com/mondoo-operator/controllers"
+	mondooadmission "go.mondoo.com/mondoo-operator/controllers/admission"
 	mondooscanapi "go.mondoo.com/mondoo-operator/controllers/scanapi"
-	mondoowebhooks "go.mondoo.com/mondoo-operator/controllers/webhooks"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
@@ -108,7 +108,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 		fmt.Sprintf("%s-webhook-service.%s.svc", auditConfig.Name, auditConfig.Namespace),
 		fmt.Sprintf("%s-webhook-service.%s.svc.cluster.local", auditConfig.Name, auditConfig.Namespace),
 	}
-	secretName := mondoowebhooks.GetTLSCertificatesSecretName(auditConfig.Name)
+	secretName := mondooadmission.GetTLSCertificatesSecretName(auditConfig.Name)
 	caCert, err := s.testCluster.MondooInstaller.GenerateServiceCerts(&auditConfig, secretName, serviceDNSNames)
 
 	// Don't bother with further webhook tests if we couldnt' save the certificates
@@ -136,7 +136,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 		"Failed to create Mondoo audit config.")
 
 	// Wait for Ready Pod
-	webhookLabels := []string{mondoowebhooks.WebhookLabelKey + "=" + mondoowebhooks.WebhookLabelValue}
+	webhookLabels := []string{mondooadmission.WebhookLabelKey + "=" + mondooadmission.WebhookLabelValue}
 	webhookLabelsString := strings.Join(webhookLabels, ",")
 	s.Truef(
 		s.testCluster.K8sHelper.IsPodReady(webhookLabelsString, auditConfig.Namespace),

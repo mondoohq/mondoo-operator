@@ -201,13 +201,10 @@ func (src *MondooAuditConfig) ConvertTo(dstRaw conversion.Hub) error {
 		switch c.Type {
 		case NodeScanningDegraded:
 			cType = v1alpha2.NodeScanningDegraded
-			break
 		case APIScanningDegraded:
 			cType = v1alpha2.K8sResourcesScanningDegraded
-			break
 		case WebhookDegraded:
 			cType = v1alpha2.AdmissionDegraded
-			break
 		default:
 			return fmt.Errorf("Unknown condition type %s", c.Type)
 		}
@@ -261,13 +258,10 @@ func (dst *MondooAuditConfig) ConvertFrom(srcRaw conversion.Hub) error {
 		switch c.Type {
 		case v1alpha2.NodeScanningDegraded:
 			cType = NodeScanningDegraded
-			break
 		case v1alpha2.K8sResourcesScanningDegraded:
 			cType = APIScanningDegraded
-			break
 		case v1alpha2.AdmissionDegraded:
 			cType = WebhookDegraded
-			break
 		default:
 			return fmt.Errorf("Unknown condition type %s", c.Type)
 		}

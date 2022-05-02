@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/controllers/webhooks"
+	"go.mondoo.com/mondoo-operator/controllers/admission"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -133,7 +133,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
 		// deleted should be called here
 
-		webhooks := webhooks.Webhooks{
+		webhooks := admission.AdmissionHandler{
 			Mondoo:                 mondooAuditConfig,
 			KubeClient:             r.Client,
 			TargetNamespace:        req.Namespace,
@@ -192,7 +192,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return result, err
 	}
 
-	webhooks := webhooks.Webhooks{
+	webhooks := admission.AdmissionHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		TargetNamespace:        req.Namespace,
