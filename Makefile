@@ -155,7 +155,7 @@ generate-manifests: manifests kustomize ## Generates manifests and pipes into a 
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > mondoo-operator-manifests.yaml
 	cd config/webhook && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/webhook > controllers/webhooks/webhook-manifests.yaml
+	$(KUSTOMIZE) build config/webhook > controllers/admission/webhook-manifests.yaml
 
 .PHONY: deploy-olm
 deploy-olm: manifests kustomize ## Deploy using operator-sdk OLM 
