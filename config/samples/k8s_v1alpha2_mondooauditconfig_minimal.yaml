@@ -4,6 +4,7 @@ metadata:
   name: mondoo-client
   namespace: mondoo-operator
 spec:
+  mondooCredsSecretRef: mondoo-client
   kubernetesResources:
     enable: true
   nodes:

@@ -326,6 +326,8 @@ spec:
                     default: mondoo-operator-workload
                     type: string
                 type: object
+            required:
+            - mondooCredsSecretRef
             type: object
           status:
             description: MondooAuditConfigStatus defines the observed state of MondooAuditConfig

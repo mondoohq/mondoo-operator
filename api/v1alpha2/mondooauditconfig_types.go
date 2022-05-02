@@ -26,7 +26,9 @@ type MondooAuditConfigSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Config is an example field of MondooAuditConfig. Edit mondooauditconfig_types.go to remove/update
-	MondooCredsSecretRef string              `json:"mondooCredsSecretRef,omitempty"`
+	// +kubebuilder:validation:Required
+	// +required
+	MondooCredsSecretRef string              `json:"mondooCredsSecretRef"`
 	Scanner              Scanner             `json:"scanner,omitempty"`
 	KubernetesResources  KubernetesResources `json:"kubernetesResources,omitempty"`
 	Nodes                Nodes               `json:"nodes,omitempty"`
