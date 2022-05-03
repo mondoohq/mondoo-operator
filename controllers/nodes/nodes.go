@@ -18,7 +18,7 @@ package nodes
 
 import (
 	"context"
-	_ "embed"
+
 	"fmt"
 	"time"
 
@@ -48,6 +48,7 @@ var (
 )
 
 type Nodes struct {
+	KubeClient             client.Client
 	Enable                 bool
 	Mondoo                 *v1alpha2.MondooAuditConfig
 	Updated                bool
@@ -55,33 +56,20 @@ type Nodes struct {
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
 }
 
-func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
+func (n *Nodes) declareConfigMap(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	configMapName := fmt.Sprintf(daemonSetConfigMapNameTemplate, n.Mondoo.Name)
-
-	found := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: n.Mondoo.Namespace,
-			Name:      configMapName,
-		},
-	}
-	err := clt.Get(ctx, client.ObjectKeyFromObject(found), found)
+	found := ConfigMap(*n.Mondoo)
+	err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(found), found)
 
 	if err != nil && errors.IsNotFound(err) {
-		found.ObjectMeta = metav1.ObjectMeta{
-			Name:      configMapName,
-			Namespace: req.NamespacedName.Namespace,
-		}
-		found.Data = map[string]string{
-			"inventory": inventory,
-		}
-		if err := ctrl.SetControllerReference(n.Mondoo, found, scheme); err != nil {
+		found := ConfigMap(*n.Mondoo)
+		if err := ctrl.SetControllerReference(n.Mondoo, found, n.KubeClient.Scheme()); err != nil {
 			log.Error(err, "Failed to set ControllerReference", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
 			return ctrl.Result{}, err
 		}
 
-		err := clt.Create(ctx, found)
+		err := n.KubeClient.Create(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to create new Configmap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
 			return ctrl.Result{}, err
@@ -317,9 +305,7 @@ func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtim
 		return n.down(ctx, clt, req)
 	}
 
-	inventory := string(dsInventoryyaml)
-
-	result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
+	result, err := n.declareConfigMap(ctx, req)
 	if err != nil || result.Requeue {
 		return result, err
 	}
