@@ -7,7 +7,7 @@ spec:
   mondooCredsSecretRef:
     name: mondoo-client
   kubernetesResources:
-    enable: true
+    enable: false
   nodes:
     enable: true
   admission:

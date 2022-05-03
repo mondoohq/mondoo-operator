@@ -3,6 +3,7 @@ package nodes
 import (
 	_ "embed"
 	"fmt"
+	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -28,7 +29,9 @@ var (
 func CronJob(image string, nodesCount int32, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
-	matchExpressions := make([]metav1.LabelSelectorRequirement, len(ls))
+	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
+
+	matchExpressions := make([]metav1.LabelSelectorRequirement, 0)
 	for k, v := range ls {
 		matchExpressions = append(
 			matchExpressions,
@@ -42,12 +45,12 @@ func CronJob(image string, nodesCount int32, m v1alpha2.MondooAuditConfig) *batc
 			Labels:    CronJobLabels(m),
 		},
 		Spec: batchv1.CronJobSpec{
-			Schedule:          CronTab,
+			Schedule:          cronTab,
 			ConcurrencyPolicy: batchv1.AllowConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: ls},
 				Spec: batchv1.JobSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: ls},
+					//Selector: &metav1.LabelSelector{MatchLabels: ls},
 					// Setting the Parallelism and Completions to the amount of nodes in combination with the PodAntiAffinity
 					// makes sure 1 job is executed on each node.
 					Parallelism: pointer.Int32(nodesCount),
@@ -67,6 +70,7 @@ func CronJob(image string, nodesCount int32, m v1alpha2.MondooAuditConfig) *batc
 									},
 								},
 							},
+							RestartPolicy: corev1.RestartPolicyOnFailure,
 							Tolerations: []corev1.Toleration{
 								{
 									Key:    "node-role.kubernetes.io/master",
