@@ -180,8 +180,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	nodes := nodes.Nodes{
-		Enable:                 mondooAuditConfig.Spec.Nodes.Enable,
 		Mondoo:                 mondooAuditConfig,
+		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: containerImageResolver,
 	}

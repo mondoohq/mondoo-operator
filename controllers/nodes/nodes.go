@@ -19,19 +19,14 @@ package nodes
 import (
 	"context"
 
-	"fmt"
-	"time"
-
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
@@ -47,349 +42,145 @@ var (
 	dsInventoryyaml []byte
 )
 
+var logger = ctrl.Log.WithName("node-scanning")
+
 type Nodes struct {
 	KubeClient             client.Client
-	Enable                 bool
 	Mondoo                 *v1alpha2.MondooAuditConfig
-	Updated                bool
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
 }
 
-func (n *Nodes) declareConfigMap(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
-
-	found := ConfigMap(*n.Mondoo)
-	err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(found), found)
-
-	if err != nil && errors.IsNotFound(err) {
-		found := ConfigMap(*n.Mondoo)
-		if err := ctrl.SetControllerReference(n.Mondoo, found, n.KubeClient.Scheme()); err != nil {
-			log.Error(err, "Failed to set ControllerReference", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
-			return ctrl.Result{}, err
-		}
-
-		err := n.KubeClient.Create(ctx, found)
-		if err != nil {
-			log.Error(err, "Failed to create new Configmap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{Requeue: true}, err
-
-	} else if err != nil {
-		log.Error(err, "Failed to get Configmap")
-		return ctrl.Result{}, err
-	} else if err == nil && found.Data["inventory"] != inventory {
-		found.Data = map[string]string{
-			"inventory": inventory,
-		}
-
-		err := clt.Update(ctx, found)
-		if err != nil {
-			log.Error(err, "Failed to update Configmap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
-			return ctrl.Result{}, err
-		}
-		n.Updated = true
-		return ctrl.Result{Requeue: true}, err
+func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
+	if !n.Mondoo.Spec.Nodes.Enable {
+		return ctrl.Result{}, n.down(ctx, req)
 	}
 
+	updated, err := n.syncConfigMap(ctx, req)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if updated {
+		logger.Info("Inventory ConfigMap was just updated. Running node scanning job now...")
+	}
+
+	err = n.syncCronJob(ctx, req)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	return ctrl.Result{}, nil
 }
 
-func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, update bool) (ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
+// syncConfigMap syncs the inventory ConfigMap. Returns a boolean indicating whether the ConfigMap has been updated. It
+// can only be "true", if the ConfigMap existed before this reconcile cycle and the inventory was different from the
+// desired state.
+func (n *Nodes) syncConfigMap(ctx context.Context, req ctrl.Request) (bool, error) {
+	existing := &corev1.ConfigMap{}
+	desired := ConfigMap(*n.Mondoo)
+	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
+		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
+		return false, err
+	}
 
+	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
+	if err != nil {
+		logger.Error(err, "Failed to create inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
+		return false, err
+	}
+
+	if created {
+		logger.Info("Created inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
+		return false, nil
+	}
+
+	updated := false
+	if existing.Data["inventory"] != desired.Data["inventory"] {
+		existing.Data["inventory"] = desired.Data["inventory"]
+
+		if err := n.KubeClient.Update(ctx, existing); err != nil {
+			logger.Error(err, "Failed to update inventory ConfigMap", "namespace", existing.Namespace, "name", existing.Name)
+			return false, err
+		}
+		updated = true
+	}
+	return updated, nil
+}
+
+func (n *Nodes) syncCronJob(ctx context.Context, req ctrl.Request) error {
 	mondooClientImage, err := n.ContainerImageResolver.MondooClientImage(
 		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
-		return ctrl.Result{}, err
+		logger.Error(err, "Failed to resolve mondoo-client container image")
+		return err
 	}
 
-	found := &appsv1.DaemonSet{}
-	err = clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(NodeDaemonSetNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-
-		declared := n.daemonsetForMondoo(mondooClientImage)
-		if err := ctrl.SetControllerReference(n.Mondoo, declared, scheme); err != nil {
-			log.Error(err, "Failed to set ControllerReference", "Daemonset.Namespace", declared.Namespace, "Daemonset.Name", declared.Name)
-			return ctrl.Result{}, err
-		}
-
-		err := clt.Create(ctx, declared)
-		if err != nil {
-			log.Error(err, "Failed to create new Daemonset", "Daemonset.Namespace", declared.Namespace, "Daemonset.Name", declared.Name)
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{Requeue: true}, err
-
-	} else if err == nil && found.Spec.Template.Spec.Containers[0].Image != mondooClientImage {
-		found.Spec.Template.Spec.Containers[0].Image = mondooClientImage
-		err := clt.Update(ctx, found)
-		if err != nil {
-			log.Error(err, "Failed to update Daemonset", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{Requeue: true}, err
-	} else if err != nil {
-		log.Error(err, "Failed to get Daemonset")
-		return ctrl.Result{}, err
+	existing := &batchv1.CronJob{}
+	// TODO: add nodes count
+	desired := CronJob(mondooClientImage, 1, *n.Mondoo)
+	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
+		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
+		return err
 	}
 
-	// check that the resource limites are identical
-	expectedResourceRequirements := k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Scanner.Resources)
-	if !k8s.AreResouceRequirementsEqual(found.Spec.Template.Spec.Containers[0].Resources, expectedResourceRequirements) {
-		log.Info("update resource requirements for nodes client")
-		found.Spec.Template.Spec.Containers[0].Resources = expectedResourceRequirements
-		err := clt.Update(ctx, found)
-		if err != nil {
-			log.Error(err, "Failed to update Daemonset", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{Requeue: true}, err
-	}
-
-	if n.Updated {
-		if found.Spec.Template.ObjectMeta.Annotations == nil {
-			annotation := map[string]string{
-				"kubectl.kubernetes.io/restartedAt": metav1.Time{Time: time.Now()}.String(),
-			}
-
-			found.Spec.Template.ObjectMeta.Annotations = annotation
-		} else if found.Spec.Template.ObjectMeta.Annotations != nil {
-			found.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = metav1.Time{Time: time.Now()}.String()
-		}
-		err := clt.Update(ctx, found)
-		if err != nil {
-			log.Error(err, "failed to restart daemonset", "Daemonset.Namespace", found.Namespace, "Dameonset.Name", found.Name)
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{Requeue: true}, err
-	}
-	updateNodeConditions(n.Mondoo, found.Status.NumberReady != found.Status.DesiredNumberScheduled)
-
-	err = n.cleanupOldDaemonSet(ctx, clt)
-
-	return ctrl.Result{}, err
-}
-
-func (n *Nodes) daemonsetForMondoo(image string) *appsv1.DaemonSet {
-	ls := CronJobLabels(*n.Mondoo)
-	ls["audit"] = "node"
-
-	dep := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf(NodeDaemonSetNameTemplate, n.Mondoo.Name),
-			Namespace: n.Mondoo.Namespace,
-			Labels:    ls,
-		},
-		Spec: appsv1.DaemonSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: ls,
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: ls,
-				},
-				Spec: corev1.PodSpec{
-					Tolerations: []corev1.Toleration{
-						{
-							Key:    "node-role.kubernetes.io/master",
-							Effect: corev1.TaintEffectNoSchedule,
-						},
-						{
-							// Rancher etcd node
-							// https://rancher.com/docs/rke/latest/en/config-options/nodes/#etcd
-							Key:    "node-role.kubernetes.io/etcd",
-							Effect: corev1.TaintEffectNoExecute,
-							Value:  "true",
-						},
-						{
-							// Rancher controlplane node
-							// https://rancher.com/docs/rke/latest/en/config-options/nodes/#controlplane
-							Key:    "node-role.kubernetes.io/controlplane",
-							Effect: corev1.TaintEffectNoSchedule,
-							Value:  "true",
-						},
-					},
-					// The node scanning does not use the Kubernetes API at all, therefore the service account token
-					// should not be mounted at all.
-					AutomountServiceAccountToken: pointer.Bool(false),
-					Containers: []corev1.Container{{
-						Image:     image,
-						Name:      "mondoo-client",
-						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
-						Resources: k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Scanner.Resources),
-						ReadinessProbe: &corev1.Probe{
-							ProbeHandler: corev1.ProbeHandler{
-								Exec: &corev1.ExecAction{
-									Command: []string{"mondoo", "status", "--config", "/etc/opt/mondoo/mondoo.yml"},
-								},
-							},
-							InitialDelaySeconds: 10,
-							PeriodSeconds:       300,
-							TimeoutSeconds:      5,
-						},
-						VolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "root",
-								ReadOnly:  true,
-								MountPath: "/mnt/host/",
-							},
-							{
-								Name:      "config",
-								ReadOnly:  true,
-								MountPath: "/etc/opt/",
-							},
-						},
-						Env: []corev1.EnvVar{
-							{
-								Name:  "DEBUG",
-								Value: "false",
-							},
-							{
-								Name:  "MONDOO_PROCFS",
-								Value: "on",
-							},
-						},
-					}},
-					Volumes: []corev1.Volume{
-						{
-							Name: "root",
-							VolumeSource: corev1.VolumeSource{
-								HostPath: &corev1.HostPathVolumeSource{
-									Path: "/",
-								},
-							},
-						},
-						{
-							Name: "config",
-							VolumeSource: corev1.VolumeSource{
-								Projected: &corev1.ProjectedVolumeSource{
-									Sources: []corev1.VolumeProjection{
-										{
-											ConfigMap: &corev1.ConfigMapProjection{
-												LocalObjectReference: corev1.LocalObjectReference{
-													Name: fmt.Sprintf(daemonSetConfigMapNameTemplate, n.Mondoo.Name),
-												},
-												Items: []corev1.KeyToPath{{
-													Key:  "inventory",
-													Path: "mondoo/inventory.yml",
-												}},
-											},
-										},
-										{
-											Secret: &corev1.SecretProjection{
-												LocalObjectReference: n.Mondoo.Spec.MondooCredsSecretRef,
-												Items: []corev1.KeyToPath{{
-													Key:  "config",
-													Path: "mondoo/mondoo.yml",
-												}},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	return dep
-}
-func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
-	if !n.Enable {
-		return n.down(ctx, clt, req)
-	}
-
-	result, err := n.declareConfigMap(ctx, req)
-	if err != nil || result.Requeue {
-		return result, err
-	}
-	result, err = n.declareDaemonSet(ctx, clt, scheme, req, true)
-	if err != nil || result.Requeue {
-		return result, err
-	}
-	return ctrl.Result{}, nil
-}
-
-func (n *Nodes) down(ctx context.Context, clt client.Client, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
-
-	found := &appsv1.DaemonSet{}
-	err := clt.Get(ctx, types.NamespacedName{Name: fmt.Sprintf(NodeDaemonSetNameTemplate, n.Mondoo.Name), Namespace: n.Mondoo.Namespace}, found)
-
-	if err != nil && errors.IsNotFound(err) {
-		return ctrl.Result{}, nil
-	} else if err != nil {
-		log.Error(err, "Failed to get Daemonset")
-		return ctrl.Result{}, err
-	}
-
-	err = clt.Delete(ctx, found)
+	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
 	if err != nil {
-		log.Error(err, "Failed to delete Daemonset", "Daemonset.Namespace", found.Namespace, "Daemonset.Name", found.Name)
-		return ctrl.Result{}, err
-	}
-	if _, err := n.deleteExternalResources(ctx, clt, req, found); err != nil {
-		// if fail to delete the external dependency here, return with error
-		// so that it can be retried
-		return ctrl.Result{}, err
+		logger.Error(err, "Failed to create inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
+		return err
 	}
 
-	if err := n.cleanupOldDaemonSet(ctx, clt); err != nil {
-		return ctrl.Result{}, err
+	if created {
+		logger.Info("Created inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
+		return nil
+	}
+
+	// TODO: implement deep equals for cronjobs
+	if existing.Name != desired.Name {
+		if err := n.KubeClient.Update(ctx, existing); err != nil {
+			logger.Error(err, "Failed to update CronJob", "namespace", existing.Namespace, "name", existing.Name)
+			return err
+		}
+	}
+
+	// TODO: for CronJob we might consider triggering the CronJob now after the ConfigMap has been changed. It will make sense from the
+	// user perspective to want to run the jobs after you have updated the config.
+
+	// TODO: figure out how to check the node scanning status
+	//updateNodeConditions(n.Mondoo, found.Status.NumberReady != found.Status.DesiredNumberScheduled)
+	return n.cleanupOldDaemonSet(ctx)
+}
+
+func (n *Nodes) down(ctx context.Context, req ctrl.Request) error {
+	cronJob := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{Name: CronJobName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
+	}
+	if err := k8s.DeleteIfExists(ctx, n.KubeClient, cronJob); err != nil {
+		logger.Error(err, "Failed to clean up node scanning CronJob", "namespace", cronJob.Namespace, "name", cronJob.Name)
+		return err
+	}
+
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
+	}
+	if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
+		logger.Error(err, "Failed to clean up inventory ConfigMap", "namespace", cronJob.Namespace, "name", cronJob.Name)
+		return err
+	}
+
+	if err := n.cleanupOldDaemonSet(ctx); err != nil {
+		return err
 	}
 
 	// Update any remnant conditions
 	updateNodeConditions(n.Mondoo, false)
 
-	return ctrl.Result{Requeue: true}, err
+	return nil
 }
 
-// deleteExternalResources deletes any external resources associated with the daemonset
-func (n *Nodes) deleteExternalResources(ctx context.Context, clt client.Client, req ctrl.Request, DaemonSet *appsv1.DaemonSet) (ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
-	found := &corev1.ConfigMap{}
-	err := clt.Get(ctx, types.NamespacedName{Name: n.Mondoo.Name + "-ds", Namespace: n.Mondoo.Namespace}, found)
-
-	if err != nil && errors.IsNotFound(err) {
-		return ctrl.Result{}, nil
-	} else if err != nil {
-		log.Error(err, "Failed to get ConfigMap")
-		return ctrl.Result{}, err
-	}
-
-	err = clt.Delete(ctx, found)
-	if err != nil {
-		log.Error(err, "Failed to delete ConfigMap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
-		return ctrl.Result{}, err
-	}
-	return ctrl.Result{Requeue: true}, err
-}
-
-func updateNodeConditions(config *v1alpha2.MondooAuditConfig, degradedStatus bool) {
-	msg := "Node Scanning is Available"
-	reason := "NodeScanningAvailable"
-	status := corev1.ConditionFalse
-	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
-	if degradedStatus {
-		msg = "Node Scanning is Unavailable"
-		reason = "NodeScanningUnavailable"
-		status = corev1.ConditionTrue
-	}
-
-	config.Status.Conditions = mondoo.SetMondooAuditCondition(
-		config.Status.Conditions, v1alpha2.NodeScanningDegraded, status, reason, msg, updateCheck)
-
-}
-
+// TODO: this should now delete the current daemon set and replace it with the cronjob
 // TODO: this can be removed once we believe enough time has passed where the old-style named
 // DaemonSet has been replaced and removed to keep us from orphaning the old-style DaemonSet.
-func (n *Nodes) cleanupOldDaemonSet(ctx context.Context, kubeClient client.Client) error {
+func (n *Nodes) cleanupOldDaemonSet(ctx context.Context) error {
 	log := ctrllog.FromContext(ctx)
 
 	ds := &appsv1.DaemonSet{
@@ -399,7 +190,7 @@ func (n *Nodes) cleanupOldDaemonSet(ctx context.Context, kubeClient client.Clien
 		},
 	}
 
-	err := k8s.DeleteIfExists(ctx, kubeClient, ds)
+	err := k8s.DeleteIfExists(ctx, n.KubeClient, ds)
 	if err != nil {
 		log.Error(err, "failed while cleaning up old DaemonSet for nodes")
 	}
