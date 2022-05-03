@@ -277,7 +277,12 @@ spec:
               mondooCredsSecretRef:
                 description: Config is an example field of MondooAuditConfig. Edit
                   mondooauditconfig_types.go to remove/update
-                type: string
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    type: string
+                type: object
               nodes:
                 properties:
                   enable:

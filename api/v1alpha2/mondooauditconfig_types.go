@@ -28,11 +28,11 @@ type MondooAuditConfigSpec struct {
 	// Config is an example field of MondooAuditConfig. Edit mondooauditconfig_types.go to remove/update
 	// +kubebuilder:validation:Required
 	// +required
-	MondooCredsSecretRef string              `json:"mondooCredsSecretRef"`
-	Scanner              Scanner             `json:"scanner,omitempty"`
-	KubernetesResources  KubernetesResources `json:"kubernetesResources,omitempty"`
-	Nodes                Nodes               `json:"nodes,omitempty"`
-	Admission            Admission           `json:"admission,omitempty"`
+	MondooCredsSecretRef corev1.LocalObjectReference `json:"mondooCredsSecretRef"`
+	Scanner              Scanner                     `json:"scanner,omitempty"`
+	KubernetesResources  KubernetesResources         `json:"kubernetesResources,omitempty"`
+	Nodes                Nodes                       `json:"nodes,omitempty"`
+	Admission            Admission                   `json:"admission,omitempty"`
 }
 
 // CertificateProvisioning defines the certificate provisioning configuration within the cluster.

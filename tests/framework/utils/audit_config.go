@@ -2,6 +2,7 @@ package utils
 
 import (
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -16,7 +17,7 @@ func DefaultAuditConfig(ns string, workloads, nodes, admission bool) mondoov2.Mo
 			Namespace: ns,
 		},
 		Spec: mondoov2.MondooAuditConfigSpec{
-			MondooCredsSecretRef: MondooClientSecret,
+			MondooCredsSecretRef: corev1.LocalObjectReference{Name: MondooClientSecret},
 			KubernetesResources:  mondoov2.KubernetesResources{Enable: workloads},
 			Nodes:                mondoov2.Nodes{Enable: nodes},
 			Admission:            mondoov2.Admission{Enable: admission},

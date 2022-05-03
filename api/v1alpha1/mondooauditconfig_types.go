@@ -159,7 +159,7 @@ func (src *MondooAuditConfig) ConvertTo(dstRaw conversion.Hub) error {
 
 	dst.ObjectMeta = *src.ObjectMeta.DeepCopy()
 
-	dst.Spec.MondooCredsSecretRef = src.Spec.MondooSecretRef
+	dst.Spec.MondooCredsSecretRef.Name = src.Spec.MondooSecretRef
 
 	dst.Spec.Admission.CertificateProvisioning.Mode =
 		v1alpha2.CertificateProvisioningMode(src.Spec.Webhooks.CertificateConfig.InjectionStyle)
@@ -230,7 +230,7 @@ func (dst *MondooAuditConfig) ConvertFrom(srcRaw conversion.Hub) error {
 
 	dst.ObjectMeta = src.ObjectMeta
 
-	dst.Spec.MondooSecretRef = src.Spec.MondooCredsSecretRef
+	dst.Spec.MondooSecretRef = src.Spec.MondooCredsSecretRef.Name
 
 	dst.Spec.Webhooks.Enable = src.Spec.Admission.Enable
 	dst.Spec.Webhooks.CertificateConfig.InjectionStyle = string(src.Spec.Admission.CertificateProvisioning.Mode)

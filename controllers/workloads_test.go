@@ -84,7 +84,7 @@ var _ = Describe("workloads", func() {
 					Namespace: namespace,
 				},
 				Spec: k8sv1alpha2.MondooAuditConfigSpec{
-					MondooCredsSecretRef: name,
+					MondooCredsSecretRef: corev1.LocalObjectReference{Name: name},
 					Scanner:              k8sv1alpha2.Scanner{ServiceAccountName: name},
 					KubernetesResources: k8sv1alpha2.KubernetesResources{
 						Enable: true,
