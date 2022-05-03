@@ -8,5 +8,5 @@ roleRef:
   name: workload
 subjects:
 - kind: ServiceAccount
-  name: workload
+  name: k8s-resources-scanning
   namespace: system

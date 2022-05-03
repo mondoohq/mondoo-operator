@@ -323,7 +323,7 @@ spec:
                         type: object
                     type: object
                   serviceAccountName:
-                    default: mondoo-operator-workload
+                    default: mondoo-operator-k8s-resources-scanning
                     type: string
                 type: object
             required:

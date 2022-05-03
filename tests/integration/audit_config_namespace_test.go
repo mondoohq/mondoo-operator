@@ -41,10 +41,10 @@ func (s *AuditConfigCustomNamespaceSuite) SetupSuite() {
 	zap.S().Infof("Created service account %q in namespace %q.", s.sa.Name, s.ns.Name)
 
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-	clusterRoleBinding.Name = "mondoo-operator-workload2"
+	clusterRoleBinding.Name = "mondoo-operator-k8s-resources-scanning2"
 	clusterRoleBinding.RoleRef.APIGroup = rbacv1.GroupName
 	clusterRoleBinding.RoleRef.Kind = "ClusterRole"
-	clusterRoleBinding.RoleRef.Name = "mondoo-operator-workload"
+	clusterRoleBinding.RoleRef.Name = "mondoo-operator-k8s-resources-scanning"
 
 	subject := rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Name: s.sa.Name, Namespace: s.sa.Namespace}
 	clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, subject)

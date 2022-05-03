@@ -291,9 +291,8 @@ For development testing you can resources the allocated resources for the Mondoo
 
 ```yaml
 spec:
-  workloads:
-    enable: true
-    serviceAccount: mondoo-operator-workload
+  mondooCredsSecretRef: mondoo-client
+  scanner:
     resources:
       limits:
         cpu: 500m
@@ -301,16 +300,10 @@ spec:
       requests:
         cpu: 100m
         memory: 20Mi
+  kubernetesResources:
+    enable: true
   nodes:
     enable: true
-    resources:
-      limits:
-        cpu: 500m
-        memory: 900Mi
-      requests:
-        cpu: 100m
-        memory: 20Mi
-  mondooSecretRef: mondoo-client
 ```
 
 ### I had a `MondooAuditConfig` in my cluster with version `v1alpha1` and now I can no longer access it?

@@ -130,7 +130,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
 		// deleted should be called here
 
-		webhooks := admission.AdmissionHandler{
+		webhooks := admission.AdmissionDeploymentHandler{
 			Mondoo:                 mondooAuditConfig,
 			KubeClient:             r.Client,
 			TargetNamespace:        req.Namespace,
@@ -189,7 +189,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return result, err
 	}
 
-	webhooks := admission.AdmissionHandler{
+	webhooks := admission.AdmissionDeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		TargetNamespace:        req.Namespace,

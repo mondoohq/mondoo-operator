@@ -173,27 +173,28 @@ metadata:
   namespace: system
 ```
 
-> When `MondooAuditConfig` is created in the same namespace as the operator a service account named `mondoo-operator-workload` is added by default. If `MondooAuditConfig` is created in any other namespace create a ServiceAccount in that other namespace and add the ServiceAccount to the `ClusterRoleBinding` named `mondoo-operator-workload` that was created during installation of the mondoo-operator. The ServiceAccount needs to be specified in the `MondooAuditConfig` object at `.spec.workload.serviceAccount`.
+> When `MondooAuditConfig` is created in the same namespace as the operator a service account named `mondoo-operator-k8s-resources-scanning` is added by default. If `MondooAuditConfig` is created in any other namespace create a ServiceAccount in that other namespace and add the ServiceAccount to the `ClusterRoleBinding` named `mondoo-operator-k8s-resources-scanning` that was created during installation of the mondoo-operator. The ServiceAccount needs to be specified in the `MondooAuditConfig` object at `.spec.workload.serviceAccount`.
 
 > Additionally, when defining a `MondooAuditConfig` in a different namespace, a ServiceAccount with no permissions is needed for the node scanning. Create a ServiceAccount named `mondoo-operator-nodes` that will be used by the DaemonSet for node scanning.
 
 > Note: A cluster admin is required to create this `ClusterRole` and create a `ClusterRoleBinding` or `RoleBinding` to the `ServiceAccount` used by the mondoo-client `Pod`s. The `ServiceAccount` used by the workload `Pod`s can be specified in the `MondooAuditConfig` object.
 
 ```yaml
-apiVersion: k8s.mondoo.com/v1alpha1
+apiVersion: k8s.mondoo.com/v1alpha2
 kind: MondooAuditConfig
 metadata:
   name: mondoo-client
   namespace: mondoo-operator
 spec:
-  workloads:
+  scanner:
+    serviceAccountName: workload
+  kubernetesResources:
     enable: true
-    serviceAccount: workload
   nodes:
     enable: true
-  webhooks:
+  admission:
     enable: false
-  mondooSecretRef: mondoo-client
+  mondooCredsSecretRef: mondoo-client
 ```
 
 ## RBAC rules for Mondoo Node Scanning
