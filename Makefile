@@ -84,8 +84,9 @@ help: ## Display this help.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen gomockgen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	go generate ./pkg/...
 
 fmt: ## Run go fmt against code.
 	go fmt ./...
@@ -189,6 +190,13 @@ gotestsum: ## Download gotestsum locally if necessary.
 GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
 	$(call go-get-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45)
+
+GOMOCKGEN = $(shell pwd)/bin/mockgen
+.PHONY: gomockgen
+gomockgen: ## Download go mockgen locally if necessary.
+	$(call go-get-tool,$(GOMOCKGEN),github.com/golang/mock/mockgen@v1.6.0)
+	# mockgen binary needs to be in $PATH
+	cp $(GOMOCKGEN) /usr/local/bin/
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))

@@ -29,10 +29,16 @@ type MondooAuditConfigSpec struct {
 	// +kubebuilder:validation:Required
 	// +required
 	MondooCredsSecretRef corev1.LocalObjectReference `json:"mondooCredsSecretRef"`
-	Scanner              Scanner                     `json:"scanner,omitempty"`
-	KubernetesResources  KubernetesResources         `json:"kubernetesResources,omitempty"`
-	Nodes                Nodes                       `json:"nodes,omitempty"`
-	Admission            Admission                   `json:"admission,omitempty"`
+
+	// MondooTokenSecretRef can optionally hold a time-limited token that the mondoo-operator will use
+	// to create a Mondoo service account saved to the Secret specified in .spec.mondooCredsSecretRef
+	// if that Secret does not exist.
+	MondooTokenSecretRef corev1.LocalObjectReference ` json:"mondooTokenSecretRef,omitempty"`
+
+	Scanner             Scanner             `json:"scanner,omitempty"`
+	KubernetesResources KubernetesResources `json:"kubernetesResources,omitempty"`
+	Nodes               Nodes               `json:"nodes,omitempty"`
+	Admission           Admission           `json:"admission,omitempty"`
 }
 
 // CertificateProvisioning defines the certificate provisioning configuration within the cluster.
