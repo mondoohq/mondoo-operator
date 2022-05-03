@@ -69,11 +69,19 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - namespaces
   - pods
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
 - apiGroups:
   - ""
   resources:

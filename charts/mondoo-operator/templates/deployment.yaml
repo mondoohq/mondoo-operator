@@ -8,7 +8,7 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "mondoo-operator.fullname" . }}-workload
+  name: {{ include "mondoo-operator.fullname" . }}-k8s-resources-scanning
   labels:
   {{- include "mondoo-operator.labels" . | nindent 4 }}
 ---
