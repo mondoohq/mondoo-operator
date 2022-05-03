@@ -94,7 +94,7 @@ jobs:
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
       # before the test execution starts.
       - name: Wait a bit for the runner to become more stable
-        run: sleep 30
+        run: sleep 40
 
       - run: make test/integration/ci
       - uses: actions/download-artifact@v3 # download the unit test results
