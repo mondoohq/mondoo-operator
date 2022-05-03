@@ -13,7 +13,7 @@ type AuditConfigSuite struct {
 	AuditConfigBaseSuite
 }
 
-func (s *AuditConfigSuite) TestReconcile_Workloads() {
+func (s *AuditConfigSuite) TestReconcile_KubernetesResources() {
 	auditConfig := utils.DefaultAuditConfig(s.testCluster.Settings.Namespace, true, false, false)
 	s.testMondooAuditConfigWorkloads(auditConfig)
 }
@@ -23,9 +23,9 @@ func (s *AuditConfigSuite) TestReconcile_Nodes() {
 	s.testMondooAuditConfigNodes(auditConfig)
 }
 
-func (s *AuditConfigSuite) TestReconcile_Webhooks() {
+func (s *AuditConfigSuite) TestReconcile_Admission() {
 	auditConfig := utils.DefaultAuditConfig(s.testCluster.Settings.Namespace, false, false, true)
-	s.testMondooAuditConfigWebhooks(auditConfig)
+	s.testMondooAuditConfigAdmission(auditConfig)
 }
 
 func TestAuditConfigSuite(t *testing.T) {

@@ -41,10 +41,10 @@ func (s *AuditConfigCustomNamespaceSuite) SetupSuite() {
 	zap.S().Infof("Created service account %q in namespace %q.", s.sa.Name, s.ns.Name)
 
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-	clusterRoleBinding.Name = "mondoo-operator-workload2"
+	clusterRoleBinding.Name = "mondoo-operator-k8s-resources-scanning2"
 	clusterRoleBinding.RoleRef.APIGroup = rbacv1.GroupName
 	clusterRoleBinding.RoleRef.Kind = "ClusterRole"
-	clusterRoleBinding.RoleRef.Name = "mondoo-operator-workload"
+	clusterRoleBinding.RoleRef.Name = "mondoo-operator-k8s-resources-scanning"
 
 	subject := rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Name: s.sa.Name, Namespace: s.sa.Namespace}
 	clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, subject)
@@ -68,22 +68,22 @@ func (s *AuditConfigCustomNamespaceSuite) TearDownSuite() {
 	s.AuditConfigBaseSuite.TearDownSuite()
 }
 
-func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Workloads() {
+func (s *AuditConfigCustomNamespaceSuite) TestReconcile_KubernetesResources() {
 	auditConfig := utils.DefaultAuditConfig(s.ns.Name, true, false, false)
-	auditConfig.Spec.Workloads.ServiceAccount = s.sa.Name
+	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigWorkloads(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes() {
 	auditConfig := utils.DefaultAuditConfig(s.ns.Name, false, true, false)
-	auditConfig.Spec.Workloads.ServiceAccount = s.sa.Name
+	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigNodes(auditConfig)
 }
 
-func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Webhooks() {
+func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Admission() {
 	auditConfig := utils.DefaultAuditConfig(s.ns.Name, false, false, true)
-	auditConfig.Spec.Workloads.ServiceAccount = s.sa.Name
-	s.testMondooAuditConfigWebhooks(auditConfig)
+	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
+	s.testMondooAuditConfigAdmission(auditConfig)
 }
 
 func TestAuditConfigCustomNamespaceSuite(t *testing.T) {

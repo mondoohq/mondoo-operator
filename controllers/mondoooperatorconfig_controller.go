@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
@@ -47,12 +47,12 @@ func (r *MondooOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl
 
 	// Since MondooOperatorConfig is cluster-scoped, there should only ever be one resource
 	// for configuring the mondoo-operator. Ensure the name of the resource is what we expect.
-	if req.Name != mondoov1alpha1.MondooOperatorConfigName {
-		configLog.Info(fmt.Sprintf("only a single MondooOperatorConfig can be used to configure mondoo-operator and it must be named %s", mondoov1alpha1.MondooOperatorConfigName))
+	if req.Name != mondoov1alpha2.MondooOperatorConfigName {
+		configLog.Info(fmt.Sprintf("only a single MondooOperatorConfig can be used to configure mondoo-operator and it must be named %s", mondoov1alpha2.MondooOperatorConfigName))
 		return ctrl.Result{}, nil
 	}
 
-	config := &mondoov1alpha1.MondooOperatorConfig{}
+	config := &mondoov1alpha2.MondooOperatorConfig{}
 	if err := r.Get(ctx, req.NamespacedName, config); err != nil {
 		if errors.IsNotFound(err) {
 			configLog.Info("MondooOperatorConfig no longer exists")
@@ -90,6 +90,6 @@ func (r *MondooOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl
 // SetupWithManager sets up the controller with the Manager.
 func (r *MondooOperatorConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&mondoov1alpha1.MondooOperatorConfig{}).
+		For(&mondoov1alpha2.MondooOperatorConfig{}).
 		Complete(r)
 }

@@ -104,10 +104,10 @@ test/ci: manifests generate fmt vet envtest gotestsum
 
 # Integration tests are run synchronously to avoid race conditions
 test/integration: manifests generate generate-manifests load-minikube
-	go test -v -p 1 ./tests/integration/...
+	go test -v -timeout 900s -p 1 ./tests/integration/...
 
 test/integration/ci: manifests generate generate-manifests load-minikube gotestsum
-	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -v -p 1
+	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -v -timeout 900s -p 1
 
 ##@ Build
 
@@ -155,7 +155,7 @@ generate-manifests: manifests kustomize ## Generates manifests and pipes into a 
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > mondoo-operator-manifests.yaml
 	cd config/webhook && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/webhook > controllers/webhooks/webhook-manifests.yaml
+	$(KUSTOMIZE) build config/webhook > controllers/admission/webhook-manifests.yaml
 
 .PHONY: deploy-olm
 deploy-olm: manifests kustomize ## Deploy using operator-sdk OLM 

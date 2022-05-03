@@ -35,12 +35,12 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
 type ServiceMonitor struct {
-	Config          *mondoov1alpha1.MondooOperatorConfig
+	Config          *mondoov1alpha2.MondooOperatorConfig
 	TargetNamespace string
 }
 
@@ -90,7 +90,7 @@ func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.C
 	return ctrl.Result{}, nil
 }
 
-func (s *ServiceMonitor) serviceMonitorForMondoo(m *mondoov1alpha1.MondooOperatorConfig) *monitoringv1.ServiceMonitor {
+func (s *ServiceMonitor) serviceMonitorForMondoo(m *mondoov1alpha2.MondooOperatorConfig) *monitoringv1.ServiceMonitor {
 	ls := labelsForMondoo(m.Name)
 	for key, value := range s.Config.Spec.Metrics.ResourceLabels {
 		ls[key] = value
@@ -155,7 +155,7 @@ func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, schem
 	return ctrl.Result{}, nil
 }
 
-func updatePrometheusNotInstalledCondition(config *mondoov1alpha1.MondooOperatorConfig, found bool) {
+func updatePrometheusNotInstalledCondition(config *mondoov1alpha2.MondooOperatorConfig, found bool) {
 	msg := "Prometheus installation detected"
 	reason := "PrometheusFound"
 	status := corev1.ConditionFalse
@@ -167,7 +167,7 @@ func updatePrometheusNotInstalledCondition(config *mondoov1alpha1.MondooOperator
 	}
 
 	config.Status.Conditions = mondoo.SetMondooOperatorConfigCondition(
-		config.Status.Conditions, mondoov1alpha1.PrometheusMissingCondition, status, reason, msg, updateCheck)
+		config.Status.Conditions, mondoov1alpha2.PrometheusMissingCondition, status, reason, msg, updateCheck)
 }
 
 func (s *ServiceMonitor) down(ctx context.Context, clt client.Client) (ctrl.Result, error) {

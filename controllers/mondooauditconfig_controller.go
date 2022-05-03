@@ -28,8 +28,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"go.mondoo.com/mondoo-operator/api/v1alpha1"
-	"go.mondoo.com/mondoo-operator/controllers/webhooks"
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/controllers/admission"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,10 +38,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const (
-	finalizerString       = "k8s.mondoo.com/delete"
-	defaultServiceAccount = "mondoo-operator-workload"
-)
+const finalizerString = "k8s.mondoo.com/delete"
 
 // MondooAuditConfigReconciler reconciles a MondooAuditConfig object
 type MondooAuditConfigReconciler struct {
@@ -92,7 +89,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	log := ctrllog.FromContext(ctx)
 
 	// Fetch the Mondoo instance
-	mondooAuditConfig := &v1alpha1.MondooAuditConfig{}
+	mondooAuditConfig := &v1alpha2.MondooAuditConfig{}
 
 	err := r.Get(ctx, req.NamespacedName, mondooAuditConfig)
 
@@ -108,8 +105,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		log.Error(err, "Failed to get mondoo")
 		return ctrl.Result{}, err
 	}
-	config := &v1alpha1.MondooOperatorConfig{}
-	if err := r.Get(ctx, types.NamespacedName{Name: v1alpha1.MondooOperatorConfigName}, config); err != nil {
+	config := &v1alpha2.MondooOperatorConfig{}
+	if err := r.Get(ctx, types.NamespacedName{Name: v1alpha2.MondooOperatorConfigName}, config); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("MondooOperatorConfig not found, using defaults")
 		} else {
@@ -124,7 +121,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	if config.DeletionTimestamp != nil {
 		// Going to proceed as if there is no MondooOperatorConfig
-		config = &v1alpha1.MondooOperatorConfig{}
+		config = &v1alpha2.MondooOperatorConfig{}
 	}
 
 	if mondooAuditConfig.DeletionTimestamp != nil {
@@ -133,7 +130,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
 		// deleted should be called here
 
-		webhooks := webhooks.Webhooks{
+		webhooks := admission.AdmissionDeploymentHandler{
 			Mondoo:                 mondooAuditConfig,
 			KubeClient:             r.Client,
 			TargetNamespace:        req.Namespace,
@@ -178,7 +175,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	workloads := Workloads{
-		Enable:                 mondooAuditConfig.Spec.Workloads.Enable,
+		Enable:                 mondooAuditConfig.Spec.KubernetesResources.Enable,
 		Mondoo:                 mondooAuditConfig,
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: containerImageResolver,
@@ -192,7 +189,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return result, err
 	}
 
-	webhooks := webhooks.Webhooks{
+	webhooks := admission.AdmissionDeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		TargetNamespace:        req.Namespace,
@@ -257,7 +254,7 @@ func getPodNames(pods []corev1.Pod) sets.String {
 // SetupWithManager sets up the controller with the Manager.
 func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.MondooAuditConfig{}).
+		For(&v1alpha2.MondooAuditConfig{}).
 		Owns(&appsv1.DaemonSet{}).
 		Owns(&appsv1.Deployment{}).
 		Complete(r)

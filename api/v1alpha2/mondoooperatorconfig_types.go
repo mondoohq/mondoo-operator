@@ -14,13 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1alpha2
 
 import (
-	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/conversion"
 )
 
 const (
@@ -91,8 +89,7 @@ const (
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:scope=Cluster
-//+kubebuilder:deprecatedversion
-//+kubebuilder:deprecatedversion:warning="k8s.mondoo.com/v1alpha1 is deprecated. The CRD will be automatically converted to v1alpha2"
+//+kubebuilder:storageversion
 
 // MondooOperatorConfig is the Schema for the mondoooperatorconfigs API
 type MondooOperatorConfig struct {
@@ -103,37 +100,8 @@ type MondooOperatorConfig struct {
 	Status MondooOperatorConfigStatus `json:"status,omitempty"`
 }
 
-// ConvertTo converts this MondooOperatorConfig to the Hub version (v1alpha2).
-func (src *MondooOperatorConfig) ConvertTo(dstRaw conversion.Hub) error {
-	dst := dstRaw.(*v1alpha2.MondooOperatorConfig)
-
-	dst.ObjectMeta = src.ObjectMeta
-
-	dst.Spec.Metrics.Enable = src.Spec.Metrics.Enable
-	dst.Spec.Metrics.ResourceLabels = src.Spec.Metrics.ResourceLabels
-
-	dst.Spec.SkipContainerResolution = src.Spec.SkipContainerResolution
-
-	// TODO: add status
-
-	return nil
-}
-
-// ConvertFrom converts from the Hub version (v1alpha2) to this version.
-func (dst *MondooOperatorConfig) ConvertFrom(srcRaw conversion.Hub) error {
-	src := srcRaw.(*v1alpha2.MondooOperatorConfig)
-
-	dst.ObjectMeta = src.ObjectMeta
-
-	dst.Spec.Metrics.Enable = src.Spec.Metrics.Enable
-	dst.Spec.Metrics.ResourceLabels = src.Spec.Metrics.ResourceLabels
-
-	dst.Spec.SkipContainerResolution = src.Spec.SkipContainerResolution
-
-	// TODO: add status
-
-	return nil
-}
+// Hub marks this type as a conversion hub.
+func (*MondooOperatorConfig) Hub() {}
 
 //+kubebuilder:object:root=true
 

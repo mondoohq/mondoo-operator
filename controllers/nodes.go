@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	appsv1 "k8s.io/api/apps/v1"
@@ -43,10 +43,10 @@ const (
 
 type Nodes struct {
 	Enable                 bool
-	Mondoo                 *v1alpha1.MondooAuditConfig
+	Mondoo                 *v1alpha2.MondooAuditConfig
 	Updated                bool
 	ContainerImageResolver mondoo.ContainerImageResolver
-	MondooOperatorConfig   *v1alpha1.MondooOperatorConfig
+	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
 }
 
 func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
@@ -62,9 +62,6 @@ func (n *Nodes) declareConfigMap(ctx context.Context, clt client.Client, scheme 
 	}
 	err := clt.Get(ctx, client.ObjectKeyFromObject(found), found)
 
-	if n.Mondoo.Spec.Nodes.Inventory != "" {
-		inventory = n.Mondoo.Spec.Nodes.Inventory
-	}
 	if err != nil && errors.IsNotFound(err) {
 		found.ObjectMeta = metav1.ObjectMeta{
 			Name:      configMapName,
@@ -110,7 +107,7 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	log := ctrllog.FromContext(ctx)
 
 	mondooClientImage, err := n.ContainerImageResolver.MondooClientImage(
-		n.Mondoo.Spec.Nodes.Image.Name, n.Mondoo.Spec.Nodes.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -148,7 +145,7 @@ func (n *Nodes) declareDaemonSet(ctx context.Context, clt client.Client, scheme 
 	}
 
 	// check that the resource limites are identical
-	expectedResourceRequirements := k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Nodes.Resources)
+	expectedResourceRequirements := k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Scanner.Resources)
 	if !k8s.AreResouceRequirementsEqual(found.Spec.Template.Spec.Containers[0].Resources, expectedResourceRequirements) {
 		log.Info("update resource requirements for nodes client")
 		found.Spec.Template.Spec.Containers[0].Resources = expectedResourceRequirements
@@ -230,7 +227,7 @@ func (n *Nodes) daemonsetForMondoo(image string) *appsv1.DaemonSet {
 						Image:     image,
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--config", "/etc/opt/mondoo/mondoo.yml"},
-						Resources: k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Nodes.Resources),
+						Resources: k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Scanner.Resources),
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
@@ -291,9 +288,7 @@ func (n *Nodes) daemonsetForMondoo(image string) *appsv1.DaemonSet {
 										},
 										{
 											Secret: &corev1.SecretProjection{
-												LocalObjectReference: corev1.LocalObjectReference{
-													Name: n.Mondoo.Spec.MondooSecretRef,
-												},
+												LocalObjectReference: n.Mondoo.Spec.MondooCredsSecretRef,
 												Items: []corev1.KeyToPath{{
 													Key:  "config",
 													Path: "mondoo/mondoo.yml",
@@ -382,7 +377,7 @@ func (n *Nodes) deleteExternalResources(ctx context.Context, clt client.Client, 
 	return ctrl.Result{Requeue: true}, err
 }
 
-func updateNodeConditions(config *v1alpha1.MondooAuditConfig, degradedStatus bool) {
+func updateNodeConditions(config *v1alpha2.MondooAuditConfig, degradedStatus bool) {
 	msg := "Node Scanning is Available"
 	reason := "NodeScanningAvailable"
 	status := corev1.ConditionFalse
@@ -394,7 +389,7 @@ func updateNodeConditions(config *v1alpha1.MondooAuditConfig, degradedStatus boo
 	}
 
 	config.Status.Conditions = mondoo.SetMondooAuditCondition(
-		config.Status.Conditions, v1alpha1.NodeScanningDegraded, status, reason, msg, updateCheck)
+		config.Status.Conditions, v1alpha2.NodeScanningDegraded, status, reason, msg, updateCheck)
 
 }
 

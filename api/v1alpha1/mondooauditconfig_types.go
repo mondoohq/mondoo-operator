@@ -17,8 +17,12 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/conversion"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -137,6 +141,8 @@ const (
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:deprecatedversion
+//+kubebuilder:deprecatedversion:warning="k8s.mondoo.com/v1alpha1 is deprecated. The CRD has to be manually converted to v1alpha2"
 
 // MondooAuditConfig is the Schema for the mondooauditconfigs API
 type MondooAuditConfig struct {
@@ -145,6 +151,134 @@ type MondooAuditConfig struct {
 
 	Spec   MondooAuditConfigData   `json:"spec,omitempty"`
 	Status MondooAuditConfigStatus `json:"status,omitempty"`
+}
+
+// ConvertTo converts this MondooAuditConfig to the Hub version (v1alpha2).
+func (src *MondooAuditConfig) ConvertTo(dstRaw conversion.Hub) error {
+	dst := dstRaw.(*v1alpha2.MondooAuditConfig)
+
+	dst.ObjectMeta = *src.ObjectMeta.DeepCopy()
+
+	dst.Spec.MondooCredsSecretRef.Name = src.Spec.MondooSecretRef
+
+	dst.Spec.Admission.CertificateProvisioning.Mode =
+		v1alpha2.CertificateProvisioningMode(src.Spec.Webhooks.CertificateConfig.InjectionStyle)
+	if dst.Spec.Admission.CertificateProvisioning.Mode == "" {
+		dst.Spec.Admission.CertificateProvisioning.Mode = v1alpha2.ManualProvisioning
+	}
+
+	dst.Spec.Scanner.ServiceAccountName = src.Spec.Workloads.ServiceAccount
+
+	// Try to set the image to the image for nodes. If such is not specified attempt to take the
+	// image from workloads.
+	if src.Spec.Nodes.Image.Name != "" || src.Spec.Nodes.Image.Tag != "" {
+		dst.Spec.Scanner.Image.Name = src.Spec.Nodes.Image.Name
+		dst.Spec.Scanner.Image.Tag = src.Spec.Nodes.Image.Tag
+	} else if src.Spec.Workloads.Image.Name != "" || src.Spec.Workloads.Image.Tag != "" {
+		dst.Spec.Scanner.Image.Name = src.Spec.Workloads.Image.Name
+		dst.Spec.Scanner.Image.Tag = src.Spec.Workloads.Image.Tag
+	}
+
+	// Try to set the requirements to the requirements for nodes. If such are not specified attempt
+	// to take the requirements from workloads.
+	if src.Spec.Nodes.Resources.Size() != 0 {
+		dst.Spec.Scanner.Resources = src.Spec.Nodes.Resources
+	} else if src.Spec.Workloads.Resources.Size() != 0 {
+		dst.Spec.Scanner.Resources = src.Spec.Workloads.Resources
+	}
+
+	dst.Spec.KubernetesResources.Enable = src.Spec.Workloads.Enable
+
+	dst.Spec.Nodes.Enable = src.Spec.Nodes.Enable
+
+	dst.Spec.Admission.Enable = src.Spec.Webhooks.Enable
+	dst.Spec.Admission.Mode = v1alpha2.AdmissionMode(src.Spec.Webhooks.Mode)
+	dst.Spec.Admission.Image.Name = src.Spec.Webhooks.Image.Name
+	dst.Spec.Admission.Image.Tag = src.Spec.Webhooks.Image.Tag
+
+	dst.Status.Pods = src.Status.Pods
+	for _, c := range src.Status.Conditions {
+		var cType v1alpha2.MondooAuditConfigConditionType
+		switch c.Type {
+		case NodeScanningDegraded:
+			cType = v1alpha2.NodeScanningDegraded
+		case APIScanningDegraded:
+			cType = v1alpha2.K8sResourcesScanningDegraded
+		case WebhookDegraded:
+			cType = v1alpha2.AdmissionDegraded
+		default:
+			return fmt.Errorf("Unknown condition type %s", c.Type)
+		}
+
+		alpha2C := v1alpha2.MondooAuditConfigCondition{
+			Type:               cType,
+			Status:             c.Status,
+			LastUpdateTime:     c.LastUpdateTime,
+			LastTransitionTime: c.LastTransitionTime,
+			Reason:             c.Reason,
+			Message:            c.Message,
+		}
+		dst.Status.Conditions = append(dst.Status.Conditions, alpha2C)
+	}
+
+	return nil
+}
+
+// ConvertFrom converts from the Hub version (v1alpha2) to this version.
+func (dst *MondooAuditConfig) ConvertFrom(srcRaw conversion.Hub) error {
+	src := srcRaw.(*v1alpha2.MondooAuditConfig)
+
+	dst.ObjectMeta = src.ObjectMeta
+
+	dst.Spec.MondooSecretRef = src.Spec.MondooCredsSecretRef.Name
+
+	dst.Spec.Webhooks.Enable = src.Spec.Admission.Enable
+	dst.Spec.Webhooks.CertificateConfig.InjectionStyle = string(src.Spec.Admission.CertificateProvisioning.Mode)
+	if dst.Spec.Webhooks.CertificateConfig.InjectionStyle == string(v1alpha2.ManualProvisioning) {
+		// The equivalent of manual provisioning in the old version is an empty string
+		dst.Spec.Webhooks.CertificateConfig.InjectionStyle = ""
+	}
+	dst.Spec.Webhooks.Mode = string(src.Spec.Admission.Mode)
+	dst.Spec.Webhooks.Image.Name = src.Spec.Admission.Image.Name
+	dst.Spec.Webhooks.Image.Tag = src.Spec.Admission.Image.Tag
+
+	dst.Spec.Workloads.Enable = src.Spec.KubernetesResources.Enable
+	dst.Spec.Workloads.ServiceAccount = src.Spec.Scanner.ServiceAccountName
+	dst.Spec.Workloads.Resources = src.Spec.Scanner.Resources
+	dst.Spec.Workloads.Image.Name = src.Spec.Scanner.Image.Name
+	dst.Spec.Workloads.Image.Tag = src.Spec.Scanner.Image.Tag
+
+	dst.Spec.Nodes.Enable = src.Spec.Nodes.Enable
+	dst.Spec.Nodes.Resources = src.Spec.Scanner.Resources
+	dst.Spec.Nodes.Image.Name = src.Spec.Scanner.Image.Name
+	dst.Spec.Nodes.Image.Tag = src.Spec.Scanner.Image.Tag
+
+	dst.Status.Pods = src.Status.Pods
+	for _, c := range src.Status.Conditions {
+		var cType MondooAuditConfigConditionType
+		switch c.Type {
+		case v1alpha2.NodeScanningDegraded:
+			cType = NodeScanningDegraded
+		case v1alpha2.K8sResourcesScanningDegraded:
+			cType = APIScanningDegraded
+		case v1alpha2.AdmissionDegraded:
+			cType = WebhookDegraded
+		default:
+			return fmt.Errorf("Unknown condition type %s", c.Type)
+		}
+
+		alpha2C := MondooAuditConfigCondition{
+			Type:               cType,
+			Status:             c.Status,
+			LastUpdateTime:     c.LastUpdateTime,
+			LastTransitionTime: c.LastTransitionTime,
+			Reason:             c.Reason,
+			Message:            c.Message,
+		}
+		dst.Status.Conditions = append(dst.Status.Conditions, alpha2C)
+	}
+
+	return nil
 }
 
 //+kubebuilder:object:root=true

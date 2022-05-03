@@ -1,0 +1,8 @@
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooOperatorConfig
+metadata:
+  name: mondoo-operator-config
+spec:
+  metrics:
+    enable: false
+  skipContainerResolution: false

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	mondoov1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
@@ -19,7 +19,7 @@ import (
 
 const (
 	OperatorManifest        = "mondoo-operator-manifests.yaml"
-	AuditConfigManifest     = "config/samples/k8s_v1alpha1_mondooauditconfig.yaml"
+	AuditConfigManifest     = "config/samples/k8s_v1alpha2_mondooauditconfig_minimal.yaml"
 	MondooCredsFile         = "creds.json"
 	MondooClientsLabel      = "mondoo_cr=mondoo-client"
 	MondooClientsNodesLabel = "audit=node"
@@ -73,9 +73,9 @@ func (i *MondooInstaller) InstallOperator() error {
 	}
 
 	// Create a MondooOperatorConfig with default values
-	operatorConfig := &mondoov1.MondooOperatorConfig{
+	operatorConfig := &mondoov2.MondooOperatorConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: mondoov1.MondooOperatorConfigName,
+			Name: mondoov2.MondooOperatorConfigName,
 		},
 	}
 	if err := i.K8sHelper.Clientset.Create(i.ctx, operatorConfig); err != nil {
@@ -115,7 +115,7 @@ func (i *MondooInstaller) UninstallOperator() error {
 func (i *MondooInstaller) CleanupAuditConfigs() error {
 	// Make sure all Mondoo audit configs are deleted so the namespace can be deleted. Leaving
 	// audit configs will result in a stuck namespace.
-	cfgs := &mondoov1.MondooAuditConfigList{}
+	cfgs := &mondoov2.MondooAuditConfigList{}
 	if err := i.K8sHelper.Clientset.List(i.ctx, cfgs); err != nil {
 		return fmt.Errorf("Failed to get Mondoo audit configs. %v", err)
 	}
@@ -180,7 +180,7 @@ func (i *MondooInstaller) readManifestWithNamespace(manifest string) string {
 
 // GenerateServiceCerts will generate a CA along with signed certificates for the provided dnsNames, and save
 // it into secretName. It will return the CA certificate and any error encountered.
-func (i *MondooInstaller) GenerateServiceCerts(auditConfig *mondoov1.MondooAuditConfig, secretName string, serviceDNSNames []string) (*bytes.Buffer, error) {
+func (i *MondooInstaller) GenerateServiceCerts(auditConfig *mondoov2.MondooAuditConfig, secretName string, serviceDNSNames []string) (*bytes.Buffer, error) {
 	if auditConfig == nil {
 		return nil, fmt.Errorf("cannot generate certificates for a nil MondooAuditConfig")
 	}

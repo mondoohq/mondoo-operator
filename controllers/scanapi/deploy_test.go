@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +31,7 @@ type DeploySuite struct {
 func (s *DeploySuite) SetupSuite() {
 	s.ctx = context.Background()
 	s.scheme = clientgoscheme.Scheme
-	s.Require().NoError(mondoov1alpha1.AddToScheme(s.scheme))
+	s.Require().NoError(mondoov1alpha2.AddToScheme(s.scheme))
 	s.image = mondoo.MondooOperatorImage + ":" + mondoo.MondooOperatorTag
 }
 

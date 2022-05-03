@@ -1,4 +1,4 @@
-package webhooks
+package admission
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 )
 
@@ -47,7 +47,7 @@ func GetTLSCertificatesSecretName(mondooAuditConfigName string) string {
 	return fmt.Sprintf(webhookTLSSecretNameTemplate, mondooAuditConfigName)
 }
 
-func WebhookDeployment(ns, image, mode string, m mondoov1alpha1.MondooAuditConfig, clusterID string) *appsv1.Deployment {
+func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, clusterID string) *appsv1.Deployment {
 	// The URL to communicate with will be http://ScanAPIServiceName-ScanAPIServiceNamespace.svc:ScanAPIPort
 	scanAPIURL := fmt.Sprintf("http://%s.%s.svc:%d", scanapi.ServiceName(m.Name), m.Namespace, scanapi.Port)
 
@@ -82,7 +82,7 @@ func WebhookDeployment(ns, image, mode string, m mondoov1alpha1.MondooAuditConfi
 								"--token-file-path",
 								"/etc/webhook/token",
 								"--enforcement-mode",
-								mode,
+								string(m.Spec.Admission.Mode),
 								"--scan-api-url",
 								scanAPIURL,
 								"--cluster-id",
@@ -171,7 +171,7 @@ func WebhookDeployment(ns, image, mode string, m mondoov1alpha1.MondooAuditConfi
 	}
 }
 
-func WebhookService(ns string, m mondoov1alpha1.MondooAuditConfig) *corev1.Service {
+func WebhookService(ns string, m mondoov1alpha2.MondooAuditConfig) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      webhookServiceName(m.Name),
@@ -201,7 +201,7 @@ func webhookDeploymentName(prefix string) string {
 	return prefix + "-webhook-manager"
 }
 
-func validatingWebhookName(mondooAuditConfig *mondoov1alpha1.MondooAuditConfig) (string, error) {
+func validatingWebhookName(mondooAuditConfig *mondoov1alpha2.MondooAuditConfig) (string, error) {
 	if mondooAuditConfig == nil {
 		return "", fmt.Errorf("cannot generate webhook name from nil MondooAuditConfig")
 	}

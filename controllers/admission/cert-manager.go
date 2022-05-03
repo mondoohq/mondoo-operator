@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package webhooks
+package admission
 
 import (
 	"context"
@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +43,7 @@ const (
 )
 
 type CertManagerHandler struct {
-	Mondoo          *v1alpha1.MondooAuditConfig
+	Mondoo          *v1alpha2.MondooAuditConfig
 	KubeClient      client.Client
 	TargetNamespace string
 	Scheme          *runtime.Scheme

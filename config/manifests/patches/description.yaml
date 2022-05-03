@@ -32,18 +32,18 @@
     3. Create `mondoo-config.yaml`
 
     ```yaml
-    apiVersion: k8s.mondoo.com/v1alpha1
+    apiVersion: k8s.mondoo.com/v1alpha2
     kind: MondooAuditConfig
     metadata:
       name: mondoo-client
       namespace: mondoo-operator
     spec:
-      workloads:
+      kubernetesResources:
         enable: true
-        serviceAccount: mondoo-operator-workload
+        serviceAccountName: mondoo-operator-k8s-resources-scanning
       nodes:
         enable: true
-      mondooSecretRef: mondoo-client
+      mondooCredsSecretRef: mondoo-client
     ```
 
     Apply the configuration via:

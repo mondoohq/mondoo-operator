@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package webhooks
+package admission
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -48,16 +48,16 @@ var (
 	webhookManifestsyaml []byte
 )
 
-type Webhooks struct {
-	Mondoo                 *mondoov1alpha1.MondooAuditConfig
+type AdmissionDeploymentHandler struct {
+	Mondoo                 *mondoov1alpha2.MondooAuditConfig
 	KubeClient             client.Client
 	TargetNamespace        string
 	ContainerImageResolver mondoo.ContainerImageResolver
-	MondooOperatorConfig   *mondoov1alpha1.MondooOperatorConfig
+	MondooOperatorConfig   *mondoov1alpha2.MondooOperatorConfig
 }
 
 // syncValidatingWebhookConfiguration will create/update the ValidatingWebhookConfiguration
-func (n *Webhooks) syncValidatingWebhookConfiguration(ctx context.Context,
+func (n *AdmissionDeploymentHandler) syncValidatingWebhookConfiguration(ctx context.Context,
 	vwc *webhooksv1.ValidatingWebhookConfiguration,
 	annotationKey, annotationValue string) error {
 
@@ -148,11 +148,11 @@ func deepEqualsValidatingWebhookConfiguration(existing, desired *webhooksv1.Vali
 	return true
 }
 
-func (n *Webhooks) syncWebhookService(ctx context.Context) error {
+func (n *AdmissionDeploymentHandler) syncWebhookService(ctx context.Context) error {
 	desiredService := WebhookService(n.TargetNamespace, *n.Mondoo)
 
 	// Annotate the Service if the Mondoo config is asking for OpenShift-style TLS certificate management.
-	if n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) {
+	if n.Mondoo.Spec.Admission.CertificateProvisioning.Mode == mondoov1alpha2.OpenShiftProvisioning {
 		// Just set the value to the name of the Secret the webhook Deployment mounts in.
 		metav1.SetMetaDataAnnotation(&desiredService.ObjectMeta, openShiftServiceAnnotationKey, GetTLSCertificatesSecretName(n.Mondoo.Name))
 	}
@@ -175,10 +175,10 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 
 	tlsSecretName := GetTLSCertificatesSecretName(n.Mondoo.Name)
 	if !k8s.AreServicesEqual(*desiredService, *service) ||
-		(n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) &&
+		(n.Mondoo.Spec.Admission.CertificateProvisioning.Mode == mondoov1alpha2.OpenShiftProvisioning &&
 			(!metav1.HasAnnotation(service.ObjectMeta, openShiftServiceAnnotationKey) ||
 				service.Annotations[openShiftServiceAnnotationKey] != tlsSecretName)) {
-		if n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle == string(mondoov1alpha1.OpenShift) {
+		if n.Mondoo.Spec.Admission.CertificateProvisioning.Mode == mondoov1alpha2.OpenShiftProvisioning {
 			metav1.SetMetaDataAnnotation(&service.ObjectMeta, openShiftServiceAnnotationKey, tlsSecretName)
 		}
 		k8s.UpdateService(service, *desiredService)
@@ -191,7 +191,7 @@ func (n *Webhooks) syncWebhookService(ctx context.Context) error {
 	return nil
 }
 
-func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
+func (n *AdmissionDeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -204,19 +204,13 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 	}
 	clusterID := string(namespace.UID)
 
-	// "permissive" by default if Spec.Webhooks.Mode is ""
-	mode := n.Mondoo.Spec.Webhooks.Mode
-	if mode == "" {
-		mode = string(mondoov1alpha1.Permissive)
-	}
-
 	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(
-		n.Mondoo.Spec.Webhooks.Image.Name, n.Mondoo.Spec.Webhooks.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+		n.Mondoo.Spec.Admission.Image.Name, n.Mondoo.Spec.Admission.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		return err
 	}
 
-	desiredDeployment := WebhookDeployment(n.TargetNamespace, mondooOperatorImage, mode, *n.Mondoo, clusterID)
+	desiredDeployment := WebhookDeployment(n.TargetNamespace, mondooOperatorImage, *n.Mondoo, clusterID)
 	if err := n.setControllerRef(desiredDeployment); err != nil {
 		return err
 	}
@@ -232,7 +226,7 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 		webhookLog.Info("Created Deployment for webhook")
 		return nil
 	}
-	updateWebhooksConditions(n.Mondoo, deployment.Status.Replicas != deployment.Status.ReadyReplicas)
+	updateAdmissionConditions(n.Mondoo, deployment.Status.Replicas != deployment.Status.ReadyReplicas)
 
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.
@@ -247,12 +241,12 @@ func (n *Webhooks) syncWebhookDeployment(ctx context.Context) error {
 	return nil
 }
 
-func (n *Webhooks) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1.ValidatingWebhookConfiguration) error {
+func (n *AdmissionDeploymentHandler) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1.ValidatingWebhookConfiguration) error {
 
 	var annotationKey, annotationValue string
 
-	switch n.Mondoo.Spec.Webhooks.CertificateConfig.InjectionStyle {
-	case string(mondoov1alpha1.CertManager):
+	switch n.Mondoo.Spec.Admission.CertificateProvisioning.Mode {
+	case mondoov1alpha2.CertManagerProvisioning:
 		cm := &CertManagerHandler{
 			KubeClient:      n.KubeClient,
 			TargetNamespace: n.TargetNamespace,
@@ -266,7 +260,7 @@ func (n *Webhooks) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1
 			return err
 		}
 
-	case string(mondoov1alpha1.OpenShift):
+	case mondoov1alpha2.OpenShiftProvisioning:
 		// For OpenShift we just annotate the webhook so that the necessary CA data is injected
 		// into the webhook.
 		annotationKey = openShiftWebhookAnnotationKey
@@ -284,7 +278,7 @@ func (n *Webhooks) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1
 	return n.syncValidatingWebhookConfiguration(ctx, vwc, annotationKey, annotationValue)
 }
 
-func (n *Webhooks) applyWebhooks(ctx context.Context) (ctrl.Result, error) {
+func (n *AdmissionDeploymentHandler) applyWebhooks(ctx context.Context) (ctrl.Result, error) {
 	if err := n.syncWebhookService(ctx); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -342,8 +336,8 @@ func (n *Webhooks) applyWebhooks(ctx context.Context) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
-	if n.Mondoo.Spec.Webhooks.Enable && n.Mondoo.DeletionTimestamp == nil {
+func (n *AdmissionDeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
+	if n.Mondoo.Spec.Admission.Enable && n.Mondoo.DeletionTimestamp == nil {
 		mondooClientImage, err := n.ContainerImageResolver.MondooClientImage("", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -376,7 +370,7 @@ func (n *Webhooks) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
+func (n *AdmissionDeploymentHandler) down(ctx context.Context) (ctrl.Result, error) {
 	// NOTE: If we ever remove a resource that was previously deployed for a webhook,
 	// we would need to add custom code here to clean it up as it will no longer be
 	// included in the webhook-manifests.yaml embedded list of resources.
@@ -474,12 +468,12 @@ func (n *Webhooks) down(ctx context.Context) (ctrl.Result, error) {
 	}
 
 	// Make sure to clear any degraded status
-	updateWebhooksConditions(n.Mondoo, false)
+	updateAdmissionConditions(n.Mondoo, false)
 
 	return ctrl.Result{}, nil
 }
 
-func (n *Webhooks) setControllerRef(obj client.Object) error {
+func (n *AdmissionDeploymentHandler) setControllerRef(obj client.Object) error {
 	if err := ctrl.SetControllerReference(n.Mondoo, obj, n.KubeClient.Scheme()); err != nil {
 		webhookLog.Error(err, "Failed to set ControllerReference", "Object", obj)
 		return err
@@ -492,7 +486,7 @@ func (n *Webhooks) setControllerRef(obj client.Object) error {
 // With the switch to naming the Webhook from MONDOOAUDIT_CONFIG_NAME-mondoo-webhook
 // to NAMESPACE-NAME-mondoo , we should try to clean up any old Webhooks so that they
 // are not orphaned.
-func (n *Webhooks) cleanupOldWebhook(ctx context.Context) error {
+func (n *AdmissionDeploymentHandler) cleanupOldWebhook(ctx context.Context) error {
 	oldWebhook := &webhooksv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: n.Mondoo.Name + "-mondoo-webhook",

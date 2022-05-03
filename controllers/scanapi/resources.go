@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 
-	"go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
@@ -38,7 +38,7 @@ const (
 	Port             = 8080
 )
 
-func ScanApiSecret(mondoo v1alpha1.MondooAuditConfig) *corev1.Secret {
+func ScanApiSecret(mondoo v1alpha2.MondooAuditConfig) *corev1.Secret {
 
 	// Generate a token. It will only be saved on initial Secret creation.
 	token := uuid.New()
@@ -54,7 +54,7 @@ func ScanApiSecret(mondoo v1alpha1.MondooAuditConfig) *corev1.Secret {
 	}
 }
 
-func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.Deployment {
+func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.Deployment {
 	labels := DeploymentLabels(m)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -120,7 +120,7 @@ func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.D
 							{Name: "PORT", Value: fmt.Sprintf("%d", Port)},
 						},
 					}},
-					ServiceAccountName: m.Spec.Workloads.ServiceAccount,
+					ServiceAccountName: m.Spec.Scanner.ServiceAccountName,
 					Volumes: []corev1.Volume{
 						{
 							Name: "config",
@@ -129,9 +129,7 @@ func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.D
 									Sources: []corev1.VolumeProjection{
 										{
 											Secret: &corev1.SecretProjection{
-												LocalObjectReference: corev1.LocalObjectReference{
-													Name: m.Spec.MondooSecretRef,
-												},
+												LocalObjectReference: m.Spec.MondooCredsSecretRef,
 												Items: []corev1.KeyToPath{{
 													Key:  "config",
 													Path: "mondoo.yml",
@@ -173,7 +171,7 @@ func ScanApiDeployment(ns, image string, m v1alpha1.MondooAuditConfig) *appsv1.D
 	}
 }
 
-func ScanApiService(ns string, m v1alpha1.MondooAuditConfig) *corev1.Service {
+func ScanApiService(ns string, m v1alpha2.MondooAuditConfig) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ServiceName(m.Name),
@@ -193,7 +191,7 @@ func ScanApiService(ns string, m v1alpha1.MondooAuditConfig) *corev1.Service {
 	}
 }
 
-func DeploymentLabels(m v1alpha1.MondooAuditConfig) map[string]string {
+func DeploymentLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 	return map[string]string{
 		"app":       "mondoo-scan-api",
 		"mondoo_cr": m.Name,
