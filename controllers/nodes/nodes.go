@@ -115,9 +115,14 @@ func (n *Nodes) syncCronJob(ctx context.Context, req ctrl.Request) error {
 		return err
 	}
 
+	nodes := &corev1.NodeList{}
+	if err := n.KubeClient.List(ctx, nodes); err != nil {
+		logger.Error(err, "Failed to list cluster nodes")
+		return err
+	}
+
 	existing := &batchv1.CronJob{}
-	// TODO: add nodes count
-	desired := CronJob(mondooClientImage, 1, *n.Mondoo)
+	desired := CronJob(mondooClientImage, int32(len(nodes.Items)), *n.Mondoo)
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 		return err
