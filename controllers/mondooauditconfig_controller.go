@@ -51,8 +51,9 @@ const finalizerString = "k8s.mondoo.com/delete"
 // MondooAuditConfigReconciler reconciles a MondooAuditConfig object
 type MondooAuditConfigReconciler struct {
 	client.Client
-	Scheme     *runtime.Scheme
-	RestConfig *rest.Config
+	Scheme              *runtime.Scheme
+	RestConfig          *rest.Config
+	MondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
 }
 
 // Embed the Default Inventory for Daemonset and Deployment Configurations
@@ -67,7 +68,7 @@ var (
 	createContainerImageResolver = mondoo.NewContainerImageResolver
 
 	// so we can mock out the mondoo client for testing
-	mondooClientBuilder = func(opts mondooclient.ClientOptions) mondooclient.Client {
+	MondooClientBuilder = func(opts mondooclient.ClientOptions) mondooclient.Client {
 		return mondooclient.NewClient(opts)
 	}
 )
@@ -353,7 +354,7 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 		Token:       jwtString,
 	}
 
-	mClient := mondooClientBuilder(opts)
+	mClient := r.MondooClientBuilder(opts)
 
 	resp, err := mClient.ExchangeRegistrationToken(ctx, &mondooclient.ExchangeRegistrationTokenInput{
 		Token: jwtString,

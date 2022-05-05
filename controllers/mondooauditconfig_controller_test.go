@@ -168,13 +168,15 @@ func TestTokenRegistration(t *testing.T) {
 
 			mClient := test.mockMondooClient(mockCtrl)
 
-			mondooClientBuilder = func(mondooclient.ClientOptions) mondooclient.Client {
+			testMondooClientBuilder := func(mondooclient.ClientOptions) mondooclient.Client {
 				return mClient
 			}
 
 			fakeClient := cfake.NewSimpleClientset(test.existingObjects...)
 
-			reconciler := &MondooAuditConfigReconciler{}
+			reconciler := &MondooAuditConfigReconciler{
+				MondooClientBuilder: testMondooClientBuilder,
+			}
 
 			// Act
 			err := reconciler.newServiceAccountIfNeeded(context.TODO(), fakeClient, test.mondooAuditConfig, logr)

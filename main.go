@@ -88,9 +88,10 @@ func main() {
 	}
 
 	if err = (&controllers.MondooAuditConfigReconciler{
-		Client:     mgr.GetClient(),
-		Scheme:     mgr.GetScheme(),
-		RestConfig: mgr.GetConfig(),
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		RestConfig:          mgr.GetConfig(),
+		MondooClientBuilder: controllers.MondooClientBuilder,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MondooAuditConfig")
 		os.Exit(1)

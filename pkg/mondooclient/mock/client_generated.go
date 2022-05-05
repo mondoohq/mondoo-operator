@@ -49,3 +49,33 @@ func (mr *MockClientMockRecorder) ExchangeRegistrationToken(arg0, arg1 interface
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExchangeRegistrationToken", reflect.TypeOf((*MockClient)(nil).ExchangeRegistrationToken), arg0, arg1)
 }
+
+// HealthCheck mocks base method.
+func (m *MockClient) HealthCheck(arg0 context.Context, arg1 *mondooclient.HealthCheckRequest) (*mondooclient.HealthCheckResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HealthCheck", arg0, arg1)
+	ret0, _ := ret[0].(*mondooclient.HealthCheckResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HealthCheck indicates an expected call of HealthCheck.
+func (mr *MockClientMockRecorder) HealthCheck(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HealthCheck", reflect.TypeOf((*MockClient)(nil).HealthCheck), arg0, arg1)
+}
+
+// RunKubernetesManifest mocks base method.
+func (m *MockClient) RunKubernetesManifest(arg0 context.Context, arg1 *mondooclient.KubernetesManifestJob) (*mondooclient.ScanResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RunKubernetesManifest", arg0, arg1)
+	ret0, _ := ret[0].(*mondooclient.ScanResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RunKubernetesManifest indicates an expected call of RunKubernetesManifest.
+func (mr *MockClientMockRecorder) RunKubernetesManifest(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunKubernetesManifest", reflect.TypeOf((*MockClient)(nil).RunKubernetesManifest), arg0, arg1)
+}
