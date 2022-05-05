@@ -312,9 +312,47 @@ We recently upgraded our CRDs version to `v1alpha2` and currently manual migrati
 kubectl get mondooauditconfigs.v1alpha1.k8s.mondoo.com -A
 ```
 
-Each of the CRDs in the list needs to be manually edited and mapped to the new version. As an example, to edit a CRD called `mondoo-client` in namespace `mondoo-operator` the following command should be executed:
-```bash
-kubectl edit mondooauditconfigs.v1alpha1.k8s.mondoo.com mondoo-client -n mondoo-operator
-```
+Each of the CRDs in the list needs to be manually edited and mapped to the new version. This is not immediately possible after performing the operator upgrade. You can do that by following these steps:
 
-The mapping from `v1alpha1` to `v1alpha2` can be found [here](../api/v1alpha1/mondooauditconfig_types.go#L155-L199).
+1. Backup your old `MondooAuditConfig`
+    ```bash
+    kubectl get mondooauditconfigs.v1alpha1.k8s.mondoo.com mondoo-client -n mondoo-operator -o yaml > audit-config.yaml
+    ```
+
+2. Map the old `v1alpha1` config to the new `v1alpha2` and save the new `MondooAuditConfig`. The mapping from `v1alpha1` to `v1alpha2` can be found [here](../api/v1alpha1/mondooauditconfig_types.go#L155-L199).
+
+3. Disable the `webhook` conversion for the `MondooAuditConfig` CRD
+    ```bash
+    kubectl edit crd mondooauditconfigs.k8s.mondoo.com
+    ```
+
+    You need to delete or comment out this section:
+    ```yaml
+    spec:
+      # conversion:
+      #   strategy: Webhook
+      #   webhook:
+      #     clientConfig:
+      #       service:
+      #         name: webhook-service
+      #         namespace: mondoo-operator
+      #         path: /convert
+      #     conversionReviewVersions:
+      #     - v1
+      group: k8s.mondoo.com
+      names:
+        kind: MondooAuditConfig
+        listKind: MondooAuditConfigList
+        plural: mondooauditconfigs
+        singular: mondooauditconfig
+    ```
+
+4. Apply the updated `MondooAuditConfig`
+    ```bash
+    kubectl apply -f audit-config.yaml
+    ```
+
+5. Restore the original CRD definition. The easiest way to do that is to just apply the manifests from our latest release:
+    ```bash
+    kubectl apply -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml
+    ```
