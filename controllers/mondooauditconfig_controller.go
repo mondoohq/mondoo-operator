@@ -33,8 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -43,6 +41,7 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/admission"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
@@ -52,7 +51,6 @@ const finalizerString = "k8s.mondoo.com/delete"
 type MondooAuditConfigReconciler struct {
 	client.Client
 	Scheme              *runtime.Scheme
-	RestConfig          *rest.Config
 	MondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
 }
 
@@ -283,24 +281,14 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 		return nil
 	}
 
-	// Using client-go to avoid controller-runtime trying to cache all Secrets
-	gClient, err := kubernetes.NewForConfig(r.RestConfig)
-	if err != nil {
-		log.Error(err, "failed to create kubernetes client-go client")
-		return err
+	mondooCredsSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mondoo.Spec.MondooCredsSecretRef.Name,
+			Namespace: mondoo.Namespace,
+		},
 	}
-
-	return r.newServiceAccountIfNeeded(ctx, gClient, mondoo, log)
-}
-
-func (r *MondooAuditConfigReconciler) newServiceAccountIfNeeded(ctx context.Context, gClient kubernetes.Interface, mondoo *v1alpha2.MondooAuditConfig, log logr.Logger) error {
-	var mondooCredsExists bool
-	_, err := gClient.CoreV1().Secrets(mondoo.Namespace).Get(ctx, mondoo.Spec.MondooCredsSecretRef.Name, metav1.GetOptions{})
-	if err == nil {
-		mondooCredsExists = true
-	} else if errors.IsNotFound(err) {
-		mondooCredsExists = false
-	} else {
+	mondooCredsExists, err := k8s.CheckIfExists(ctx, r.Client, mondooCredsSecret, mondooCredsSecret)
+	if err != nil {
 		log.Error(err, "failed to check whether Mondoo creds secret exists")
 		return err
 	}
@@ -310,13 +298,14 @@ func (r *MondooAuditConfigReconciler) newServiceAccountIfNeeded(ctx context.Cont
 		return nil
 	}
 
-	var mondooTokenExists bool
-	mondooTokenSecret, err := gClient.CoreV1().Secrets(mondoo.Namespace).Get(ctx, mondoo.Spec.MondooTokenSecretRef.Name, metav1.GetOptions{})
-	if err == nil {
-		mondooTokenExists = true
-	} else if errors.IsNotFound(err) {
-		mondooTokenExists = false
-	} else {
+	mondooTokenSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mondoo.Spec.MondooTokenSecretRef.Name,
+			Namespace: mondoo.Namespace,
+		},
+	}
+	mondooTokenExists, err := k8s.CheckIfExists(ctx, r.Client, mondooTokenSecret, mondooTokenSecret)
+	if err != nil {
 		log.Error(err, "failed to cehck whether Mondoo token secret exists")
 		return err
 	}
@@ -329,10 +318,12 @@ func (r *MondooAuditConfigReconciler) newServiceAccountIfNeeded(ctx context.Cont
 
 	log.Info("Creating Mondoo service account from token")
 	token := strings.TrimSuffix(string(mondooTokenSecret.Data["token"]), "\n")
-	return r.createServiceAccountFromToken(ctx, gClient, mondoo, token, log)
+
+	return r.createServiceAccountFromToken(ctx, mondoo, token, log)
+
 }
 
-func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.Context, gClient kubernetes.Interface, mondoo *v1alpha2.MondooAuditConfig, jwtString string, log logr.Logger) error {
+func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.Context, mondoo *v1alpha2.MondooAuditConfig, jwtString string, log logr.Logger) error {
 
 	parser := &jwt.Parser{}
 	token, _, err := parser.ParseUnverified(jwtString, jwt.MapClaims{})
@@ -375,12 +366,13 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 		},
 	}
 
-	_, err = gClient.CoreV1().Secrets(mondoo.Namespace).Create(ctx, tokenSecret, metav1.CreateOptions{})
+	_, err = k8s.CreateIfNotExist(ctx, r.Client, tokenSecret, tokenSecret)
 	if err != nil {
-		log.Error(err, "failed to save Mondoo service account into secret")
+		log.Error(err, "error while trying to save Mondoo service account into secret")
 		return err
 	}
 	log.Info("saved Mondoo service account", "secret", fmt.Sprintf("%s/%s", mondoo.Namespace, mondoo.Spec.MondooCredsSecretRef.Name))
+
 	return nil
 }
 

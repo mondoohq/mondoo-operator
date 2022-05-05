@@ -87,7 +87,6 @@ var _ = BeforeSuite(func() {
 	err = (&MondooAuditConfigReconciler{
 		Client:              k8sManager.GetClient(),
 		Scheme:              k8sManager.GetScheme(),
-		RestConfig:          k8sManager.GetConfig(),
 		MondooClientBuilder: MondooClientBuilder,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())

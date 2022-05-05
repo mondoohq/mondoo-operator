@@ -11,19 +11,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/zapr"
 	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
+
+	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
-	cfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	scheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
@@ -43,27 +48,30 @@ var (
 	testTokenData string
 )
 
+func init() {
+	utilruntime.Must(v1alpha2.AddToScheme(scheme.Scheme))
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme.Scheme))
+	utilruntime.Must(certmanagerv1.AddToScheme(scheme.Scheme))
+}
+
 func TestTokenRegistration(t *testing.T) {
 
-	zapLog, err := zap.NewDevelopment()
-	require.NoError(t, err, "error setting up logging")
-	logr := zapr.NewLogger(zapLog)
+	utilruntime.Must(v1alpha2.AddToScheme(scheme.Scheme))
 
 	testTokenData = testToken(t)
 
 	tests := []struct {
-		name              string
-		existingObjects   []runtime.Object
-		mondooAuditConfig *v1alpha2.MondooAuditConfig
-		mockMondooClient  func(*gomock.Controller) *mockmondoo.MockClient
-		verify            func(*testing.T, kubernetes.Interface)
-		expectError       bool
+		name             string
+		existingObjects  []runtime.Object
+		mockMondooClient func(*gomock.Controller) *mockmondoo.MockClient
+		verify           func(*testing.T, client.Client)
+		expectError      bool
 	}{
 		{
-			name:              "generate service account from token secret",
-			mondooAuditConfig: testMondooAuditConfig(),
+			name: "generate service account from token secret",
 			existingObjects: []runtime.Object{
 				testTokenSecret(),
+				testMondooAuditConfig(),
 			},
 			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockClient {
 				mClient := mockmondoo.NewMockClient(mockCtrl)
@@ -74,33 +82,48 @@ func TestTokenRegistration(t *testing.T) {
 
 				return mClient
 			},
-			verify: func(t *testing.T, kubeClient kubernetes.Interface) {
+			verify: func(t *testing.T, kubeClient client.Client) {
 
-				tokenSecret, err := kubeClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), testMondooCredsSecretName, metav1.GetOptions{})
+				credsSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testMondooCredsSecretName,
+						Namespace: testNamespace,
+					},
+				}
+				err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(credsSecret), credsSecret)
+
 				assert.NoError(t, err, "error getting secret that should exist")
 
 				// Check StringData because we're using the fake client
-				assert.Equal(t, testServiceAccountData, tokenSecret.StringData["config"])
+				assert.Equal(t, testServiceAccountData, credsSecret.StringData["config"])
 			},
 		},
 		{
-			name:              "no token, no service account",
-			mondooAuditConfig: testMondooAuditConfig(),
+			name: "no token, no service account",
+			existingObjects: []runtime.Object{
+				testMondooAuditConfig(),
+			},
 			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockClient {
 				mClient := mockmondoo.NewMockClient(mockCtrl)
 
 				return mClient
 			},
-			verify: func(t *testing.T, kubeClient kubernetes.Interface) {
-				_, err := kubeClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), testMondooCredsSecretName, metav1.GetOptions{})
+			verify: func(t *testing.T, kubeClient client.Client) {
+				credsSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testMondooCredsSecretName,
+						Namespace: testNamespace,
+					},
+				}
+
+				err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(credsSecret), credsSecret)
 				assert.True(t, errors.IsNotFound(err), "expected Mondoo creds secret to not exist")
 			},
 		},
 		{
-			name:              "already a Mondoo creds secret",
-			mondooAuditConfig: testMondooAuditConfig(),
+			name: "already a Mondoo creds secret",
 			existingObjects: func() []runtime.Object {
-				objs := []runtime.Object{}
+				objs := []runtime.Object{testMondooAuditConfig()}
 
 				objs = append(objs, &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -119,18 +142,25 @@ func TestTokenRegistration(t *testing.T) {
 
 				return mClient
 			},
-			verify: func(t *testing.T, kubeClient kubernetes.Interface) {
-				credsSecret, err := kubeClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), testMondooCredsSecretName, metav1.GetOptions{})
+			verify: func(t *testing.T, kubeClient client.Client) {
+				credsSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testMondooCredsSecretName,
+						Namespace: testNamespace,
+					},
+				}
+				err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(credsSecret), credsSecret)
+
 				assert.NoError(t, err, "unexpected error getting pre-existing Secret")
 
 				assert.Equal(t, "EXISTING MONDOO CONFIG", credsSecret.StringData["config"])
 			},
 		},
 		{
-			name:              "mondoo API error",
-			mondooAuditConfig: testMondooAuditConfig(),
+			name: "mondoo API error",
 			existingObjects: []runtime.Object{
 				testTokenSecret(),
+				testMondooAuditConfig(),
 			},
 			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockClient {
 				mClient := mockmondoo.NewMockClient(mockCtrl)
@@ -142,10 +172,9 @@ func TestTokenRegistration(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:              "malformed JWT",
-			mondooAuditConfig: testMondooAuditConfig(),
+			name: "malformed JWT",
 			existingObjects: func() []runtime.Object {
-				objs := []runtime.Object{}
+				objs := []runtime.Object{testMondooAuditConfig()}
 				sec := testTokenSecret()
 				sec.Data["token"] = []byte("NOT JWT DATA")
 				objs = append(objs, sec)
@@ -172,14 +201,20 @@ func TestTokenRegistration(t *testing.T) {
 				return mClient
 			}
 
-			fakeClient := cfake.NewSimpleClientset(test.existingObjects...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjects...).Build()
 
 			reconciler := &MondooAuditConfigReconciler{
 				MondooClientBuilder: testMondooClientBuilder,
+				Client:              fakeClient,
 			}
 
 			// Act
-			err := reconciler.newServiceAccountIfNeeded(context.TODO(), fakeClient, test.mondooAuditConfig, logr)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      testMondooAuditConfigName,
+					Namespace: testNamespace,
+				},
+			})
 
 			// Assert
 
