@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
-	"go.mondoo.com/mondoo-operator/pkg/scanner"
+	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/webhooks/utils"
 )
 
@@ -50,7 +50,7 @@ type webhookValidator struct {
 	client    client.Client
 	decoder   *admission.Decoder
 	mode      mondoov1alpha1.WebhookMode
-	scanner   *scanner.Scanner
+	scanner   mondooclient.Client
 	clusterID string
 }
 
@@ -65,10 +65,10 @@ func NewWebhookValidator(client client.Client, mode, scanURL, token, clusterID s
 	return &webhookValidator{
 		client: client,
 		mode:   webhookMode,
-		scanner: &scanner.Scanner{
-			Endpoint: scanURL,
-			Token:    token,
-		},
+		scanner: mondooclient.NewClient(mondooclient.ClientOptions{
+			ApiEndpoint: scanURL,
+			Token:       token,
+		}),
 		clusterID: clusterID,
 	}, nil
 }
@@ -96,8 +96,8 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 	}
 	k8sLabels[mondooClusterIDLabel] = a.clusterID
 
-	result, err := a.scanner.RunKubernetesManifest(ctx, &scanner.KubernetesManifestJob{
-		Files: []*scanner.File{
+	result, err := a.scanner.RunKubernetesManifest(ctx, &mondooclient.KubernetesManifestJob{
+		Files: []*mondooclient.File{
 			{
 				Data: k8sObjectData,
 			},
@@ -110,7 +110,7 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 	}
 
 	passed := false
-	if result.WorstScore != nil && result.WorstScore.Type == scanner.ValidScanResult && result.WorstScore.Value == 100 {
+	if result.WorstScore != nil && result.WorstScore.Type == mondooclient.ValidScanResult && result.WorstScore.Value == 100 {
 		passed = true
 	}
 

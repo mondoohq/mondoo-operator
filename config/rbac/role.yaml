@@ -85,6 +85,15 @@ rules:
   - delete
 - apiGroups:
   - ""
+  resourceNames:
+  - mondoo-client
+  - mondoo-token
+  resources:
+  - secrets
+  verbs:
+  - get
+- apiGroups:
+  - ""
   resources:
   - services
   verbs:

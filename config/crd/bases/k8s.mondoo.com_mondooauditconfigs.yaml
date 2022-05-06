@@ -283,6 +283,17 @@ spec:
                       TODO: Add other useful fields. apiVersion, kind, uid?'
                     type: string
                 type: object
+              mondooTokenSecretRef:
+                description: MondooTokenSecretRef can optionally hold a time-limited
+                  token that the mondoo-operator will use to create a Mondoo service
+                  account saved to the Secret specified in .spec.mondooCredsSecretRef
+                  if that Secret does not exist.
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    type: string
+                type: object
               nodes:
                 properties:
                   enable:

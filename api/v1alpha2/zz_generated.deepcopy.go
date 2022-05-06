@@ -189,6 +189,7 @@ func (in *MondooAuditConfigList) DeepCopyObject() runtime.Object {
 func (in *MondooAuditConfigSpec) DeepCopyInto(out *MondooAuditConfigSpec) {
 	*out = *in
 	out.MondooCredsSecretRef = in.MondooCredsSecretRef
+	out.MondooTokenSecretRef = in.MondooTokenSecretRef
 	in.Scanner.DeepCopyInto(&out.Scanner)
 	out.KubernetesResources = in.KubernetesResources
 	out.Nodes = in.Nodes

@@ -1,17 +1,17 @@
-package fakescanapi
+package fakeserver
 
 import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 
-	"go.mondoo.com/mondoo-operator/pkg/scanner"
+	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 )
 
 func FakeServer() *httptest.Server {
 	mux := http.NewServeMux()
-	mux.HandleFunc(scanner.HealthCheckEndpoint, func(w http.ResponseWriter, r *http.Request) {
-		result := &scanner.HealthCheckResponse{
+	mux.HandleFunc(mondooclient.HealthCheckEndpoint, func(w http.ResponseWriter, r *http.Request) {
+		result := &mondooclient.HealthCheckResponse{
 			Status: "SERVING",
 		}
 		data, err := json.Marshal(result)
@@ -25,11 +25,11 @@ func FakeServer() *httptest.Server {
 		}
 	})
 
-	mux.HandleFunc(scanner.ScanKubernetesEndpoint, func(w http.ResponseWriter, r *http.Request) {
-		result := &scanner.ScanResult{
+	mux.HandleFunc(mondooclient.RunKubernetesManifestEndpoint, func(w http.ResponseWriter, r *http.Request) {
+		result := &mondooclient.ScanResult{
 			Ok: true,
-			WorstScore: &scanner.Score{
-				Type:  scanner.ValidScanResult,
+			WorstScore: &mondooclient.Score{
+				Type:  mondooclient.ValidScanResult,
 				Value: 100,
 			},
 		}

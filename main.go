@@ -24,10 +24,12 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -81,6 +83,11 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "60679458.mondoo.com",
+		ClientDisableCacheFor: []client.Object{
+			// Don't cache so we can do a Get() on a Secret without a background List()
+			// trying to cache things we don't have access to
+			&corev1.Secret{},
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -88,8 +95,9 @@ func main() {
 	}
 
 	if err = (&controllers.MondooAuditConfigReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		MondooClientBuilder: controllers.MondooClientBuilder,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MondooAuditConfig")
 		os.Exit(1)

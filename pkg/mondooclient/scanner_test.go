@@ -1,4 +1,4 @@
-package scanner_test
+package mondooclient_test
 
 import (
 	"context"
@@ -11,14 +11,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/yaml"
 
-	"go.mondoo.com/mondoo-operator/pkg/scanner"
-	"go.mondoo.com/mondoo-operator/pkg/scanner/fakescanapi"
+	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/mondooclient/fakeserver"
 )
 
 var webhookPayload = mustRead("../../tests/data/webhook-payload.json")
 
 func TestScanner(t *testing.T) {
-	testserver := fakescanapi.FakeServer()
+	testserver := fakeserver.FakeServer()
 	url := testserver.URL
 	token := ""
 
@@ -27,13 +27,13 @@ func TestScanner(t *testing.T) {
 	// token := "<token here>"
 
 	// do client request
-	s := &scanner.Scanner{
-		Endpoint: url,
-		Token:    token,
-	}
+	mClient := mondooclient.NewClient(mondooclient.ClientOptions{
+		ApiEndpoint: url,
+		Token:       token,
+	})
 
 	// Run Health Check
-	healthResp, err := s.HealthCheck(context.Background(), &scanner.HealthCheckRequest{})
+	healthResp, err := mClient.HealthCheck(context.Background(), &mondooclient.HealthCheckRequest{})
 	require.NoError(t, err)
 	assert.True(t, healthResp.Status == "SERVING")
 
@@ -44,8 +44,8 @@ func TestScanner(t *testing.T) {
 	k8sObjectData, err := yaml.Marshal(request.Object)
 	require.NoError(t, err)
 
-	result, err := s.RunKubernetesManifest(context.Background(), &scanner.KubernetesManifestJob{
-		Files: []*scanner.File{
+	result, err := mClient.RunKubernetesManifest(context.Background(), &mondooclient.KubernetesManifestJob{
+		Files: []*mondooclient.File{
 			{
 				Data: k8sObjectData,
 			},

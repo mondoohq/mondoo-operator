@@ -20,8 +20,8 @@ import (
 	"sigs.k8s.io/yaml"
 
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
-	"go.mondoo.com/mondoo-operator/pkg/scanner"
-	"go.mondoo.com/mondoo-operator/pkg/scanner/fakescanapi"
+	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/mondooclient/fakeserver"
 )
 
 const (
@@ -69,13 +69,13 @@ func TestWebhookValidate(t *testing.T) {
 				test.mode = mondoov1alpha1.Permissive
 			}
 
-			testserver := fakescanapi.FakeServer()
+			testserver := fakeserver.FakeServer()
 			validator := &webhookValidator{
 				decoder: decoder,
 				mode:    test.mode,
-				scanner: &scanner.Scanner{
-					Endpoint: testserver.URL,
-				},
+				scanner: mondooclient.NewClient(mondooclient.ClientOptions{
+					ApiEndpoint: testserver.URL,
+				}),
 			}
 
 			request := admission.Request{

@@ -19,23 +19,30 @@ package controllers
 import (
 	"context"
 	_ "embed"
+	"fmt"
+	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
+	jwt "github.com/golang-jwt/jwt/v4"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/admission"
+	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
-
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const finalizerString = "k8s.mondoo.com/delete"
@@ -43,7 +50,8 @@ const finalizerString = "k8s.mondoo.com/delete"
 // MondooAuditConfigReconciler reconciles a MondooAuditConfig object
 type MondooAuditConfigReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme              *runtime.Scheme
+	MondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
 }
 
 // Embed the Default Inventory for Daemonset and Deployment Configurations
@@ -56,6 +64,9 @@ var (
 
 	// Defined as a var so we can easily mock this in tests.
 	createContainerImageResolver = mondoo.NewContainerImageResolver
+
+	// so we can mock out the mondoo client for testing
+	MondooClientBuilder = mondooclient.NewClient
 )
 
 // The update permissions for MondooAuditConfigs are required because having update permissions just for finalizers is insufficient
@@ -71,6 +82,8 @@ var (
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // Just neeed to be able to create a Secret to hold the generated ScanAPI token
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=create;delete
+// Need to be able to check for the existence of Secrets with tokens and Mondoo service accounts without asking for permission to read all Secrets
+//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get,resourceNames=mondoo-client;mondoo-token
 //+kubebuilder:rbac:groups=cert-manager.io,resources=certificates;issuers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
@@ -159,6 +172,15 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	mondooAuditConfigCopy := mondooAuditConfig.DeepCopy()
+
+	// If spec.MondooTokenSecretRef != "" and the Secret referenced in spec.MondooCredsSecretRef
+	// does not exist, then attempt to trade the token for a Mondoo service account and save it
+	// in the Secret referenced in .spec.MondooCredsSecretRef
+	if err := r.exchangeTokenForServiceAccount(ctx, mondooAuditConfig, log); err != nil {
+		log.Error(err, "errors while checking if Mondoo service account needs creating")
+		return ctrl.Result{}, err
+	}
+
 	nodes := Nodes{
 		Enable:                 mondooAuditConfig.Spec.Nodes.Enable,
 		Mondoo:                 mondooAuditConfig,
@@ -249,6 +271,107 @@ func getPodNames(pods []corev1.Pod) sets.String {
 		podNames = append(podNames, pod.Name)
 	}
 	return sets.NewString(podNames...)
+}
+
+func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context.Context, mondoo *v1alpha2.MondooAuditConfig, log logr.Logger) error {
+	if mondoo.Spec.MondooCredsSecretRef.Name == "" {
+		log.Info("MondooAuditConfig without .spec.mondooCredsSecretRef defined")
+		return nil
+	}
+
+	mondooCredsSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mondoo.Spec.MondooCredsSecretRef.Name,
+			Namespace: mondoo.Namespace,
+		},
+	}
+	mondooCredsExists, err := k8s.CheckIfExists(ctx, r.Client, mondooCredsSecret, mondooCredsSecret)
+	if err != nil {
+		log.Error(err, "failed to check whether Mondoo creds secret exists")
+		return err
+	}
+
+	if mondooCredsExists {
+		// Nothing to do as we already have creds
+		return nil
+	}
+
+	mondooTokenSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mondoo.Spec.MondooTokenSecretRef.Name,
+			Namespace: mondoo.Namespace,
+		},
+	}
+	mondooTokenExists, err := k8s.CheckIfExists(ctx, r.Client, mondooTokenSecret, mondooTokenSecret)
+	if err != nil {
+		log.Error(err, "failed to cehck whether Mondoo token secret exists")
+		return err
+	}
+
+	// mondoCredsExists is already false from here down
+	if !mondooTokenExists {
+		log.Info("neither .spec.MondooCredsSecretRef nor .spec.MondooTokenSecretRef exist")
+		return nil
+	}
+
+	log.Info("Creating Mondoo service account from token")
+	token := strings.TrimSpace(string(mondooTokenSecret.Data["token"]))
+
+	return r.createServiceAccountFromToken(ctx, mondoo, token, log)
+
+}
+
+func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.Context, mondoo *v1alpha2.MondooAuditConfig, jwtString string, log logr.Logger) error {
+
+	parser := &jwt.Parser{}
+	token, _, err := parser.ParseUnverified(jwtString, jwt.MapClaims{})
+	if err != nil {
+		log.Error(err, "failed to parse token")
+		return err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		err := fmt.Errorf("failed to type asesrt claims from token")
+		log.Error(err, "failed to extract claim")
+		return err
+	}
+	apiEndpoint := claims["api_endpoint"]
+
+	opts := mondooclient.ClientOptions{
+		ApiEndpoint: fmt.Sprintf("%v", apiEndpoint),
+		Token:       jwtString,
+	}
+
+	mClient := r.MondooClientBuilder(opts)
+
+	resp, err := mClient.ExchangeRegistrationToken(ctx, &mondooclient.ExchangeRegistrationTokenInput{
+		Token: jwtString,
+	})
+	if err != nil {
+		log.Error(err, "failed to exchange token for a service account")
+		return err
+	}
+
+	// Save the service account
+	tokenSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mondoo.Spec.MondooCredsSecretRef.Name,
+			Namespace: mondoo.Namespace,
+		},
+		StringData: map[string]string{
+			"config": resp.ServiceAccount,
+		},
+	}
+
+	_, err = k8s.CreateIfNotExist(ctx, r.Client, tokenSecret, tokenSecret)
+	if err != nil {
+		log.Error(err, "error while trying to save Mondoo service account into secret")
+		return err
+	}
+	log.Info("saved Mondoo service account", "secret", fmt.Sprintf("%s/%s", mondoo.Namespace, mondoo.Spec.MondooCredsSecretRef.Name))
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
