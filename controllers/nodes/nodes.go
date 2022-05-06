@@ -121,29 +121,31 @@ func (n *Nodes) syncCronJob(ctx context.Context, req ctrl.Request) error {
 		return err
 	}
 
-	existing := &batchv1.CronJob{}
-	desired := CronJob(mondooClientImage, int32(len(nodes.Items)), *n.Mondoo)
-	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
-		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
-		return err
-	}
-
-	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
-	if err != nil {
-		logger.Error(err, "Failed to create inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
-		return err
-	}
-
-	if created {
-		logger.Info("Created inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
-		return nil
-	}
-
-	// TODO: implement deep equals for cronjobs
-	if existing.Name != desired.Name {
-		if err := n.KubeClient.Update(ctx, existing); err != nil {
-			logger.Error(err, "Failed to update CronJob", "namespace", existing.Namespace, "name", existing.Name)
+	for _, node := range nodes.Items {
+		existing := &batchv1.CronJob{}
+		desired := CronJob(mondooClientImage, node, *n.Mondoo)
+		if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
+			logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 			return err
+		}
+
+		created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
+		if err != nil {
+			logger.Error(err, "Failed to create inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
+			return err
+		}
+
+		if created {
+			logger.Info("Created CronJob", "namespace", desired.Namespace, "name", desired.Name)
+			continue
+		}
+
+		// TODO: implement deep equals for cronjobs
+		if existing.Name != desired.Name {
+			if err := n.KubeClient.Update(ctx, existing); err != nil {
+				logger.Error(err, "Failed to update CronJob", "namespace", existing.Namespace, "name", existing.Name)
+				return err
+			}
 		}
 	}
 
@@ -156,19 +158,27 @@ func (n *Nodes) syncCronJob(ctx context.Context, req ctrl.Request) error {
 }
 
 func (n *Nodes) down(ctx context.Context, req ctrl.Request) error {
-	cronJob := &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{Name: CronJobName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
-	}
-	if err := k8s.DeleteIfExists(ctx, n.KubeClient, cronJob); err != nil {
-		logger.Error(err, "Failed to clean up node scanning CronJob", "namespace", cronJob.Namespace, "name", cronJob.Name)
+	nodes := &corev1.NodeList{}
+	if err := n.KubeClient.List(ctx, nodes); err != nil {
+		logger.Error(err, "Failed to list cluster nodes")
 		return err
+	}
+
+	for _, node := range nodes.Items {
+		cronJob := &batchv1.CronJob{
+			ObjectMeta: metav1.ObjectMeta{Name: CronJobName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace},
+		}
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, cronJob); err != nil {
+			logger.Error(err, "Failed to clean up node scanning CronJob", "namespace", cronJob.Namespace, "name", cronJob.Name)
+			return err
+		}
 	}
 
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
 	}
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
-		logger.Error(err, "Failed to clean up inventory ConfigMap", "namespace", cronJob.Namespace, "name", cronJob.Name)
+		logger.Error(err, "Failed to clean up inventory ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
 		return err
 	}
 

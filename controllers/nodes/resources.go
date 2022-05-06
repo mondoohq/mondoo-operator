@@ -9,12 +9,13 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 )
 
 const (
-	CronJobSuffix = "-node-scanning"
+	CronJobNameBase = "-node-scanning-"
 
 	// Execute hourly
 	CronTab                  = "0 * * * *"
@@ -26,7 +27,7 @@ var (
 	inventoryYaml []byte
 )
 
-func CronJob(image string, nodesCount int32, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+func CronJob(image string, node v1.Node, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
@@ -40,7 +41,7 @@ func CronJob(image string, nodesCount int32, m v1alpha2.MondooAuditConfig) *batc
 
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      CronJobName(m.Name),
+			Name:      CronJobName(m.Name, node.Name),
 			Namespace: m.Namespace,
 			Labels:    CronJobLabels(m),
 		},
@@ -50,55 +51,25 @@ func CronJob(image string, nodesCount int32, m v1alpha2.MondooAuditConfig) *batc
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: ls},
 				Spec: batchv1.JobSpec{
-					//Selector: &metav1.LabelSelector{MatchLabels: ls},
-					// Setting the Parallelism and Completions to the amount of nodes in combination with the PodAntiAffinity
-					// makes sure 1 job is executed on each node.
-					Parallelism: pointer.Int32(nodesCount),
-					Completions: pointer.Int32(nodesCount),
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: ls},
 						Spec: corev1.PodSpec{
-							Affinity: &corev1.Affinity{
-								PodAntiAffinity: &corev1.PodAntiAffinity{
-									RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-										{
-											// The pod anti-affinity terms should be validated only for the namespace of the MondooAuditConfig.
-											Namespaces:    []string{m.Namespace},
-											TopologyKey:   corev1.LabelHostname,
-											LabelSelector: &metav1.LabelSelector{MatchExpressions: matchExpressions},
-										},
-									},
-								},
-							},
+							NodeName:      node.Name,
 							RestartPolicy: corev1.RestartPolicyOnFailure,
-							Tolerations: []corev1.Toleration{
-								{
-									Key:    "node-role.kubernetes.io/master",
-									Effect: corev1.TaintEffectNoSchedule,
-								},
-								{
-									// Rancher etcd node
-									// https://rancher.com/docs/rke/latest/en/config-options/nodes/#etcd
-									Key:    "node-role.kubernetes.io/etcd",
-									Effect: corev1.TaintEffectNoExecute,
-									Value:  "true",
-								},
-								{
-									// Rancher controlplane node
-									// https://rancher.com/docs/rke/latest/en/config-options/nodes/#controlplane
-									Key:    "node-role.kubernetes.io/controlplane",
-									Effect: corev1.TaintEffectNoSchedule,
-									Value:  "true",
-								},
-							},
+							Tolerations:   k8s.TaintsToTolerations(node.Spec.Taints),
 							// The node scanning does not use the Kubernetes API at all, therefore the service account token
 							// should not be mounted at all.
 							AutomountServiceAccountToken: pointer.Bool(false),
 							Containers: []corev1.Container{
 								{
-									Image:     image,
-									Name:      "mondoo-client",
-									Command:   []string{"mondoo", "scan", "--config", "/etc/opt/mondoo/mondoo.yml", "--exit-0-on-success"},
+									Image: image,
+									Name:  "mondoo-client",
+									Command: []string{
+										"mondoo", "scan",
+										"--config", "/etc/opt/mondoo/mondoo.yml",
+										"--inventory-file", "/etc/opt/mondoo/inventory.yml",
+										"--exit-0-on-success",
+									},
 									Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources),
 									VolumeMounts: []corev1.VolumeMount{
 										{
@@ -179,8 +150,8 @@ func ConfigMap(m v1alpha2.MondooAuditConfig) *corev1.ConfigMap {
 	}
 }
 
-func CronJobName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, CronJobSuffix)
+func CronJobName(prefix string, suffix string) string {
+	return fmt.Sprintf("%s%s%s", prefix, CronJobNameBase, suffix)
 }
 
 func ConfigMapName(prefix string) string {

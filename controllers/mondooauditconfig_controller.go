@@ -87,6 +87,9 @@ var (
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
 //The last line is required as we cant assign higher permissions that exist for operator serviceaccount
 
+// TODO: the line below is needed for cleaning up old DaemonSet deployments. It can be deleted once the cleanup code is removed
+//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;delete
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
