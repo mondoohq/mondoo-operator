@@ -69,7 +69,25 @@ __Preconditions__:
     kubectl get csv -n operators
     ```
 
-## Configuring the Mondoo client secret
+## Configuring the Mondoo credentials
+There are two choices for setting up the Mondoo credentials for the Mondoo client. It is possible to use short-lived tokens and have the Mondoo Operator convert that to a service account, or to download the service account from the Mondoo UI and save it directly to a Secret.
+
+Note that in an effort to limit the permissions mondoo-operator runs with, the default RBAC for mondoo-operator limits access to Secrets with the names `mondoo-client` (for storing the Mondoo service account), and `mondoo-token` for storing the time-limited tokens. Attempting to use different names for the Secrets means the ClusterRole for mondoo-operator will need updates to allow access to the alternative Secret names.
+
+### Configuring the Mondoo credentials with a token
+To configure the Mondoo credentials using a time-limited token, follow these steps:
+1. Naviate to the Mondoo UI Settings -> Service Accounts -> Add Account
+2. Store the token data into a local file `token.json`.
+3. Create a Secret holding the token data with:
+    ```bash
+    kubectl create secret generic mondoo-token --namespace mondoo-operator --from-file=token=token.json
+    ```
+
+Note: you should create the MondooAuditConfig below before the token expires. Otherwise, just copy a new token and delete/overwrite the `mondoo-token` Secret with the updated data.
+
+### Configuring the Mondoo credentials with a downloaded client secret
+Note: You can skip these steps if using the token as described above.
+
 To configure the Mondoo client secret to the following steps:
 1. Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts)
 2. Store the service account json into a local file `creds.json`. The `creds.json` should look like the following example:
@@ -91,7 +109,7 @@ To configure the Mondoo client secret to the following steps:
 ## Creating the MondooAuditConfig
 Once the secret is configured, we configure the operator to define the scan targets:
 
-1. Create `mondoo-config.yaml`:
+If following the time-limited token steps, create a local file named `mondoo-config.yaml`:
     ```yaml
     apiVersion: k8s.mondoo.com/v1alpha2
     kind: MondooAuditConfig
@@ -99,11 +117,31 @@ Once the secret is configured, we configure the operator to define the scan targ
       name: mondoo-client
       namespace: mondoo-operator
     spec:
+      mondooTokenSecretRef:
+        name: mondoo-token
+      mondooCredsSecretRef:
+        name: mondoo-client
       kubernetesResources:
         enable: true
       nodes:
         enable: true
     ```
+If using the downloaded client credentials, create a local file named `mondoo-config.yaml`:
+```yaml
+    apiVersion: k8s.mondoo.com/v1alpha2
+    kind: MondooAuditConfig
+    metadata:
+      name: mondoo-client
+      namespace: mondoo-operator
+    spec:
+      mondooCredsSecretRef:
+        name: mondoo-client
+      kubernetesResources:
+        enable: true
+      nodes:
+        enable: true
+    ```
+
 
 2. Apply the configuration via:
     ```bash
