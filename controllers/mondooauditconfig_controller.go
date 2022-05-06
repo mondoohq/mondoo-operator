@@ -66,9 +66,7 @@ var (
 	createContainerImageResolver = mondoo.NewContainerImageResolver
 
 	// so we can mock out the mondoo client for testing
-	MondooClientBuilder = func(opts mondooclient.ClientOptions) mondooclient.Client {
-		return mondooclient.NewClient(opts)
-	}
+	MondooClientBuilder = mondooclient.NewClient
 )
 
 // The update permissions for MondooAuditConfigs are required because having update permissions just for finalizers is insufficient
@@ -317,7 +315,7 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 	}
 
 	log.Info("Creating Mondoo service account from token")
-	token := strings.TrimSuffix(string(mondooTokenSecret.Data["token"]), "\n")
+	token := strings.TrimSpace(string(mondooTokenSecret.Data["token"]))
 
 	return r.createServiceAccountFromToken(ctx, mondoo, token, log)
 
