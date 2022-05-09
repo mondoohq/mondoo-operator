@@ -99,7 +99,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 
 	// Verify there is just 1 daemon set and that its name matches the name of the CR.
 	s.Equalf(1, len(daemonSets.Items), "DaemonSets count in Mondoo namespace is incorrect.")
-	expectedDaemonSetName := fmt.Sprintf(nodes.NodeDaemonSetNameTemplate, auditConfig.Name)
+	expectedDaemonSetName := fmt.Sprintf(nodes.OldNodeDaemonSetNameTemplate, auditConfig.Name)
 	s.Equalf(expectedDaemonSetName, daemonSets.Items[0].Name, "DaemonSet name does not match expected name based from audit config name.")
 }
 

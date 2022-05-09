@@ -253,7 +253,7 @@ func (n *DeploymentHandler) cleanupOldDaemonSet(ctx context.Context) error {
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: n.Mondoo.Namespace,
-			Name:      fmt.Sprintf(NodeDaemonSetNameTemplate, n.Mondoo.Name),
+			Name:      fmt.Sprintf(OldNodeDaemonSetNameTemplate, n.Mondoo.Name),
 		},
 	}
 
