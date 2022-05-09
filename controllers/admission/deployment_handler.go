@@ -48,7 +48,7 @@ var (
 	webhookManifestsyaml []byte
 )
 
-type AdmissionDeploymentHandler struct {
+type DeploymentHandler struct {
 	Mondoo                 *mondoov1alpha2.MondooAuditConfig
 	KubeClient             client.Client
 	TargetNamespace        string
@@ -57,7 +57,7 @@ type AdmissionDeploymentHandler struct {
 }
 
 // syncValidatingWebhookConfiguration will create/update the ValidatingWebhookConfiguration
-func (n *AdmissionDeploymentHandler) syncValidatingWebhookConfiguration(ctx context.Context,
+func (n *DeploymentHandler) syncValidatingWebhookConfiguration(ctx context.Context,
 	vwc *webhooksv1.ValidatingWebhookConfiguration,
 	annotationKey, annotationValue string) error {
 
@@ -148,7 +148,7 @@ func deepEqualsValidatingWebhookConfiguration(existing, desired *webhooksv1.Vali
 	return true
 }
 
-func (n *AdmissionDeploymentHandler) syncWebhookService(ctx context.Context) error {
+func (n *DeploymentHandler) syncWebhookService(ctx context.Context) error {
 	desiredService := WebhookService(n.TargetNamespace, *n.Mondoo)
 
 	// Annotate the Service if the Mondoo config is asking for OpenShift-style TLS certificate management.
@@ -191,7 +191,7 @@ func (n *AdmissionDeploymentHandler) syncWebhookService(ctx context.Context) err
 	return nil
 }
 
-func (n *AdmissionDeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
+func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -241,7 +241,7 @@ func (n *AdmissionDeploymentHandler) syncWebhookDeployment(ctx context.Context) 
 	return nil
 }
 
-func (n *AdmissionDeploymentHandler) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1.ValidatingWebhookConfiguration) error {
+func (n *DeploymentHandler) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1.ValidatingWebhookConfiguration) error {
 
 	var annotationKey, annotationValue string
 
@@ -278,7 +278,7 @@ func (n *AdmissionDeploymentHandler) prepareValidatingWebhook(ctx context.Contex
 	return n.syncValidatingWebhookConfiguration(ctx, vwc, annotationKey, annotationValue)
 }
 
-func (n *AdmissionDeploymentHandler) applyWebhooks(ctx context.Context) (ctrl.Result, error) {
+func (n *DeploymentHandler) applyWebhooks(ctx context.Context) (ctrl.Result, error) {
 	if err := n.syncWebhookService(ctx); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -336,7 +336,7 @@ func (n *AdmissionDeploymentHandler) applyWebhooks(ctx context.Context) (ctrl.Re
 	return ctrl.Result{}, nil
 }
 
-func (n *AdmissionDeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
+func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	if n.Mondoo.Spec.Admission.Enable && n.Mondoo.DeletionTimestamp == nil {
 		mondooClientImage, err := n.ContainerImageResolver.MondooClientImage("", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
 		if err != nil {
@@ -370,7 +370,7 @@ func (n *AdmissionDeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result
 	return ctrl.Result{}, nil
 }
 
-func (n *AdmissionDeploymentHandler) down(ctx context.Context) (ctrl.Result, error) {
+func (n *DeploymentHandler) down(ctx context.Context) (ctrl.Result, error) {
 	// NOTE: If we ever remove a resource that was previously deployed for a webhook,
 	// we would need to add custom code here to clean it up as it will no longer be
 	// included in the webhook-manifests.yaml embedded list of resources.
@@ -473,7 +473,7 @@ func (n *AdmissionDeploymentHandler) down(ctx context.Context) (ctrl.Result, err
 	return ctrl.Result{}, nil
 }
 
-func (n *AdmissionDeploymentHandler) setControllerRef(obj client.Object) error {
+func (n *DeploymentHandler) setControllerRef(obj client.Object) error {
 	if err := ctrl.SetControllerReference(n.Mondoo, obj, n.KubeClient.Scheme()); err != nil {
 		webhookLog.Error(err, "Failed to set ControllerReference", "Object", obj)
 		return err
@@ -486,7 +486,7 @@ func (n *AdmissionDeploymentHandler) setControllerRef(obj client.Object) error {
 // With the switch to naming the Webhook from MONDOOAUDIT_CONFIG_NAME-mondoo-webhook
 // to NAMESPACE-NAME-mondoo , we should try to clean up any old Webhooks so that they
 // are not orphaned.
-func (n *AdmissionDeploymentHandler) cleanupOldWebhook(ctx context.Context) error {
+func (n *DeploymentHandler) cleanupOldWebhook(ctx context.Context) error {
 	oldWebhook := &webhooksv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: n.Mondoo.Name + "-mondoo-webhook",

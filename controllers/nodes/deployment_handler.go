@@ -41,14 +41,14 @@ const (
 
 var logger = ctrl.Log.WithName("node-scanning")
 
-type Nodes struct {
+type DeploymentHandler struct {
 	KubeClient             client.Client
 	Mondoo                 *v1alpha2.MondooAuditConfig
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
 }
 
-func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
+func (n *DeploymentHandler) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
 	if !n.Mondoo.Spec.Nodes.Enable {
 		return ctrl.Result{}, n.down(ctx, req)
 	}
@@ -72,7 +72,7 @@ func (n *Nodes) Reconcile(ctx context.Context, clt client.Client, scheme *runtim
 // syncConfigMap syncs the inventory ConfigMap. Returns a boolean indicating whether the ConfigMap has been updated. It
 // can only be "true", if the ConfigMap existed before this reconcile cycle and the inventory was different from the
 // desired state.
-func (n *Nodes) syncConfigMap(ctx context.Context, req ctrl.Request) (bool, error) {
+func (n *DeploymentHandler) syncConfigMap(ctx context.Context, req ctrl.Request) (bool, error) {
 	existing := &corev1.ConfigMap{}
 	desired := ConfigMap(*n.Mondoo)
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
@@ -104,7 +104,7 @@ func (n *Nodes) syncConfigMap(ctx context.Context, req ctrl.Request) (bool, erro
 	return updated, nil
 }
 
-func (n *Nodes) syncCronJob(ctx context.Context, req ctrl.Request) error {
+func (n *DeploymentHandler) syncCronJob(ctx context.Context, req ctrl.Request) error {
 	mondooClientImage, err := n.ContainerImageResolver.MondooClientImage(
 		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
@@ -167,7 +167,7 @@ func (n *Nodes) syncCronJob(ctx context.Context, req ctrl.Request) error {
 }
 
 // cleanupCronJobsForDeletedNodes deletes dangling CronJobs for nodes that have been deleted from the cluster.
-func (n *Nodes) cleanupCronJobsForDeletedNodes(ctx context.Context, currentNodes corev1.NodeList) error {
+func (n *DeploymentHandler) cleanupCronJobsForDeletedNodes(ctx context.Context, currentNodes corev1.NodeList) error {
 	cronJobs, err := n.getCronJobsForAuditConfig(ctx)
 	if err != nil {
 		return err
@@ -198,7 +198,7 @@ func (n *Nodes) cleanupCronJobsForDeletedNodes(ctx context.Context, currentNodes
 	return nil
 }
 
-func (n *Nodes) getCronJobsForAuditConfig(ctx context.Context) ([]batchv1.CronJob, error) {
+func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]batchv1.CronJob, error) {
 	cronJobs := &batchv1.CronJobList{}
 	cronJobLabels := CronJobLabels(*n.Mondoo)
 
@@ -211,7 +211,7 @@ func (n *Nodes) getCronJobsForAuditConfig(ctx context.Context) ([]batchv1.CronJo
 	return cronJobs.Items, nil
 }
 
-func (n *Nodes) down(ctx context.Context, req ctrl.Request) error {
+func (n *DeploymentHandler) down(ctx context.Context, req ctrl.Request) error {
 	nodes := &corev1.NodeList{}
 	if err := n.KubeClient.List(ctx, nodes); err != nil {
 		logger.Error(err, "Failed to list cluster nodes")
@@ -247,7 +247,7 @@ func (n *Nodes) down(ctx context.Context, req ctrl.Request) error {
 }
 
 // TODO: Delete in followup version
-func (n *Nodes) cleanupOldDaemonSet(ctx context.Context) error {
+func (n *DeploymentHandler) cleanupOldDaemonSet(ctx context.Context) error {
 	log := ctrllog.FromContext(ctx)
 
 	ds := &appsv1.DaemonSet{
