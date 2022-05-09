@@ -398,7 +398,10 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}
 
 			for _, a := range auditConfigs.Items {
-				requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&a)})
+				// Only enqueue the MondooAuditConfig if it has node scanning enabled.
+				if a.Spec.Nodes.Enable {
+					requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&a)})
+				}
 			}
 
 			return requests
