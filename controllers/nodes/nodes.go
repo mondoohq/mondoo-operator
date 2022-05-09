@@ -26,6 +26,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -121,6 +122,7 @@ func (n *Nodes) syncCronJob(ctx context.Context, req ctrl.Request) error {
 		return err
 	}
 
+	// Create/update CronJobs for nodes
 	for _, node := range nodes.Items {
 		existing := &batchv1.CronJob{}
 		desired := CronJob(mondooClientImage, node, *n.Mondoo)
@@ -149,11 +151,50 @@ func (n *Nodes) syncCronJob(ctx context.Context, req ctrl.Request) error {
 		}
 	}
 
+	// Delete dangling CronJobs for nodes that have been deleted from the cluster.
+	cronJobs := &batchv1.CronJobList{}
+	cronJobLabels := CronJobLabels(*n.Mondoo)
+
+	// Lits only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
+	listOpts := &client.ListOptions{Namespace: n.Mondoo.Namespace, LabelSelector: labels.SelectorFromSet(cronJobLabels)}
+	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
+		logger.Error(err, "Failed to list CronJobs in namespace", "namespace", n.Mondoo.Namespace)
+		return err
+	}
+
+	for _, c := range cronJobs.Items {
+		// Check if the node for that CronJob is still present in the cluster.
+		found := false
+		for _, node := range nodes.Items {
+			if CronJobName(n.Mondoo.Name, node.Name) == c.Name {
+				found = true
+				break
+			}
+		}
+
+		// If the node is still there, there is nothing to update.
+		if found {
+			continue
+		}
+
+		// If the node for the CronJob has been deleted from the cluster, the CronJob needs to be deleted.
+		if err := n.KubeClient.Delete(ctx, &c); err != nil {
+			logger.Error(err, "Failed to deleted CronJob", "namespace", c.Namespace, "name", c.Name)
+			return err
+		}
+		logger.Info("Deleted CronJob", "namespace", c.Namespace, "name", c.Name)
+	}
+
 	// TODO: for CronJob we might consider triggering the CronJob now after the ConfigMap has been changed. It will make sense from the
 	// user perspective to want to run the jobs after you have updated the config.
 
-	// TODO: figure out how to check the node scanning status
-	//updateNodeConditions(n.Mondoo, found.Status.NumberReady != found.Status.DesiredNumberScheduled)
+	// List the CronJobs again after they have been synced.
+	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
+		logger.Error(err, "Failed to list CronJobs in namespace", "namespace", n.Mondoo.Namespace)
+		return err
+	}
+
+	updateNodeConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs.Items))
 	return n.cleanupOldDaemonSet(ctx)
 }
 
