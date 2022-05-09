@@ -40,9 +40,9 @@ func AreCronJobsEqual(a, b batchv1.CronJob) bool {
 	aPodSpec := a.Spec.JobTemplate.Spec.Template.Spec
 	bPodSpec := b.Spec.JobTemplate.Spec.Template.Spec
 	return len(aPodSpec.Containers) == len(bPodSpec.Containers) &&
-		reflect.DeepEqual(a.Spec.JobTemplate.Spec.Selector, b.Spec.JobTemplate.Spec.Selector) &&
 		aPodSpec.ServiceAccountName == bPodSpec.ServiceAccountName &&
 		reflect.DeepEqual(aPodSpec.Tolerations, bPodSpec.Tolerations) &&
+		reflect.DeepEqual(aPodSpec.NodeName, bPodSpec.NodeName) &&
 		reflect.DeepEqual(aPodSpec.Containers[0].Image, bPodSpec.Containers[0].Image) &&
 		reflect.DeepEqual(aPodSpec.Containers[0].Command, bPodSpec.Containers[0].Command) &&
 		reflect.DeepEqual(aPodSpec.Containers[0].Args, bPodSpec.Containers[0].Args) &&

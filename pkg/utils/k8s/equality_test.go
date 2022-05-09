@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -306,6 +307,241 @@ func TestAreServicesEqual(t *testing.T) {
 				assert.True(t, AreServicesEqual(a, test.createB(a)))
 			} else {
 				assert.False(t, AreServicesEqual(a, test.createB(a)))
+			}
+		})
+	}
+}
+
+func TestAreCronJobsEqual(t *testing.T) {
+	labels := map[string]string{"label": "value"}
+	a := batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cronjob",
+			Namespace: "ns",
+			Labels:    labels,
+		},
+		Spec: batchv1.CronJobSpec{
+			Schedule:          "0 * * * *",
+			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			JobTemplate: batchv1.JobTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: labels},
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: labels},
+						Spec: corev1.PodSpec{
+							NodeName:      "node01",
+							RestartPolicy: corev1.RestartPolicyOnFailure,
+							Tolerations: []corev1.Toleration{{
+								Key:    "key",
+								Effect: corev1.TaintEffectNoExecute,
+								Value:  "value",
+							}},
+							// The node scanning does not use the Kubernetes API at all, therefore the service account token
+							// should not be mounted at all.
+							AutomountServiceAccountToken: pointer.Bool(false),
+							Containers: []corev1.Container{
+								{
+									Image: "test-image:latest",
+									Name:  "mondoo-client",
+									Command: []string{
+										"mondoo", "scan",
+										"--config", "/etc/opt/mondoo/mondoo.yml",
+										"--inventory-file", "/etc/opt/mondoo/inventory.yml",
+										"--exit-0-on-success",
+									},
+									Resources: DefaultMondooClientResources,
+									VolumeMounts: []corev1.VolumeMount{
+										{
+											Name:      "root",
+											ReadOnly:  true,
+											MountPath: "/mnt/host/",
+										},
+										{
+											Name:      "config",
+											ReadOnly:  true,
+											MountPath: "/etc/opt/",
+										},
+									},
+									Env: []corev1.EnvVar{
+										{
+											Name:  "DEBUG",
+											Value: "false",
+										},
+										{
+											Name:  "MONDOO_PROCFS",
+											Value: "on",
+										},
+									},
+								},
+							},
+							Volumes: []corev1.Volume{
+								{
+									Name: "config",
+									VolumeSource: corev1.VolumeSource{
+										Projected: &corev1.ProjectedVolumeSource{
+											Sources: []corev1.VolumeProjection{
+												{
+													ConfigMap: &corev1.ConfigMapProjection{
+														LocalObjectReference: corev1.LocalObjectReference{Name: "configMap"},
+														Items: []corev1.KeyToPath{{
+															Key:  "inventory",
+															Path: "mondoo/inventory.yml",
+														}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			SuccessfulJobsHistoryLimit: pointer.Int32(1),
+			FailedJobsHistoryLimit:     pointer.Int32(1),
+		},
+	}
+
+	tests := []struct {
+		name          string
+		createB       func(batchv1.CronJob) batchv1.CronJob
+		shouldBeEqual bool
+	}{
+		{
+			name: "should be equal when identical",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				return *a.DeepCopy()
+			},
+			shouldBeEqual: true,
+		},
+		{
+			name: "should not be equal when container count differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.JobTemplate.Spec.Template.Spec.Containers = append(
+					b.Spec.JobTemplate.Spec.Template.Spec.Containers, b.Spec.JobTemplate.Spec.Template.Spec.Containers[0])
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when service accounts differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.JobTemplate.Spec.Template.Spec.ServiceAccountName = "test"
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when tolerations differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.JobTemplate.Spec.Template.Spec.Tolerations =
+					append(b.Spec.JobTemplate.Spec.Template.Spec.Tolerations, b.Spec.JobTemplate.Spec.Template.Spec.Tolerations[0])
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when node names differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.JobTemplate.Spec.Template.Spec.NodeName = "test-node"
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when container images differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image = "test"
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when container commands differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test"}
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when volume mounts differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts = make([]corev1.VolumeMount, 0)
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when env vars differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env = make([]corev1.EnvVar, 0)
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when owner references differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				assert.NoError(t, ctrl.SetControllerReference(&a, &b, scheme.Scheme))
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when container args differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Args = []string{"some", "different", "args"}
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when Pod volume definition(s) differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.JobTemplate.Spec.Template.Spec.Volumes[0].VolumeSource.Projected.Sources[0].ConfigMap.Items[0].Key = "differentkey"
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when successful jobs history limits differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.SuccessfulJobsHistoryLimit = pointer.Int32(100)
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when failed jobs history limits differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.FailedJobsHistoryLimit = pointer.Int32(100)
+				return b
+			},
+			shouldBeEqual: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.shouldBeEqual {
+				assert.True(t, AreCronJobsEqual(a, test.createB(a)))
+			} else {
+				assert.False(t, AreCronJobsEqual(a, test.createB(a)))
 			}
 		})
 	}
