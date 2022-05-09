@@ -34,9 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/admission"
@@ -44,6 +47,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const finalizerString = "k8s.mondoo.com/delete"
@@ -381,5 +385,23 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&v1alpha2.MondooAuditConfig{}).
 		Owns(&appsv1.DaemonSet{}).
 		Owns(&appsv1.Deployment{}).
+
+		// Watch creations and deletions of nodes and enqueue all MondooAuditConfigs for reconciliation.
+		Watches(&source.Kind{Type: &corev1.Node{}}, handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+			ctx := context.Background()
+			var requests []reconcile.Request
+			auditConfigs := &v1alpha2.MondooAuditConfigList{}
+			if err := r.Client.List(ctx, auditConfigs); err != nil {
+				logger := ctrllog.Log.WithName("node-watcher")
+				logger.Error(err, "Failed to list MondooAuditConfigs")
+				return requests
+			}
+
+			for _, a := range auditConfigs.Items {
+				requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&a)})
+			}
+
+			return requests
+		}), builder.WithPredicates(k8s.CreateOrDeletePredicate{})).
 		Complete(r)
 }

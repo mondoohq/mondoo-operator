@@ -32,13 +32,6 @@ func CronJob(image string, node v1.Node, m v1alpha2.MondooAuditConfig) *batchv1.
 
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
 
-	matchExpressions := make([]metav1.LabelSelectorRequirement, 0)
-	for k, v := range ls {
-		matchExpressions = append(
-			matchExpressions,
-			metav1.LabelSelectorRequirement{Key: k, Values: []string{v}, Operator: metav1.LabelSelectorOpIn})
-	}
-
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CronJobName(m.Name, node.Name),
