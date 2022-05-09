@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -31,6 +32,26 @@ func AreServicesEqual(a, b corev1.Service) bool {
 		reflect.DeepEqual(a.Spec.Selector, b.Spec.Selector) &&
 		reflect.DeepEqual(a.GetOwnerReferences(), b.GetOwnerReferences()) &&
 		a.Spec.Type == b.Spec.Type
+}
+
+// AreCronJobsEqual returns a value indicating whether 2 cron jobs are equal. Note that it does not perform a full
+// comparison but checks just some of the properties of a deployment (only the ones we are currently interested at).
+func AreCronJobsEqual(a, b batchv1.CronJob) bool {
+	aPodSpec := a.Spec.JobTemplate.Spec.Template.Spec
+	bPodSpec := b.Spec.JobTemplate.Spec.Template.Spec
+	return len(aPodSpec.Containers) == len(bPodSpec.Containers) &&
+		reflect.DeepEqual(a.Spec.JobTemplate.Spec.Selector, b.Spec.JobTemplate.Spec.Selector) &&
+		aPodSpec.ServiceAccountName == bPodSpec.ServiceAccountName &&
+		reflect.DeepEqual(aPodSpec.Tolerations, bPodSpec.Tolerations) &&
+		reflect.DeepEqual(aPodSpec.Containers[0].Image, bPodSpec.Containers[0].Image) &&
+		reflect.DeepEqual(aPodSpec.Containers[0].Command, bPodSpec.Containers[0].Command) &&
+		reflect.DeepEqual(aPodSpec.Containers[0].Args, bPodSpec.Containers[0].Args) &&
+		reflect.DeepEqual(aPodSpec.Containers[0].VolumeMounts, bPodSpec.Containers[0].VolumeMounts) &&
+		reflect.DeepEqual(aPodSpec.Containers[0].Env, bPodSpec.Containers[0].Env) &&
+		reflect.DeepEqual(aPodSpec.Volumes, bPodSpec.Volumes) &&
+		reflect.DeepEqual(a.Spec.SuccessfulJobsHistoryLimit, b.Spec.SuccessfulJobsHistoryLimit) &&
+		reflect.DeepEqual(a.Spec.FailedJobsHistoryLimit, b.Spec.FailedJobsHistoryLimit) &&
+		reflect.DeepEqual(a.GetOwnerReferences(), b.GetOwnerReferences())
 }
 
 // AreResouceRequirementsEqual returns a value indicating whether 2 resource requirements are equal.

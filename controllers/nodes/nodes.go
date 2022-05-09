@@ -18,6 +18,7 @@ package nodes
 
 import (
 	"context"
+	"fmt"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -34,13 +35,8 @@ import (
 )
 
 const (
-	daemonSetConfigMapNameTemplate = `%s-ds`
-	OldNodeDaemonSetNameTemplate   = `%s-node`
-)
-
-var (
-	//go:embed inventory-ds.yaml
-	dsInventoryyaml []byte
+	// TODO: remove this once the cleanup code is deleted.
+	OldNodeDaemonSetNameTemplate = `%s-node`
 )
 
 var logger = ctrl.Log.WithName("node-scanning")
@@ -142,8 +138,9 @@ func (n *Nodes) syncCronJob(ctx context.Context, req ctrl.Request) error {
 			continue
 		}
 
-		// TODO: implement deep equals for cronjobs
-		if existing.Name != desired.Name {
+		if !k8s.AreCronJobsEqual(*existing, *desired) {
+			existing.Spec.JobTemplate = desired.Spec.JobTemplate
+
 			if err := n.KubeClient.Update(ctx, existing); err != nil {
 				logger.Error(err, "Failed to update CronJob", "namespace", existing.Namespace, "name", existing.Name)
 				return err
@@ -152,20 +149,34 @@ func (n *Nodes) syncCronJob(ctx context.Context, req ctrl.Request) error {
 	}
 
 	// Delete dangling CronJobs for nodes that have been deleted from the cluster.
-	cronJobs := &batchv1.CronJobList{}
-	cronJobLabels := CronJobLabels(*n.Mondoo)
-
-	// Lits only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
-	listOpts := &client.ListOptions{Namespace: n.Mondoo.Namespace, LabelSelector: labels.SelectorFromSet(cronJobLabels)}
-	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
-		logger.Error(err, "Failed to list CronJobs in namespace", "namespace", n.Mondoo.Namespace)
+	if err := n.cleanupCronJobsForDeletedNodes(ctx, *nodes); err != nil {
 		return err
 	}
 
-	for _, c := range cronJobs.Items {
+	// TODO: for CronJob we might consider triggering the CronJob now after the ConfigMap has been changed. It will make sense from the
+	// user perspective to want to run the jobs after you have updated the config.
+
+	// List the CronJobs again after they have been synced.
+	cronJobs, err := n.getCronJobsForAuditConfig(ctx)
+	if err != nil {
+		return err
+	}
+
+	updateNodeConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs))
+	return n.cleanupOldDaemonSet(ctx)
+}
+
+// cleanupCronJobsForDeletedNodes deletes dangling CronJobs for nodes that have been deleted from the cluster.
+func (n *Nodes) cleanupCronJobsForDeletedNodes(ctx context.Context, currentNodes corev1.NodeList) error {
+	cronJobs, err := n.getCronJobsForAuditConfig(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range cronJobs {
 		// Check if the node for that CronJob is still present in the cluster.
 		found := false
-		for _, node := range nodes.Items {
+		for _, node := range currentNodes.Items {
 			if CronJobName(n.Mondoo.Name, node.Name) == c.Name {
 				found = true
 				break
@@ -184,18 +195,20 @@ func (n *Nodes) syncCronJob(ctx context.Context, req ctrl.Request) error {
 		}
 		logger.Info("Deleted CronJob", "namespace", c.Namespace, "name", c.Name)
 	}
+	return nil
+}
 
-	// TODO: for CronJob we might consider triggering the CronJob now after the ConfigMap has been changed. It will make sense from the
-	// user perspective to want to run the jobs after you have updated the config.
+func (n *Nodes) getCronJobsForAuditConfig(ctx context.Context) ([]batchv1.CronJob, error) {
+	cronJobs := &batchv1.CronJobList{}
+	cronJobLabels := CronJobLabels(*n.Mondoo)
 
-	// List the CronJobs again after they have been synced.
+	// Lits only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
+	listOpts := &client.ListOptions{Namespace: n.Mondoo.Namespace, LabelSelector: labels.SelectorFromSet(cronJobLabels)}
 	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
 		logger.Error(err, "Failed to list CronJobs in namespace", "namespace", n.Mondoo.Namespace)
-		return err
+		return nil, err
 	}
-
-	updateNodeConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs.Items))
-	return n.cleanupOldDaemonSet(ctx)
+	return cronJobs.Items, nil
 }
 
 func (n *Nodes) down(ctx context.Context, req ctrl.Request) error {
@@ -233,16 +246,14 @@ func (n *Nodes) down(ctx context.Context, req ctrl.Request) error {
 	return nil
 }
 
-// TODO: this should now delete the current daemon set and replace it with the cronjob
-// TODO: this can be removed once we believe enough time has passed where the old-style named
-// DaemonSet has been replaced and removed to keep us from orphaning the old-style DaemonSet.
+// TODO: Delete in followup version
 func (n *Nodes) cleanupOldDaemonSet(ctx context.Context) error {
 	log := ctrllog.FromContext(ctx)
 
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: n.Mondoo.Namespace,
-			Name:      n.Mondoo.Name,
+			Name:      fmt.Sprintf(NodeDaemonSetNameTemplate, n.Mondoo.Name),
 		},
 	}
 

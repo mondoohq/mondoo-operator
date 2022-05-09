@@ -127,8 +127,8 @@ func CronJob(image string, node v1.Node, m v1alpha2.MondooAuditConfig) *batchv1.
 					},
 				},
 			},
-
-			// TODO: what do we want to do about job history? How many do we keep?
+			SuccessfulJobsHistoryLimit: pointer.Int32(1),
+			FailedJobsHistoryLimit:     pointer.Int32(1),
 		},
 	}
 }
