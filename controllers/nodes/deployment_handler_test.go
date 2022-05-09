@@ -16,6 +16,37 @@ limitations under the License.
 
 package nodes
 
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+)
+
+type DeploymentHandlerSuite struct {
+	suite.Suite
+	ctx    context.Context
+	scheme *runtime.Scheme
+	//image  string
+}
+
+func (s *DeploymentHandlerSuite) SetupSuite() {
+	utilruntime.Must(mondoov1alpha2.AddToScheme(scheme.Scheme))
+
+	s.ctx = context.Background()
+	s.scheme = clientgoscheme.Scheme
+	s.Require().NoError(mondoov1alpha2.AddToScheme(s.scheme))
+}
+
+func TestDeploymentHandlerSuite(t *testing.T) {
+	suite.Run(t, new(DeploymentHandlerSuite))
+}
+
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 

@@ -263,19 +263,25 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
 }
 
-// labelsForMondoo returns the labels for selecting the resources
-// belonging to the given mondoo CR name.
-func labelsForMondoo(name string) map[string]string {
-	return map[string]string{"app": "mondoo", "mondoo_cr": name}
-}
-
-// getPodNames returns a Set of the pod names of the array of pods passed in
-func getPodNames(pods []corev1.Pod) sets.String {
-	var podNames []string
-	for _, pod := range pods {
-		podNames = append(podNames, pod.Name)
+// nodeEventsRequestMapper Maps node events to enqueue all MondooAuditConfigs that have node scanning enabled for
+// reconciliation.
+func (r *MondooAuditConfigReconciler) nodeEventsRequestMapper(o client.Object) []reconcile.Request {
+	ctx := context.Background()
+	var requests []reconcile.Request
+	auditConfigs := &v1alpha2.MondooAuditConfigList{}
+	if err := r.Client.List(ctx, auditConfigs); err != nil {
+		logger := ctrllog.Log.WithName("node-watcher")
+		logger.Error(err, "Failed to list MondooAuditConfigs")
+		return requests
 	}
-	return sets.NewString(podNames...)
+
+	for _, a := range auditConfigs.Items {
+		// Only enqueue the MondooAuditConfig if it has node scanning enabled.
+		if a.Spec.Nodes.Enable {
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&a)})
+		}
+	}
+	return requests
 }
 
 func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context.Context, mondoo *v1alpha2.MondooAuditConfig, log logr.Logger) error {
@@ -385,26 +391,24 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&v1alpha2.MondooAuditConfig{}).
 		Owns(&appsv1.DaemonSet{}).
 		Owns(&appsv1.Deployment{}).
-
-		// Watch creations and deletions of nodes and enqueue all MondooAuditConfigs for reconciliation.
-		Watches(&source.Kind{Type: &corev1.Node{}}, handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-			ctx := context.Background()
-			var requests []reconcile.Request
-			auditConfigs := &v1alpha2.MondooAuditConfigList{}
-			if err := r.Client.List(ctx, auditConfigs); err != nil {
-				logger := ctrllog.Log.WithName("node-watcher")
-				logger.Error(err, "Failed to list MondooAuditConfigs")
-				return requests
-			}
-
-			for _, a := range auditConfigs.Items {
-				// Only enqueue the MondooAuditConfig if it has node scanning enabled.
-				if a.Spec.Nodes.Enable {
-					requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&a)})
-				}
-			}
-
-			return requests
-		}), builder.WithPredicates(k8s.CreateOrDeletePredicate{})).
+		Watches(
+			&source.Kind{Type: &corev1.Node{}},
+			handler.EnqueueRequestsFromMapFunc(r.nodeEventsRequestMapper),
+			builder.WithPredicates(k8s.CreateOrDeletePredicate{})).
 		Complete(r)
+}
+
+// labelsForMondoo returns the labels for selecting the resources
+// belonging to the given mondoo CR name.
+func labelsForMondoo(name string) map[string]string {
+	return map[string]string{"app": "mondoo", "mondoo_cr": name}
+}
+
+// getPodNames returns a Set of the pod names of the array of pods passed in
+func getPodNames(pods []corev1.Pod) sets.String {
+	var podNames []string
+	for _, pod := range pods {
+		podNames = append(podNames, pod.Name)
+	}
+	return sets.NewString(podNames...)
 }
