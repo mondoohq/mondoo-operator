@@ -59,7 +59,7 @@ jobs:
         run: |
           operator-sdk olm install
           kubectl create ns mondoo-operator
-          operator-sdk run bundle ghcr.io/mondoohq/mondoo-operator-bundle:v0.2.8 --namespace mondoo-operator --timeout 4m0s
+          operator-sdk run bundle ghcr.io/mondoohq/mondoo-operator-bundle:v0.2.8 --namespace mondoo-operator --timeout 10m0s
 
       - name: Gather running pods
         if: failure()
