@@ -19,6 +19,7 @@ package nodes
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -28,7 +29,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
@@ -48,21 +48,23 @@ type DeploymentHandler struct {
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
 }
 
-func (n *DeploymentHandler) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
+func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	if !n.Mondoo.Spec.Nodes.Enable {
-		return ctrl.Result{}, n.down(ctx, req)
+		return ctrl.Result{}, n.down(ctx)
 	}
 
-	updated, err := n.syncConfigMap(ctx, req)
+	updated, err := n.syncConfigMap(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
+	// TODO: for CronJob we might consider triggering the CronJob now after the ConfigMap has been changed. It will make sense from the
+	// user perspective to want to run the jobs after you have updated the config.
 	if updated {
-		logger.Info("Inventory ConfigMap was just updated. Running node scanning job now...")
+		logger.Info("Inventory ConfigMap was just updated. The job will use the new config during the next scheduled run.")
 	}
 
-	err = n.syncCronJob(ctx, req)
+	err = n.syncCronJob(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -72,7 +74,7 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context, clt client.Client, sc
 // syncConfigMap syncs the inventory ConfigMap. Returns a boolean indicating whether the ConfigMap has been updated. It
 // can only be "true", if the ConfigMap existed before this reconcile cycle and the inventory was different from the
 // desired state.
-func (n *DeploymentHandler) syncConfigMap(ctx context.Context, req ctrl.Request) (bool, error) {
+func (n *DeploymentHandler) syncConfigMap(ctx context.Context) (bool, error) {
 	existing := &corev1.ConfigMap{}
 	desired := ConfigMap(*n.Mondoo)
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
@@ -92,8 +94,10 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, req ctrl.Request)
 	}
 
 	updated := false
-	if existing.Data["inventory"] != desired.Data["inventory"] {
+	if existing.Data["inventory"] != desired.Data["inventory"] ||
+		!reflect.DeepEqual(existing.GetOwnerReferences(), desired.GetOwnerReferences()) {
 		existing.Data["inventory"] = desired.Data["inventory"]
+		existing.SetOwnerReferences(desired.GetOwnerReferences())
 
 		if err := n.KubeClient.Update(ctx, existing); err != nil {
 			logger.Error(err, "Failed to update inventory ConfigMap", "namespace", existing.Namespace, "name", existing.Name)
@@ -104,7 +108,7 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, req ctrl.Request)
 	return updated, nil
 }
 
-func (n *DeploymentHandler) syncCronJob(ctx context.Context, req ctrl.Request) error {
+func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	mondooClientImage, err := n.ContainerImageResolver.MondooClientImage(
 		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
@@ -140,6 +144,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context, req ctrl.Request) e
 
 		if !k8s.AreCronJobsEqual(*existing, *desired) {
 			existing.Spec.JobTemplate = desired.Spec.JobTemplate
+			existing.SetOwnerReferences(desired.GetOwnerReferences())
 
 			if err := n.KubeClient.Update(ctx, existing); err != nil {
 				logger.Error(err, "Failed to update CronJob", "namespace", existing.Namespace, "name", existing.Name)
@@ -152,9 +157,6 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context, req ctrl.Request) e
 	if err := n.cleanupCronJobsForDeletedNodes(ctx, *nodes); err != nil {
 		return err
 	}
-
-	// TODO: for CronJob we might consider triggering the CronJob now after the ConfigMap has been changed. It will make sense from the
-	// user perspective to want to run the jobs after you have updated the config.
 
 	// List the CronJobs again after they have been synced.
 	cronJobs, err := n.getCronJobsForAuditConfig(ctx)
@@ -211,7 +213,7 @@ func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]ba
 	return cronJobs.Items, nil
 }
 
-func (n *DeploymentHandler) down(ctx context.Context, req ctrl.Request) error {
+func (n *DeploymentHandler) down(ctx context.Context) error {
 	nodes := &corev1.NodeList{}
 	if err := n.KubeClient.List(ctx, nodes); err != nil {
 		logger.Error(err, "Failed to list cluster nodes")

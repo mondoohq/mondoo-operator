@@ -193,7 +193,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		ContainerImageResolver: containerImageResolver,
 	}
 
-	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req)
+	result, err := nodes.Reconcile(ctx)
 	if err != nil {
 		log.Error(err, "Failed to declare nodes")
 	}
