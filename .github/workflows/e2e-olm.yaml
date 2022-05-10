@@ -59,13 +59,14 @@ jobs:
         run: |
           operator-sdk olm install
           kubectl create ns mondoo-operator
-          operator-sdk run bundle ghcr.io/mondoohq/mondoo-operator-bundle:v0.2.8 --namespace mondoo-operator --timeout 1m0s
+          operator-sdk run bundle ghcr.io/mondoohq/mondoo-operator-bundle:v0.2.8 --namespace mondoo-operator --timeout 4m0s
 
       - name: Gather running pods
         if: failure()
         run: |
           mkdir -p tests/integration/_output
           kubectl get pods -n mondoo-operator -o yaml >> tests/integration/_output/olm-installation-pods.log
+          kubectl logs -n mondoo-operator ghcr-io-mondoohq-mondoo-operator-bundle-v0-2-8 >> tests/integration/_output/olm-installation-pods.log
 
       - name: Store creds
         run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
