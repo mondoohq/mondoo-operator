@@ -34,15 +34,20 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/admission"
+	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const finalizerString = "k8s.mondoo.com/delete"
@@ -56,9 +61,6 @@ type MondooAuditConfigReconciler struct {
 
 // Embed the Default Inventory for Daemonset and Deployment Configurations
 var (
-	//go:embed inventory-ds.yaml
-	dsInventoryyaml []byte
-
 	//go:embed inventory-deploy.yaml
 	deployInventoryyaml []byte
 
@@ -75,10 +77,10 @@ var (
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooauditconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooauditconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondoooperatorconfigs,verbs=get;watch;list
-//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=pods;namespaces,verbs=get;list;watch
+//+kubebuilder:rbac:groups=core,resources=pods;namespaces;nodes,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // Just neeed to be able to create a Secret to hold the generated ScanAPI token
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=create;delete
@@ -88,6 +90,9 @@ var (
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
 //The last line is required as we cant assign higher permissions that exist for operator serviceaccount
+
+// TODO: the line below is needed for cleaning up old DaemonSet deployments. It can be deleted once the cleanup code is removed
+//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -143,7 +148,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
 		// deleted should be called here
 
-		webhooks := admission.AdmissionDeploymentHandler{
+		webhooks := admission.DeploymentHandler{
 			Mondoo:                 mondooAuditConfig,
 			KubeClient:             r.Client,
 			TargetNamespace:        req.Namespace,
@@ -181,14 +186,14 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	nodes := Nodes{
-		Enable:                 mondooAuditConfig.Spec.Nodes.Enable,
+	nodes := nodes.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
+		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: containerImageResolver,
 	}
 
-	result, err := nodes.Reconcile(ctx, r.Client, r.Scheme, req, string(dsInventoryyaml))
+	result, err := nodes.Reconcile(ctx)
 	if err != nil {
 		log.Error(err, "Failed to declare nodes")
 	}
@@ -211,7 +216,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return result, err
 	}
 
-	webhooks := admission.AdmissionDeploymentHandler{
+	webhooks := admission.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		TargetNamespace:        req.Namespace,
@@ -258,19 +263,25 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
 }
 
-// labelsForMondoo returns the labels for selecting the resources
-// belonging to the given mondoo CR name.
-func labelsForMondoo(name string) map[string]string {
-	return map[string]string{"app": "mondoo", "mondoo_cr": name}
-}
-
-// getPodNames returns a Set of the pod names of the array of pods passed in
-func getPodNames(pods []corev1.Pod) sets.String {
-	var podNames []string
-	for _, pod := range pods {
-		podNames = append(podNames, pod.Name)
+// nodeEventsRequestMapper Maps node events to enqueue all MondooAuditConfigs that have node scanning enabled for
+// reconciliation.
+func (r *MondooAuditConfigReconciler) nodeEventsRequestMapper(o client.Object) []reconcile.Request {
+	ctx := context.Background()
+	var requests []reconcile.Request
+	auditConfigs := &v1alpha2.MondooAuditConfigList{}
+	if err := r.Client.List(ctx, auditConfigs); err != nil {
+		logger := ctrllog.Log.WithName("node-watcher")
+		logger.Error(err, "Failed to list MondooAuditConfigs")
+		return requests
 	}
-	return sets.NewString(podNames...)
+
+	for _, a := range auditConfigs.Items {
+		// Only enqueue the MondooAuditConfig if it has node scanning enabled.
+		if a.Spec.Nodes.Enable {
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&a)})
+		}
+	}
+	return requests
 }
 
 func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context.Context, mondoo *v1alpha2.MondooAuditConfig, log logr.Logger) error {
@@ -380,5 +391,24 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&v1alpha2.MondooAuditConfig{}).
 		Owns(&appsv1.DaemonSet{}).
 		Owns(&appsv1.Deployment{}).
+		Watches(
+			&source.Kind{Type: &corev1.Node{}},
+			handler.EnqueueRequestsFromMapFunc(r.nodeEventsRequestMapper),
+			builder.WithPredicates(k8s.IgnoreGenericEventsPredicate{})).
 		Complete(r)
+}
+
+// labelsForMondoo returns the labels for selecting the resources
+// belonging to the given mondoo CR name.
+func labelsForMondoo(name string) map[string]string {
+	return map[string]string{"app": "mondoo", "mondoo_cr": name}
+}
+
+// getPodNames returns a Set of the pod names of the array of pods passed in
+func getPodNames(pods []corev1.Pod) sets.String {
+	var podNames []string
+	for _, pod := range pods {
+		podNames = append(podNames, pod.Name)
+	}
+	return sets.NewString(podNames...)
 }

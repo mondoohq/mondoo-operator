@@ -14,17 +14,17 @@ type AuditConfigSuite struct {
 }
 
 func (s *AuditConfigSuite) TestReconcile_KubernetesResources() {
-	auditConfig := utils.DefaultAuditConfig(s.testCluster.Settings.Namespace, true, false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false)
 	s.testMondooAuditConfigWorkloads(auditConfig)
 }
 
 func (s *AuditConfigSuite) TestReconcile_Nodes() {
-	auditConfig := utils.DefaultAuditConfig(s.testCluster.Settings.Namespace, false, true, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, true, false)
 	s.testMondooAuditConfigNodes(auditConfig)
 }
 
 func (s *AuditConfigSuite) TestReconcile_Admission() {
-	auditConfig := utils.DefaultAuditConfig(s.testCluster.Settings.Namespace, false, false, true)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true)
 	s.testMondooAuditConfigAdmission(auditConfig)
 }
 

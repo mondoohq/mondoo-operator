@@ -36,8 +36,8 @@ import (
 
 const (
 	cmd           = "kubectl"
-	retryInterval = 5
-	retryLoop     = 30
+	RetryInterval = 5
+	RetryLoop     = 30
 )
 
 var (
@@ -141,24 +141,23 @@ func (k8sh *K8sHelper) IsPodReady(labelSelector, namespace string) bool {
 	listOpts.Namespace = namespace
 	ctx := context.Background()
 	podList := &v1.PodList{}
-	for i := 0; i < retryLoop; i++ {
+
+	err = k8sh.ExecuteWithRetries(func() (bool, error) {
 		err := k8sh.Clientset.List(ctx, podList, listOpts)
 		if err == nil {
 			if len(podList.Items) >= 1 {
 				for _, pod := range podList.Items {
 					for _, c := range pod.Status.Conditions {
 						if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
-							return true
+							return true, nil
 						}
 					}
-
 				}
 			}
 		}
-		time.Sleep(retryInterval * time.Second)
-	}
-	zap.S().Debugf("%+v", podList)
-	return false
+		return false, nil
+	})
+	return err == nil
 }
 
 func LabelSelectorListOptions(labelSelector string) (*client.ListOptions, error) {
@@ -228,21 +227,34 @@ func (k8sh *K8sHelper) WaitForResourceDeletion(r client.Object) error {
 	ctx := context.Background()
 	key := client.ObjectKeyFromObject(r)
 	kind := r.GetObjectKind().GroupVersionKind().String()
-	for i := 0; i < retryLoop; i++ {
 
+	return k8sh.ExecuteWithRetries(func() (bool, error) {
 		err := k8sh.Clientset.Get(ctx, key, r)
 		if err == nil {
 			zap.S().Infof("Resource %s %s/%s still exists.", kind, key.Namespace, key.Name)
-			time.Sleep(retryInterval * time.Second)
-			continue
+			return false, nil
 		}
 		if kerrors.IsNotFound(err) {
 			zap.S().Infof("Resource %s %s/%s deleted.", kind, key.Namespace, key.Name)
+			return true, nil
+		}
+		return false, fmt.Errorf("Gave up deleting %s %s/%s. %v", kind, key.Namespace, key.Name, err)
+	})
+}
+
+func (k8sh *K8sHelper) ExecuteWithRetries(f func() (bool, error)) error {
+	for i := 0; i < RetryLoop; i++ {
+		success, err := f()
+		if success {
 			return nil
 		}
-		return err
+
+		if err != nil {
+			return err
+		}
+		time.Sleep(RetryInterval * time.Second)
 	}
-	return fmt.Errorf("Gave up deleting %s %s/%s ", kind, key.Namespace, key.Name)
+	return fmt.Errorf("Test did not succeed after %d retries.", RetryLoop)
 }
 
 func (k8sh *K8sHelper) appendPodDescribe(file *os.File, namespace, name string) {

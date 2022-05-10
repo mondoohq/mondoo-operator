@@ -421,7 +421,7 @@ func TestReconcile(t *testing.T) {
 			}
 			fakeClient := fake.NewClientBuilder().WithObjects(existingObj...).Build()
 
-			webhooks := &AdmissionDeploymentHandler{
+			webhooks := &DeploymentHandler{
 				Mondoo:                 auditConfig,
 				KubeClient:             fakeClient,
 				TargetNamespace:        testNamespace,

@@ -7,11 +7,11 @@ spec:
   mondooCredsSecretRef:
     name: mondoo-client
   kubernetesResources:
-    enable: true
+    enable: false
   nodes:
     enable: true
   admission:
-    enable: false
+    enable: true
     certificateProvisioning:
       # Could be "cert-manager", "openshift" or "manual"
       mode: cert-manager

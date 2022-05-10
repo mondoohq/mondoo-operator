@@ -11,12 +11,16 @@ import (
 
 	webhooksv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	mondoocontrollers "go.mondoo.com/mondoo-operator/controllers"
 	mondooadmission "go.mondoo.com/mondoo-operator/controllers/admission"
+	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	mondooscanapi "go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
@@ -81,25 +85,59 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
 
-	zap.S().Info("Verify the nodes client is ready.")
-	nodesLabels := []string{installer.MondooClientsNodesLabel, installer.MondooClientsLabel}
-	nodesLabelsString := strings.Join(nodesLabels, ",")
-	s.Truef(
-		s.testCluster.K8sHelper.IsPodReady(nodesLabelsString, auditConfig.Namespace),
-		"Mondoo nodes clients are not in a Ready state.")
+	zap.S().Info("Verify the nodes scanning cron jobs are created.")
 
-	zap.S().Info("Verify the pods are actually created from a DaemonSet.")
-	listOpts, err := utils.LabelSelectorListOptions(nodesLabelsString)
-	listOpts.Namespace = auditConfig.Namespace
-	s.NoError(err)
+	cronJobs := &batchv1.CronJobList{}
+	cronJobLabels := nodes.CronJobLabels(auditConfig)
 
-	daemonSets := &appsv1.DaemonSetList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, daemonSets, listOpts))
+	// Lits only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
+	listOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(cronJobLabels)}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, cronJobs, listOpts))
 
-	// Verify there is just 1 daemon set and that its name matches the name of the CR.
-	s.Equalf(1, len(daemonSets.Items), "DaemonSets count in Mondoo namespace is incorrect.")
-	expectedDaemonSetName := fmt.Sprintf(mondoocontrollers.NodeDaemonSetNameTemplate, auditConfig.Name)
-	s.Equalf(expectedDaemonSetName, daemonSets.Items[0].Name, "DaemonSet name does not match expected name based from audit config name.")
+	nodes := &corev1.NodeList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodes))
+
+	// Verify the amount of CronJobs created is equal to the amount of nodes
+	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, cronJobs, listOpts))
+		if len(nodes.Items) == len(cronJobs.Items) {
+			return true, nil
+		}
+		return false, nil
+	})
+	s.NoErrorf(
+		err,
+		"The amount of node scanning CronJobs is not equal to the amount of cluster nodes. expected: %d; actual: %d",
+		len(nodes.Items), len(cronJobs.Items))
+
+	for _, c := range cronJobs.Items {
+		found := false
+		for _, n := range nodes.Items {
+			if n.Name == c.Spec.JobTemplate.Spec.Template.Spec.NodeName {
+				found = true
+			}
+		}
+		s.Truef(found, "CronJob %s/%s does not have a corresponding cluster node.", c.Namespace, c.Name)
+	}
+
+	// Make sure we have 1 successful run for each CronJob
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, cronJobs, listOpts))
+		for _, c := range cronJobs.Items {
+			// Make sure the job has been scheduled
+			if c.Status.LastScheduleTime == nil {
+				return false, nil
+			}
+		}
+
+		// Make sure all jobs have succeeded
+		if k8s.AreCronJobsSuccessful(cronJobs.Items) {
+			return true, nil
+		}
+		return false, nil
+	})
+
+	s.NoError(err, "Not all CronJobs have run successfully.")
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
