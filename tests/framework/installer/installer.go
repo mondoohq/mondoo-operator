@@ -18,20 +18,22 @@ import (
 )
 
 const (
-	OperatorManifest        = "mondoo-operator-manifests.yaml"
-	AuditConfigManifest     = "config/samples/k8s_v1alpha2_mondooauditconfig_minimal.yaml"
-	MondooCredsFile         = "creds.json"
-	MondooClientsLabel      = "mondoo_cr=mondoo-client"
-	MondooClientsNodesLabel = "audit=node"
-	MondooClientsK8sLabel   = "audit=k8s"
+	OperatorManifest           = "mondoo-operator-manifests.yaml"
+	AuditConfigManifest        = "config/samples/k8s_v1alpha2_mondooauditconfig_minimal.yaml"
+	MondooCredsFile            = "creds.json"
+	MondooClientsLabel         = "mondoo_cr=mondoo-client"
+	MondooClientsNodesLabel    = "audit=node"
+	MondooClientsK8sLabel      = "audit=k8s"
+	ExternalInstallationEnvVar = "EXTERNAL_INSTALLATION"
 )
 
 type MondooInstaller struct {
-	T           func() *testing.T
-	Settings    Settings
-	K8sHelper   *utils.K8sHelper
-	isInstalled bool
-	ctx         context.Context
+	T                     func() *testing.T
+	Settings              Settings
+	K8sHelper             *utils.K8sHelper
+	isInstalled           bool
+	ctx                   context.Context
+	isInstalledExternally bool
 }
 
 func NewMondooInstaller(settings Settings, t func() *testing.T) *MondooInstaller {
@@ -40,15 +42,28 @@ func NewMondooInstaller(settings Settings, t func() *testing.T) *MondooInstaller
 		panic("failed to get kubectl client :" + err.Error())
 	}
 
+	_, ok := os.LookupEnv(ExternalInstallationEnvVar)
+
 	return &MondooInstaller{
-		T:         t,
-		Settings:  settings,
-		K8sHelper: k8sHelper,
-		ctx:       context.Background(),
+		T:                     t,
+		Settings:              settings,
+		K8sHelper:             k8sHelper,
+		ctx:                   context.Background(),
+		isInstalled:           ok,
+		isInstalledExternally: ok,
 	}
 }
 
 func (i *MondooInstaller) InstallOperator() error {
+	if err := i.CreateClientSecret(i.Settings.Namespace); err != nil {
+		return err
+	}
+
+	if i.isInstalledExternally {
+		zap.S().Info("The Mondoo operator is installed externally. Skipping installation...")
+		return nil
+	}
+
 	rootFolder, err := utils.FindRootFolder()
 	if err != nil {
 		return err
@@ -64,22 +79,8 @@ func (i *MondooInstaller) InstallOperator() error {
 		return fmt.Errorf("Failed to create mondoo-operator manifest(s): %v ", err)
 	}
 
-	if err := i.CreateClientSecret(i.Settings.Namespace); err != nil {
-		return err
-	}
-
 	if !i.K8sHelper.IsPodReady("control-plane=controller-manager", i.Settings.Namespace) {
 		return fmt.Errorf("Mondoo operator is not in a ready state.")
-	}
-
-	// Create a MondooOperatorConfig with default values
-	operatorConfig := &mondoov2.MondooOperatorConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: mondoov2.MondooOperatorConfigName,
-		},
-	}
-	if err := i.K8sHelper.Clientset.Create(i.ctx, operatorConfig); err != nil {
-		return fmt.Errorf("failed to create default MondooOperatorConfig: %s", err)
 	}
 	zap.S().Info("Mondoo operator is ready.")
 
@@ -103,6 +104,12 @@ func (i *MondooInstaller) UninstallOperator() error {
 	secret.Namespace = i.Settings.Namespace
 	if err := i.K8sHelper.DeleteResourceIfExists(secret); err != nil {
 		return err
+	}
+	zap.S().Info("Deleted Mondoo client secret %s/%s.", secret.Namespace, secret.Name)
+
+	if i.isInstalledExternally {
+		zap.S().Info("The Mondoo operator has been installed externally. Skipping uninstall...")
+		return nil
 	}
 
 	_, err := i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.DeleteIngoreNotFoundFromStdinArgs...)
@@ -143,7 +150,7 @@ func (i *MondooInstaller) CreateClientSecret(ns string) error {
 	secret.Name = utils.MondooClientSecret
 	secret.Namespace = ns
 	if err := i.K8sHelper.Clientset.Create(i.ctx, &secret); err != nil {
-		return fmt.Errorf("Failed to create Мondoo secret. %v", err)
+		return fmt.Errorf("Failed to create Мondoo secret in namespace %s. %v", ns, err)
 	}
 	zap.S().Infof("Created Мondoo client secret %q.", utils.MondooClientSecret)
 	return nil

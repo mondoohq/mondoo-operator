@@ -32,6 +32,7 @@ type AuditConfigBaseSuite struct {
 	suite.Suite
 	ctx         context.Context
 	testCluster *TestCluster
+	auditConfig mondoov2.MondooAuditConfig
 }
 
 func (s *AuditConfigBaseSuite) SetupSuite() {
@@ -47,10 +48,20 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 	if s.testCluster != nil {
 		s.testCluster.GatherAllMondooLogs(testName, installer.MondooNamespace)
 		s.NoError(s.testCluster.CleanupAuditConfigs())
+		secret := &corev1.Secret{}
+		secret.Name = mondooadmission.GetTLSCertificatesSecretName(s.auditConfig.Name)
+		secret.Namespace = s.auditConfig.Namespace
+		s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(secret), "Failed to delete TLS secret")
+
+		operatorConfig := &mondoov2.MondooOperatorConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: mondoov2.MondooOperatorConfigName},
+		}
+		s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(operatorConfig), "Failed to delete MondooOperatorConfig")
 	}
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigWorkloads(auditConfig mondoov2.MondooAuditConfig) {
+	s.auditConfig = auditConfig
 	zap.S().Info("Create an audit config that enables only workloads scanning.")
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
@@ -80,6 +91,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigWorkloads(auditConfig mondoo
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
+	s.auditConfig = auditConfig
 	zap.S().Info("Create an audit config that enables only nodes scanning.")
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
@@ -141,6 +153,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
+	s.auditConfig = auditConfig
 	// Generate certificates manually
 	serviceDNSNames := []string{
 		// DNS names will take the form of ServiceName.ServiceNamespace.svc and .svc.cluster.local
@@ -159,14 +172,12 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 		ObjectMeta: metav1.ObjectMeta{
 			Name: mondoov2.MondooOperatorConfigName,
 		},
+		Spec: mondoov2.MondooOperatorConfigSpec{
+			SkipContainerResolution: true,
+		},
 	}
 	s.Require().NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(operatorConfig), operatorConfig),
-		"Failed to get existing MondooOperatorConfig")
-
-	operatorConfig.Spec.SkipContainerResolution = true
-	s.Require().NoErrorf(s.testCluster.K8sHelper.Clientset.Update(s.ctx, operatorConfig),
-		"Failed to set SkipContainerResolution on MondooOperatorConfig for webhook test")
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, operatorConfig), "Failed to create MondooOperatorConfig")
 
 	// Enable webhook
 	zap.S().Info("Create an audit config that enables only admission control.")
@@ -259,9 +270,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 		"Expected update of Deployment to succeed after CA data applied to webhook")
 
 	// Bring back the default image resolution behavior
-	operatorConfig.Spec.SkipContainerResolution = false
-
 	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Update(s.ctx, operatorConfig),
+		s.testCluster.K8sHelper.Clientset.Delete(s.ctx, operatorConfig),
 		"Failed to restore container resolution in MondooOperatorConfig")
+
 }
