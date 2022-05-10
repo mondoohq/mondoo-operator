@@ -20,7 +20,7 @@ It is backed by Mondoo's powerful Policy-as-Code the Mondoo Query Language (MQL)
 - CIS Kubernetes Benchmark
 - Kubernetes Application Benchmark
 
-![Architecture](docs/img/architecture.png)
+![Architecture](docs/img/architecture.svg)
 
 ## Getting Started
 
