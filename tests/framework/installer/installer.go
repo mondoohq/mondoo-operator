@@ -55,11 +55,11 @@ func NewMondooInstaller(settings Settings, t func() *testing.T) *MondooInstaller
 }
 
 func (i *MondooInstaller) InstallOperator() error {
-	if err := i.CreateClientSecret(i.Settings.Namespace); err != nil {
-		return err
-	}
-
 	if i.isInstalledExternally {
+		if err := i.CreateClientSecret(i.Settings.Namespace); err != nil {
+			return err
+		}
+
 		zap.S().Info("The Mondoo operator is installed externally. Skipping installation...")
 		return nil
 	}
@@ -77,6 +77,10 @@ func (i *MondooInstaller) InstallOperator() error {
 	i.isInstalled = true // If the command above has run there is a change things have been partially created.
 	if err != nil {
 		return fmt.Errorf("Failed to create mondoo-operator manifest(s): %v ", err)
+	}
+
+	if err := i.CreateClientSecret(i.Settings.Namespace); err != nil {
+		return err
 	}
 
 	if !i.K8sHelper.IsPodReady("control-plane=controller-manager", i.Settings.Namespace) {
