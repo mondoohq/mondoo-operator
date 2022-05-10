@@ -99,9 +99,13 @@ Once the secret is configured, we configure the operator to define the scan targ
       name: mondoo-client
       namespace: mondoo-operator
     spec:
+      mondooCredsSecretRef:
+        name: mondoo-client
       kubernetesResources:
         enable: true
       nodes:
+        enable: true
+      admission:
         enable: true
     ```
 
