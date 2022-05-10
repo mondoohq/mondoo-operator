@@ -64,6 +64,7 @@ jobs:
       - name: Gather running pods
         if: failure()
         run: |
+          kubectl get pods -A
           mkdir -p tests/integration/_output
           kubectl get pods -n mondoo-operator -o yaml >> tests/integration/_output/olm-installation-pods.log
           kubectl logs -n mondoo-operator ghcr-io-mondoohq-mondoo-operator-bundle-v0-2-8 >> tests/integration/_output/olm-installation-pods.log
