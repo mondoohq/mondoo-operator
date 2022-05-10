@@ -394,7 +394,7 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&source.Kind{Type: &corev1.Node{}},
 			handler.EnqueueRequestsFromMapFunc(r.nodeEventsRequestMapper),
-			builder.WithPredicates(k8s.CreateOrDeletePredicate{})).
+			builder.WithPredicates(k8s.IgnoreGenericEventsPredicate{})).
 		Complete(r)
 }
 

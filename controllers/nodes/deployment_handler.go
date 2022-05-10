@@ -133,7 +133,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 
 		created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
 		if err != nil {
-			logger.Error(err, "Failed to create inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
+			logger.Error(err, "Failed to create CronJob", "namespace", desired.Namespace, "name", desired.Name)
 			return err
 		}
 
@@ -204,7 +204,7 @@ func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]ba
 	cronJobs := &batchv1.CronJobList{}
 	cronJobLabels := CronJobLabels(*n.Mondoo)
 
-	// Lits only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
+	// Lists only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
 	listOpts := &client.ListOptions{Namespace: n.Mondoo.Namespace, LabelSelector: labels.SelectorFromSet(cronJobLabels)}
 	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
 		logger.Error(err, "Failed to list CronJobs in namespace", "namespace", n.Mondoo.Namespace)
