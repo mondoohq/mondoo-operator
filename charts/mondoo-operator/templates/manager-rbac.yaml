@@ -22,6 +22,15 @@ rules:
   resources:
   - daemonsets
   verbs:
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
   - create
   - delete
   - get
@@ -30,9 +39,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - apps
+  - batch
   resources:
-  - deployments
+  - cronjobs
   verbs:
   - create
   - delete
@@ -70,6 +79,7 @@ rules:
   - ""
   resources:
   - namespaces
+  - nodes
   - pods
   verbs:
   - get
@@ -82,6 +92,15 @@ rules:
   verbs:
   - create
   - delete
+- apiGroups:
+  - ""
+  resourceNames:
+  - mondoo-client
+  - mondoo-token
+  resources:
+  - secrets
+  verbs:
+  - get
 - apiGroups:
   - ""
   resources:
