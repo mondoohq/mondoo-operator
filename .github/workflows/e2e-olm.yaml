@@ -29,8 +29,9 @@ jobs:
           go-version: "${{ env.golang-version }}"
       - name: Start minikube
         uses: medyagh/setup-minikube@master
-      - name: Try the cluster !
-        run: kubectl get pods -A
+        with:
+          memory: 4000m      
+
       - name: Install operator-sdk
         id: operator-sdk
         run: |
@@ -44,28 +45,40 @@ jobs:
           gpg -u "Operator SDK (release) <cncf-operator-sdk@cncf.io>" --verify checksums.txt.asc
           grep operator-sdk_${OS}_${ARCH} checksums.txt | sha256sum -c -
           chmod +x operator-sdk_${OS}_${ARCH} && sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
-      - name: Install olm
+
+      - name: Install Mondoo operator using OLM
         run: |
-          trap 'echo "Saving OLM logs" ; kubectl get pods --namespace mondoo-operator -o yaml >> olm-logs.txt ; kubectl get pods -o name -n mondoo-operator | xargs -I{} kubectl logs --namespace mondoo-operator --prefix {} >> olm-logs.txt' EXIT
           operator-sdk olm install
           kubectl create ns mondoo-operator
           operator-sdk run bundle '${{ inputs.bundle-img }}' --namespace mondoo-operator --timeout 5m0s
-          echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
-          kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
-          rm creds.json
-          kubectl apply -f config/samples/k8s_v1alpha1_mondooauditconfig.yaml
-      - name: Install mondoo and run e2e test with olm
-        run: |
-          curl -sSL http://mondoo.io/download.sh | bash
-          mv mondoo /usr/local/bin/ 
-          make test/deployment
+
+      - name: Store creds
+        run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+
+      # Now that dependencies are cached the tests start almost immediately after minikube has started
+      # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
+      # before the test execution starts.
+      - name: Wait a bit for the runner to become more stable
+        run: sleep 60
+
+      - name: Run integration tests
+        run: EXTERNAL_INSTALLATION=1 make test/integration/ci
+
       - name: Clean up
         run: |
           operator-sdk cleanup mondoo-operator --namespace mondoo-operator
           operator-sdk olm uninstall
-      - name: Upload olm logs artifact
+
+      - name: Upload test logs artifact
         uses: actions/upload-artifact@v3
         if: failure()
         with:
-          name: olm-logs
-          path: /home/runner/work/mondoo-operator/mondoo-operator/olm-logs.txt
+          name: test-logs
+          path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
+
+      - uses: dorny/test-reporter@v1
+        if: failure() || success()
+        with:
+          name: Report OLM test results
+          path: '*.xml'                     # Path to test results
+          reporter: java-junit              # Format of test results

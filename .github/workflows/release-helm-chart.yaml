@@ -2,7 +2,6 @@ name: Release Helm Chart
 
 on:
   workflow_call:
-  pull_request: # TODO: temporary just to verify whether stuff works
 
 jobs:
   release:
@@ -35,8 +34,7 @@ jobs:
         id: install
 
       - name: Store creds
-        run: |
-          echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+        run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
       - name: Install Mondoo Operator Helm chart
         run: helm install mondoo-operator charts/mondoo-operator -n mondoo-operator --create-namespace --wait
@@ -57,17 +55,16 @@ jobs:
           name: test-logs
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
         
-        # TODO: temporary don't release helm chart
-      #- name: Run chart-releaser
+      - name: Run chart-releaser
         # switch back to helm/chart-releaser-action when #60 is fixed
         # https://github.com/helm/chart-releaser-action/issues/60
-        # uses: luisico/chart-releaser-action@on-tags
-        # env:
-        #   CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        uses: luisico/chart-releaser-action@on-tags
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
       - uses: dorny/test-reporter@v1
         if: failure() || success()
         with:
-          name: Report test results
-          path: '*.xml'                     # Path to test results (inside artifact .zip)
+          name: Report Helm test results
+          path: '*.xml'                     # Path to test results
           reporter: java-junit              # Format of test results
