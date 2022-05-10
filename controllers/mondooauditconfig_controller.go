@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -44,6 +45,7 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/admission"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -326,7 +328,7 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 	}
 
 	log.Info("Creating Mondoo service account from token")
-	token := strings.TrimSpace(string(mondooTokenSecret.Data["token"]))
+	token := strings.TrimSpace(string(mondooTokenSecret.Data[constants.MondooTokenSecretKey]))
 
 	return r.createServiceAccountFromToken(ctx, mondoo, token, log)
 
@@ -356,23 +358,55 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 
 	mClient := r.MondooClientBuilder(opts)
 
-	resp, err := mClient.ExchangeRegistrationToken(ctx, &mondooclient.ExchangeRegistrationTokenInput{
-		Token: jwtString,
-	})
-	if err != nil {
-		log.Error(err, "failed to exchange token for a service account")
-		return err
-	}
-
-	// Save the service account
 	tokenSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mondoo.Spec.MondooCredsSecretRef.Name,
 			Namespace: mondoo.Namespace,
 		},
-		StringData: map[string]string{
-			"config": resp.ServiceAccount,
-		},
+	}
+	if mondoo.Spec.ConsoleIntegration.Enable {
+		// owner is the MRN of the integration
+		tokenOwner, ok := claims["owner"]
+		if !ok {
+			err := fmt.Errorf("'owner' claim missing from token which is expected for Mondoo integration registration")
+			log.Error(err, "missing data in token Secret")
+			return err
+		}
+		// Do an integration-style registration to associate the generated
+		// service account with the Mondoo console Integration
+		resp, err := mClient.IntegrationRegister(ctx, &mondooclient.IntegrationRegisterInput{
+			Mrn:   fmt.Sprintf("%v", tokenOwner),
+			Token: jwtString,
+		})
+		if err != nil {
+			log.Error(err, "failed to exchange token for a service account")
+			return err
+		}
+
+		integrationMrn := resp.Mrn
+		credsBytes, err := json.Marshal(*resp.Creds)
+		if err != nil {
+			log.Error(err, "failed to marshal service account creds from IntegrationRegister()")
+			return err
+		}
+		tokenSecret.StringData = map[string]string{
+			constants.MondooCredsSecretServiceAccountKey: string(credsBytes),
+			constants.MondooCredsSecretIntegrationMRNKey: integrationMrn,
+		}
+	} else {
+		// Do a vanilla token-for-service-account exchange
+		resp, err := mClient.ExchangeRegistrationToken(ctx, &mondooclient.ExchangeRegistrationTokenInput{
+			Token: jwtString,
+		})
+		if err != nil {
+			log.Error(err, "failed to exchange token for a service account")
+			return err
+		}
+
+		// Save the service account
+		tokenSecret.StringData = map[string]string{
+			constants.MondooCredsSecretServiceAccountKey: resp.ServiceAccount,
+		}
 	}
 
 	_, err = k8s.CreateIfNotExist(ctx, r.Client, tokenSecret, tokenSecret)

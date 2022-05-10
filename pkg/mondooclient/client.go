@@ -26,6 +26,9 @@ type Client interface {
 
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	RunKubernetesManifest(context.Context, *KubernetesManifestJob) (*ScanResult, error)
+
+	IntegrationRegister(context.Context, *IntegrationRegisterInput) (*IntegrationRegisterOutput, error)
+	IntegrationCheckIn(context.Context, *IntegrationCheckInInput) (*IntegrationCheckInOutput, error)
 }
 
 func DefaultHttpClient() *http.Client {
@@ -224,4 +227,87 @@ func NewClient(opts ClientOptions) Client {
 		Token:       opts.Token,
 	}
 	return mClient
+}
+
+type IntegrationRegisterInput struct {
+	// Mrn is the MRN of the integration. It should be provided in the JWT under the "owner" claim
+	Mrn   string `protobuf:"bytes,1,opt,name=mrn,proto3" json:"mrn,omitempty"`
+	Token string `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
+}
+
+type IntegrationRegisterOutput struct {
+	// Mrn is the integration MRN
+	Mrn string `protobuf:"bytes,1,opt,name=mrn,proto3" json:"mrn,omitempty"`
+	// Creds holds all the Mondoo serivce account data
+	Creds *ServiceAccountCredentials `protobuf:"bytes,2,opt,name=creds,proto3" json:"creds,omitempty"`
+}
+
+type ServiceAccountCredentials struct {
+	Mrn         string `protobuf:"bytes,1,opt,name=mrn,proto3" json:"mrn,omitempty"`
+	SpaceMrn    string `protobuf:"bytes,2,opt,name=space_mrn,json=spaceMrn,proto3" json:"space_mrn,omitempty"`
+	PrivateKey  string `protobuf:"bytes,3,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
+	Certificate string `protobuf:"bytes,4,opt,name=certificate,proto3" json:"certificate,omitempty"`
+	ApiEndpoint string `protobuf:"bytes,5,opt,name=api_endpoint,json=apiEndpoint,proto3" json:"api_endpoint,omitempty"`
+}
+
+const IntegrationRegisterEndpoint = "/IntegrationsManager/Register"
+
+func (s *mondooClient) IntegrationRegister(ctx context.Context, in *IntegrationRegisterInput) (*IntegrationRegisterOutput, error) {
+	url := s.ApiEndpoint + IntegrationRegisterEndpoint
+
+	reqBodyBytes, err := json.Marshal(in)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	respBodyBytes, err := s.request(ctx, url, reqBodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	out := &IntegrationRegisterOutput{}
+	if err = json.Unmarshal(respBodyBytes, out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal proto response: %v", err)
+	}
+
+	return out, nil
+}
+
+type IntegrationCheckInInput struct {
+	// Mrn should hold the MRN of the integration that is having the CheckIn() called for
+	Mrn string `protobuf:"bytes,1,opt,name=mrn,proto3" json:"mrn,omitempty"`
+	// optional, ensure the client has the exact same configuration options
+	// as the ones saved to the integration/db
+	ConfigurationHash string `protobuf:"bytes,2,opt,name=configuration_hash,json=configurationHash,proto3" json:"configuration_hash,omitempty"`
+	// source identifier for the integration, e.g. AWS account id
+	Identifier string `protobuf:"bytes,3,opt,name=identifier,proto3" json:"identifier,omitempty"`
+}
+
+type IntegrationCheckInOutput struct {
+	Mrn string `protobuf:"bytes,1,opt,name=mrn,proto3" json:"mrn,omitempty"`
+	// true if the configuration hash sent in matches the hash of the stored configuration
+	ConfigurationMatch bool `protobuf:"varint,2,opt,name=configuration_match,json=configurationMatch,proto3" json:"configuration_match,omitempty"`
+}
+
+const IntegrationCheckInEndpoint = "/IntegrationsManager/CheckIn"
+
+func (s *mondooClient) IntegrationCheckIn(ctx context.Context, in *IntegrationCheckInInput) (*IntegrationCheckInOutput, error) {
+	url := s.ApiEndpoint + IntegrationCheckInEndpoint
+
+	reqBodyBytes, err := json.Marshal(in)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	respBodyBytes, err := s.request(ctx, url, reqBodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	out := &IntegrationCheckInOutput{}
+	if err = json.Unmarshal(respBodyBytes, out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %v", err)
+	}
+
+	return out, nil
 }

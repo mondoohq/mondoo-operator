@@ -2,16 +2,10 @@ package controllers
 
 import (
 	"context"
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"testing"
-	"time"
 
-	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,6 +27,7 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	mockmondoo "go.mondoo.com/mondoo-operator/pkg/mondooclient/mock"
+	"go.mondoo.com/mondoo-operator/tests/credentials"
 )
 
 const (
@@ -42,10 +37,22 @@ const (
 	testMondooTokenSecretName = "mondoo-token'"
 
 	testServiceAccountData = `SERVICE ACCOUNT DATA HERE`
+
+	testIntegrationMRN = "//integration.api.mondoo.app/spaces/test-infallible-taussig-123456/integrations/abcdefghhijklmnop"
 )
 
 var (
-	testTokenData string
+	testTokenData            string
+	testIntegrationTokenData string
+
+	testMondooServiceAccount = &mondooclient.ServiceAccountCredentials{
+		Mrn:         "//agents.api.mondoo.app/spaces/test-infallible-taussig-123456/serviceaccounts/1234567890987654321",
+		SpaceMrn:    "//captain.api.mondoo.app/spaces/test-infallible-taussig-123456",
+		PrivateKey:  "PRIVATE KEY DATA HERE",
+		Certificate: "CERTIFICATE DATA HERE",
+		ApiEndpoint: "http://127.0.0.2:8989",
+	}
+	testMondooServiceAccountDataBytes []byte
 )
 
 func init() {
@@ -58,7 +65,12 @@ func TestTokenRegistration(t *testing.T) {
 
 	utilruntime.Must(v1alpha2.AddToScheme(scheme.Scheme))
 
-	testTokenData = testToken(t)
+	testTokenData = credentials.MondooToken(t, "")
+	testIntegrationTokenData = credentials.MondooToken(t, testIntegrationMRN)
+
+	var err error
+	testMondooServiceAccountDataBytes, err = json.Marshal(testMondooServiceAccount)
+	require.NoError(t, err, "error converting sample service account data")
 
 	tests := []struct {
 		name             string
@@ -187,6 +199,54 @@ func TestTokenRegistration(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name: "generate service account via Integrations",
+			existingObjects: []runtime.Object{
+				testIntegrationTokenSecret(),
+				testMondooAuditConfigWithIntegration(),
+			},
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockClient {
+				mClient := mockmondoo.NewMockClient(mockCtrl)
+
+				mClient.EXPECT().IntegrationRegister(gomock.Any(), &mondooclient.IntegrationRegisterInput{
+					Mrn:   testIntegrationMRN,       // verify we are getting the expected integration MRN
+					Token: testIntegrationTokenData, // and that the token data matches what was in the token Secret
+				}).Times(1).Return(&mondooclient.IntegrationRegisterOutput{
+					Mrn:   testIntegrationMRN,
+					Creds: testMondooServiceAccount,
+				}, nil)
+
+				return mClient
+			},
+			verify: func(t *testing.T, kubeClient client.Client) {
+
+				credsSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testMondooCredsSecretName,
+						Namespace: testNamespace,
+					},
+				}
+				err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(credsSecret), credsSecret)
+
+				assert.NoError(t, err, "error getting secret that should exist")
+
+				// Check StringData because we're using the fake client
+				assert.Equal(t, string(testMondooServiceAccountDataBytes), credsSecret.StringData["config"])
+			},
+		},
+		{
+			name: "missing owner claim error",
+			existingObjects: []runtime.Object{
+				testTokenSecret(),
+				testMondooAuditConfigWithIntegration(),
+			},
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockClient {
+				mClient := mockmondoo.NewMockClient(mockCtrl)
+
+				return mClient
+			},
+			expectError: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -249,6 +309,13 @@ func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {
 	}
 }
 
+func testMondooAuditConfigWithIntegration() *v1alpha2.MondooAuditConfig {
+	mac := testMondooAuditConfig()
+	mac.Spec.ConsoleIntegration.Enable = true
+
+	return mac
+}
+
 func testTokenSecret() *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -261,32 +328,14 @@ func testTokenSecret() *corev1.Secret {
 	}
 }
 
-func testToken(t *testing.T) string {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err, "failed to generate private key for generating JWT")
-
-	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
-	require.NoError(t, err, "failed to extract public key")
-
-	hasher := crypto.SHA256.New()
-	hasher.Write(publicKeyBytes)
-	publicKeyHash := hasher.Sum(nil)
-	keyID := base64.RawURLEncoding.EncodeToString(publicKeyHash)
-
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
-		"sub":          "//some/user/id",
-		"aud":          []string{"mondoo"},
-		"iss":          "mondoo/issuer",
-		"api_endpoint": "https://some.domain.com/path/to/endpoint",
-		"exp":          time.Now().Unix() + 600, // 600 seconds
-		"iat":          time.Now().Unix(),
-		"space":        "//some/mondoo/spaceID",
-	})
-
-	token.Header["kid"] = keyID
-
-	tokenString, err := token.SignedString(privateKey)
-	require.NoError(t, err, "failed to generate signed token string")
-
-	return tokenString
+func testIntegrationTokenSecret() *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testMondooTokenSecretName,
+			Namespace: testNamespace,
+		},
+		Data: map[string][]byte{
+			"token": []byte(testIntegrationTokenData),
+		},
+	}
 }

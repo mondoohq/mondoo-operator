@@ -39,6 +39,7 @@ import (
 	k8sv1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers"
+	"go.mondoo.com/mondoo-operator/controllers/integration"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
 )
@@ -107,6 +108,11 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MondooOperatorConfig")
+		os.Exit(1)
+	}
+
+	if err = integration.Add(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Integration")
 		os.Exit(1)
 	}
 
