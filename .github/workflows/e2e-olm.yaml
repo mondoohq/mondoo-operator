@@ -14,6 +14,8 @@ on:
         description: "bundle image that is used for e2e testing"
         required: true
         type: string
+  
+  pull_request: # TODO: remove
 
 jobs:
   e2e-olm:
@@ -46,11 +48,24 @@ jobs:
           grep operator-sdk_${OS}_${ARCH} checksums.txt | sha256sum -c -
           chmod +x operator-sdk_${OS}_${ARCH} && sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
 
+      # Now that dependencies are cached the tests start almost immediately after minikube has started
+      # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
+      # before the test execution starts.
+      - name: Wait a bit for the runner to become more stable
+        run: sleep 60
+
       - name: Install Mondoo operator using OLM
+        # TODO: replace image with '${{ inputs.bundle-img }}' 
         run: |
           operator-sdk olm install
           kubectl create ns mondoo-operator
-          operator-sdk run bundle '${{ inputs.bundle-img }}' --namespace mondoo-operator --timeout 5m0s
+          operator-sdk run bundle ghcr.io/mondoohq/mondoo-operator-bundle:v0.2.8 --namespace mondoo-operator --timeout 5m0s
+
+      - name: Gather running pods
+        if: failure()
+        run: |
+          mkdir -p tests/integration/_output
+          kubectl get pods -n mondoo-operator -o yaml >> olm-installation-pods.log
 
       - name: Store creds
         run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
