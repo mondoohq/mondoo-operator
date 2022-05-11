@@ -14,8 +14,6 @@ on:
         description: "bundle image that is used for e2e testing"
         required: true
         type: string
-  
-  pull_request: # TODO: remove
 
 jobs:
   e2e-olm:
@@ -55,12 +53,11 @@ jobs:
         run: sleep 60
 
       - name: Install Mondoo operator using OLM
-        # TODO: replace image with '${{ inputs.bundle-img }}' 
         run: |
           operator-sdk olm install
           sleep 30
           kubectl create ns mondoo-operator
-          operator-sdk run bundle ghcr.io/mondoohq/mondoo-operator-bundle:v0.2.8 --namespace mondoo-operator --timeout 3m0s
+          operator-sdk run bundle '${{ inputs.bundle-img }}' --namespace mondoo-operator --timeout 3m0s
 
       - name: Gather running pods
         if: failure()
@@ -95,8 +92,3 @@ jobs:
           name: Report OLM test results
           path: '*.xml'                     # Path to test results
           reporter: java-junit              # Format of test results
-
-      - name: setup tmate session for debugging
-        if: failure()
-        uses: mxschmitt/action-tmate@v3
-        timeout-minutes: 60
