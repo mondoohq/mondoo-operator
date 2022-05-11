@@ -58,6 +58,7 @@ jobs:
         # TODO: replace image with '${{ inputs.bundle-img }}' 
         run: |
           operator-sdk olm install
+          sleep 30
           kubectl create ns mondoo-operator
           operator-sdk run bundle ghcr.io/mondoohq/mondoo-operator-bundle:v0.2.8 --namespace mondoo-operator --timeout 5m0s
 
