@@ -24,9 +24,8 @@ jobs:
 
       - name: Start minikube
         uses: medyagh/setup-minikube@master
-
-      - name: Try the cluster !
-        run: kubectl get pods -A
+        with:
+          memory: 4000m
 
       - name: Install Helm
         uses: azure/setup-helm@v1
@@ -34,34 +33,38 @@ jobs:
           version: "v3.8.0" # default is latest stable
         id: install
 
-      - name: Create and Install Helm chart
-        run: |
-          trap 'echo "Saving Helm logs" ; kubectl get pods --namespace mondoo-operator -o yaml >> helm-logs.txt ; kubectl logs --namespace mondoo-operator deployment/mondoo-operator-controller-manager >> helm-logs.txt' EXIT
-          kubectl create namespace mondoo-operator
-          helm install mondoo-operator charts/mondoo-operator --namespace mondoo-operator
-          echo ${{ secrets.MONDOO_CLIENT }} > creds.json
-          kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
-          rm creds.json
-          kubectl apply -f config/samples/k8s_v1alpha2_mondooauditconfig_minimal.yaml
-      - name: Verify Mondoo Operator Helm Chart
-        run: |
-          trap 'echo "Saving Helm logs" ; kubectl get pods --namespace mondoo-operator -o yaml >> helm-logs.txt' EXIT
-          kubectl wait --for=condition=Ready pod -l control-plane=controller-manager --namespace mondoo-operator 
-          kubectl wait --for=condition=Ready pod -l mondoo_cr=mondoo-client --namespace mondoo-operator --timeout=600s
-          curl -sSL http://mondoo.io/download.sh | bash
-          mv mondoo /usr/local/bin/ 
-          make test/deployment
-          kubectl delete -f config/samples/k8s_v1alpha2_mondooauditconfig_minimal.yaml
-          helm uninstall mondoo-operator  --namespace mondoo-operator
+      - name: Store creds
+        run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+
+      - name: Install Mondoo Operator Helm chart
+        run: helm install mondoo-operator charts/mondoo-operator -n mondoo-operator --create-namespace --wait
+
+      # Now that dependencies are cached the tests start almost immediately after minikube has started
+      # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
+      # before the test execution starts.
+      - name: Wait a bit for the runner to become more stable
+        run: sleep 60
+
+      - name: Run integration tests
+        run: EXTERNAL_INSTALLATION=1 make test/integration/ci
+
+      - name: Upload test logs artifact
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: test-logs
+          path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
+        
       - name: Run chart-releaser
         # switch back to helm/chart-releaser-action when #60 is fixed
         # https://github.com/helm/chart-releaser-action/issues/60
         uses: luisico/chart-releaser-action@on-tags
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-      - name: Upload helm logs artifact
-        uses: actions/upload-artifact@v3
-        if: failure()
+
+      - uses: dorny/test-reporter@v1
+        if: failure() || success()
         with:
-          name: helm-logs
-          path: /home/runner/work/mondoo-operator/mondoo-operator/helm-logs.txt
+          name: Report Helm test results
+          path: '*.xml'                     # Path to test results
+          reporter: java-junit              # Format of test results
