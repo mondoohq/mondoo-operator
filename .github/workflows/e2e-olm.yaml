@@ -94,3 +94,8 @@ jobs:
           name: Report OLM test results
           path: '*.xml'                     # Path to test results
           reporter: java-junit              # Format of test results
+
+      - name: setup tmate session for debugging
+        if: failure()
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 60
