@@ -2,20 +2,20 @@
 This user manual describes how to install and use the Mondoo operator.
 
 ## Mondoo Operator Installation
-Install the Mondoo operator using `kubectl`, Helm, or Operator Lifecycle Manager.
+Install the Mondoo operator using kubectl, Helm, or Operator Lifecycle Manager.
 
 ### Installing with kubectl
-Follow this step to set up the Mondoo operator using `kubectl` and a manifest file.
+Follow this step to set up the Mondoo operator using kubectl and a manifest file.
 
-__Precondition:__ `kubectl` with cluster admin access
+Precondition: kubectl with cluster admin access
 
-__->__ Apply the operator manifests:
+&rarr; Apply the operator manifests:
 
     ```bash
     kubectl apply -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml
     ```
     
-    or
+or
 
     ```bash
     curl -sSL https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml > mondoo-operator-manifests.yaml
@@ -25,7 +25,7 @@ __->__ Apply the operator manifests:
 ### Installing with Helm
 Follow these steps to set up a development Kubernetes to test the operator using [Helm](https://helm.sh/).
 
-__Preconditions:__
+Preconditions:
 - `kubectl` with cluster admin access
 - `helm 3`
 
@@ -41,10 +41,10 @@ __Preconditions:__
     ```
 
 ### Installing with Operator Lifecycle Manager (OLM)
-Follow these steps to set up the Mondoo operator using [Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/).
+Follow these steps to set up the Mondoo operator using [Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/):
 
-__Preconditions:__
-- `kubectl` with cluster admin access
+Preconditions:
+- kubectl with cluster admin access
 - [`operator-lifecycle-manager`](https://olm.operatorframework.io/) installed in the cluster (see the [OLM QuickStart](https://olm.operatorframework.io/docs/getting-started/))
 - [`operator-sdk`](https://sdk.operatorframework.io/docs/installation/) installed locally
 
@@ -89,7 +89,7 @@ Follow these steps to configure the Mondoo client secret:
     ```
 
 ## Creating MondooAuditConfig
-Once the secret is configured, configure the operator to define the scan targets.
+Once the secret is configured, configure the operator to define the scan targets:
 
 1. Create `mondoo-config.yaml`:
     ```yaml
@@ -132,8 +132,8 @@ And create/modify/delete a pod in another window:
 kubectl delete pod -n mondoo-operator --selector control-plane=controller-manager
 ```
 
-### Using cert-manager
-[cert-manager](https://cert-manager.io/) is the easiest way to bootstrap the admission controller TLS certificate. 
+### Deploying the admission controller using cert-manager
+[cert-manager](https://cert-manager.io/) is the easiest way to bootstrap the admission controller TLS certificate: 
 
 1. Install cert-manger on the cluster if it isn't already installed. ([See instructions](https://cert-manager.io/docs/installation/).)
 
@@ -160,19 +160,19 @@ kubectl delete pod -n mondoo-operator --selector control-plane=controller-manage
 The admission controller `Deployment` should start. `ValidatingWebhookConfiguration` should be annotated to insert the certificate authority data. cert-manager creates a secret named `webhook-serving-cert` that contains the TLS certificates.
 
 ### Manually creating TLS certificates using OpenSSL
-It is possible to manually create the TLS certificate required for the admission controller. One way of doing that is described below.
+You can manually create the TLS certificate required for the admission controller. These steps show one method:
 
-1. Create key for your certificate authority:
+1. Create a key for your certificate authority:
    ```bash
    openssl genrsa -out ca.key 2048
    ```
 
-2. Generate certificate for your certificate authority:
+2. Generate a certificate for your certificate authority:
    ```bash
    openssl req -x509 -new -nodes -key ca.key -subj "/CN=Webhook Issuer" -days 10000 -out ca.crt
    ```
 
-3. Generate the key for the webhook server pod:
+3. Generate a key for the webhook server pod:
    ```bash
    openssl genrsa -out server.key 2048
    ```
@@ -225,8 +225,8 @@ It is possible to manually create the TLS certificate required for the admission
     kubectl edit validatingwebhookconfiguration mondoo-operator-mondoo-webhook
     ```
 
-The end result should look something like this:
-    ```yaml
+The end result should resemble this:
+```yaml
     apiVersion: admissionregistration.k8s.io/v1
     kind: ValidatingWebhookConfiguration
     metadata:
@@ -243,7 +243,7 @@ The end result should look something like this:
             namespace: mondoo-operator
             path: /validate-k8s-mondoo-com-core
             port: 443
-    ```
+```
 
 ## Uninstalling the Mondoo operator
 Before uninstalling the Mondoo operator, be sure to delete all `MondooAuditConfig` and `MondooOperatorConfig` objects. You can find any in your cluster by running:
@@ -251,7 +251,7 @@ Before uninstalling the Mondoo operator, be sure to delete all `MondooAuditConfi
 kubectl get mondooauditconfigs.k8s.mondoo.com,mondoooperatorconfigs.k8s.mondoo.com -A
 ```
 
-### Uninstalling the operator with `kubectl`
+### Uninstalling the operator with kubectl
 Run: 
 ```bash
 kubectl delete -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml
