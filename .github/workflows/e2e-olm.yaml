@@ -15,6 +15,8 @@ on:
         required: true
         type: string
 
+  pull_request:
+
 jobs:
   e2e-olm:
     name: E2E tests
@@ -52,12 +54,13 @@ jobs:
       - name: Wait a bit for the runner to become more stable
         run: sleep 60
 
+        # TODO: replace the '${{ inputs.bundle-img }}'
       - name: Install Mondoo operator using OLM
         run: |
           operator-sdk olm install
           sleep 30
           kubectl create ns mondoo-operator
-          operator-sdk run bundle '${{ inputs.bundle-img }}' --namespace mondoo-operator --timeout 3m0s
+          operator-sdk run bundle ghcr.io/mondoohq/mondoo-operator-bundle:v0.2.9 --namespace mondoo-operator --timeout 3m0s
 
       - name: Gather running pods
         if: failure()

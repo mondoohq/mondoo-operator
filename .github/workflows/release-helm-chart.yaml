@@ -2,6 +2,7 @@ name: Release Helm Chart
 
 on:
   workflow_call:
+  pull_request:
 
 jobs:
   release:
@@ -55,12 +56,12 @@ jobs:
           name: test-logs
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
         
-      - name: Run chart-releaser
+      #- name: Run chart-releaser
         # switch back to helm/chart-releaser-action when #60 is fixed
         # https://github.com/helm/chart-releaser-action/issues/60
-        uses: luisico/chart-releaser-action@on-tags
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      #  uses: luisico/chart-releaser-action@on-tags
+      #  env:
+      #    CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
       - uses: dorny/test-reporter@v1
         if: failure() || success()
