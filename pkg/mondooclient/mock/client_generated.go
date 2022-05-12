@@ -65,6 +65,36 @@ func (mr *MockClientMockRecorder) HealthCheck(arg0, arg1 interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HealthCheck", reflect.TypeOf((*MockClient)(nil).HealthCheck), arg0, arg1)
 }
 
+// IntegrationCheckIn mocks base method.
+func (m *MockClient) IntegrationCheckIn(arg0 context.Context, arg1 *mondooclient.IntegrationCheckInInput) (*mondooclient.IntegrationCheckInOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IntegrationCheckIn", arg0, arg1)
+	ret0, _ := ret[0].(*mondooclient.IntegrationCheckInOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IntegrationCheckIn indicates an expected call of IntegrationCheckIn.
+func (mr *MockClientMockRecorder) IntegrationCheckIn(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IntegrationCheckIn", reflect.TypeOf((*MockClient)(nil).IntegrationCheckIn), arg0, arg1)
+}
+
+// IntegrationRegister mocks base method.
+func (m *MockClient) IntegrationRegister(arg0 context.Context, arg1 *mondooclient.IntegrationRegisterInput) (*mondooclient.IntegrationRegisterOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IntegrationRegister", arg0, arg1)
+	ret0, _ := ret[0].(*mondooclient.IntegrationRegisterOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IntegrationRegister indicates an expected call of IntegrationRegister.
+func (mr *MockClientMockRecorder) IntegrationRegister(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IntegrationRegister", reflect.TypeOf((*MockClient)(nil).IntegrationRegister), arg0, arg1)
+}
+
 // RunKubernetesManifest mocks base method.
 func (m *MockClient) RunKubernetesManifest(arg0 context.Context, arg1 *mondooclient.KubernetesManifestJob) (*mondooclient.ScanResult, error) {
 	m.ctrl.T.Helper()

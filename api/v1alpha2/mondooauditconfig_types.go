@@ -39,6 +39,11 @@ type MondooAuditConfigSpec struct {
 	KubernetesResources KubernetesResources `json:"kubernetesResources,omitempty"`
 	Nodes               Nodes               `json:"nodes,omitempty"`
 	Admission           Admission           `json:"admission,omitempty"`
+	ConsoleIntegration  ConsoleIntegration  `json:"consoleIntegration,omitempty"`
+}
+
+type ConsoleIntegration struct {
+	Enable bool `json:"enable,omitempty"`
 }
 
 // CertificateProvisioning defines the certificate provisioning configuration within the cluster.
