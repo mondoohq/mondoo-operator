@@ -9,18 +9,18 @@ Follow this step to set up the Mondoo operator using kubectl and a manifest file
 
 Precondition: kubectl with cluster admin access
 
-&rarr; Apply the operator manifests:
+To install with kubectl, apply the operator manifests:
 
-    ```bash
-    kubectl apply -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml
-    ```
+```bash
+kubectl apply -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml
+```
     
 or
 
-    ```bash
-    curl -sSL https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml > mondoo-operator-manifests.yaml
-    kubectl apply -f mondoo-operator-manifests.yaml
-    ```
+```bash
+curl -sSL https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml > mondoo-operator-manifests.yaml
+kubectl apply -f mondoo-operator-manifests.yaml
+```
 
 ### Installing with Helm
 Follow these steps to set up a development Kubernetes to test the operator using [Helm](https://helm.sh/).
