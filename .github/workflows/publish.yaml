@@ -266,12 +266,83 @@ jobs:
 
   # run olm e2e tests
   run-olm-e2e:
+    name: OLM integration tests
     if: startsWith(github.ref, 'refs/tags/v')
-    uses: ./.github/workflows/e2e-olm.yaml
     needs:
       - build-bundle
-    with:
-      bundle-img: ghcr.io/${{ github.repository }}-bundle:${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "${{ env.golang-version }}"
+      - name: Start minikube
+        uses: medyagh/setup-minikube@master
+        with:
+          memory: 4000m      
+
+      - name: Install operator-sdk
+        id: operator-sdk
+        run: |
+          export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
+          export OS=$(uname | awk '{print tolower($0)}')
+          export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.20.0
+          curl -LO ${OPERATOR_SDK_DL_URL}/operator-sdk_${OS}_${ARCH}
+          gpg --keyserver keyserver.ubuntu.com --recv-keys 052996E2A20B5C7E
+          curl -LO ${OPERATOR_SDK_DL_URL}/checksums.txt
+          curl -LO ${OPERATOR_SDK_DL_URL}/checksums.txt.asc
+          gpg -u "Operator SDK (release) <cncf-operator-sdk@cncf.io>" --verify checksums.txt.asc
+          grep operator-sdk_${OS}_${ARCH} checksums.txt | sha256sum -c -
+          chmod +x operator-sdk_${OS}_${ARCH} && sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
+
+      # Now that dependencies are cached the tests start almost immediately after minikube has started
+      # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
+      # before the test execution starts.
+      - name: Wait a bit for the runner to become more stable
+        run: sleep 60
+
+      - name: Install Mondoo operator using OLM
+        run: |
+          operator-sdk olm install
+          sleep 30
+          kubectl create ns mondoo-operator
+          operator-sdk run bundle ghcr.io/${{ github.repository }}-bundle:${{ github.ref_name }} --namespace mondoo-operator --timeout 3m0s
+
+      - name: Gather running pods
+        if: failure()
+        run: |
+          kubectl get pods -A
+          mkdir -p tests/integration/_output
+          kubectl get pods -n mondoo-operator -o yaml >> tests/integration/_output/mondoo-pods.log
+          kubectl logs -n olm deployment/olm-operator >> tests/integration/_output/olm-operator-pods.log
+
+      - name: Store creds
+        run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+
+      - name: Run integration tests
+        run: EXTERNAL_INSTALLATION=1 make test/integration/ci
+
+      - name: Clean up
+        run: |
+          operator-sdk cleanup mondoo-operator --namespace mondoo-operator
+          operator-sdk olm uninstall
+
+      - name: Upload test logs artifact
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: olm-test-logs
+          path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
+
+      - uses: dorny/test-reporter@v1
+        if: failure() || success()
+        with:
+          name: Report OLM test results
+          path: '*.xml'                     # Path to test results
+          reporter: java-junit              # Format of test results
 
   # publish kubectl manifests
   run-release-manifests:
@@ -282,7 +353,70 @@ jobs:
 
   # publish helm chart after the release of container images is complete
   run-release-helm:
+    name: Release helm chart
     if: startsWith(github.ref, 'refs/tags/v')
-    uses: ./.github/workflows/release-helm-chart.yaml
     needs:
       - push-virtual-tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "${{ env.golang-version }}"
+
+      - name: Start minikube
+        uses: medyagh/setup-minikube@master
+        with:
+          memory: 4000m
+
+      - name: Install Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: "v3.8.0" # default is latest stable
+        id: install
+
+      - name: Store creds
+        run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+
+      - name: Install Mondoo Operator Helm chart
+        run: helm install mondoo-operator charts/mondoo-operator -n mondoo-operator --create-namespace --wait
+
+      # Now that dependencies are cached the tests start almost immediately after minikube has started
+      # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
+      # before the test execution starts.
+      - name: Wait a bit for the runner to become more stable
+        run: sleep 60
+
+      - name: Run integration tests
+        run: EXTERNAL_INSTALLATION=1 make test/integration/ci
+
+      - name: Upload test logs artifact
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: helm-test-logs
+          path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
+        
+      - name: Run chart-releaser
+        # switch back to helm/chart-releaser-action when #60 is fixed
+        # https://github.com/helm/chart-releaser-action/issues/60
+        uses: luisico/chart-releaser-action@on-tags
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - uses: dorny/test-reporter@v1
+        if: failure() || success()
+        with:
+          name: Report Helm test results
+          path: '*.xml'                     # Path to test results
+          reporter: java-junit              # Format of test results
