@@ -26,6 +26,14 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 )
 
+const (
+	// How often to wake up and perform the integration CheckIn()
+	interval = time.Minute * 10
+
+	// must be set to "mondoo/ams" when making Mondoo API calls
+	tokenIssuer = "mondoo/ams"
+)
+
 // Add creates a new Integrations controller adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	var log logr.Logger
@@ -44,7 +52,7 @@ func Add(mgr manager.Manager) error {
 
 	mc := &IntegrationReconciler{
 		Client:              mgr.GetClient(),
-		Interval:            10 * time.Minute,
+		Interval:            interval,
 		log:                 log,
 		mondooClientBuilder: mondooclient.NewClient,
 	}
@@ -62,11 +70,14 @@ type IntegrationReconciler struct {
 	Interval            time.Duration
 	log                 logr.Logger
 	mondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
+	ctx                 context.Context
 }
 
 // Start begins the integration status loop.
 func (r *IntegrationReconciler) Start(ctx context.Context) error {
-	r.log.Info("started metrics calculator goroutine")
+	r.log.Info("started Mondoo console integration goroutine")
+
+	r.ctx = ctx
 
 	// Run forever, sleep at the end:
 	wait.Until(r.integrationLoop, r.Interval, ctx.Done())
@@ -79,7 +90,7 @@ func (r *IntegrationReconciler) integrationLoop() {
 	r.log.Info("Listing all MondooAuditConfigs")
 
 	mondooAuditConfigs := &v1alpha2.MondooAuditConfigList{}
-	if err := r.Client.List(context.TODO(), mondooAuditConfigs); err != nil {
+	if err := r.Client.List(r.ctx, mondooAuditConfigs); err != nil {
 		r.log.Error(err, "error listing MondooAuditConfigs")
 		return
 	}
@@ -102,7 +113,7 @@ func (r *IntegrationReconciler) processMondooAuditConfig(mondoo v1alpha2.MondooA
 			Namespace: mondoo.Namespace,
 		},
 	}
-	if err := r.Client.Get(context.Background(), client.ObjectKeyFromObject(mondooCreds), mondooCreds); err != nil {
+	if err := r.Client.Get(r.ctx, client.ObjectKeyFromObject(mondooCreds), mondooCreds); err != nil {
 		r.log.Error(err, "failed to read Mondoo creds from secret")
 		return err
 	}
@@ -110,7 +121,7 @@ func (r *IntegrationReconciler) processMondooAuditConfig(mondoo v1alpha2.MondooA
 	integrationMrn, ok := mondooCreds.Data[constants.MondooCredsSecretIntegrationMRNKey]
 	if !ok {
 		err := fmt.Errorf("cannot CheckIn() with 'integrationmrn' data missing from Mondoo creds secret")
-		r.log.Error(err, "missing data in Mondoo creds Secret")
+		r.log.Error(err, "in order to perform a CheckIn(), the MondooAuditConfig.Spec.MondooCredsSecretRef must specify the integration MRN in the key 'integrationmrn'")
 		return err
 	}
 	serviceAccount := &mondooclient.ServiceAccountCredentials{}
@@ -129,7 +140,7 @@ func (r *IntegrationReconciler) processMondooAuditConfig(mondoo v1alpha2.MondooA
 	})
 
 	// Do the actual check-in
-	if _, err := mondooClient.IntegrationCheckIn(context.Background(), &mondooclient.IntegrationCheckInInput{
+	if _, err := mondooClient.IntegrationCheckIn(r.ctx, &mondooclient.IntegrationCheckInInput{
 		Mrn: string(integrationMrn),
 	}); err != nil {
 		r.log.Error(err, "failed to CheckIn() to Mondoo API")
@@ -152,18 +163,18 @@ func (r *IntegrationReconciler) generateTokenFromServiceAccount(serviceAccount *
 	}
 	switch pk := key.(type) {
 	case *ecdsa.PrivateKey:
-		return r.buildTokenFromPrivateKey(pk, serviceAccount)
+		return r.createSignedToken(pk, serviceAccount)
 	default:
 		return "", fmt.Errorf("AuthKey must be of type ecdsa.PrivateKey")
 	}
 }
 
-func (r *IntegrationReconciler) buildTokenFromPrivateKey(pk *ecdsa.PrivateKey, sa *mondooclient.ServiceAccountCredentials) (string, error) {
+func (r *IntegrationReconciler) createSignedToken(pk *ecdsa.PrivateKey, sa *mondooclient.ServiceAccountCredentials) (string, error) {
 	issuedAt := time.Now().Unix()
 
 	token := jwt.NewWithClaims(jwt.SigningMethodES384, jwt.MapClaims{
 		"sub": sa.Mrn,
-		"iss": "mondoo/ams", // needs to be set to "mondoo/ams" to be accepted by Mondoo API
+		"iss": tokenIssuer,
 		"iat": issuedAt,
 		"exp": issuedAt + 60, // expire in 1 minute
 		"nbf": issuedAt,
