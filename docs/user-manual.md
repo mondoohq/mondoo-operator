@@ -1,5 +1,5 @@
 # User manual
-This user manual describes how to install and use the Mondoo operator.
+This user manual describes how to install and use the Mondoo Operator.
 
 ## Mondoo Operator Installation
 Install the Mondoo operator using kubectl, Helm, or Operator Lifecycle Manager.
