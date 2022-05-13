@@ -18,25 +18,17 @@ package nodes
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
-)
-
-const (
-	// TODO: remove this once the cleanup code is deleted.
-	OldNodeDaemonSetNameTemplate = `%s-node`
 )
 
 var logger = ctrl.Log.WithName("node-scanning")
@@ -165,7 +157,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	updateNodeConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs))
-	return n.cleanupOldDaemonSet(ctx)
+	return n.cleanupOldCronJobs(ctx)
 }
 
 // cleanupCronJobsForDeletedNodes deletes dangling CronJobs for nodes that have been deleted from the cluster.
@@ -238,7 +230,7 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		return err
 	}
 
-	if err := n.cleanupOldDaemonSet(ctx); err != nil {
+	if err := n.cleanupOldCronJobs(ctx); err != nil {
 		return err
 	}
 
@@ -248,20 +240,24 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 	return nil
 }
 
-// TODO: Delete in followup version
-func (n *DeploymentHandler) cleanupOldDaemonSet(ctx context.Context) error {
-	log := ctrllog.FromContext(ctx)
-
-	ds := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: n.Mondoo.Namespace,
-			Name:      fmt.Sprintf(OldNodeDaemonSetNameTemplate, n.Mondoo.Name),
-		},
+func (n *DeploymentHandler) cleanupOldCronJobs(ctx context.Context) error {
+	nodes := &corev1.NodeList{}
+	if err := n.KubeClient.List(ctx, nodes); err != nil {
+		logger.Error(err, "Failed to list nodes")
+		return err
 	}
 
-	err := k8s.DeleteIfExists(ctx, n.KubeClient, ds)
-	if err != nil {
-		log.Error(err, "failed while cleaning up old DaemonSet for nodes")
+	for _, node := range nodes.Items {
+		cronJob := &batchv1.CronJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      OldCronJobName(n.Mondoo.Name, node.Name),
+				Namespace: n.Mondoo.Namespace,
+			},
+		}
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, cronJob); err != nil {
+			logger.Error(err, "Failed to cleanup old CronJob", "name", cronJob.Name, "namespace", cronJob.Namespace)
+			return err
+		}
 	}
-	return err
+	return nil
 }
