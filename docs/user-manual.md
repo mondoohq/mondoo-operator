@@ -2,10 +2,10 @@
 This user manual describes how to install and use the Mondoo Operator.
 
 ## Mondoo Operator Installation
-Install the Mondoo operator using kubectl, Helm, or Operator Lifecycle Manager.
+Install the Mondoo Operator using kubectl, Helm, or Operator Lifecycle Manager.
 
 ### Installing with kubectl
-Follow this step to set up the Mondoo operator using kubectl and a manifest file.
+Follow this step to set up the Mondoo Operator using kubectl and a manifest file.
 
 Precondition: kubectl with cluster admin access
 
@@ -41,7 +41,7 @@ Preconditions:
     ```
 
 ### Installing with Operator Lifecycle Manager (OLM)
-Follow these steps to set up the Mondoo operator using [Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/):
+Follow these steps to set up the Mondoo Operator using [Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/):
 
 Preconditions:
 - kubectl with cluster admin access
@@ -58,7 +58,7 @@ Preconditions:
     INFO[0001] Successfully got OLM status for version "v0.20.0"
     ```
 
-2. Install the Mondoo operator bundle:
+2. Install the Mondoo Operator bundle:
     ```bash
     kubectl create namespace mondoo-operator
     operator-sdk run bundle ghcr.io/mondoohq/mondoo-operator-bundle:latest --namespace=mondoo-operator
@@ -69,8 +69,8 @@ Preconditions:
     kubectl get csv -n operators
     ```
 
-## Configuring the Mondoo client secret
-Follow these steps to configure the Mondoo client secret:
+## Configuring the Mondoo Secret
+Follow these steps to configure the Mondoo Secret:
 1. Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts).
 2. Store the service account json into a local file `creds.json`. The `creds.json` file should look like this:
     ```json
@@ -83,13 +83,13 @@ Follow these steps to configure the Mondoo client secret:
     }
     ```
 
-3. Store the service account as a secret in the Mondoo namespace:
+3. Store the service account as a Secret in the Mondoo namespace:
     ```bash
     kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
     ```
 
 ## Creating a MondooAuditConfig
-Once the secret is configured, configure the operator to define the scan targets:
+Once the Secret is configured, configure the operator to define the scan targets:
 
 1. Create `mondoo-config.yaml`:
     ```yaml
@@ -120,14 +120,14 @@ You can choose one of three approaches:
 - Use the OpenShift certificate creation/rotation features
 - Create (and rotate) your own TLS certificates manually
 
-A working setup shows the webhook pod processing the created/modified/deleted pods.
+A working setup shows the webhook Pod processing the created/modified/deleted Pods.
 
 Display the logs in one window:
 ```bash
 kubectl logs -f deployment/mondoo-client-webhook-manager -n mondoo-operator
 ```
 
-And create/modify/delete a pod in another window:
+And create/modify/delete a Pod in another window:
 ```bash
 kubectl delete pod -n mondoo-operator --selector control-plane=controller-manager
 ```
@@ -157,7 +157,7 @@ kubectl delete pod -n mondoo-operator --selector control-plane=controller-manage
           mode: cert-manager
     ```
 
-The admission controller `Deployment` should start.  The`ValidatingWebhookConfiguration` should be annotated to insert the certificate authority data. cert-manager creates a secret named `webhook-serving-cert` that contains the TLS certificates.
+The admission controller `Deployment` should start.  The`ValidatingWebhookConfiguration` should be annotated to insert the certificate authority data. cert-manager creates a Secret named `webhook-serving-cert` that contains the TLS certificates.
 
 ### Manually creating TLS certificates using OpenSSL
 You can manually create the TLS certificate required for the admission controller. These steps show one method:
@@ -271,7 +271,7 @@ operator-sdk olm uninstall mondoo-operator
 
 ## FAQ
 
-### I do not see the service running, only the operator. What's should I do?
+### I do not see the service running, only the operator. What should I do?
 1. Check that the CRD is properly registered with the operator:
 
 ```bash
