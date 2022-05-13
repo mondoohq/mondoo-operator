@@ -88,7 +88,7 @@ Follow these steps to configure the Mondoo client secret:
     kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
     ```
 
-## Creating MondooAuditConfig
+## Creating a MondooAuditConfig
 Once the secret is configured, configure the operator to define the scan targets:
 
 1. Create `mondoo-config.yaml`:
