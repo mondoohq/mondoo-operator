@@ -149,6 +149,10 @@ func ConfigMap(m v1alpha2.MondooAuditConfig) *corev1.ConfigMap {
 
 func CronJobName(prefix string, suffix string) string {
 	name := fmt.Sprintf("%s%s%s", prefix, CronJobNameBase, suffix)
+
+	// If the name becomes longer than 52 chars, then we hash the suffix and trim
+	// it such that the full name fits within 52 chars. This is needed because in
+	// manager Kubernetes services such as EKS or GKE the node names can be very long.
 	if len(name) > 52 {
 		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(suffix)))
 
