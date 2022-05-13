@@ -23,7 +23,7 @@ kubectl apply -f mondoo-operator-manifests.yaml
 ```
 
 ### Installing with Helm
-Follow these steps to set up a development Kubernetes to test the operator using [Helm](https://helm.sh/).
+Follow these steps to set up the Mondoo Operator using [Helm](https://helm.sh/).
 
 Preconditions:
 - `kubectl` with cluster admin access
