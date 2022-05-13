@@ -28,6 +28,7 @@ import (
 	jwt "github.com/golang-jwt/jwt/v4"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,7 +62,7 @@ type MondooAuditConfigReconciler struct {
 	MondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
 }
 
-// Embed the Default Inventory for Daemonset and Deployment Configurations
+// Embed the Default Inventory for CronJob and Deployment Configurations
 var (
 	//go:embed inventory-deploy.yaml
 	deployInventoryyaml []byte
@@ -92,9 +93,6 @@ var (
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
 //The last line is required as we cant assign higher permissions that exist for operator serviceaccount
-
-// TODO: the line below is needed for cleaning up old DaemonSet deployments. It can be deleted once the cleanup code is removed
-//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -235,7 +233,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	// Update the mondoo status with the pod names only after all pod creation actions are done
-	// List the pods for this mondoo's daemonset and deployment
+	// List the pods for this mondoo's cronjobs and deployment
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(mondooAuditConfig.Namespace),
@@ -423,7 +421,7 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha2.MondooAuditConfig{}).
-		Owns(&appsv1.DaemonSet{}).
+		Owns(&batchv1.CronJob{}).
 		Owns(&appsv1.Deployment{}).
 		Watches(
 			&source.Kind{Type: &corev1.Node{}},
