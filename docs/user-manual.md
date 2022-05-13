@@ -215,7 +215,7 @@ You can manually create the TLS certificate required for the admission controlle
    openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 10000 -extensions v3_ext -extfile csr.conf
    ```
 
-7. Create the secret holding the TLS certificate data:
+7. Create the Secret holding the TLS certificate data:
    ```bash
    kubectl create secret tls -n mondoo-operator webhook-server-cert --cert ./server.crt --key ./server.key
    ```
