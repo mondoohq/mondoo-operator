@@ -1,6 +1,7 @@
 package nodes
 
 import (
+	"crypto/sha256"
 	_ "embed"
 	"fmt"
 	"time"
@@ -15,7 +16,10 @@ import (
 )
 
 const (
-	CronJobNameBase = "-node-scanning-"
+	CronJobNameBase = "-node-"
+
+	// TODO: remove in a follow-up version
+	OldCronJobNameBase = "-node-scanning-"
 
 	// Execute hourly
 	CronTab                  = "0 * * * *"
@@ -144,7 +148,22 @@ func ConfigMap(m v1alpha2.MondooAuditConfig) *corev1.ConfigMap {
 }
 
 func CronJobName(prefix string, suffix string) string {
-	return fmt.Sprintf("%s%s%s", prefix, CronJobNameBase, suffix)
+	name := fmt.Sprintf("%s%s%s", prefix, CronJobNameBase, suffix)
+
+	// If the name becomes longer than 52 chars, then we hash the suffix and trim
+	// it such that the full name fits within 52 chars. This is needed because in
+	// manager Kubernetes services such as EKS or GKE the node names can be very long.
+	if len(name) > 52 {
+		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(suffix)))
+
+		base := fmt.Sprintf("%s%s", prefix, CronJobNameBase)
+		return fmt.Sprintf("%s%s", base, hash[:52-len(base)])
+	}
+	return name
+}
+
+func OldCronJobName(prefix string, suffix string) string {
+	return fmt.Sprintf("%s%s%s", prefix, OldCronJobNameBase, suffix)
 }
 
 func ConfigMapName(prefix string) string {
