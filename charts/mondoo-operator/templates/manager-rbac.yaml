@@ -20,15 +20,6 @@ rules:
 - apiGroups:
   - apps
   resources:
-  - daemonsets
-  verbs:
-  - delete
-  - get
-  - list
-  - watch
-- apiGroups:
-  - apps
-  resources:
   - deployments
   verbs:
   - create
