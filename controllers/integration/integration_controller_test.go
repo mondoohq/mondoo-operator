@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -8,6 +9,8 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -16,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -116,6 +120,53 @@ func (s *IntegrationCheckInSuite) TestCheckIn() {
 
 	// Assert
 	s.NoError(err, "should not error while processing valid MondooAuditConfig")
+	s.Zero(len(mondooAuditConfig.Status.Conditions), "expected no condtion set on happy path")
+	mockCtrl.Finish()
+
+}
+
+func (s *IntegrationCheckInSuite) TestClearPreviousCondition() {
+	// Arrange
+	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{
+		{
+			Type:   v1alpha2.MondooIntegrationDegraded,
+			Status: corev1.ConditionTrue,
+		},
+	}
+
+	existingObjects := []runtime.Object{
+		testMondooCredsSecret(),
+		mondooAuditConfig,
+	}
+
+	mockCtrl := gomock.NewController(s.T())
+
+	mClient := mockmondoo.NewMockClient(mockCtrl)
+	mClient.EXPECT().IntegrationCheckIn(gomock.Any(), &mondooclient.IntegrationCheckInInput{
+		Mrn: testIntegrationMRN, // make sure MRN in the CheckIn() in what is required for the real Mondoo API
+	}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{
+		Mrn: testIntegrationMRN,
+	}, nil)
+
+	testMondooClientBuilder := func(mondooclient.ClientOptions) mondooclient.Client {
+		return mClient
+	}
+
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()
+
+	r := &IntegrationReconciler{
+		Client:              fakeClient,
+		Log:                 testLogger,
+		MondooClientBuilder: testMondooClientBuilder,
+	}
+
+	// Act
+	err := r.processMondooAuditConfig(*mondooAuditConfig)
+
+	// Assert
+	s.NoError(err, "should not error while processing valid MondooAuditConfig")
+	assertConditionExists(s.T(), fakeClient, corev1.ConditionFalse, "Mondoo integration is working")
 	mockCtrl.Finish()
 
 }
@@ -155,6 +206,7 @@ func (s *IntegrationCheckInSuite) TestMissingIntegrationMRN() {
 	// Assert
 	// this controller doesn't make changes to k8s resources...the only side effect here are the mondooclient API calls
 	s.Error(err, "expected error when missing integration MRN")
+	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "data missing from Mondoo creds secret")
 	mockCtrl.Finish()
 
 }
@@ -194,6 +246,7 @@ func (s *IntegrationCheckInSuite) TestBadServiceAccountData() {
 	// Assert
 	// this controller doesn't make changes to k8s resources...the only side effect here are the mondooclient API calls
 	s.Error(err, "expected error when Mondoo service account data broken")
+	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "failed to unmarshal creds")
 	mockCtrl.Finish()
 
 }
@@ -232,6 +285,7 @@ func (s *IntegrationCheckInSuite) TestFailedCheckIn() {
 	// Assert
 	// this controller doesn't make changes to k8s resources...the only side effect here are the mondooclient API calls
 	s.Error(err, "expected error when CheckIn() return error")
+	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "failed to CheckIn")
 	mockCtrl.Finish()
 
 }
@@ -261,4 +315,21 @@ func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {
 			},
 		},
 	}
+}
+
+func assertConditionExists(t *testing.T, kubeClient client.Client, status corev1.ConditionStatus, message string) {
+
+	mondoo := testMondooAuditConfig()
+	require.NoError(t, kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(mondoo), mondoo), "error fetching current MondooAuditConfig from fake client")
+
+	found := false
+	for _, cond := range mondoo.Status.Conditions {
+		if cond.Type == v1alpha2.MondooIntegrationDegraded {
+			found = true
+			assert.Equal(t, status, cond.Status)
+			assert.Contains(t, cond.Message, message)
+		}
+	}
+
+	assert.True(t, found, "expected condition to exist")
 }
