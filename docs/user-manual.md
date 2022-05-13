@@ -172,7 +172,7 @@ You can manually create the TLS certificate required for the admission controlle
    openssl req -x509 -new -nodes -key ca.key -subj "/CN=Webhook Issuer" -days 10000 -out ca.crt
    ```
 
-3. Generate a key for the webhook server pod:
+3. Generate a key for the webhook server Pod:
    ```bash
    openssl genrsa -out server.key 2048
    ```
