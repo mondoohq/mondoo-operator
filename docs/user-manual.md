@@ -124,7 +124,7 @@ A working setup shows the webhook pod processing the created/modified/deleted po
 
 Display the logs in one window:
 ```bash
-kubectl logs -f deployment/mondoo-operator/mondoo-operator-webhook-manager -n mondoo-operator
+kubectl logs -f deployment/mondoo-client-webhook-manager -n mondoo-operator
 ```
 
 And create/modify/delete a pod in another window:
