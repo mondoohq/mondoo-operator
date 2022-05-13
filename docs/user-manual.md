@@ -157,7 +157,7 @@ kubectl delete pod -n mondoo-operator --selector control-plane=controller-manage
           mode: cert-manager
     ```
 
-The admission controller `Deployment` should start. `ValidatingWebhookConfiguration` should be annotated to insert the certificate authority data. cert-manager creates a secret named `webhook-serving-cert` that contains the TLS certificates.
+The admission controller `Deployment` should start.  The`ValidatingWebhookConfiguration` should be annotated to insert the certificate authority data. cert-manager creates a secret named `webhook-serving-cert` that contains the TLS certificates.
 
 ### Manually creating TLS certificates using OpenSSL
 You can manually create the TLS certificate required for the admission controller. These steps show one method:
