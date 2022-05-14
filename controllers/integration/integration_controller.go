@@ -132,28 +132,6 @@ func (r *IntegrationReconciler) processMondooAuditConfig(mondoo v1alpha2.MondooA
 		return err
 	}
 
-	// serviceAccount := &mondooclient.ServiceAccountCredentials{}
-	// if err := json.Unmarshal(mondooCreds.Data[constants.MondooCredsSecretServiceAccountKey], serviceAccount); err != nil {
-	// 	r.log.Error(err, "failed to unmarshal creds Secret")
-	// 	return err
-	// }
-	// token, err := r.generateTokenFromServiceAccount(serviceAccount)
-	// if err != nil {
-	// 	r.log.Error(err, "unable to generate token from service account")
-	// 	return err
-	// }
-	// mondooClient := r.mondooClientBuilder(mondooclient.ClientOptions{
-	// 	ApiEndpoint: serviceAccount.ApiEndpoint,
-	// 	Token:       token,
-	// })
-
-	// // Do the actual check-in
-	// if _, err := mondooClient.IntegrationCheckIn(r.ctx, &mondooclient.IntegrationCheckInInput{
-	// 	Mrn: string(integrationMrn),
-	// }); err != nil {
-	// 	r.log.Error(err, "failed to CheckIn() to Mondoo API")
-	// 	return err
-	// }
 	return nil
 }
 
