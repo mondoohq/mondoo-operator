@@ -53,8 +53,8 @@ func Add(mgr manager.Manager) error {
 	mc := &IntegrationReconciler{
 		Client:              mgr.GetClient(),
 		Interval:            interval,
-		log:                 log,
-		mondooClientBuilder: mondooclient.NewClient,
+		Log:                 log,
+		MondooClientBuilder: mondooclient.NewClient,
 	}
 	if err := mgr.Add(mc); err != nil {
 		log.Error(err, "failed to add integration controller to manager")
@@ -68,14 +68,14 @@ type IntegrationReconciler struct {
 
 	// Interval is the length of time we sleep between runs
 	Interval            time.Duration
-	log                 logr.Logger
-	mondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
+	Log                 logr.Logger
+	MondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
 	ctx                 context.Context
 }
 
 // Start begins the integration status loop.
 func (r *IntegrationReconciler) Start(ctx context.Context) error {
-	r.log.Info("started Mondoo console integration goroutine")
+	r.Log.Info("started Mondoo console integration goroutine")
 
 	r.ctx = ctx
 
@@ -87,18 +87,18 @@ func (r *IntegrationReconciler) Start(ctx context.Context) error {
 
 func (r *IntegrationReconciler) integrationLoop() {
 
-	r.log.Info("Listing all MondooAuditConfigs")
+	r.Log.Info("Listing all MondooAuditConfigs")
 
 	mondooAuditConfigs := &v1alpha2.MondooAuditConfigList{}
 	if err := r.Client.List(r.ctx, mondooAuditConfigs); err != nil {
-		r.log.Error(err, "error listing MondooAuditConfigs")
+		r.Log.Error(err, "error listing MondooAuditConfigs")
 		return
 	}
 
 	for _, mac := range mondooAuditConfigs.Items {
 		if mac.Spec.ConsoleIntegration.Enable {
 			if err := r.processMondooAuditConfig(mac); err != nil {
-				r.log.Error(err, "failed to process MondooAuditconfig", "mondooAuditConfig", fmt.Sprintf("%s/%s", mac.Namespace, mac.Name))
+				r.Log.Error(err, "failed to process MondooAuditconfig", "mondooAuditConfig", fmt.Sprintf("%s/%s", mac.Namespace, mac.Name))
 			}
 		}
 	}
@@ -114,27 +114,62 @@ func (r *IntegrationReconciler) processMondooAuditConfig(mondoo v1alpha2.MondooA
 		},
 	}
 	if err := r.Client.Get(r.ctx, client.ObjectKeyFromObject(mondooCreds), mondooCreds); err != nil {
-		r.log.Error(err, "failed to read Mondoo creds from secret")
+		r.Log.Error(err, "failed to read Mondoo creds from secret")
 		return err
 	}
 
 	integrationMrn, ok := mondooCreds.Data[constants.MondooCredsSecretIntegrationMRNKey]
 	if !ok {
 		err := fmt.Errorf("cannot CheckIn() with 'integrationmrn' data missing from Mondoo creds secret")
-		r.log.Error(err, "in order to perform a CheckIn(), the MondooAuditConfig.Spec.MondooCredsSecretRef must specify the integration MRN in the key 'integrationmrn'")
+		r.Log.Error(err, "in order to perform a CheckIn(), the MondooAuditConfig.Spec.MondooCredsSecretRef must specify the integration MRN in the key 'integrationmrn'")
 		return err
 	}
+
+	serviceAccount := mondooCreds.Data[constants.MondooCredsSecretServiceAccountKey]
+
+	if err := r.IntegrationCheckIn(integrationMrn, serviceAccount); err != nil {
+		r.Log.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
+		return err
+	}
+
+	// serviceAccount := &mondooclient.ServiceAccountCredentials{}
+	// if err := json.Unmarshal(mondooCreds.Data[constants.MondooCredsSecretServiceAccountKey], serviceAccount); err != nil {
+	// 	r.log.Error(err, "failed to unmarshal creds Secret")
+	// 	return err
+	// }
+	// token, err := r.generateTokenFromServiceAccount(serviceAccount)
+	// if err != nil {
+	// 	r.log.Error(err, "unable to generate token from service account")
+	// 	return err
+	// }
+	// mondooClient := r.mondooClientBuilder(mondooclient.ClientOptions{
+	// 	ApiEndpoint: serviceAccount.ApiEndpoint,
+	// 	Token:       token,
+	// })
+
+	// // Do the actual check-in
+	// if _, err := mondooClient.IntegrationCheckIn(r.ctx, &mondooclient.IntegrationCheckInInput{
+	// 	Mrn: string(integrationMrn),
+	// }); err != nil {
+	// 	r.log.Error(err, "failed to CheckIn() to Mondoo API")
+	// 	return err
+	// }
+	return nil
+}
+
+func (r *IntegrationReconciler) IntegrationCheckIn(integrationMrn, serviceAccountBytes []byte) error {
 	serviceAccount := &mondooclient.ServiceAccountCredentials{}
-	if err := json.Unmarshal(mondooCreds.Data[constants.MondooCredsSecretServiceAccountKey], serviceAccount); err != nil {
-		r.log.Error(err, "failed to unmarshal creds Secret")
+	if err := json.Unmarshal(serviceAccountBytes, serviceAccount); err != nil {
+		r.Log.Error(err, "failed to unmarshal creds Secret")
 		return err
 	}
+
 	token, err := r.generateTokenFromServiceAccount(serviceAccount)
 	if err != nil {
-		r.log.Error(err, "unable to generate token from service account")
+		r.Log.Error(err, "unable to generate token from service account")
 		return err
 	}
-	mondooClient := r.mondooClientBuilder(mondooclient.ClientOptions{
+	mondooClient := r.MondooClientBuilder(mondooclient.ClientOptions{
 		ApiEndpoint: serviceAccount.ApiEndpoint,
 		Token:       token,
 	})
@@ -143,9 +178,10 @@ func (r *IntegrationReconciler) processMondooAuditConfig(mondoo v1alpha2.MondooA
 	if _, err := mondooClient.IntegrationCheckIn(r.ctx, &mondooclient.IntegrationCheckInInput{
 		Mrn: string(integrationMrn),
 	}); err != nil {
-		r.log.Error(err, "failed to CheckIn() to Mondoo API")
+		r.Log.Error(err, "failed to CheckIn() to Mondoo API")
 		return err
 	}
+
 	return nil
 }
 
@@ -153,12 +189,12 @@ func (r *IntegrationReconciler) generateTokenFromServiceAccount(serviceAccount *
 	block, _ := pem.Decode([]byte(serviceAccount.PrivateKey))
 	if block == nil {
 		err := fmt.Errorf("found no PEM block in private key")
-		r.log.Error(err, "failed to decode service account's private key")
+		r.Log.Error(err, "failed to decode service account's private key")
 		return "", err
 	}
 	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
-		r.log.Error(err, "failed to parse private key data")
+		r.Log.Error(err, "failed to parse private key data")
 		return "", err
 	}
 	switch pk := key.(type) {
@@ -184,7 +220,7 @@ func (r *IntegrationReconciler) createSignedToken(pk *ecdsa.PrivateKey, sa *mond
 
 	tokenString, err := token.SignedString(pk)
 	if err != nil {
-		r.log.Error(err, "failed to generate token")
+		r.Log.Error(err, "failed to generate token")
 		return "", err
 	}
 

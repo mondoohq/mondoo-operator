@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -57,7 +56,7 @@ var (
 
 func init() {
 	utilruntime.Must(v1alpha2.AddToScheme(scheme.Scheme))
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme.Scheme))
+	utilruntime.Must(scheme.AddToScheme(scheme.Scheme))
 	utilruntime.Must(certmanagerv1.AddToScheme(scheme.Scheme))
 }
 
@@ -67,6 +66,7 @@ func TestTokenRegistration(t *testing.T) {
 
 	testTokenData = credentials.MondooToken(t, "")
 	testIntegrationTokenData = credentials.MondooToken(t, testIntegrationMRN)
+	testMondooServiceAccount.PrivateKey = credentials.MondooServiceAccount(t)
 
 	var err error
 	testMondooServiceAccountDataBytes, err = json.Marshal(testMondooServiceAccount)
@@ -215,6 +215,11 @@ func TestTokenRegistration(t *testing.T) {
 					Mrn:   testIntegrationMRN,
 					Creds: testMondooServiceAccount,
 				}, nil)
+
+				// expect initial CheckIn()
+				mClient.EXPECT().IntegrationCheckIn(gomock.Any(), &mondooclient.IntegrationCheckInInput{
+					Mrn: testIntegrationMRN,
+				}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{}, nil)
 
 				return mClient
 			},

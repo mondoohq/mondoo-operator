@@ -40,17 +40,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/admission"
+	"go.mondoo.com/mondoo-operator/controllers/integration"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const finalizerString = "k8s.mondoo.com/delete"
@@ -391,6 +392,15 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 			constants.MondooCredsSecretServiceAccountKey: string(credsBytes),
 			constants.MondooCredsSecretIntegrationMRNKey: integrationMrn,
 		}
+		_, err = k8s.CreateIfNotExist(ctx, r.Client, tokenSecret, tokenSecret)
+		if err != nil {
+			log.Error(err, "error while trying to save Mondoo service account into secret")
+			return err
+		}
+
+		// No easy way to retry this one-off CheckIn(). An error on initial CheckIn()
+		// means we'll just retry on the regularly scheduled interval via the integration controller
+		_ = r.performInitialCheckIn(integrationMrn, credsBytes, log)
 	} else {
 		// Do a vanilla token-for-service-account exchange
 		resp, err := mClient.ExchangeRegistrationToken(ctx, &mondooclient.ExchangeRegistrationTokenInput{
@@ -405,15 +415,30 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 		tokenSecret.StringData = map[string]string{
 			constants.MondooCredsSecretServiceAccountKey: resp.ServiceAccount,
 		}
+		_, err = k8s.CreateIfNotExist(ctx, r.Client, tokenSecret, tokenSecret)
+		if err != nil {
+			log.Error(err, "error while trying to save Mondoo service account into secret")
+			return err
+		}
 	}
 
-	_, err = k8s.CreateIfNotExist(ctx, r.Client, tokenSecret, tokenSecret)
-	if err != nil {
-		log.Error(err, "error while trying to save Mondoo service account into secret")
-		return err
-	}
 	log.Info("saved Mondoo service account", "secret", fmt.Sprintf("%s/%s", mondoo.Namespace, mondoo.Spec.MondooCredsSecretRef.Name))
 
+	return nil
+}
+
+func (r *MondooAuditConfigReconciler) performInitialCheckIn(integrationMrn string, serviceAccount []byte, logger logr.Logger) error {
+
+	// build a minimal IntegrationReconciler to be able to attempt a CheckIn()
+	integrationReconciler := &integration.IntegrationReconciler{
+		Log:                 logger,
+		MondooClientBuilder: r.MondooClientBuilder,
+	}
+
+	if err := integrationReconciler.IntegrationCheckIn([]byte(integrationMrn), serviceAccount); err != nil {
+		logger.Error(err, "initial CheckIn() failed, will CheckIn() periodically", "integrationMRN", integrationMrn)
+		return err
+	}
 	return nil
 }
 
