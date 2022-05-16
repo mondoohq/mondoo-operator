@@ -40,9 +40,6 @@ spec:
         - --leader-elect
         command:
         - /manager
-        env:
-        - name: KUBERNETES_CLUSTER_DOMAIN
-          value: {{ .Values.kubernetesClusterDomain }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
         imagePullPolicy: IfNotPresent
