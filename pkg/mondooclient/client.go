@@ -170,7 +170,7 @@ type HealthCheckResponse struct {
 }
 
 const (
-	RunKubernetesManifestEndpoint = "/Scan/RunKubernetesManifests"
+	RunKubernetesManifestEndpoint = "/Scan/RunKubernetesManifest"
 	// A valid result would come back as a '2'
 	ValidScanResult = uint32(2)
 )
