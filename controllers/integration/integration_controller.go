@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -24,6 +25,7 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
 const (
@@ -114,14 +116,18 @@ func (r *IntegrationReconciler) processMondooAuditConfig(mondoo v1alpha2.MondooA
 		},
 	}
 	if err := r.Client.Get(r.ctx, client.ObjectKeyFromObject(mondooCreds), mondooCreds); err != nil {
-		r.Log.Error(err, "failed to read Mondoo creds from secret")
+		msg := "failed to read Mondoo creds from secret"
+		r.Log.Error(err, msg)
+		_ = r.setIntegrationCondition(&mondoo, true, fmt.Sprintf("%s: %s", msg, err))
 		return err
 	}
 
 	integrationMrn, ok := mondooCreds.Data[constants.MondooCredsSecretIntegrationMRNKey]
 	if !ok {
-		err := fmt.Errorf("cannot CheckIn() with 'integrationmrn' data missing from Mondoo creds secret")
+		msg := "cannot CheckIn() with 'integrationmrn' data missing from Mondoo creds secret"
+		err := fmt.Errorf(msg)
 		r.Log.Error(err, "in order to perform a CheckIn(), the MondooAuditConfig.Spec.MondooCredsSecretRef must specify the integration MRN in the key 'integrationmrn'")
+		_ = r.setIntegrationCondition(&mondoo, true, msg)
 		return err
 	}
 
@@ -129,8 +135,11 @@ func (r *IntegrationReconciler) processMondooAuditConfig(mondoo v1alpha2.MondooA
 
 	if err := r.IntegrationCheckIn(integrationMrn, serviceAccount); err != nil {
 		r.Log.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
+		_ = r.setIntegrationCondition(&mondoo, true, err.Error())
 		return err
 	}
+
+	_ = r.setIntegrationCondition(&mondoo, false, "")
 
 	return nil
 }
@@ -138,14 +147,16 @@ func (r *IntegrationReconciler) processMondooAuditConfig(mondoo v1alpha2.MondooA
 func (r *IntegrationReconciler) IntegrationCheckIn(integrationMrn, serviceAccountBytes []byte) error {
 	serviceAccount := &mondooclient.ServiceAccountCredentials{}
 	if err := json.Unmarshal(serviceAccountBytes, serviceAccount); err != nil {
-		r.Log.Error(err, "failed to unmarshal creds Secret")
-		return err
+		msg := "failed to unmarshal creds Secret"
+		r.Log.Error(err, msg)
+		return fmt.Errorf("%s: %s", msg, err)
 	}
 
 	token, err := r.generateTokenFromServiceAccount(serviceAccount)
 	if err != nil {
-		r.Log.Error(err, "unable to generate token from service account")
-		return err
+		msg := "unable to generate token from service account"
+		r.Log.Error(err, msg)
+		return fmt.Errorf("%s: %s", msg, err)
 	}
 	mondooClient := r.MondooClientBuilder(mondooclient.ClientOptions{
 		ApiEndpoint: serviceAccount.ApiEndpoint,
@@ -156,8 +167,9 @@ func (r *IntegrationReconciler) IntegrationCheckIn(integrationMrn, serviceAccoun
 	if _, err := mondooClient.IntegrationCheckIn(r.ctx, &mondooclient.IntegrationCheckInInput{
 		Mrn: string(integrationMrn),
 	}); err != nil {
-		r.Log.Error(err, "failed to CheckIn() to Mondoo API")
-		return err
+		msg := "failed to CheckIn() to Mondoo API"
+		r.Log.Error(err, msg)
+		return fmt.Errorf("%s: %s", msg, err)
 	}
 
 	return nil
@@ -203,4 +215,40 @@ func (r *IntegrationReconciler) createSignedToken(pk *ecdsa.PrivateKey, sa *mond
 	}
 
 	return tokenString, nil
+}
+
+func (r *IntegrationReconciler) setIntegrationCondition(config *v1alpha2.MondooAuditConfig, degradedStatus bool, customMessage string) error {
+
+	originalConfig := config.DeepCopy()
+
+	updateIntegrationCondition(config, degradedStatus, customMessage)
+
+	if !reflect.DeepEqual(originalConfig.Status.Conditions, config.Status.Conditions) {
+		r.Log.Info("status has changed, updating")
+		if err := r.Client.Status().Update(r.ctx, config); err != nil {
+			r.Log.Error(err, "failed to update status")
+			return err
+		}
+	}
+
+	return nil
+}
+
+func updateIntegrationCondition(config *v1alpha2.MondooAuditConfig, degradedStatus bool, customMessage string) {
+	msg := "Mondoo integration is working"
+	reason := "IntegrationAvailable"
+	status := corev1.ConditionFalse
+	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
+	if degradedStatus {
+		msg = "Mondoo integration not working"
+		reason = "IntegrationUnvailable"
+		status = corev1.ConditionTrue
+	}
+
+	// If user provided a custom message, use it
+	if customMessage != "" {
+		msg = customMessage
+	}
+
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, v1alpha2.MondooIntegrationDegraded, status, reason, msg, updateCheck)
 }
