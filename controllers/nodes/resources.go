@@ -70,7 +70,7 @@ func CronJob(image string, node v1.Node, m v1alpha2.MondooAuditConfig) *batchv1.
 										"mondoo", "scan",
 										"--config", "/etc/opt/mondoo/mondoo.yml",
 										"--inventory-file", "/etc/opt/mondoo/inventory.yml",
-										"--exit-0-on-success",
+										"--score-threshold", "0",
 									},
 									Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources),
 									VolumeMounts: []corev1.VolumeMount{
