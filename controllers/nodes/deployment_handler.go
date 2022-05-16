@@ -45,59 +45,10 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		return ctrl.Result{}, n.down(ctx)
 	}
 
-	updated, err := n.syncConfigMap(ctx)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// TODO: for CronJob we might consider triggering the CronJob now after the ConfigMap has been changed. It will make sense from the
-	// user perspective to want to run the jobs after you have updated the config.
-	if updated {
-		logger.Info("Inventory ConfigMap was just updated. The job will use the new config during the next scheduled run.")
-	}
-
-	err = n.syncCronJob(ctx)
-	if err != nil {
+	if err := n.syncCronJob(ctx); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
-}
-
-// syncConfigMap syncs the inventory ConfigMap. Returns a boolean indicating whether the ConfigMap has been updated. It
-// can only be "true", if the ConfigMap existed before this reconcile cycle and the inventory was different from the
-// desired state.
-func (n *DeploymentHandler) syncConfigMap(ctx context.Context) (bool, error) {
-	existing := &corev1.ConfigMap{}
-	desired := ConfigMap(*n.Mondoo)
-	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
-		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
-		return false, err
-	}
-
-	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
-	if err != nil {
-		logger.Error(err, "Failed to create inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
-		return false, err
-	}
-
-	if created {
-		logger.Info("Created inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
-		return false, nil
-	}
-
-	updated := false
-	if existing.Data["inventory"] != desired.Data["inventory"] ||
-		!reflect.DeepEqual(existing.GetOwnerReferences(), desired.GetOwnerReferences()) {
-		existing.Data["inventory"] = desired.Data["inventory"]
-		existing.SetOwnerReferences(desired.GetOwnerReferences())
-
-		if err := n.KubeClient.Update(ctx, existing); err != nil {
-			logger.Error(err, "Failed to update inventory ConfigMap", "namespace", existing.Namespace, "name", existing.Name)
-			return false, err
-		}
-		updated = true
-	}
-	return updated, nil
 }
 
 func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
@@ -116,6 +67,20 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 
 	// Create/update CronJobs for nodes
 	for _, node := range nodes.Items {
+		updated, err := n.syncConfigMap(ctx, node)
+		if err != nil {
+			return err
+		}
+
+		// TODO: for CronJob we might consider triggering the CronJob now after the ConfigMap has been changed. It will make sense from the
+		// user perspective to want to run the jobs after you have updated the config.
+		if updated {
+			logger.Info(
+				"Inventory ConfigMap was just updated. The job will use the new config during the next scheduled run.",
+				"namespace", n.Mondoo.Namespace,
+				"name", CronJobName(n.Mondoo.Name, node.Name))
+		}
+
 		existing := &batchv1.CronJob{}
 		desired := CronJob(mondooClientImage, node, *n.Mondoo)
 		if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
@@ -157,7 +122,47 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	updateNodeConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs))
+	if err := n.cleanupOldConfigMaps(ctx); err != nil {
+		return err
+	}
 	return n.cleanupOldCronJobs(ctx)
+}
+
+// syncConfigMap syncs the inventory ConfigMap. Returns a boolean indicating whether the ConfigMap has been updated. It
+// can only be "true", if the ConfigMap existed before this reconcile cycle and the inventory was different from the
+// desired state.
+func (n *DeploymentHandler) syncConfigMap(ctx context.Context, node corev1.Node) (bool, error) {
+	existing := &corev1.ConfigMap{}
+	desired := ConfigMap(node, *n.Mondoo)
+	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
+		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
+		return false, err
+	}
+
+	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
+	if err != nil {
+		logger.Error(err, "Failed to create inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
+		return false, err
+	}
+
+	if created {
+		logger.Info("Created inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
+		return false, nil
+	}
+
+	updated := false
+	if existing.Data["inventory"] != desired.Data["inventory"] ||
+		!reflect.DeepEqual(existing.GetOwnerReferences(), desired.GetOwnerReferences()) {
+		existing.Data["inventory"] = desired.Data["inventory"]
+		existing.SetOwnerReferences(desired.GetOwnerReferences())
+
+		if err := n.KubeClient.Update(ctx, existing); err != nil {
+			logger.Error(err, "Failed to update inventory ConfigMap", "namespace", existing.Namespace, "name", existing.Name)
+			return false, err
+		}
+		updated = true
+	}
+	return updated, nil
 }
 
 // cleanupCronJobsForDeletedNodes deletes dangling CronJobs for nodes that have been deleted from the cluster.
@@ -183,11 +188,19 @@ func (n *DeploymentHandler) cleanupCronJobsForDeletedNodes(ctx context.Context, 
 		}
 
 		// If the node for the CronJob has been deleted from the cluster, the CronJob needs to be deleted.
-		if err := n.KubeClient.Delete(ctx, &c); err != nil {
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, &c); err != nil {
 			logger.Error(err, "Failed to deleted CronJob", "namespace", c.Namespace, "name", c.Name)
 			return err
 		}
 		logger.Info("Deleted CronJob", "namespace", c.Namespace, "name", c.Name)
+
+		configMap := &corev1.ConfigMap{}
+		configMap.Name = ConfigMapName(n.Mondoo.Name, c.Spec.JobTemplate.Spec.Template.Spec.NodeName)
+		configMap.Namespace = n.Mondoo.Namespace
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
+			logger.Error(err, "Failed to delete ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
+			return err
+		}
 	}
 	return nil
 }
@@ -220,17 +233,21 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 			logger.Error(err, "Failed to clean up node scanning CronJob", "namespace", cronJob.Namespace, "name", cronJob.Name)
 			return err
 		}
-	}
 
-	configMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
-	}
-	if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
-		logger.Error(err, "Failed to clean up inventory ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
-		return err
+		configMap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace},
+		}
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
+			logger.Error(err, "Failed to clean up inventory ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
+			return err
+		}
 	}
 
 	if err := n.cleanupOldCronJobs(ctx); err != nil {
+		return err
+	}
+
+	if err := n.cleanupOldConfigMaps(ctx); err != nil {
 		return err
 	}
 
@@ -240,6 +257,7 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 	return nil
 }
 
+// TODO: remove in future version
 func (n *DeploymentHandler) cleanupOldCronJobs(ctx context.Context) error {
 	nodes := &corev1.NodeList{}
 	if err := n.KubeClient.List(ctx, nodes); err != nil {
@@ -258,6 +276,18 @@ func (n *DeploymentHandler) cleanupOldCronJobs(ctx context.Context) error {
 			logger.Error(err, "Failed to cleanup old CronJob", "name", cronJob.Name, "namespace", cronJob.Namespace)
 			return err
 		}
+	}
+	return nil
+}
+
+// TODO: remove in future version
+func (n *DeploymentHandler) cleanupOldConfigMaps(ctx context.Context) error {
+	configMap := &corev1.ConfigMap{}
+	configMap.Name = OldConfigMapName(n.Mondoo.Name)
+	configMap.Namespace = n.Mondoo.Namespace
+	if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
+		logger.Error(err, "Failed to cleanup old ConfigMap", "name", configMap.Name, "namespace", configMap.Namespace)
+		return err
 	}
 	return nil
 }

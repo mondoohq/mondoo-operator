@@ -62,13 +62,97 @@ func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMap() {
+	s.seedNodes()
 	d := s.createDeploymentHandler()
 
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	expected := ConfigMap(s.auditConfig)
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
+
+	for _, node := range nodes.Items {
+		expected := ConfigMap(node, s.auditConfig)
+		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+
+		// Set some fields that the kube client sets
+		gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
+		s.NoError(err)
+		expected.SetGroupVersionKind(gvk)
+		expected.ResourceVersion = "1"
+
+		created := &corev1.ConfigMap{}
+		created.Name = expected.Name
+		created.Namespace = expected.Namespace
+		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+
+		s.Equal(expected, created)
+	}
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
+
+	for _, node := range nodes.Items {
+		existing := ConfigMap(node, s.auditConfig)
+		existing.Data["inventory"] = ""
+		s.NoError(d.KubeClient.Create(s.ctx, existing))
+	}
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	for _, node := range nodes.Items {
+		expected := ConfigMap(node, s.auditConfig)
+		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+
+		// Set some fields that the kube client sets
+		gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
+		s.NoError(err)
+		expected.SetGroupVersionKind(gvk)
+		expected.ResourceVersion = "2"
+
+		created := &corev1.ConfigMap{}
+		created.Name = expected.Name
+		created.Namespace = expected.Namespace
+		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+
+		s.Equal(expected, created)
+	}
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_CleanConfigMapsForDeletedNodes() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+
+	// Reconcile to create the initial cron jobs
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
+
+	// Delete one node
+	s.NoError(d.KubeClient.Delete(s.ctx, &nodes.Items[1]))
+
+	// Reconcile again to delete the cron job for the deleted node
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	configMaps := &corev1.ConfigMapList{}
+	s.NoError(d.KubeClient.List(s.ctx, configMaps))
+
+	s.Equal(1, len(configMaps.Items))
+
+	expected := ConfigMap(nodes.Items[0], s.auditConfig)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -76,34 +160,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMap() {
 	s.NoError(err)
 	expected.SetGroupVersionKind(gvk)
 	expected.ResourceVersion = "1"
-
-	created := &corev1.ConfigMap{}
-	created.Name = expected.Name
-	created.Namespace = expected.Namespace
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
-
-	s.Equal(expected, created)
-}
-
-func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
-	existing := ConfigMap(s.auditConfig)
-	existing.Data["inventory"] = ""
-
-	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(existing)
-	d := s.createDeploymentHandler()
-
-	result, err := d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
-
-	expected := ConfigMap(s.auditConfig)
-	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
-
-	// Set some fields that the kube client sets
-	gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
-	s.NoError(err)
-	expected.SetGroupVersionKind(gvk)
-	expected.ResourceVersion = "1000"
 
 	created := &corev1.ConfigMap{}
 	created.Name = expected.Name

@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	_ "embed"
 	"fmt"
+	"math"
+	"strings"
 	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -16,14 +18,17 @@ import (
 )
 
 const (
-	CronJobNameBase = "-node-"
+	CronJobNameBase        = "-node-"
+	InventoryConfigMapBase = "-node-inventory-"
 
 	// TODO: remove in a follow-up version
-	OldCronJobNameBase = "-node-scanning-"
+	OldCronJobNameBase          = "-node-scanning-"
+	OldInventoryConfigMapSuffix = "-node-scanning-inventory"
 
 	// Execute hourly
-	CronTab                  = "0 * * * *"
-	InventoryConfigMapSuffix = "-node-scanning-inventory"
+	CronTab = "0 * * * *"
+
+	InventoryNodeNamePlaceholder = "{{node-name}}"
 )
 
 var (
@@ -65,7 +70,7 @@ func CronJob(image string, node v1.Node, m v1alpha2.MondooAuditConfig) *batchv1.
 										"mondoo", "scan",
 										"--config", "/etc/opt/mondoo/mondoo.yml",
 										"--inventory-file", "/etc/opt/mondoo/inventory.yml",
-										"--exit-0-on-success",
+										"--score-threshold", "0",
 									},
 									Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources),
 									VolumeMounts: []corev1.VolumeMount{
@@ -106,7 +111,7 @@ func CronJob(image string, node v1.Node, m v1alpha2.MondooAuditConfig) *batchv1.
 											Sources: []corev1.VolumeProjection{
 												{
 													ConfigMap: &corev1.ConfigMapProjection{
-														LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name)},
+														LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name, node.Name)},
 														Items: []corev1.KeyToPath{{
 															Key:  "inventory",
 															Path: "mondoo/inventory.yml",
@@ -137,41 +142,40 @@ func CronJob(image string, node v1.Node, m v1alpha2.MondooAuditConfig) *batchv1.
 	}
 }
 
-func ConfigMap(m v1alpha2.MondooAuditConfig) *corev1.ConfigMap {
+func ConfigMap(node corev1.Node, m v1alpha2.MondooAuditConfig) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: m.Namespace,
-			Name:      ConfigMapName(m.Name),
+			Name:      ConfigMapName(m.Name, node.Name),
 		},
-		Data: map[string]string{"inventory": Inventory(m)},
+		Data: map[string]string{"inventory": Inventory(node, m)},
 	}
 }
 
-func CronJobName(prefix string, suffix string) string {
-	name := fmt.Sprintf("%s%s%s", prefix, CronJobNameBase, suffix)
-
+func CronJobName(prefix, suffix string) string {
 	// If the name becomes longer than 52 chars, then we hash the suffix and trim
 	// it such that the full name fits within 52 chars. This is needed because in
 	// manager Kubernetes services such as EKS or GKE the node names can be very long.
-	if len(name) > 52 {
-		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(suffix)))
-
-		base := fmt.Sprintf("%s%s", prefix, CronJobNameBase)
-		return fmt.Sprintf("%s%s", base, hash[:52-len(base)])
-	}
-	return name
+	base := fmt.Sprintf("%s%s", prefix, CronJobNameBase)
+	return fmt.Sprintf("%s%s", base, NodeNameOrHash(52-len(base), suffix))
 }
 
-func OldCronJobName(prefix string, suffix string) string {
+func OldCronJobName(prefix, suffix string) string {
 	return fmt.Sprintf("%s%s%s", prefix, OldCronJobNameBase, suffix)
 }
 
-func ConfigMapName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, InventoryConfigMapSuffix)
+func ConfigMapName(prefix, nodeName string) string {
+	base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
+	return fmt.Sprintf("%s%s", base, NodeNameOrHash(52-len(base), nodeName))
 }
 
-func Inventory(m v1alpha2.MondooAuditConfig) string {
-	return string(inventoryYaml)
+func OldConfigMapName(prefix string) string {
+	return fmt.Sprintf("%s%s", prefix, OldInventoryConfigMapSuffix)
+}
+
+func Inventory(node corev1.Node, m v1alpha2.MondooAuditConfig) string {
+	inventory := string(inventoryYaml)
+	return strings.ReplaceAll(inventory, InventoryNodeNamePlaceholder, node.Name)
 }
 
 func CronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {
@@ -180,4 +184,12 @@ func CronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 		"scan":      "nodes",
 		"mondoo_cr": m.Name,
 	}
+}
+
+func NodeNameOrHash(allowedLen int, nodeName string) string {
+	if len(nodeName) > allowedLen {
+		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(nodeName)))
+		return hash[:int(math.Min(float64(allowedLen), float64(len(hash))))]
+	}
+	return nodeName
 }
