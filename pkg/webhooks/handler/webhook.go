@@ -14,6 +14,7 @@ import (
 
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	customobject "go.mondoo.com/mondoo-operator/pkg/utils/genericobjectdecoder"
 	"go.mondoo.com/mondoo-operator/pkg/webhooks/utils"
 )
 
@@ -145,13 +146,6 @@ func (a *webhookValidator) InjectDecoder(d *admission.Decoder) error {
 	return nil
 }
 
-// customObjectMeta allows us to decode the raw k8s Object to unmarshal
-// the Type and Object fields we use to generate labels from.
-type customObjectMeta struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-}
-
 func generateLabelsFromAdmissionRequest(req admission.Request) (map[string]string, error) {
 
 	k8sObjectData, err := yaml.Marshal(req.Object)
@@ -161,7 +155,7 @@ func generateLabelsFromAdmissionRequest(req admission.Request) (map[string]strin
 	}
 
 	r := bytes.NewReader(k8sObjectData)
-	objMeta := &customObjectMeta{}
+	objMeta := &customobject.CustomObjectMeta{}
 
 	yamlDecoder := yamlutil.NewYAMLOrJSONDecoder(r, 4096)
 
