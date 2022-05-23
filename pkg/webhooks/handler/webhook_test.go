@@ -102,13 +102,22 @@ func TestWebhookValidate(t *testing.T) {
 
 var webhookPayload = mustRead("../../../tests/data/webhook-payload.json")
 
-func TestLabelGeneratorForPod(t *testing.T) {
-
+func TestLabels(t *testing.T) {
 	req := admission.Request{}
 	require.NoError(t, yaml.Unmarshal(webhookPayload, &req), "failed to unmarshal webhook payload")
 
-	labels, err := generateLabelsFromAdmissionRequest(req)
-	require.NoError(t, err, "Unexpected error while generating labels")
+	webhook := &webhookValidator{
+		integrationMRN: "testIntegrationMRN",
+		clusterID:      "testClusterID",
+	}
+
+	labels, err := webhook.generateLabels(req)
+
+	require.NoError(t, err, "unexpected error while testing label creation")
+	assert.Contains(t, labels, mondooClusterIDLabel, "cluster ID label missing")
+	assert.Equal(t, "testClusterID", labels[mondooClusterIDLabel], "cluster ID label not as expected")
+	assert.Contains(t, labels, mondooIntegrationLabel, "integration label missing")
+	assert.Equal(t, "testIntegrationMRN", labels[mondooIntegrationLabel], "integration label not as expected")
 
 	// string literals being compared to are taken from example webhook payload json
 	require.Contains(t, labels, mondooNameLabel, "Name label missing")
@@ -129,7 +138,6 @@ func TestLabelGeneratorForPod(t *testing.T) {
 	require.Equal(t, "CREATE", labels[mondooOperationLabel])
 	require.Contains(t, labels, mondooResourceVersionLabel, "ResourceVersion label missing")
 	require.Equal(t, "", labels[mondooResourceVersionLabel], "Expect empty value for a CREATE webhook")
-
 }
 
 func testExamplePod() runtime.RawExtension {

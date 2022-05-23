@@ -45,19 +45,23 @@ const (
 	mondooAuthorLabel          = mondooLabelPrefix + "author"
 	mondooOperationLabel       = mondooLabelPrefix + "operation"
 	mondooClusterIDLabel       = mondooLabelPrefix + "cluster-id"
+
+	// for consistency with other integrations, the integration tag will not use the 'k8s' prefix
+	mondooIntegrationLabel = "mondoo.com/" + "integration-mrn"
 )
 
 type webhookValidator struct {
-	client    client.Client
-	decoder   *admission.Decoder
-	mode      mondoov1alpha1.WebhookMode
-	scanner   mondooclient.Client
-	clusterID string
+	client         client.Client
+	decoder        *admission.Decoder
+	mode           mondoov1alpha1.WebhookMode
+	scanner        mondooclient.Client
+	integrationMRN string
+	clusterID      string
 }
 
 // NewWebhookValidator will initialize a CoreValidator with the provided k8s Client and
 // set it to the provided mode. Returns error if mode is invalid.
-func NewWebhookValidator(client client.Client, mode, scanURL, token, clusterID string) (admission.Handler, error) {
+func NewWebhookValidator(client client.Client, mode, scanURL, token, integrationMRN, clusterID string) (admission.Handler, error) {
 	webhookMode, err := utils.ModeStringToWebhookMode(mode)
 	if err != nil {
 		return nil, err
@@ -90,12 +94,11 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		return
 	}
 
-	k8sLabels, err := generateLabelsFromAdmissionRequest(req)
+	k8sLabels, err := a.generateLabels(req)
 	if err != nil {
-		handlerlog.Error(err, "failed to extract labels from incoming request")
+		handlerlog.Error(err, "failed to set labels for incoming request")
 		return
 	}
-	k8sLabels[mondooClusterIDLabel] = a.clusterID
 
 	result, err := a.scanner.RunKubernetesManifest(ctx, &mondooclient.KubernetesManifestJob{
 		Files: []*mondooclient.File{
@@ -144,6 +147,20 @@ var _ admission.DecoderInjector = &webhookValidator{}
 func (a *webhookValidator) InjectDecoder(d *admission.Decoder) error {
 	a.decoder = d
 	return nil
+}
+
+func (a *webhookValidator) generateLabels(req admission.Request) (map[string]string, error) {
+	labels, err := generateLabelsFromAdmissionRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	labels[mondooClusterIDLabel] = a.clusterID
+	if a.integrationMRN != "" {
+		labels[mondooIntegrationLabel] = a.integrationMRN
+	}
+
+	return labels, nil
 }
 
 func generateLabelsFromAdmissionRequest(req admission.Request) (map[string]string, error) {

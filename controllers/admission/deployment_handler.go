@@ -37,6 +37,7 @@ import (
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
@@ -204,13 +205,19 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 	}
 	clusterID := string(namespace.UID)
 
+	integrationMRN, err := n.getIntegrationMRN(ctx)
+	if err != nil {
+		webhookLog.Error(err, "failed why checking for Integration MRN")
+		return err
+	}
+
 	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(
 		n.Mondoo.Spec.Admission.Image.Name, n.Mondoo.Spec.Admission.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		return err
 	}
 
-	desiredDeployment := WebhookDeployment(n.TargetNamespace, mondooOperatorImage, *n.Mondoo, clusterID)
+	desiredDeployment := WebhookDeployment(n.TargetNamespace, mondooOperatorImage, *n.Mondoo, integrationMRN, clusterID)
 	if err := n.setControllerRef(desiredDeployment); err != nil {
 		return err
 	}
@@ -239,6 +246,32 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (n *DeploymentHandler) getIntegrationMRN(ctx context.Context) (string, error) {
+	if !n.Mondoo.Spec.ConsoleIntegration.Enable {
+		// sending an empty integrationMRN means the webhook will run w/o setting integration
+		// labels (which is exactly what we want when console integration is not enabled)
+		return "", nil
+	}
+
+	serviceAccountSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      n.Mondoo.Spec.MondooCredsSecretRef.Name,
+			Namespace: n.Mondoo.Namespace,
+		},
+	}
+	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(serviceAccountSecret), serviceAccountSecret); err != nil {
+		webhookLog.Error(err, "failed to check for Integration MRN in creds secret")
+		return "", err
+	}
+	integrationMRN, ok := serviceAccountSecret.Data[constants.MondooCredsSecretIntegrationMRNKey]
+	if !ok {
+		err := fmt.Errorf("creds Secret %s/%s missing %s key with integration MRN data", serviceAccountSecret.Namespace, serviceAccountSecret.Name, constants.MondooCredsSecretIntegrationMRNKey)
+		return "", err
+	}
+
+	return string(integrationMRN), nil
 }
 
 func (n *DeploymentHandler) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1.ValidatingWebhookConfiguration) error {

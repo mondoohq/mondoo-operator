@@ -23,6 +23,7 @@ import (
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -31,6 +32,7 @@ import (
 const (
 	testNamespace             = "mondoo-operator"
 	testMondooAuditConfigName = "mondoo-client"
+	testCredsSecretName       = "mondoo-client'"
 	testClusterID             = "abcd-1234"
 )
 
@@ -49,10 +51,8 @@ func TestReconcile(t *testing.T) {
 		validate              func(*testing.T, client.Client)
 	}{
 		{
-			name: "admission disabled",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
-				Admission: mondoov1alpha2.Admission{Enable: false},
-			},
+			name:                  "admission disabled",
+			mondooAuditConfigSpec: testMondooAuditConfigSpec(false, false),
 			validate: func(t *testing.T, kubeClient client.Client) {
 				objects := defaultResourcesWhenEnabled()
 
@@ -63,10 +63,8 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "admission enabled",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
-				Admission: mondoov1alpha2.Admission{Enable: true},
-			},
+			name:                  "admission enabled",
+			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),
 			validate: func(t *testing.T, kubeClient client.Client) {
 				list := &corev1.ServiceList{}
 				assert.NoError(t, kubeClient.List(context.TODO(), list))
@@ -79,14 +77,13 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "admission enabled with cert-manager",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
-				Admission: mondoov1alpha2.Admission{
-					Enable: true,
-					CertificateProvisioning: mondoov1alpha2.CertificateProvisioning{
-						Mode: mondoov1alpha2.CertManagerProvisioning,
-					},
-				},
-			},
+			mondooAuditConfigSpec: func() mondoov1alpha2.MondooAuditConfigSpec {
+				mac := testMondooAuditConfigSpec(true, false)
+				mac.Admission.CertificateProvisioning = mondoov1alpha2.CertificateProvisioning{
+					Mode: mondoov1alpha2.CertManagerProvisioning,
+				}
+				return mac
+			}(),
 			validate: func(t *testing.T, kubeClient client.Client) {
 				objects := defaultResourcesWhenEnabled()
 				for _, obj := range objects {
@@ -113,10 +110,8 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "cleanup when admission change to disabled",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
-				Admission: mondoov1alpha2.Admission{Enable: false},
-			},
+			name:                  "cleanup when admission change to disabled",
+			mondooAuditConfigSpec: testMondooAuditConfigSpec(false, false),
 			// existing objects from admission being previously enabled
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
 				objects := defaultResourcesWhenEnabled()
@@ -183,12 +178,11 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "pass admission mode down to Deployment",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
-				Admission: mondoov1alpha2.Admission{
-					Enable: true,
-					Mode:   mondoov1alpha2.Permissive,
-				},
-			},
+			mondooAuditConfigSpec: func() mondoov1alpha2.MondooAuditConfigSpec {
+				mac := testMondooAuditConfigSpec(true, false)
+				mac.Admission.Mode = mondoov1alpha2.Permissive
+				return mac
+			}(),
 			validate: func(t *testing.T, kubeClient client.Client) {
 				deployment := &appsv1.Deployment{}
 				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
@@ -199,13 +193,8 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "pass ClusterID mode down to Deployment",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
-				Admission: mondoov1alpha2.Admission{
-					Enable: true,
-					Mode:   mondoov1alpha2.Permissive,
-				},
-			},
+			name:                  "pass ClusterID mode down to Deployment",
+			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),
 			validate: func(t *testing.T, kubeClient client.Client) {
 				deployment := &appsv1.Deployment{}
 				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
@@ -216,13 +205,37 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "update admission Deployment when mode changes",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
-				Admission: mondoov1alpha2.Admission{
-					Enable: true,
-					Mode:   mondoov1alpha2.Permissive,
-				},
+			name:                  "pass Integration MRN down to Deployment",
+			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, true),
+			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
+				return []client.Object{
+					&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      testCredsSecretName,
+							Namespace: testNamespace,
+						},
+						Data: map[string][]byte{
+							constants.MondooCredsSecretIntegrationMRNKey: []byte("exampleIntegrationMRN"),
+						},
+					},
+				}
 			},
+			validate: func(t *testing.T, kubeClient client.Client) {
+				deployment := &appsv1.Deployment{}
+				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
+				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
+				require.NoError(t, err, "expected Webhook Deployment to exist")
+
+				assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, "exampleIntegrationMRN", "expected args to include integration MRN")
+			},
+		},
+		{
+			name: "update admission Deployment when mode changes",
+			mondooAuditConfigSpec: func() mondoov1alpha2.MondooAuditConfigSpec {
+				mac := testMondooAuditConfigSpec(true, false)
+				mac.Admission.Mode = mondoov1alpha2.Permissive
+				return mac
+			}(),
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
 				deployment := &appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
@@ -257,15 +270,10 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "update webhook Deployment when changed externally",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
-				Admission: mondoov1alpha2.Admission{
-					Enable: true,
-					Mode:   mondoov1alpha2.Enforcing,
-				},
-			},
+			name:                  "update webhook Deployment when changed externally",
+			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
-				deployment := WebhookDeployment(testNamespace, "wrong", m, testClusterID)
+				deployment := WebhookDeployment(testNamespace, "wrong", m, "", testClusterID)
 				return []client.Object{deployment}
 			},
 			validate: func(t *testing.T, kubeClient client.Client) {
@@ -282,16 +290,14 @@ func TestReconcile(t *testing.T) {
 
 				img, err := containerImageResolver.MondooOperatorImage("", "", false)
 				require.NoErrorf(t, err, "failed to get mondoo operator image.")
-				expectedDeployment := WebhookDeployment(testNamespace, img, *auditConfig, testClusterID)
+				expectedDeployment := WebhookDeployment(testNamespace, img, *auditConfig, "", testClusterID)
 				require.NoError(t, ctrl.SetControllerReference(auditConfig, expectedDeployment, kubeClient.Scheme()))
 				assert.Truef(t, k8s.AreDeploymentsEqual(*deployment, *expectedDeployment), "deployment has not been updated")
 			},
 		},
 		{
-			name: "update webhook Service when changed externally",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
-				Admission: mondoov1alpha2.Admission{Enable: true},
-			},
+			name:                  "update webhook Service when changed externally",
+			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
 				service := WebhookService(testNamespace, m)
 				service.Spec.Type = corev1.ServiceTypeExternalName
@@ -315,10 +321,8 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "update scan API Deployment when changed externally",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
-				Admission: mondoov1alpha2.Admission{Enable: true},
-			},
+			name:                  "update scan API Deployment when changed externally",
+			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
 				deployment := scanapi.ScanApiDeployment(testNamespace, "wrong", m)
 				return []client.Object{deployment}
@@ -343,10 +347,8 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "update scan API Service when changed externally",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
-				Admission: mondoov1alpha2.Admission{Enable: true},
-			},
+			name:                  "update scan API Service when changed externally",
+			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
 				service := scanapi.ScanApiService(testNamespace, m)
 				service.Spec.Type = corev1.ServiceTypeExternalName
@@ -370,10 +372,8 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "cleanup old-style admission",
-			mondooAuditConfigSpec: mondoov1alpha2.MondooAuditConfigSpec{
-				Admission: mondoov1alpha2.Admission{Enable: true},
-			},
+			name:                  "cleanup old-style admission",
+			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),
 			// existing objects from webhooks being previously enabled
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
 				objects := defaultResourcesWhenEnabled()
@@ -415,6 +415,7 @@ func TestReconcile(t *testing.T) {
 					UID:  types.UID(testClusterID),
 				},
 			}
+
 			existingObj := []client.Object{auditConfig, kubeSystemNamespace}
 			if test.existingObjects != nil {
 				existingObj = append(existingObj, test.existingObjects(*auditConfig)...)
@@ -495,4 +496,18 @@ func defaultResourcesWhenEnabled() []client.Object {
 	objects = append(objects, vwc)
 
 	return objects
+}
+
+func testMondooAuditConfigSpec(admissionEnabled, integrationEnabled bool) mondoov1alpha2.MondooAuditConfigSpec {
+	return mondoov1alpha2.MondooAuditConfigSpec{
+		Admission: mondoov1alpha2.Admission{
+			Enable: admissionEnabled,
+		},
+		ConsoleIntegration: mondoov1alpha2.ConsoleIntegration{
+			Enable: integrationEnabled,
+		},
+		MondooCredsSecretRef: corev1.LocalObjectReference{
+			Name: testCredsSecretName,
+		},
+	}
 }

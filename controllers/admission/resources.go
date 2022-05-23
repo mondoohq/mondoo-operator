@@ -47,11 +47,26 @@ func GetTLSCertificatesSecretName(mondooAuditConfigName string) string {
 	return fmt.Sprintf(webhookTLSSecretNameTemplate, mondooAuditConfigName)
 }
 
-func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, clusterID string) *appsv1.Deployment {
+func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, integrationMRN, clusterID string) *appsv1.Deployment {
 	// The URL to communicate with will be http://ScanAPIServiceName-ScanAPIServiceNamespace.svc:ScanAPIPort
 	scanAPIURL := fmt.Sprintf("http://%s.%s.svc:%d", scanapi.ServiceName(m.Name), m.Namespace, scanapi.Port)
 
-	return &appsv1.Deployment{
+	containerArgs := []string{
+		"--token-file-path",
+		"/etc/webhook/token",
+		"--enforcement-mode",
+		string(m.Spec.Admission.Mode),
+		"--scan-api-url",
+		scanAPIURL,
+		"--cluster-id",
+		clusterID,
+	}
+
+	if integrationMRN != "" {
+		containerArgs = append(containerArgs, []string{"--integration-mrn", integrationMRN}...)
+	}
+
+	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      webhookDeploymentName(m.Name),
 			Namespace: ns,
@@ -78,16 +93,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, clu
 							Command: []string{
 								"/webhook",
 							},
-							Args: []string{
-								"--token-file-path",
-								"/etc/webhook/token",
-								"--enforcement-mode",
-								string(m.Spec.Admission.Mode),
-								"--scan-api-url",
-								scanAPIURL,
-								"--cluster-id",
-								clusterID,
-							},
+							Args:            containerArgs,
 							Image:           image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							LivenessProbe: &corev1.Probe{
@@ -169,6 +175,8 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, clu
 			},
 		},
 	}
+
+	return deployment
 }
 
 func WebhookService(ns string, m mondoov1alpha2.MondooAuditConfig) *corev1.Service {
