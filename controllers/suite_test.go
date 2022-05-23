@@ -55,8 +55,6 @@ func TestAPIs(t *testing.T) {
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	createContainerImageResolver = fake.NewNoOpContainerImageResolver
-
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	By("bootstrapping test environment")
@@ -85,9 +83,10 @@ var _ = BeforeSuite(func() {
 	Expect(k8sManager).NotTo(BeNil())
 
 	err = (&MondooAuditConfigReconciler{
-		Client:              k8sManager.GetClient(),
-		Scheme:              k8sManager.GetScheme(),
-		MondooClientBuilder: MondooClientBuilder,
+		Client:                 k8sManager.GetClient(),
+		Scheme:                 k8sManager.GetScheme(),
+		MondooClientBuilder:    MondooClientBuilder,
+		ContainerImageResolver: fake.NewNoOpContainerImageResolver(),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

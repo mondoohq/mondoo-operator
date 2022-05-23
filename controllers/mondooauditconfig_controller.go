@@ -59,8 +59,9 @@ const finalizerString = "k8s.mondoo.com/delete"
 // MondooAuditConfigReconciler reconciles a MondooAuditConfig object
 type MondooAuditConfigReconciler struct {
 	client.Client
-	Scheme              *runtime.Scheme
-	MondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
+	Scheme                 *runtime.Scheme
+	MondooClientBuilder    func(mondooclient.ClientOptions) mondooclient.Client
+	ContainerImageResolver mondoo.ContainerImageResolver
 }
 
 // Embed the Default Inventory for CronJob and Deployment Configurations
@@ -131,10 +132,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
-	// Have on container image resolver for the whole reconcile cycle. This will make sure that the same image is
-	// not resolved multiple times during a single reconcile.
-	containerImageResolver := createContainerImageResolver()
-
 	if config.DeletionTimestamp != nil {
 		// Going to proceed as if there is no MondooOperatorConfig
 		config = &v1alpha2.MondooOperatorConfig{}
@@ -151,7 +148,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			KubeClient:             r.Client,
 			TargetNamespace:        req.Namespace,
 			MondooOperatorConfig:   config,
-			ContainerImageResolver: containerImageResolver,
+			ContainerImageResolver: r.ContainerImageResolver,
 		}
 		result, err := webhooks.Reconcile(ctx)
 		if err != nil {
@@ -188,7 +185,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
-		ContainerImageResolver: containerImageResolver,
+		ContainerImageResolver: r.ContainerImageResolver,
 	}
 
 	result, err := nodes.Reconcile(ctx)
@@ -203,7 +200,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Enable:                 mondooAuditConfig.Spec.KubernetesResources.Enable,
 		Mondoo:                 mondooAuditConfig,
 		MondooOperatorConfig:   config,
-		ContainerImageResolver: containerImageResolver,
+		ContainerImageResolver: r.ContainerImageResolver,
 	}
 
 	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req)
@@ -219,7 +216,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		KubeClient:             r.Client,
 		TargetNamespace:        req.Namespace,
 		MondooOperatorConfig:   config,
-		ContainerImageResolver: containerImageResolver,
+		ContainerImageResolver: r.ContainerImageResolver,
 	}
 
 	result, err = webhooks.Reconcile(ctx)
