@@ -65,9 +65,6 @@ type MondooAuditConfigReconciler struct {
 
 // Embed the Default Inventory for CronJob and Deployment Configurations
 var (
-	//go:embed inventory-deploy.yaml
-	deployInventoryyaml []byte
-
 	// Defined as a var so we can easily mock this in tests.
 	createContainerImageResolver = mondoo.NewContainerImageResolver
 
@@ -209,7 +206,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		ContainerImageResolver: containerImageResolver,
 	}
 
-	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req, string(deployInventoryyaml))
+	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req)
 	if err != nil {
 		log.Error(err, "Failed to declare workloads")
 	}

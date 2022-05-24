@@ -30,8 +30,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/yaml"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/inventory"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
@@ -49,18 +52,32 @@ type Workloads struct {
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
 }
 
-func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
+func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	configMapName := fmt.Sprintf(workloadDeploymentConfigMapNameTemplate, n.Mondoo.Name)
-	found := &corev1.ConfigMap{}
-	err := clt.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: n.Mondoo.Namespace}, found)
+	found := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf(workloadDeploymentConfigMapNameTemplate, n.Mondoo.Name),
+			Namespace: n.Mondoo.Namespace,
+		},
+	}
 
+	// generate the Mondoo client inventory
+	inventoryData, err := defaultMondooInventory(ctx, clt, n.Mondoo)
+	if err != nil {
+		log.Error(err, "failed to build Mondoo Inventory for workload scanning")
+		return ctrl.Result{}, err
+	}
+
+	inventoryBytes, err := yaml.Marshal(inventoryData)
+	if err != nil {
+		log.Error(err, "failed to marshal inventory to yaml")
+		return ctrl.Result{}, err
+	}
+	inventory := string(inventoryBytes)
+
+	err = clt.Get(ctx, client.ObjectKeyFromObject(found), found)
 	if err != nil && errors.IsNotFound(err) {
-		found.ObjectMeta = metav1.ObjectMeta{
-			Name:      configMapName,
-			Namespace: req.NamespacedName.Namespace,
-		}
 		found.Data = map[string]string{
 			"inventory": inventory,
 		}
@@ -286,12 +303,12 @@ func (n *Workloads) deploymentForMondoo(image string) *appsv1.Deployment {
 	return dep
 }
 
-func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request, inventory string) (ctrl.Result, error) {
+func (n *Workloads) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
 	if !n.Enable {
 		return n.down(ctx, clt, req)
 	}
 
-	result, err := n.declareConfigMap(ctx, clt, scheme, req, inventory)
+	result, err := n.declareConfigMap(ctx, clt, scheme, req)
 	if err != nil || result.Requeue {
 		return result, err
 	}
@@ -391,4 +408,59 @@ func (n *Workloads) cleanupWorkloadDeployment(ctx context.Context, kubeClient cl
 		log.Error(err, "failed while cleaning up old Deployment for workloads")
 	}
 	return err
+}
+
+func defaultMondooInventory(ctx context.Context, kubeClient client.Client, mac *v1alpha2.MondooAuditConfig) (*inventory.MondooInventory, error) {
+	inv := &inventory.MondooInventory{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Inventory",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mondoo-k8s-inventory",
+			Labels: map[string]string{
+				"environment": "production",
+			},
+		},
+		Spec: inventory.MondooInventorySpec{
+			Assets: []inventory.Asset{
+				{
+					Id: "api",
+					Connections: []*inventory.TransportConfig{
+						{
+							Backend: "k8s",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if mac.Spec.ConsoleIntegration.Enable {
+		// Put the Integration MRN as a label
+		sec := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mac.Spec.MondooCredsSecretRef.Name,
+				Namespace: mac.Namespace,
+			},
+		}
+
+		if err := kubeClient.Get(ctx, client.ObjectKeyFromObject(sec), sec); err != nil {
+			return nil, fmt.Errorf("failed to get Mondoo creds Secret: %s", err)
+		}
+
+		integrationMRN, ok := sec.Data[constants.MondooCredsSecretIntegrationMRNKey]
+		if !ok {
+			return nil, fmt.Errorf("console integration enabled and Mondoo creds Secret is missing integration MRN data expected in key '%s'", constants.MondooCredsSecretIntegrationMRNKey)
+		}
+
+		for i := range inv.Spec.Assets {
+			if inv.Spec.Assets[i].Labels == nil {
+				inv.Spec.Assets[i].Labels = map[string]string{}
+			}
+			inv.Spec.Assets[i].Labels[constants.MondooAssetsIntegrationLabel] = string(integrationMRN)
+		}
+	}
+
+	return inv, nil
 }
