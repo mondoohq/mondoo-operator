@@ -2,7 +2,7 @@ controllerManager:
   manager:
     image:
       repository: ghcr.io/mondoohq/mondoo-operator
-      tag: v0.2.14
+      tag: v0.2.15
     resources:
       limits:
         cpu: 200m
