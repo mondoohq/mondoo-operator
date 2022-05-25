@@ -18,8 +18,10 @@ package controllers
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
-	"time"
+	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -42,12 +44,13 @@ import (
 const (
 	workloadDeploymentConfigMapNameTemplate = `%s-deploy`
 	WorkloadDeploymentNameTemplate          = `%s-workload`
+	configMapInventoryKey                   = "inventory"
 )
 
 type Workloads struct {
 	Enable                 bool
 	Mondoo                 *v1alpha2.MondooAuditConfig
-	Updated                bool
+	configMapHash          string
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
 }
@@ -61,6 +64,19 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 			Namespace: n.Mondoo.Namespace,
 		},
 	}
+
+	// calculate SHA for ConfigMap contents
+	defer func() {
+		cm := &corev1.ConfigMap{}
+		if err := clt.Get(ctx, client.ObjectKeyFromObject(found), cm); err != nil {
+			log.Error(err, "failed to get ConfigMap to calculate SHA")
+			return
+		}
+		inventoryData := cm.Data[configMapInventoryKey]
+
+		md5sum := md5.Sum([]byte(inventoryData))
+		n.configMapHash = hex.EncodeToString(md5sum[:])
+	}()
 
 	// generate the Mondoo client inventory
 	inventoryData, err := defaultMondooInventory(ctx, clt, n.Mondoo)
@@ -79,7 +95,7 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 	err = clt.Get(ctx, client.ObjectKeyFromObject(found), found)
 	if err != nil && errors.IsNotFound(err) {
 		found.Data = map[string]string{
-			"inventory": inventory,
+			configMapInventoryKey: inventory,
 		}
 		if err := ctrl.SetControllerReference(n.Mondoo, found, scheme); err != nil {
 			log.Error(err, "Failed to set ControllerReference", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
@@ -92,14 +108,14 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 			return ctrl.Result{}, err
 		}
 
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 
 	} else if err != nil {
 		log.Error(err, "Failed to get Configmap")
 		return ctrl.Result{}, err
-	} else if err == nil && found.Data["inventory"] != inventory {
+	} else if err == nil && found.Data[configMapInventoryKey] != inventory {
 		found.Data = map[string]string{
-			"inventory": inventory,
+			configMapInventoryKey: inventory,
 		}
 
 		err := clt.Update(ctx, found)
@@ -107,8 +123,7 @@ func (n *Workloads) declareConfigMap(ctx context.Context, clt client.Client, sch
 			log.Error(err, "Failed to update Configmap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
 			return ctrl.Result{}, err
 		}
-		n.Updated = true
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
@@ -136,7 +151,7 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", desiredDeployment.Namespace, "Deployment.Name", desiredDeployment.Name)
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 
 	} else if err == nil && n.deploymentNeedsUpdate(desiredDeployment, found) {
 		found.Spec = desiredDeployment.Spec
@@ -146,28 +161,10 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 			return ctrl.Result{}, err
 		}
 
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
-	}
-
-	if n.Updated {
-		if found.Spec.Template.ObjectMeta.Annotations == nil {
-			annotation := map[string]string{
-				"kubectl.kubernetes.io/restartedAt": metav1.Time{Time: time.Now()}.String(),
-			}
-
-			found.Spec.Template.ObjectMeta.Annotations = annotation
-		} else if found.Spec.Template.ObjectMeta.Annotations != nil {
-			found.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = metav1.Time{Time: time.Now()}.String()
-		}
-		err := clt.Update(ctx, found)
-		if err != nil {
-			log.Error(err, "failed to restart Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{Requeue: true}, err
 	}
 
 	updateWorkloadsConditions(n.Mondoo, found.Status.Replicas != found.Status.ReadyReplicas)
@@ -187,6 +184,10 @@ func (n *Workloads) deploymentNeedsUpdate(desired, existing *appsv1.Deployment) 
 	}
 
 	if !k8s.AreResouceRequirementsEqual(existing.Spec.Template.Spec.Containers[0].Resources, desired.Spec.Template.Spec.Containers[0].Resources) {
+		return true
+	}
+
+	if !reflect.DeepEqual(desired.Spec.Template.ObjectMeta.Annotations, existing.Spec.Template.ObjectMeta.Annotations) {
 		return true
 	}
 
@@ -210,6 +211,9 @@ func (n *Workloads) deploymentForMondoo(image string) *appsv1.Deployment {
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"mondoo-operator/configmap-hash": n.configMapHash,
+					},
 					Labels: ls,
 				},
 				Spec: corev1.PodSpec{
@@ -277,7 +281,7 @@ func (n *Workloads) deploymentForMondoo(image string) *appsv1.Deployment {
 													Name: fmt.Sprintf(workloadDeploymentConfigMapNameTemplate, n.Mondoo.Name),
 												},
 												Items: []corev1.KeyToPath{{
-													Key:  "inventory",
+													Key:  configMapInventoryKey,
 													Path: "mondoo/inventory.yml",
 												}},
 											},
@@ -350,7 +354,7 @@ func (n *Workloads) down(ctx context.Context, clt client.Client, req ctrl.Reques
 	// Clear any remant status
 	updateWorkloadsConditions(n.Mondoo, false)
 
-	return ctrl.Result{Requeue: true}, err
+	return ctrl.Result{}, err
 }
 
 // deleteExternalResources deletes any external resources associated with the Deployment
@@ -373,7 +377,7 @@ func (n *Workloads) deleteExternalResources(ctx context.Context, clt client.Clie
 		log.Error(err, "Failed to delete ConfigMap", "ConfigMap.Namespace", found.Namespace, "ConfigMap.Name", found.Name)
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{Requeue: true}, err
+	return ctrl.Result{}, err
 }
 
 func updateWorkloadsConditions(config *v1alpha2.MondooAuditConfig, degradedStatus bool) {
