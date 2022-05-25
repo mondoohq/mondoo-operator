@@ -10,4 +10,7 @@ const (
 	// MondooTokenSecretKey is the name of the key in the Secret that holds the JWT data
 	// used for creating a Mondoo service account
 	MondooTokenSecretKey = "token"
+	// MondooAssetsIntegrationLabel is the label we set for any assets whenever the consoleIntegration is enabled
+	// (for consistency with other integrations, the integration tag will not use the 'k8s' prefix)
+	MondooAssetsIntegrationLabel = "mondoo.com/" + "integration-mrn"
 )

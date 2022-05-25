@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	customobject "go.mondoo.com/mondoo-operator/pkg/utils/genericobjectdecoder"
 	"go.mondoo.com/mondoo-operator/pkg/webhooks/utils"
@@ -45,9 +46,6 @@ const (
 	mondooAuthorLabel          = mondooLabelPrefix + "author"
 	mondooOperationLabel       = mondooLabelPrefix + "operation"
 	mondooClusterIDLabel       = mondooLabelPrefix + "cluster-id"
-
-	// for consistency with other integrations, the integration tag will not use the 'k8s' prefix
-	mondooIntegrationLabel = "mondoo.com/" + "integration-mrn"
 )
 
 type webhookValidator struct {
@@ -157,7 +155,7 @@ func (a *webhookValidator) generateLabels(req admission.Request) (map[string]str
 
 	labels[mondooClusterIDLabel] = a.clusterID
 	if a.integrationMRN != "" {
-		labels[mondooIntegrationLabel] = a.integrationMRN
+		labels[constants.MondooAssetsIntegrationLabel] = a.integrationMRN
 	}
 
 	return labels, nil

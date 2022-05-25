@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient/fakeserver"
 )
@@ -116,8 +117,8 @@ func TestLabels(t *testing.T) {
 	require.NoError(t, err, "unexpected error while testing label creation")
 	assert.Contains(t, labels, mondooClusterIDLabel, "cluster ID label missing")
 	assert.Equal(t, "testClusterID", labels[mondooClusterIDLabel], "cluster ID label not as expected")
-	assert.Contains(t, labels, mondooIntegrationLabel, "integration label missing")
-	assert.Equal(t, "testIntegrationMRN", labels[mondooIntegrationLabel], "integration label not as expected")
+	assert.Contains(t, labels, constants.MondooAssetsIntegrationLabel, "integration label missing")
+	assert.Equal(t, "testIntegrationMRN", labels[constants.MondooAssetsIntegrationLabel], "integration label not as expected")
 
 	// string literals being compared to are taken from example webhook payload json
 	require.Contains(t, labels, mondooNameLabel, "Name label missing")
