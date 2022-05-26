@@ -13,7 +13,7 @@ The Mondoo Operator provides the following features:
 
 - Continuous validation of deployed workloads
 - Continuous validation of Kubernetes nodes **without** privileged access
-- Admission Controller (coming soon)
+- Admission Controller (alpha version)
 
 It is backed by Mondoo's powerful Policy-as-Code the Mondoo Query Language (MQL). Mondoo ships out-of-the-box security policies for Kubernetes:
 
@@ -34,8 +34,9 @@ The following Kubernetes environments are tested:
 
 - AWS EKS 1.21
 - Azure AKS 1.21
-- GCP GKE 1.21 and 1.22
+- GCP GKE 1.22 and 1.23
 - Minikube
+- Rancher RKE1 1.22 and 1.23
 - K3S
 
 ## Documentation
