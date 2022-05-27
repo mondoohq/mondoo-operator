@@ -52,8 +52,9 @@ func TestScanner(t *testing.T) {
 			{},
 		},
 		Labels: map[string]string{
-			"k8s.mondoo.com/author":    request.UserInfo.Username,
-			"k8s.mondoo.com/operation": string(request.Operation),
+			"k8s.mondoo.com/author":     request.UserInfo.Username,
+			"k8s.mondoo.com/operation":  string(request.Operation),
+			"k8s.mondoo.com/cluster-id": "SOME-ID-HERE",
 		},
 	})
 	require.NoError(t, err)
