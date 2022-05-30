@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	webhookhandler "go.mondoo.com/mondoo-operator/pkg/webhooks/handler"
 )
@@ -50,7 +50,7 @@ func main() {
 	var clusterID string
 	flag.StringVar(&scanAPIURL, "scan-api-url", "", "The URL of the Service to send scan requests to.")
 	flag.StringVar(&tokenFilePath, "token-file-path", "", "Path to file containing token to use when making scan requests.")
-	flag.StringVar(&webhookMode, "enforcement-mode", string(mondoov1alpha1.Permissive), "Mode 'permissive' allows resources that had a failing scan result pass, and mode 'enforcing' will deny resources with failed scanning result.")
+	flag.StringVar(&webhookMode, "enforcement-mode", string(mondoov1alpha2.Permissive), "Mode 'permissive' allows resources that had a failing scan result pass, and mode 'enforcing' will deny resources with failed scanning result.")
 	flag.StringVar(&integrationMRN, "integration-mrn", "", "The Mondoo integration MRN to label scanned items with if the MondooAuditConfig is configured with Mondoo integration")
 	flag.StringVar(&clusterID, "cluster-id", "", "A cluster-unique ID for associating the webhook payloads with the underlying cluster.")
 

@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/yaml"
 
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	customobject "go.mondoo.com/mondoo-operator/pkg/utils/genericobjectdecoder"
@@ -51,7 +51,7 @@ const (
 type webhookValidator struct {
 	client         client.Client
 	decoder        *admission.Decoder
-	mode           mondoov1alpha1.WebhookMode
+	mode           mondoov1alpha2.AdmissionMode
 	scanner        mondooclient.Client
 	integrationMRN string
 	clusterID      string
@@ -60,7 +60,7 @@ type webhookValidator struct {
 // NewWebhookValidator will initialize a CoreValidator with the provided k8s Client and
 // set it to the provided mode. Returns error if mode is invalid.
 func NewWebhookValidator(client client.Client, mode, scanURL, token, integrationMRN, clusterID string) (admission.Handler, error) {
-	webhookMode, err := utils.ModeStringToWebhookMode(mode)
+	webhookMode, err := utils.ModeStringToAdmissionMode(mode)
 	if err != nil {
 		return nil, err
 	}
@@ -121,13 +121,13 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 	// Depending on the mode, we either just allow the resource through no matter the scan result
 	// or allow/deny based on the scan result
 	switch a.mode {
-	case mondoov1alpha1.Permissive:
+	case mondoov1alpha2.Permissive:
 		if passed {
 			response = admission.Allowed(passedScan)
 		} else {
 			response = admission.Allowed(failedScanPermitted)
 		}
-	case mondoov1alpha1.Enforcing:
+	case mondoov1alpha2.Enforcing:
 		if passed {
 			response = admission.Allowed(passedScan)
 		} else {

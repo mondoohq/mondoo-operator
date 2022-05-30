@@ -78,8 +78,8 @@ type Admission struct {
 	// on the scan results may reject the k8s resource creation/modification.
 	// +kubebuilder:validation:Enum=permissive;enforcing
 	// +kubebuilder:default=permissive
-	Mode AdmissionMode `json:"mode,omitempty"`
-
+	Mode                    AdmissionMode           `json:"mode,omitempty"`
+	Test                    string                  `json:"string"`
 	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
 }
 
