@@ -8,13 +8,13 @@ import (
 // defaultMondooClientResources for Mondoo Client container
 var DefaultMondooClientResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("1G"),
+		corev1.ResourceMemory: resource.MustParse("250M"),
 		corev1.ResourceCPU:    resource.MustParse("500m"),
 	},
 
 	Requests: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("500M"), // 50% of the limit
-		corev1.ResourceCPU:    resource.MustParse("50m"),  // 10% of the limit
+		corev1.ResourceMemory: resource.MustParse("180M"), // 50% of the limit
+		corev1.ResourceCPU:    resource.MustParse("100m"), // 10% of the limit
 	},
 }
 

@@ -23,12 +23,12 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
 const (
@@ -73,10 +73,20 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image:     image,
-						Name:      "mondoo-client",
-						Command:   []string{"mondoo", "serve", "--api", "--config", "/etc/opt/mondoo/config/mondoo.yml", "--token-file-path", "/etc/opt/mondoo/token/token"},
-						Resources: k8s.DefaultMondooClientResources,
+						Image:   image,
+						Name:    "mondoo-client",
+						Command: []string{"mondoo", "serve", "--api", "--config", "/etc/opt/mondoo/config/mondoo.yml", "--token-file-path", "/etc/opt/mondoo/token/token"},
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("130M"),
+								corev1.ResourceCPU:    resource.MustParse("150m"),
+							},
+
+							Requests: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("80M"), // 50% of the limit
+								corev1.ResourceCPU:    resource.MustParse("80m"), // 10% of the limit
+							},
+						},
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{
