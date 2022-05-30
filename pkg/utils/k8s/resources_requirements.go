@@ -13,8 +13,8 @@ var DefaultMondooClientResources corev1.ResourceRequirements = corev1.ResourceRe
 	},
 
 	Requests: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("180M"), // 50% of the limit
-		corev1.ResourceCPU:    resource.MustParse("100m"), // 10% of the limit
+		corev1.ResourceMemory: resource.MustParse("180M"),
+		corev1.ResourceCPU:    resource.MustParse("150m"),
 	},
 }
 
