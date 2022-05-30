@@ -79,7 +79,6 @@ type Admission struct {
 	// +kubebuilder:validation:Enum=permissive;enforcing
 	// +kubebuilder:default=permissive
 	Mode                    AdmissionMode           `json:"mode,omitempty"`
-	Test                    string                  `json:"string"`
 	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
 }
 
@@ -152,7 +151,6 @@ const (
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:storageversion
 
 // MondooAuditConfig is the Schema for the mondooauditconfigs API
 type MondooAuditConfig struct {
