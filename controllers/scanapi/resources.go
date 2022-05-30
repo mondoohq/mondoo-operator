@@ -78,13 +78,13 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 						Command: []string{"mondoo", "serve", "--api", "--config", "/etc/opt/mondoo/config/mondoo.yml", "--token-file-path", "/etc/opt/mondoo/token/token"},
 						Resources: corev1.ResourceRequirements{
 							Limits: corev1.ResourceList{
-								corev1.ResourceMemory: resource.MustParse("130M"),
-								corev1.ResourceCPU:    resource.MustParse("150m"),
+								corev1.ResourceMemory: resource.MustParse("300M"),
+								corev1.ResourceCPU:    resource.MustParse("300m"),
 							},
 
 							Requests: corev1.ResourceList{
-								corev1.ResourceMemory: resource.MustParse("80M"), // 50% of the limit
-								corev1.ResourceCPU:    resource.MustParse("80m"), // 10% of the limit
+								corev1.ResourceMemory: resource.MustParse("100M"),
+								corev1.ResourceCPU:    resource.MustParse("150m"),
 							},
 						},
 						ReadinessProbe: &corev1.Probe{
