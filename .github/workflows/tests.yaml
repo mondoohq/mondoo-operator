@@ -51,6 +51,11 @@ jobs:
     needs: [unit-tests]
     if: needs.unit-tests.result == 'success' # run only if unit-tests are successful
     name: Integration tests
+
+    strategy:
+      matrix:
+        k8s-version: [v1.22.10, v1.23.7, v1.24.1]
+
     steps:
       - uses: actions/checkout@v2
       - name: Import environment variables from file
@@ -59,6 +64,7 @@ jobs:
         uses: medyagh/setup-minikube@master
         with:
           memory: 4000m
+          kubernetes-version: ${{ matrix.k8s-version }}
       - uses: actions/setup-go@v2
         with:
           go-version: "${{ env.golang-version }}"
