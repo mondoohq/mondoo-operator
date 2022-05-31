@@ -271,6 +271,11 @@ jobs:
     needs:
       - build-bundle
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        k8s-version: [v1.22.10, v1.23.7, v1.24.1]
+
     steps:
       - uses: actions/checkout@v2
       - name: Import environment variables from file
@@ -282,7 +287,8 @@ jobs:
       - name: Start minikube
         uses: medyagh/setup-minikube@master
         with:
-          memory: 4000m      
+          memory: 4000m
+          kubernetes-version: ${{ matrix.k8s-version }}
 
       - name: Install operator-sdk
         id: operator-sdk
@@ -358,6 +364,11 @@ jobs:
     needs:
       - push-virtual-tag
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        k8s-version: [v1.22.10, v1.23.7, v1.24.1]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -378,6 +389,7 @@ jobs:
         uses: medyagh/setup-minikube@master
         with:
           memory: 4000m
+          kubernetes-version: ${{ matrix.k8s-version }}
 
       - name: Install Helm
         uses: azure/setup-helm@v1
