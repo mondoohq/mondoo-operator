@@ -66,9 +66,6 @@ type MondooAuditConfigReconciler struct {
 
 // Embed the Default Inventory for CronJob and Deployment Configurations
 var (
-	// Defined as a var so we can easily mock this in tests.
-	createContainerImageResolver = mondoo.NewContainerImageResolver
-
 	// so we can mock out the mondoo client for testing
 	MondooClientBuilder = mondooclient.NewClient
 )

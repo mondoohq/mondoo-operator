@@ -19,7 +19,6 @@ type ImageCacher interface {
 type imageCache struct {
 	images      map[string]imageData
 	imagesMutex sync.RWMutex
-	lastCleanup time.Time
 	fetchImage  func(string) (string, error)
 }
 
@@ -28,29 +27,16 @@ type imageData struct {
 	lastUpdated time.Time
 }
 
+// GetImage will return a "recent" (ie less than refreshPeriod old) image
+// with SHA if a recent cache entry is available. Otherwise, it will
+// create/update any entry and return an up-to-date image+sha
 func (i *imageCache) GetImage(image string) (string, error) {
-
-	defer i.cleanup()
-
 	sha, err := i.getImageWithSHA(image)
 	if err != nil {
 		return "", err
 	}
 
 	return sha, nil
-}
-
-func (i *imageCache) cleanup() {
-	if i.lastCleanup.Add(refreshPeriod).Before(time.Now()) {
-		i.imagesMutex.Lock()
-		defer i.imagesMutex.Unlock()
-		for key, val := range i.images {
-			if val.lastUpdated.Add(refreshPeriod).Before(time.Now()) {
-				delete(i.images, key)
-			}
-		}
-		i.lastCleanup = time.Now()
-	}
 }
 
 func (i *imageCache) getImageWithSHA(image string) (string, error) {
@@ -110,8 +96,7 @@ func queryImageWithSHA(image string) (string, error) {
 
 func NewImageCacher() ImageCacher {
 	return &imageCache{
-		lastCleanup: time.Now(),
-		images:      map[string]imageData{},
-		fetchImage:  queryImageWithSHA,
+		images:     map[string]imageData{},
+		fetchImage: queryImageWithSHA,
 	}
 }

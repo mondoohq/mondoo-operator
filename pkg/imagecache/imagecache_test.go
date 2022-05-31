@@ -18,13 +18,12 @@ const (
 func TestCache(t *testing.T) {
 
 	tests := []struct {
-		name                string
-		imagesMap           map[string]imageData
-		fetchImageFunc      func(string) (string, error)
-		expectedImage       string
-		extraValidation     func(*testing.T, *imageCache)
-		overrideLastCleanup time.Time
-		expectError         bool
+		name            string
+		imagesMap       map[string]imageData
+		fetchImageFunc  func(string) (string, error)
+		expectedImage   string
+		extraValidation func(*testing.T, *imageCache)
+		expectError     bool
 	}{
 		{
 			name:          "image in cache",
@@ -61,40 +60,6 @@ func TestCache(t *testing.T) {
 			},
 		},
 		{
-			name:          "recent image in cache",
-			expectedImage: testCurrentImageDigest,
-			imagesMap: map[string]imageData{
-				"imageA:latest": {
-					url:         testCurrentImageDigest,
-					lastUpdated: time.Now(),
-				},
-			},
-			fetchImageFunc: func(string) (string, error) {
-				return "", fmt.Errorf("should not call fetchImage")
-			},
-		},
-		{
-			name:          "clean up old images",
-			expectedImage: testCurrentImageDigest,
-			imagesMap: map[string]imageData{
-				"stale:image": {
-					url:         "stale@sha256:abcdefg",
-					lastUpdated: time.Now().Add(-25 * time.Hour),
-				},
-				"imageA:latest": {
-					url:         testCurrentImageDigest,
-					lastUpdated: time.Now().Add(-2 * time.Hour),
-				},
-			},
-			extraValidation: func(t *testing.T, imageCache *imageCache) {
-				assert.Equal(t, 1, len(imageCache.images), "expected old image data to be cleaned up")
-			},
-			overrideLastCleanup: time.Now().Add(-25 * time.Hour),
-			fetchImageFunc: func(string) (string, error) {
-				return "", fmt.Errorf("should not call fetchImage")
-			},
-		},
-		{
 			name: "error during image fetching",
 			fetchImageFunc: func(string) (string, error) {
 				return "", fmt.Errorf("example error while fetching image")
@@ -107,13 +72,8 @@ func TestCache(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			testCache := &imageCache{
-				images:      test.imagesMap,
-				fetchImage:  test.fetchImageFunc,
-				lastCleanup: time.Now(),
-			}
-
-			if !test.overrideLastCleanup.IsZero() {
-				testCache.lastCleanup = test.overrideLastCleanup
+				images:     test.imagesMap,
+				fetchImage: test.fetchImageFunc,
 			}
 
 			// Act
