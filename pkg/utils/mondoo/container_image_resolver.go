@@ -20,10 +20,11 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"go.mondoo.com/mondoo-operator/pkg/version"
+
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"go.mondoo.com/mondoo-operator/pkg/imagecache"
+	"go.mondoo.com/mondoo-operator/pkg/version"
 )
 
 const (
@@ -38,8 +39,6 @@ const (
 // "latest".
 var MondooOperatorTag = version.Version
 
-type getRemoteImageFunc func(ref name.Reference, options ...remote.Option) (*remote.Descriptor, error)
-
 type ContainerImageResolver interface {
 	// MondooClientImage return the Mondoo client image. If skipResolveImage is false, then the image tag is replaced
 	// by a digest. If userImage or userTag are empty strings, default values are used.
@@ -51,18 +50,15 @@ type ContainerImageResolver interface {
 }
 
 type containerImageResolver struct {
-	imageCache map[string]string
-	logger     logr.Logger
+	logger logr.Logger
 
-	// Used only for testing purposes, so we can test the code without actually querying a remote container registry.
-	getRemoteImage getRemoteImageFunc
+	imageCacher imagecache.ImageCacher
 }
 
 func NewContainerImageResolver() ContainerImageResolver {
 	return &containerImageResolver{
-		imageCache:     make(map[string]string),
-		logger:         ctrl.Log.WithName("container-image-resolver"),
-		getRemoteImage: remote.Get,
+		logger:      ctrl.Log.WithName("container-image-resolver"),
+		imageCacher: imagecache.NewImageCacher(),
 	}
 }
 
@@ -81,37 +77,13 @@ func (c *containerImageResolver) resolveImage(image string, skipImageResolution 
 		return image, nil
 	}
 
-	// Check if the image already exists in the cache. If yes, then return the cached value.
-	imageWithDigest, ok := c.imageCache[image]
-	if ok {
-		return imageWithDigest, nil
-	}
-
-	imageWithDigest, err := c.getImageWithDigest(image)
+	imageWithDigest, err := c.imageCacher.GetImage(image)
 	if err != nil {
-		c.logger.Error(err, "Failed to get image with digest")
+		c.logger.Error(err, "failed to resolve image plus digest")
 		return "", err
 	}
-	c.imageCache[image] = imageWithDigest // Cache the result for consecutive calls.
+
 	return imageWithDigest, nil
-}
-
-func (c *containerImageResolver) getImageWithDigest(image string) (string, error) {
-	ref, err := name.ParseReference(image)
-	if err != nil {
-		c.logger.Error(err, "Failed to parse container reference")
-		return "", err
-	}
-
-	desc, err := c.getRemoteImage(ref)
-	if err != nil {
-		c.logger.Error(err, "Failed to get remote container reference")
-		return "", err
-	}
-	imgDigest := desc.Digest.String()
-	repoName := ref.Context().Name()
-	imageUrl := repoName + "@" + imgDigest
-	return imageUrl, nil
 }
 
 func userImageOrDefault(defaultImage, defaultTag, userImage, userTag string) string {

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/stretchr/testify/suite"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -19,21 +18,31 @@ type ContainerImageResolverSuite struct {
 	testHex          string
 }
 
+type fakeCacher struct {
+	fakeGetImage func(string) (string, error)
+}
+
+func (f *fakeCacher) GetImage(img string) (string, error) {
+	return f.fakeGetImage(img)
+}
+
+func NewFakeCacher(f func(string) (string, error)) *fakeCacher {
+	return &fakeCacher{
+		fakeGetImage: f,
+	}
+}
+
 func (s *ContainerImageResolverSuite) BeforeTest(suiteName, testName string) {
 	s.remoteCallsCount = 0
 	s.testHex = "test"
 	s.resolver = containerImageResolver{
-		imageCache: make(map[string]string),
-		logger:     ctrl.Log.WithName("container-image-resolver"),
-		getRemoteImage: func(ref name.Reference, options ...remote.Option) (*remote.Descriptor, error) {
+		logger: ctrl.Log.WithName("container-image-resolver"),
+		imageCacher: NewFakeCacher(func(image string) (string, error) {
 			s.remoteCallsCount++
 
-			return &remote.Descriptor{
-				Descriptor: v1.Descriptor{
-					Digest: v1.Hash{Algorithm: "sha256", Hex: s.testHex},
-				},
-			}, nil
-		},
+			imageParts := strings.Split(image, ":")
+			return imageParts[0] + "@sha256:" + s.testHex, nil
+		}),
 	}
 }
 
@@ -67,19 +76,6 @@ func (s *ContainerImageResolverSuite) TestMondooClientImage() {
 	s.Equalf(1, s.remoteCallsCount, "remote call has not been performed")
 }
 
-func (s *ContainerImageResolverSuite) TestMondooClientImage_Cached() {
-	image := "ghcr.io/mondoo/testimage"
-	tag := "testtag"
-	cachedDigest := "testDigest"
-
-	s.resolver.imageCache[fmt.Sprintf("%s:%s", image, tag)] = cachedDigest
-	res, err := s.resolver.MondooClientImage(image, tag, false)
-	s.NoError(err)
-
-	s.Equal(cachedDigest, res)
-	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
-}
-
 func (s *ContainerImageResolverSuite) TestMondooClientImage_Defaults() {
 	res, err := s.resolver.MondooClientImage("", "", true)
 	s.NoError(err)
@@ -106,19 +102,6 @@ func (s *ContainerImageResolverSuite) TestMondooOperatorImage() {
 
 	s.Equal(fmt.Sprintf("%s@sha256:%s", image, s.testHex), res)
 	s.Equalf(1, s.remoteCallsCount, "remote call has not been performed")
-}
-
-func (s *ContainerImageResolverSuite) TestMondooOperatorImage_Cached() {
-	image := "ghcr.io/mondoo/testimage"
-	tag := "testtag"
-	cachedDigest := "testDigest"
-
-	s.resolver.imageCache[fmt.Sprintf("%s:%s", image, tag)] = cachedDigest
-	res, err := s.resolver.MondooOperatorImage(image, tag, false)
-	s.NoError(err)
-
-	s.Equal(cachedDigest, res)
-	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
 }
 
 func (s *ContainerImageResolverSuite) TestMondooOperatorImage_Defaults() {
