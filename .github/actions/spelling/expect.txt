@@ -71,3 +71,4 @@ yaml
 mondoooperatorconfigs
 uninstalling
 RKE
+jsonpath
