@@ -2,6 +2,9 @@
 
 This document describes the release process for the operator
 
+## Versioning
+Always consider what is the suitable version number to be released based on the [Operator upgrade manual](docs/operator-upgrades.md).
+
 ## Release script
 
 The `release.sh` script will generate/update the Helm chart files and the OperatorHub.io bundle.
