@@ -51,6 +51,11 @@ jobs:
     needs: [unit-tests]
     if: needs.unit-tests.result == 'success' # run only if unit-tests are successful
     name: Integration tests
+
+    strategy:
+      matrix:
+        k8s-version: [v1.22.10, v1.23.7, v1.24.1]
+
     steps:
       - uses: actions/checkout@v2
       - name: Import environment variables from file
@@ -59,6 +64,7 @@ jobs:
         uses: medyagh/setup-minikube@master
         with:
           memory: 4000m
+          kubernetes-version: ${{ matrix.k8s-version }}
       - uses: actions/setup-go@v2
         with:
           go-version: "${{ env.golang-version }}"
@@ -81,16 +87,17 @@ jobs:
         if: success() || failure()        # run this step even if previous step failed
         with:
           name: unit-test-results
+      - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-version }}.xml
       - uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: test-results
           path: |
             unit-tests.xml
-            integration-tests.xml
+            integration-tests-${{ matrix.k8s-version }}.xml
       - name: Upload test logs artifact
         uses: actions/upload-artifact@v3
         if: failure()
         with:
-          name: test-logs
+          name: test-logs-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/

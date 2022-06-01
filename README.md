@@ -35,7 +35,7 @@ The following Kubernetes environments are tested:
 - AWS EKS 1.21
 - Azure AKS 1.21
 - GCP GKE 1.22 and 1.23
-- Minikube
+- Minikube with Kubernetes versions 1.22, 1.23 and 1.24
 - Rancher RKE1 1.22 and 1.23
 - K3S
 
