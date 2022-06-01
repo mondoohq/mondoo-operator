@@ -340,7 +340,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: failure()
         with:
-          name: olm-test-logs
+          name: olm-test-logs-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
 
       - uses: dorny/test-reporter@v1
@@ -358,8 +358,8 @@ jobs:
       - push-virtual-tag
 
   # publish helm chart after the release of container images is complete
-  run-release-helm:
-    name: Release helm chart
+  run-helm-tests:
+    name: Run helm integration tests
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
       - push-virtual-tag
@@ -374,11 +374,6 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Install Go
         uses: actions/setup-go@v2
@@ -416,15 +411,8 @@ jobs:
         uses: actions/upload-artifact@v3
         if: failure()
         with:
-          name: helm-test-logs
+          name: helm-test-logs-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
-        
-      - name: Run chart-releaser
-        # switch back to helm/chart-releaser-action when #60 is fixed
-        # https://github.com/helm/chart-releaser-action/issues/60
-        uses: luisico/chart-releaser-action@on-tags
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
       - uses: dorny/test-reporter@v1
         if: failure() || success()
@@ -432,3 +420,33 @@ jobs:
           name: Report Helm test results
           path: '*.xml'                     # Path to test results
           reporter: java-junit              # Format of test results
+
+  release-helm:
+    name: Release helm chart
+    needs:
+    - run-helm-tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: "v3.8.0" # default is latest stable
+        id: install
+
+      - name: Run chart-releaser
+        # switch back to helm/chart-releaser-action when #60 is fixed
+        # https://github.com/helm/chart-releaser-action/issues/60
+        uses: luisico/chart-releaser-action@on-tags
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
