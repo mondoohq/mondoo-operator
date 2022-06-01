@@ -23,24 +23,24 @@ spec:
       displayName: Mondoo Audit Config
       kind: MondooAuditConfig
       name: mondooauditconfigs.k8s.mondoo.com
-      version: v1alpha2
+      version: v1alpha1
+    - description: MondooOperatorConfig is the Schema for the mondoooperatorconfigs
+        API
+      displayName: Mondoo Operator Config
+      kind: MondooOperatorConfig
+      name: mondoooperatorconfigs.k8s.mondoo.com
+      version: v1alpha1
     - description: MondooAuditConfig is the Schema for the mondooauditconfigs API
       displayName: Mondoo Audit Config
       kind: MondooAuditConfig
       name: mondooauditconfigs.k8s.mondoo.com
-      version: v1alpha1
-    - description: MondooOperatorConfig is the Schema for the mondoooperatorconfigs
-        API
-      displayName: Mondoo Operator Config
-      kind: MondooOperatorConfig
-      name: mondoooperatorconfigs.k8s.mondoo.com
       version: v1alpha2
     - description: MondooOperatorConfig is the Schema for the mondoooperatorconfigs
         API
       displayName: Mondoo Operator Config
       kind: MondooOperatorConfig
       name: mondoooperatorconfigs.k8s.mondoo.com
-      version: v1alpha1
+      version: v1alpha2
   description: A Kubernetes Operator for creating and managing Mondoo controller instances.
   displayName: mondoo-operator
   icon:
