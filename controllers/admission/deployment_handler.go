@@ -514,8 +514,7 @@ func (n *DeploymentHandler) setControllerRef(obj client.Object) error {
 	return nil
 }
 
-// TODO: This cleanup can be removed afer we are sure no more old-style
-// ValidatingWebhooks exist.
+// TODO: remove with 0.4.0 relesae
 // With the switch to naming the Webhook from MONDOOAUDIT_CONFIG_NAME-mondoo-webhook
 // to NAMESPACE-NAME-mondoo , we should try to clean up any old Webhooks so that they
 // are not orphaned.

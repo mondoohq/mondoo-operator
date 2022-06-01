@@ -396,7 +396,8 @@ func updateWorkloadsConditions(config *v1alpha2.MondooAuditConfig, degradedStatu
 
 }
 
-// TODO: this can be removed once we believe enough time has passed where the old-style named
+// TODO: remove with 0.4.0 release
+// This can be removed once we believe enough time has passed where the old-style named
 // Deployment for workloads has been replaced and removed to keep us from orphaning the old-style Deployment.
 func (n *Workloads) cleanupWorkloadDeployment(ctx context.Context, kubeClient client.Client) error {
 	log := ctrllog.FromContext(ctx)

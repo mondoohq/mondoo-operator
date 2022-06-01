@@ -280,7 +280,7 @@ func (n *DeploymentHandler) cleanupOldCronJobs(ctx context.Context) error {
 	return nil
 }
 
-// TODO: remove in future version
+// TODO: remove with 0.4.0 release
 func (n *DeploymentHandler) cleanupOldConfigMaps(ctx context.Context) error {
 	configMap := &corev1.ConfigMap{}
 	configMap.Name = OldConfigMapName(n.Mondoo.Name)
