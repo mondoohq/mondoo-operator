@@ -1,39 +1,40 @@
-# Upgrading the operator
-The Mondoo operator versions are expressed as `x.y.z`, where `x` is the major version, `y` is the minor version, and `z` is the patch version, following [Semantic Versioning](https://semver.org/) terminology. The operator releases are done in a way that makes sure there are no breaking changes between 2 adjacent minor versions. For example, upgrading the operator from `v0.2.15` to `v0.3.0` is possible without any manual actions. The operator will automatically execute any migration and/or cleanup steps needed.
+# Upgrading the Mondoo Operator
+The Mondoo Operator version numbers are expressed as `x.y.z`, where `x` is the major version, `y` is the minor version, and `z` is the patch version, following [Semantic Versioning](https://semver.org/) standards. Our release approach ensures there are no breaking changes between two adjacent minor versions. For example, you can upgrade the Mondoo Operator from `v0.2.15` to `v0.3.0` without any manual actions. The Mondoo Operator automatically executes any required migration and/or cleanup steps.
 
-When upgrading the operator it is important to note that skipping patch versions is possible but skipping minor versions is not. Upgrading from `v0.2.0` directly to `v0.4.0` is possible but can result in the operator not functioning as expected and/or unused operator resource being left behind in the cluster. Performing such an upgrade will require manual actions to ensure the operator is fully functional.
+You can skip Mondoo Operator patch versions, however we don't recommend skipping minor versions. For example, if you upgrade from `v0.2.0` directly to `v0.4.0`, the Mondoo Operator may not behave as expected, and you may leave behind unused resources in the cluster. Skipping a minor version may require manual actions to ensure the Mondoo Operator is fully functional.
 
-**Never upgrade the operator by simply changing the tag for the Mondoo operator container image!**
+**WARNING: Never try to upgrade the Mondoo Operator by simply changing the tag for the Mondoo Operator container image.**
 
-## Recommended operator upgrade approach
-Follow the steps below to ensure smooth Mondoo operator upgrade procedure:
-1. Verify the Mondoo operator version currently running in the cluster:
+## Recommended Mondoo Operator upgrade process
+Follow these steps for a smooth Mondoo Operator upgrade:
+1. Verify the Mondoo Operator version currently running in the cluster:
     ```bash
     kubectl get deployments -n mondoo-operator -o jsonpath='{.items[*].spec.template.spec.containers[0].image}'
     ```
-2. Verify the current latest version for the Mondoo operator by clicking [here](https://github.com/mondoohq/mondoo-operator/releases/latest).
+2. Check the latest version of the Mondoo Operator on our [Releases](https://github.com/mondoohq/mondoo-operator/releases/latest) GitHub page.
 
-Based on whether there is more than 1 minor version difference between the installed version and the current latest, follow the sections below.
+Based on the version difference between your Mondo Operator and the latest release, follow the steps below.
 
-### Not more than 1 minor version difference
-If there is not more than 1 minor version difference between the installed version and the current latest, simply apply the latest manifest to the cluster:
+### If your current Mondoo Operator is no more than one minor version behind  
+If there is **not** more than one minor version difference between the installed Mondoo Operator and the latest release, apply the latest manifest to the cluster:
 ```bash
 kubectl apply -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml
 ```
 
-### More than 1 minor version difference
-If there is more than 1 minor version difference between the installed version and the current latest, the manifest files for each minor version in between the 2 need to be applied step-by-step. For example, if the version installed is `v0.2.0` and the current latest is `v0.4.3` the upgrade will consist of the following steps:
+### If your current Mondoo Operator is more than one minor version behind
+If there **is** more than one minor version difference between the installed Mondoo Operator and the latest release, you must apply the manifest files for each minor version between the two versions. For example, if the version installed is `v0.2.0` and the latest version is `v0.4.3`, you must install `v0.3.0`. Follow these steps:
 
-1. Apply the manifest for `v0.3.0`:
+1. Apply the manifest for `v0.3.0` (the version you skipped):
     ```bash
     kubectl apply -f https://github.com/mondoohq/mondoo-operator/releases/v0.3.0/download/mondoo-operator-manifests.yaml
     ```
-2. Wait until the new version of the operator is running and verify there are no errors in the operator log:
+2. Wait until the new version of the Mondoo Operator is running and verify there are no errors in the operator log:
     ```bash
     kubectl logs -n mondoo-operator deployment/mondoo-operator-controller-manager
     ```
-    Waiting for the new version of the operator to be ready and checking the logs is essential as directly upgrading to the next version might result in skipping internal upgrade procedures.
-3. Apply the manifest for `v0.4.3` (which is the latest):
+    It's essential to check the logs and wait for the new version of the operator to run; directly upgrading to the next version can result in skipped internal upgrade procedures and unexpected behavior.
+3. Apply the manifest for `v0.4.3` (the latest version):
     ```bash
     kubectl apply -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml
     ```
+Adjust the steps above to fit your current situation. There may be multiple minor release versions between your installed version and the latest release. You must install each minor version independently, wait between each update to verify that the version installed properly and the log is error-free.      
