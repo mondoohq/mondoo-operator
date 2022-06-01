@@ -3,7 +3,7 @@ The Mondoo operator versions are expressed as `x.y.z`, where `x` is the major ve
 
 When upgrading the operator it is important to note that skipping patch versions is possible but skipping minor versions is not. Upgrading from `v0.2.0` directly to `v0.4.0` is possible but can result in the operator not functioning as expected and/or unused operator resource being left behind in the cluster. Performing such an upgrade will require manual actions to ensure the operator is fully functional.
 
-Never upgrade the operator by simply changing the tag for the Mondoo operator container image!
+**Never upgrade the operator by simply changing the tag for the Mondoo operator container image!**
 
 ## Recommended operator upgrade approach
 Follow the steps below to ensure smooth Mondoo operator upgrade procedure:
