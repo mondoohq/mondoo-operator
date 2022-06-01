@@ -19,7 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/yaml"
 
-	mondoov1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
+	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient/fakeserver"
@@ -34,7 +34,7 @@ func TestWebhookValidate(t *testing.T) {
 	decoder := setupDecoder(t)
 	tests := []struct {
 		name          string
-		mode          mondoov1alpha1.WebhookMode
+		mode          mondoov1alpha2.AdmissionMode
 		expectAllowed bool
 		expectReason  string
 		object        runtime.RawExtension
@@ -67,7 +67,7 @@ func TestWebhookValidate(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			if test.mode == "" {
-				test.mode = mondoov1alpha1.Permissive
+				test.mode = mondoov1alpha2.Permissive
 			}
 
 			testserver := fakeserver.FakeServer()

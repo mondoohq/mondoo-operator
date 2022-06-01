@@ -36,7 +36,6 @@ import (
 	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
-	k8sv1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers"
 	"go.mondoo.com/mondoo-operator/controllers/integration"
@@ -53,7 +52,6 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(k8sv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(k8sv1alpha2.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 

@@ -89,7 +89,6 @@ const (
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:scope=Cluster
-//+kubebuilder:storageversion
 
 // MondooOperatorConfig is the Schema for the mondoooperatorconfigs API
 type MondooOperatorConfig struct {

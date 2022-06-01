@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	k8sv1alpha1 "go.mondoo.com/mondoo-operator/api/v1alpha1"
 	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 )
 
@@ -103,7 +102,7 @@ var _ = Describe("workloads", func() {
 			}()
 
 			By("Checking that the mondoo crd is found")
-			foundMondoo := &k8sv1alpha1.MondooAuditConfig{}
+			foundMondoo := &k8sv1alpha2.MondooAuditConfig{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundMondoo)
 				return err == nil
@@ -122,7 +121,7 @@ var _ = Describe("workloads", func() {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, foundMondoo)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
-			foundMondoo.Spec.Workloads.Enable = false
+			foundMondoo.Spec.KubernetesResources.Enable = false
 			Expect(k8sClient.Update(ctx, foundMondoo)).Should(Succeed())
 
 			By("Checking that the deployment is NOT found")

@@ -78,8 +78,7 @@ type Admission struct {
 	// on the scan results may reject the k8s resource creation/modification.
 	// +kubebuilder:validation:Enum=permissive;enforcing
 	// +kubebuilder:default=permissive
-	Mode AdmissionMode `json:"mode,omitempty"`
-
+	Mode                    AdmissionMode           `json:"mode,omitempty"`
 	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
 }
 
@@ -152,7 +151,6 @@ const (
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:storageversion
 
 // MondooAuditConfig is the Schema for the mondooauditconfigs API
 type MondooAuditConfig struct {
