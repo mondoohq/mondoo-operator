@@ -262,7 +262,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 
 	// Some time is needed before the webhook starts working. Might be a better way to check this but
 	// will have to do with a sleep for now.
-	time.Sleep(4 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// Now the Deployment Update() should work
 	s.NoErrorf(

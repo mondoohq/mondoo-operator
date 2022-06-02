@@ -76,7 +76,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 						Image:     image,
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--api", "--config", "/etc/opt/mondoo/config/mondoo.yml", "--token-file-path", "/etc/opt/mondoo/token/token"},
-						Resources: k8s.DefaultMondooClientResources,
+						Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources),
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{
