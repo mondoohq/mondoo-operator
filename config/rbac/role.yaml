@@ -73,6 +73,7 @@ rules:
   - namespaces
   - nodes
   - pods
+  - serviceaccounts
   verbs:
   - get
   - list
