@@ -514,7 +514,7 @@ func (n *DeploymentHandler) setControllerRef(obj client.Object) error {
 	return nil
 }
 
-// TODO: remove with 0.4.0 relesae
+// TODO: remove with 0.4.0 release
 // With the switch to naming the Webhook from MONDOOAUDIT_CONFIG_NAME-mondoo-webhook
 // to NAMESPACE-NAME-mondoo , we should try to clean up any old Webhooks so that they
 // are not orphaned.

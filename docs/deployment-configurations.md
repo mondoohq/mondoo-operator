@@ -18,7 +18,7 @@ The Mondoo Operator can be configured via a cluster-scoped MondooOperatorConfig 
 To enable metrics reporting via Prometheus and to disable the translation of container image/tags to image/checksums, the following configuration would be used.
 
 ```yaml
-apiVersion: k8s.mondoo.com/v1alpha1
+apiVersion: k8s.mondoo.com/v1alpha2
 Kind: MondooOperatorConfig
 metadata:
   name: mondoo-operator-config
