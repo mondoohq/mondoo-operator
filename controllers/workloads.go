@@ -137,6 +137,17 @@ func (n *Workloads) declareDeployment(ctx context.Context, clt client.Client, sc
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+
+	//Check whether specified SA exists in the namespace, just in case, e.g. when Deployment is spread across namespaces
+	desiredServiceAccountName := n.Mondoo.Spec.Scanner.ServiceAccountName
+	desiredNamespace := n.Mondoo.Namespace
+	foundServiceAccount := &corev1.ServiceAccount{}
+	err = clt.Get(ctx, types.NamespacedName{Name: desiredServiceAccountName, Namespace: desiredNamespace}, foundServiceAccount)
+	if err != nil && errors.IsNotFound(err) {
+		log.Error(err, "Cannot create Deployment because ServiceAccount is missing in namespace", "Deployment.Namespace", desiredNamespace, "Deployment.serviceAccountName", desiredServiceAccountName)
+		return ctrl.Result{}, err
+	}
+
 	desiredDeployment := n.deploymentForMondoo(mondooClientImage)
 	err = clt.Get(ctx, client.ObjectKeyFromObject(desiredDeployment), found)
 	if err != nil && errors.IsNotFound(err) {
