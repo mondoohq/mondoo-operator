@@ -35,11 +35,32 @@ func (s *DeploySuite) SetupSuite() {
 	s.image = mondoo.MondooOperatorImage + ":" + mondoo.MondooOperatorTag
 }
 
-func (s *DeploySuite) TestDeploy_Create() {
+func (s *DeploySuite) TestDeploy_TryCreateWithoutServiceAccount() {
 	ns := "test-ns"
 	auditConfig := utils.DefaultAuditConfig(ns, false, false, true)
 
 	kubeClient := fake.NewClientBuilder().WithScheme(s.scheme).Build()
+
+	s.Error(Deploy(s.ctx, kubeClient, ns, s.image, auditConfig))
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(kubeClient.List(s.ctx, ds))
+	s.Equal(0, len(ds.Items))
+}
+
+func (s *DeploySuite) TestDeploy_CreateWithServiceAccount() {
+	ns := "test-ns"
+	auditConfig := utils.DefaultAuditConfig(ns, false, false, true)
+
+	kubeClient := fake.NewClientBuilder().WithScheme(s.scheme).Build()
+
+	serviceaccount := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      auditConfig.Spec.Scanner.ServiceAccountName,
+			Namespace: ns,
+		},
+	}
+	s.NoError(kubeClient.Create(s.ctx, serviceaccount))
 
 	s.NoError(Deploy(s.ctx, kubeClient, ns, s.image, auditConfig))
 
@@ -82,12 +103,20 @@ func (s *DeploySuite) TestDeploy_Update() {
 	service := ScanApiService(ns, auditConfig)
 	service.Spec.Ports[0].Port = 1234
 
-	client := fake.NewClientBuilder().WithObjects(d, service).WithScheme(s.scheme).Build()
+	kubeClient := fake.NewClientBuilder().WithObjects(d, service).WithScheme(s.scheme).Build()
 
-	s.NoError(Deploy(s.ctx, client, ns, s.image, auditConfig))
+	serviceaccount := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      auditConfig.Spec.Scanner.ServiceAccountName,
+			Namespace: ns,
+		},
+	}
+	s.NoError(kubeClient.Create(s.ctx, serviceaccount))
+
+	s.NoError(Deploy(s.ctx, kubeClient, ns, s.image, auditConfig))
 
 	ds := &appsv1.DeploymentList{}
-	s.NoError(client.List(s.ctx, ds))
+	s.NoError(kubeClient.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
 	d = ScanApiDeployment(ns, s.image, auditConfig)
@@ -97,7 +126,7 @@ func (s *DeploySuite) TestDeploy_Update() {
 	s.True(k8s.AreDeploymentsEqual(*d, ds.Items[0]))
 
 	ss := &corev1.ServiceList{}
-	s.NoError(client.List(s.ctx, ss))
+	s.NoError(kubeClient.List(s.ctx, ss))
 	s.Equal(1, len(ss.Items))
 
 	service = ScanApiService(ns, auditConfig)

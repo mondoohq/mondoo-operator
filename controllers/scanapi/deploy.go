@@ -26,6 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 )
@@ -35,6 +36,16 @@ var logger = ctrl.Log.WithName("scan-api-deploy")
 // Deploy deploys the scan API for a given MondooAuditConfig. The function checks if the scan API is already deployed.
 // If that is the case, the existing resources are compared with the ones that are desired and the necessary updates are applied.
 func Deploy(ctx context.Context, kubeClient client.Client, ns, image string, mondoo mondoov1alpha2.MondooAuditConfig) error {
+	//Check whether specified SA exists in the namespace, just in case, e.g. when Deployment is spread across namespaces
+	desiredServiceAccountName := mondoo.Spec.Scanner.ServiceAccountName
+	desiredNamespace := ns
+	foundServiceAccount := &corev1.ServiceAccount{}
+	err := kubeClient.Get(ctx, types.NamespacedName{Name: desiredServiceAccountName, Namespace: desiredNamespace}, foundServiceAccount)
+	if err != nil && errors.IsNotFound(err) {
+		logger.Error(err, "Cannot create Deployment because ServiceAccount is missing in namespace", "Deployment.Namespace", desiredNamespace, "Deployment.serviceAccountName", desiredServiceAccountName)
+		return err
+	}
+
 	if err := createSecret(ctx, kubeClient, mondoo); err != nil {
 		return err
 	}

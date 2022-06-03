@@ -422,6 +422,14 @@ func TestReconcile(t *testing.T) {
 			}
 			fakeClient := fake.NewClientBuilder().WithObjects(existingObj...).Build()
 
+			serviceaccount := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      auditConfig.Spec.Scanner.ServiceAccountName,
+					Namespace: testNamespace,
+				},
+			}
+			require.NoError(t, fakeClient.Create(context.TODO(), serviceaccount))
+
 			webhooks := &DeploymentHandler{
 				Mondoo:                 auditConfig,
 				KubeClient:             fakeClient,
@@ -508,6 +516,9 @@ func testMondooAuditConfigSpec(admissionEnabled, integrationEnabled bool) mondoo
 		},
 		MondooCredsSecretRef: corev1.LocalObjectReference{
 			Name: testCredsSecretName,
+		},
+		Scanner: mondoov1alpha2.Scanner{
+			ServiceAccountName: "mondoo-operator-k8s-resources-scanning",
 		},
 	}
 }

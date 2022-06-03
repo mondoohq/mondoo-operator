@@ -41,7 +41,8 @@ func DefaultAuditConfig(ns string, workloads, nodes, admission bool) mondoov2.Mo
 			Nodes:                mondoov2.Nodes{Enable: nodes},
 			Admission:            mondoov2.Admission{Enable: admission},
 			Scanner: mondoov2.Scanner{
-				Image: mondoov2.Image{Name: "test", Tag: "latest"},
+				Image:              mondoov2.Image{Name: "test", Tag: "latest"},
+				ServiceAccountName: "mondoo-operator-k8s-resources-scanning",
 			},
 		},
 	}
