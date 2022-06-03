@@ -90,33 +90,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigWorkloads(auditConfig mondoo
 	s.Equalf(int32(1), *deployments.Items[0].Spec.Replicas, "Deployment does not have 1 replica.")
 }
 
-func (s *AuditConfigBaseSuite) testMondooAuditConfigWorkloadsMissingServiceAccount(auditConfig mondoov2.MondooAuditConfig) {
-	auditConfig.Spec.Scanner.ServiceAccountName = auditConfig.Spec.Scanner.ServiceAccountName + "-does-not-exist"
-	s.auditConfig = auditConfig
-	zap.S().Info("Create an audit config that enables only workloads scanning, but with a missing service account.")
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
-		"Failed to create Mondoo audit config.")
-
-	zap.S().Info("Make sure the Mondoo k8s client is not ready.")
-	workloadsLabels := []string{installer.MondooClientsK8sLabel, installer.MondooClientsLabel}
-	workloadsLabelsString := strings.Join(workloadsLabels, ",")
-	s.Falsef(
-		s.testCluster.K8sHelper.IsPodReady(workloadsLabelsString, auditConfig.Namespace),
-		"Mondoo workloads clients are in a Ready state.")
-
-	zap.S().Info("Verify the operator didn't create any Deployment.")
-	listOpts, err := utils.LabelSelectorListOptions(workloadsLabelsString)
-	listOpts.Namespace = auditConfig.Namespace
-	s.NoError(err)
-
-	deployments := &appsv1.DeploymentList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
-
-	// Verify there is no deployment
-	s.Equalf(0, len(deployments.Items), "Deployments count in Mondoo namespace is incorrect.")
-}
-
 func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
 	s.auditConfig = auditConfig
 	zap.S().Info("Create an audit config that enables only nodes scanning.")
