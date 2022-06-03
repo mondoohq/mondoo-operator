@@ -120,6 +120,9 @@ func main() {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
+
+	// TODO: add a ready check that verifies whether all CRD statuses state they are upgraded to
+	// the current version of the operator
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
