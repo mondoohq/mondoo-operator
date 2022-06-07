@@ -52,6 +52,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 	scanAPIURL := fmt.Sprintf("http://%s.%s.svc:%d", scanapi.ServiceName(m.Name), m.Namespace, scanapi.Port)
 
 	containerArgs := []string{
+		"webhook",
 		"--token-file-path",
 		"/etc/webhook/token",
 		"--enforcement-mode",
@@ -91,7 +92,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 					Containers: []corev1.Container{
 						{
 							Command: []string{
-								"/webhook",
+								"/mondoo-operator",
 							},
 							Args:            containerArgs,
 							Image:           image,

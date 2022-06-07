@@ -113,11 +113,10 @@ test/integration/ci: manifests generate generate-manifests load-minikube gotests
 ##@ Build
 
 build: generate fmt vet ## Build manager binary.
-	CGO_ENABLED=0 GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build -o bin/manager -ldflags "-s -w -X go.mondoo.com/mondoo-operator/pkg/version.Version=${VERSION}" main.go
-	CGO_ENABLED=0 GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build -o bin/webhook pkg/webhooks/main.go
+	CGO_ENABLED=0 GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build -o bin/mondoo-operator -ldflags "-s -w -X go.mondoo.com/mondoo-operator/pkg/version.Version=${VERSION}" cmd/mondoo-operator/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
-	MONDOO_OPERATOR_NAMESPACE=mondoo-operator go run ./main.go
+	MONDOO_OPERATOR_NAMESPACE=mondoo-operator go run ./cmd/mondoo-operator/main.go
 
 docker-build: TARGET_OS=linux
 docker-build: build ## Build docker image with the manager.

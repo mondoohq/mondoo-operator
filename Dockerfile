@@ -2,8 +2,7 @@
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
-ADD bin/manager .
-ADD bin/webhook .
+ADD bin/mondoo-operator .
 USER 65532:65532
 
-ENTRYPOINT ["/manager"]
+ENTRYPOINT ["/mondoo-operator"]

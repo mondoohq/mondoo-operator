@@ -72,7 +72,8 @@ func NewWebhookValidator(client client.Client, mode, scanURL, token, integration
 			ApiEndpoint: scanURL,
 			Token:       token,
 		}),
-		clusterID: clusterID,
+		integrationMRN: integrationMRN,
+		clusterID:      clusterID,
 	}, nil
 }
 

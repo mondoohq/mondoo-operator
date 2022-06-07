@@ -28,8 +28,9 @@ spec:
         runAsNonRoot: true
       containers:
       - command:
-        - /manager
+        - /mondoo-operator
         args:
+        - operator
         - --leader-elect
         image: controller:latest
         imagePullPolicy: IfNotPresent
