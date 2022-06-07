@@ -88,6 +88,7 @@ jobs:
         with:
           name: unit-test-results
       - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-version }}.xml
+        if: success() || failure()
       - uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
