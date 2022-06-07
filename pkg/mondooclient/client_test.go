@@ -67,6 +67,41 @@ func TestScanner(t *testing.T) {
 	}
 }
 
+func TestScanner_ScanKubernetesResources(t *testing.T) {
+	testserver := fakeserver.FakeServer()
+	url := testserver.URL
+	token := ""
+
+	// To test with a real client, just set
+	// url := "http://127.0.0.1:8989"
+	// token := "abcdefgh"
+
+	// do client request
+	mClient := mondooclient.NewClient(mondooclient.ClientOptions{
+		ApiEndpoint: url,
+		Token:       token,
+	})
+
+	// Run Health Check
+	healthResp, err := mClient.HealthCheck(context.Background(), &mondooclient.HealthCheckRequest{})
+	require.NoError(t, err)
+	assert.True(t, healthResp.Status == "SERVING")
+
+	request := admission.Request{}
+	err = yaml.Unmarshal(webhookPayload, &request)
+	require.NoError(t, err)
+
+	result, err := mClient.ScanKubernetesResources(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// check if the scan passed
+	if assert.NotNil(t, result.WorstScore, "nil WorstScore") {
+		passed := result.WorstScore.Type == 2 && result.WorstScore.Value == 100
+		assert.True(t, passed)
+	}
+}
+
 func mustRead(file string) []byte {
 	bytes, err := ioutil.ReadFile(file)
 	if err != nil {

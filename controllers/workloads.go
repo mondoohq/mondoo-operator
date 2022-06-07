@@ -431,9 +431,9 @@ func defaultMondooInventory(ctx context.Context, kubeClient client.Client, mac *
 			Assets: []inventory.Asset{
 				{
 					Id: "api",
-					Connections: []*inventory.TransportConfig{
+					Connections: []inventory.TransportConfig{
 						{
-							Backend: "k8s",
+							Backend: inventory.TransportBackend_CONNECTION_K8S,
 						},
 					},
 				},

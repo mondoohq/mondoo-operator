@@ -9,6 +9,8 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"go.mondoo.com/mondoo-operator/pkg/inventory"
 )
 
 const (
@@ -26,6 +28,7 @@ type Client interface {
 
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	RunKubernetesManifest(context.Context, *KubernetesManifestJob) (*ScanResult, error)
+	ScanKubernetesResources(context.Context) (*ScanResult, error)
 
 	IntegrationRegister(context.Context, *IntegrationRegisterInput) (*IntegrationRegisterOutput, error)
 	IntegrationCheckIn(context.Context, *IntegrationCheckInInput) (*IntegrationCheckInOutput, error)
@@ -219,6 +222,48 @@ type Score struct {
 	DataTotal       uint32 `json:"data_total,omitempty"`
 	DataCompletion  uint32 `json:"data_completion,omitempty"`
 	Message         string `json:"message,omitempty"`
+}
+
+const ScanKubernetesResourcesEndpoint = "/Scan/Run"
+
+func (s *mondooClient) ScanKubernetesResources(ctx context.Context) (*ScanResult, error) {
+	url := s.ApiEndpoint + ScanKubernetesResourcesEndpoint
+	inventory := ScanJob{
+		Inventory: inventory.MondooInventory{
+			Spec: inventory.MondooInventorySpec{
+				Assets: []inventory.Asset{
+					{
+						Connections: []inventory.TransportConfig{
+							{
+								Backend: inventory.TransportBackend_CONNECTION_K8S,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	reqBodyBytes, err := json.Marshal(inventory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	respBodyBytes, err := s.request(ctx, url, reqBodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	out := &ScanResult{}
+	if err = json.Unmarshal(respBodyBytes, out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal proto response: %v", err)
+	}
+
+	return out, nil
+}
+
+type ScanJob struct {
+	Inventory inventory.MondooInventory `json:"inventory"`
 }
 
 func NewClient(opts ClientOptions) Client {
