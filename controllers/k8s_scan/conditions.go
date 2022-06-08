@@ -7,13 +7,13 @@ import (
 )
 
 func updateWorkloadsConditions(config *v1alpha2.MondooAuditConfig, degradedStatus bool) {
-	msg := "API Scanning is Available"
-	reason := "APIScanningAvailable"
+	msg := "Kubernetes Resources Scanning is Available"
+	reason := "KubernetesResourcesScanningAvailable"
 	status := corev1.ConditionFalse
 	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
 	if degradedStatus {
-		msg = "API Scanning is Unavailable"
-		reason = "APIScanningUnavailable"
+		msg = "Kubernetes Resources Scanning is Unavailable"
+		reason = "KubernetesResourcesScanningUnavailable"
 		status = corev1.ConditionTrue
 	}
 
