@@ -170,8 +170,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
-	// TODO: extract deployment of scan API here instead of having it separate for admission and k8s_scan as this does not work
-
 	mondooAuditConfigCopy := mondooAuditConfig.DeepCopy()
 
 	// If spec.MondooTokenSecretRef != "" and the Secret referenced in spec.MondooCredsSecretRef

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/inventory"
 )
 
@@ -28,7 +29,7 @@ type Client interface {
 
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	RunKubernetesManifest(context.Context, *KubernetesManifestJob) (*ScanResult, error)
-	ScanKubernetesResources(context.Context) (*ScanResult, error)
+	ScanKubernetesResources(ctx context.Context, integrationMrn string) (*ScanResult, error)
 
 	IntegrationRegister(context.Context, *IntegrationRegisterInput) (*IntegrationRegisterOutput, error)
 	IntegrationCheckIn(context.Context, *IntegrationCheckInInput) (*IntegrationCheckInOutput, error)
@@ -226,9 +227,9 @@ type Score struct {
 
 const ScanKubernetesResourcesEndpoint = "/Scan/Run"
 
-func (s *mondooClient) ScanKubernetesResources(ctx context.Context) (*ScanResult, error) {
+func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationMrn string) (*ScanResult, error) {
 	url := s.ApiEndpoint + ScanKubernetesResourcesEndpoint
-	inventory := ScanJob{
+	scanJob := ScanJob{
 		Inventory: inventory.MondooInventory{
 			Spec: inventory.MondooInventorySpec{
 				Assets: []inventory.Asset{
@@ -244,7 +245,14 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context) (*ScanResult
 		},
 	}
 
-	reqBodyBytes, err := json.Marshal(inventory)
+	if integrationMrn != "" {
+		if scanJob.Inventory.Spec.Assets[0].Labels == nil {
+			scanJob.Inventory.Spec.Assets[0].Labels = make(map[string]string)
+		}
+		scanJob.Inventory.Spec.Assets[0].Labels[constants.MondooAssetsIntegrationLabel] = integrationMrn
+	}
+
+	reqBodyBytes, err := json.Marshal(scanJob)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}

@@ -20,6 +20,7 @@ var Cmd = &cobra.Command{
 func init() {
 	scanApiUrl := Cmd.Flags().String("scan-api-url", "", "The URL of the service to send scan requests to.")
 	tokenFilePath := Cmd.Flags().String("token-file-path", "", "Path to a file containing token to use when making scan requests.")
+	integrationMrn := Cmd.Flags().String("integration-mrn", "", "The Mondoo integration MRN to label scanned items with if the MondooAuditConfig is configured with Mondoo integration.")
 
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(zap.New())
@@ -44,9 +45,8 @@ func init() {
 			Token:       token,
 		})
 
-		// TODO: I guess add integration-mrn label to the scans if it's available
 		logger.Info("triggering Kubernetes resources scan")
-		res, err := client.ScanKubernetesResources(context.Background())
+		res, err := client.ScanKubernetesResources(context.Background(), *integrationMrn)
 		if err != nil {
 			logger.Error(err, "failed to trigger a Kubernetes resources scan")
 		}

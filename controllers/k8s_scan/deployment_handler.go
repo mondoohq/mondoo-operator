@@ -67,8 +67,15 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
+	integrationMrn, err := k8s.GetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
+	if err != nil {
+		logger.Error(err,
+			"failed to retrieve integration-mrn for MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
+		return err
+	}
+
 	existing := &batchv1.CronJob{}
-	desired := CronJob(mondooClientImage, *n.Mondoo)
+	desired := CronJob(mondooClientImage, integrationMrn, *n.Mondoo)
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 		return err

@@ -31,11 +31,21 @@ import (
 
 const CronJobNameSuffix = "-k8s-scan"
 
-func CronJob(image string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
 	scanApiUrl := scanapi.ScanApiServiceUrl(m)
+
+	containerArgs := []string{
+		"k8s-scan",
+		"--scan-api-url", scanApiUrl,
+		"--token-file-path", "/etc/webhook/token",
+	}
+
+	if integrationMrn != "" {
+		containerArgs = append(containerArgs, []string{"--integration-mrn", integrationMrn}...)
+	}
 
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -62,11 +72,7 @@ func CronJob(image string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
 									ImagePullPolicy: corev1.PullIfNotPresent,
 									Name:            "mondoo-client",
 									Command:         []string{"/mondoo-operator"},
-									Args: []string{
-										"k8s-scan",
-										"--scan-api-url", scanApiUrl,
-										"--token-file-path", "/etc/webhook/token",
-									},
+									Args:            containerArgs,
 									Resources: corev1.ResourceRequirements{
 										Limits: corev1.ResourceList{
 											corev1.ResourceCPU:    resource.MustParse("200m"),

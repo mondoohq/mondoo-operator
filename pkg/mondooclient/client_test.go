@@ -91,7 +91,7 @@ func TestScanner_ScanKubernetesResources(t *testing.T) {
 	err = yaml.Unmarshal(webhookPayload, &request)
 	require.NoError(t, err)
 
-	result, err := mClient.ScanKubernetesResources(context.Background())
+	result, err := mClient.ScanKubernetesResources(context.Background(), "")
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
