@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
@@ -51,15 +50,6 @@ type DeploymentHandler struct {
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	if !n.Mondoo.Spec.KubernetesResources.Enable {
 		return ctrl.Result{}, n.down(ctx)
-	}
-
-	mondooClientImage, err := n.ContainerImageResolver.MondooClientImage(
-		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
-	if err != nil {
-		logger.Error(err, "Failed to resolve mondoo-client container image")
-	}
-	if err := scanapi.Deploy(ctx, n.KubeClient, n.Mondoo.Namespace, mondooClientImage, *n.Mondoo); err != nil {
-		return ctrl.Result{}, err
 	}
 
 	if err := n.syncCronJob(ctx); err != nil {
@@ -125,10 +115,6 @@ func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]ba
 }
 
 func (n *DeploymentHandler) down(ctx context.Context) error {
-	if err := scanapi.Cleanup(ctx, n.KubeClient, n.Mondoo.Namespace, *n.Mondoo); err != nil {
-		return err
-	}
-
 	cronJob := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, cronJob); err != nil {
 		logger.Error(

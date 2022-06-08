@@ -49,6 +49,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/integration"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
+	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -181,6 +182,20 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
+	scanapi := scanapi.DeploymentHandler{
+		Mondoo:                 mondooAuditConfig,
+		KubeClient:             r.Client,
+		MondooOperatorConfig:   config,
+		ContainerImageResolver: r.ContainerImageResolver,
+	}
+	result, err := scanapi.Reconcile(ctx)
+	if err != nil {
+		log.Error(err, "Failed to set up scan API")
+	}
+	if err != nil || result.Requeue {
+		return result, err
+	}
+
 	nodes := nodes.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
@@ -188,9 +203,9 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		ContainerImageResolver: r.ContainerImageResolver,
 	}
 
-	result, err := nodes.Reconcile(ctx)
+	result, err = nodes.Reconcile(ctx)
 	if err != nil {
-		log.Error(err, "Failed to declare nodes")
+		log.Error(err, "Failed to set up nodes scanning")
 	}
 	if err != nil || result.Requeue {
 		return result, err

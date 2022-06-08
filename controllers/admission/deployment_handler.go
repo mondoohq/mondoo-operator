@@ -36,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -370,16 +369,7 @@ func (n *DeploymentHandler) applyWebhooks(ctx context.Context) (ctrl.Result, err
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
-	if n.Mondoo.Spec.Admission.Enable && n.Mondoo.DeletionTimestamp == nil {
-		mondooClientImage, err := n.ContainerImageResolver.MondooClientImage("", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		if err := scanapi.Deploy(ctx, n.KubeClient, n.TargetNamespace, mondooClientImage, *n.Mondoo); err != nil {
-			return ctrl.Result{}, err
-		}
-
+	if n.Mondoo.Spec.Admission.Enable && n.Mondoo.DeletionTimestamp.IsZero() {
 		result, err := n.applyWebhooks(ctx)
 		if err != nil || result.Requeue {
 			return result, err
@@ -429,11 +419,6 @@ func (n *DeploymentHandler) down(ctx context.Context) (ctrl.Result, error) {
 	}
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, deployment); err != nil {
 		webhookLog.Error(err, "failed to clean up webhook Deployment resource")
-		return ctrl.Result{}, err
-	}
-
-	if err := scanapi.Cleanup(ctx, n.KubeClient, n.TargetNamespace, *n.Mondoo); err != nil {
-		webhookLog.Error(err, "failed to clean up scan API resources")
 		return ctrl.Result{}, err
 	}
 
