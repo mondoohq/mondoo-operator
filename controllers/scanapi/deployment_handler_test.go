@@ -37,7 +37,6 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 	s.ctx = context.Background()
 	s.scheme = clientgoscheme.Scheme
 	s.Require().NoError(mondoov1alpha2.AddToScheme(s.scheme))
-	//s.image = mondoo.MondooOperatorImage + ":" + mondoo.MondooOperatorTag
 	s.containerImageResolver = fakeMondoo.NewNoOpContainerImageResolver()
 }
 
@@ -46,7 +45,49 @@ func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
 	s.fakeClientBuilder = fake.NewClientBuilder()
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_Create() {
+func (s *DeploymentHandlerSuite) TestReconcile_Create_KubernetesResources() {
+	d := s.createDeploymentHandler()
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	tokenSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      SecretName(s.auditConfig.Name),
+		},
+	}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret), "Error checking for token secret")
+	// This really should be checking tokenSecret.Data, but the fake kubeClient just takes and stores the objects given to it
+	// and our code populates the Secret through Secret.StringData["token"]
+	s.Contains(tokenSecret.StringData, "token")
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, ds))
+	s.Equal(1, len(ds.Items))
+
+	image, err := s.containerImageResolver.MondooClientImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig)
+	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
+	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
+	s.Equal(*deployment, ds.Items[0])
+
+	ss := &corev1.ServiceList{}
+	s.NoError(d.KubeClient.List(s.ctx, ss))
+	s.Equal(1, len(ss.Items))
+
+	service := ScanApiService(d.Mondoo.Namespace, s.auditConfig)
+	service.ResourceVersion = "1" // Needed because the fake client sets it.
+	s.NoError(ctrl.SetControllerReference(&s.auditConfig, service, s.scheme))
+	s.Equal(*service, ss.Items[0])
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
+	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", false, false, true)
+
 	d := s.createDeploymentHandler()
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
@@ -125,7 +166,37 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.True(k8s.AreServicesEqual(*service, ss.Items[0]))
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_Cleanup() {
+func (s *DeploymentHandlerSuite) TestReconcile_Cleanup_NoScanning() {
+	// Disable all scanning
+	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", false, false, false)
+
+	image, err := s.containerImageResolver.MondooClientImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig)
+	service := ScanApiService(s.auditConfig.Namespace, s.auditConfig)
+	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(deployment, service)
+
+	d := s.createDeploymentHandler()
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, ds))
+	s.Equal(0, len(ds.Items))
+
+	sec := &corev1.SecretList{}
+	s.NoError(d.KubeClient.List(s.ctx, sec))
+	s.Equal(0, len(sec.Items))
+
+	ss := &corev1.ServiceList{}
+	s.NoError(d.KubeClient.List(s.ctx, ss))
+	s.Equal(0, len(ss.Items))
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_Cleanup_AuditConfigDeletion() {
 	// Set the audit config for deletion
 	now := metav1.Now()
 	s.auditConfig.SetDeletionTimestamp(&now)

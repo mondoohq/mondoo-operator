@@ -54,9 +54,6 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 	return ctrl.Result{}, n.syncService(ctx)
 }
 
-// Deploy deploys the scan API for a given MondooAuditConfig. The function checks if the scan API is already deployed.
-// If that is the case, the existing resources are compared with the ones that are desired and the necessary updates are applied.
-
 // down cleans up the scan API for a given MondooAuditConfig. The function returns no errors if the scan API is already
 // deleted.
 func (n *DeploymentHandler) down(ctx context.Context) error {
