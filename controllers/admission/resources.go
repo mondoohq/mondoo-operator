@@ -48,8 +48,7 @@ func GetTLSCertificatesSecretName(mondooAuditConfigName string) string {
 }
 
 func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, integrationMRN, clusterID string) *appsv1.Deployment {
-	// The URL to communicate with will be http://ScanAPIServiceName-ScanAPIServiceNamespace.svc:ScanAPIPort
-	scanAPIURL := fmt.Sprintf("http://%s.%s.svc:%d", scanapi.ServiceName(m.Name), m.Namespace, scanapi.Port)
+	scanApiUrl := scanapi.ScanApiServiceUrl(m)
 
 	containerArgs := []string{
 		"webhook",
@@ -58,7 +57,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 		"--enforcement-mode",
 		string(m.Spec.Admission.Mode),
 		"--scan-api-url",
-		scanAPIURL,
+		scanApiUrl,
 		"--cluster-id",
 		clusterID,
 	}

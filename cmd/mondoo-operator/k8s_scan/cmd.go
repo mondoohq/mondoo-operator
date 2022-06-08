@@ -44,6 +44,7 @@ func init() {
 			Token:       token,
 		})
 
+		// TODO: I guess add integration-mrn label to the scans if it's available
 		logger.Info("triggering Kubernetes resources scan")
 		res, err := client.ScanKubernetesResources(context.Background())
 		if err != nil {
