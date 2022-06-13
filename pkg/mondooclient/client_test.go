@@ -87,10 +87,6 @@ func TestScanner_ScanKubernetesResources(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, healthResp.Status == "SERVING")
 
-	request := admission.Request{}
-	err = yaml.Unmarshal(webhookPayload, &request)
-	require.NoError(t, err)
-
 	result, err := mClient.ScanKubernetesResources(context.Background(), "")
 	require.NoError(t, err)
 	require.NotNil(t, result)

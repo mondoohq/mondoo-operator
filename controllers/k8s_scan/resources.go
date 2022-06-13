@@ -40,7 +40,7 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 	containerArgs := []string{
 		"k8s-scan",
 		"--scan-api-url", scanApiUrl,
-		"--token-file-path", "/etc/webhook/token",
+		"--token-file-path", "/etc/scanapi/token",
 	}
 
 	if integrationMrn != "" {
@@ -70,7 +70,7 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 								{
 									Image:           image,
 									ImagePullPolicy: corev1.PullIfNotPresent,
-									Name:            "mondoo-client",
+									Name:            "mondoo-k8s-scan",
 									Command:         []string{"/mondoo-operator"},
 									Args:            containerArgs,
 									Resources: corev1.ResourceRequirements{
@@ -86,7 +86,7 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 									VolumeMounts: []corev1.VolumeMount{
 										{
 											Name:      "token",
-											MountPath: "/etc/webhook",
+											MountPath: "/etc/scanapi",
 											ReadOnly:  true,
 										},
 									},

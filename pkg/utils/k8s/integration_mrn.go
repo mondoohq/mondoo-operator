@@ -31,7 +31,7 @@ import (
 // is enabled. When ConsoleIntegration is disabled an empty string is returned.
 func GetIntegrationMrnForAuditConfig(ctx context.Context, kubeClient client.Client, auditConfig v1alpha2.MondooAuditConfig) (string, error) {
 	if !auditConfig.Spec.ConsoleIntegration.Enable {
-		// sending an empty integrationMRN means the webhook will run w/o setting integration
+		// sending an empty integrationMRN means the webhook or k8s resources scan will run w/o setting integration
 		// labels (which is exactly what we want when console integration is not enabled)
 		return "", nil
 	}
