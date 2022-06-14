@@ -194,6 +194,11 @@ func ScanApiService(ns string, m v1alpha2.MondooAuditConfig) *corev1.Service {
 	}
 }
 
+func ScanApiServiceUrl(m v1alpha2.MondooAuditConfig) string {
+	// The URL to communicate with will be http://ScanAPIServiceName-ScanAPIServiceNamespace.svc:ScanAPIPort
+	return fmt.Sprintf("http://%s.%s.svc:%d", ServiceName(m.Name), m.Namespace, Port)
+}
+
 func DeploymentLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 	return map[string]string{
 		"app":       "mondoo-scan-api",

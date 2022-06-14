@@ -14,22 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package k8s
+package utils
 
-import corev1 "k8s.io/api/core/v1"
+import "math/rand"
 
-func TaintsToTolerations(taints []corev1.Taint) []corev1.Toleration {
-	var tolerations []corev1.Toleration
-	for _, t := range taints {
-		tolerations = append(tolerations, TaintToToleration(t))
+var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func RandString(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
-	return tolerations
-}
-
-func TaintToToleration(t corev1.Taint) corev1.Toleration {
-	return corev1.Toleration{
-		Key:    t.Key,
-		Effect: t.Effect,
-		Value:  t.Value,
-	}
+	return string(b)
 }

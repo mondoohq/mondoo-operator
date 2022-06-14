@@ -36,8 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/controllers/scanapi"
-	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
@@ -205,9 +203,10 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 	}
 	clusterID := string(namespace.UID)
 
-	integrationMRN, err := n.getIntegrationMRN(ctx)
+	integrationMRN, err := k8s.GetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
 	if err != nil {
-		webhookLog.Error(err, "failed why checking for Integration MRN")
+		webhookLog.Error(err,
+			"failed to retrieve integration-mrn for MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
 		return err
 	}
 
@@ -246,32 +245,6 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (n *DeploymentHandler) getIntegrationMRN(ctx context.Context) (string, error) {
-	if !n.Mondoo.Spec.ConsoleIntegration.Enable {
-		// sending an empty integrationMRN means the webhook will run w/o setting integration
-		// labels (which is exactly what we want when console integration is not enabled)
-		return "", nil
-	}
-
-	serviceAccountSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      n.Mondoo.Spec.MondooCredsSecretRef.Name,
-			Namespace: n.Mondoo.Namespace,
-		},
-	}
-	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(serviceAccountSecret), serviceAccountSecret); err != nil {
-		webhookLog.Error(err, "failed to check for Integration MRN in creds secret")
-		return "", err
-	}
-	integrationMRN, ok := serviceAccountSecret.Data[constants.MondooCredsSecretIntegrationMRNKey]
-	if !ok {
-		err := fmt.Errorf("creds Secret %s/%s missing %s key with integration MRN data", serviceAccountSecret.Namespace, serviceAccountSecret.Name, constants.MondooCredsSecretIntegrationMRNKey)
-		return "", err
-	}
-
-	return string(integrationMRN), nil
 }
 
 func (n *DeploymentHandler) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1.ValidatingWebhookConfiguration) error {
@@ -370,16 +343,7 @@ func (n *DeploymentHandler) applyWebhooks(ctx context.Context) (ctrl.Result, err
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
-	if n.Mondoo.Spec.Admission.Enable && n.Mondoo.DeletionTimestamp == nil {
-		mondooClientImage, err := n.ContainerImageResolver.MondooClientImage("", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		if err := scanapi.Deploy(ctx, n.KubeClient, n.TargetNamespace, mondooClientImage, *n.Mondoo); err != nil {
-			return ctrl.Result{}, err
-		}
-
+	if n.Mondoo.Spec.Admission.Enable && n.Mondoo.DeletionTimestamp.IsZero() {
 		result, err := n.applyWebhooks(ctx)
 		if err != nil || result.Requeue {
 			return result, err
@@ -429,11 +393,6 @@ func (n *DeploymentHandler) down(ctx context.Context) (ctrl.Result, error) {
 	}
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, deployment); err != nil {
 		webhookLog.Error(err, "failed to clean up webhook Deployment resource")
-		return ctrl.Result{}, err
-	}
-
-	if err := scanapi.Cleanup(ctx, n.KubeClient, n.TargetNamespace, *n.Mondoo); err != nil {
-		webhookLog.Error(err, "failed to clean up scan API resources")
 		return ctrl.Result{}, err
 	}
 

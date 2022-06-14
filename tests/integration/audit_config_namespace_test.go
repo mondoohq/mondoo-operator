@@ -71,7 +71,7 @@ func (s *AuditConfigCustomNamespaceSuite) TearDownSuite() {
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_KubernetesResources() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, true, false, false)
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
-	s.testMondooAuditConfigWorkloads(auditConfig)
+	s.testMondooAuditConfigKubernetesResources(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes() {

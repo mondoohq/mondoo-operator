@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -25,7 +26,7 @@ func TestCronJobName(t *testing.T) {
 			name: "should be prefix+base+suffix when shorter than 52 chars",
 			data: func() (suffix, expected string) {
 				base := fmt.Sprintf("%s%s", prefix, CronJobNameBase)
-				suffix = RandString(52 - len(base))
+				suffix = utils.RandString(52 - len(base))
 				return suffix, fmt.Sprintf("%s%s", base, suffix)
 			},
 		},
@@ -33,7 +34,7 @@ func TestCronJobName(t *testing.T) {
 			name: "should be prefix+base+hash when longer than 52 chars",
 			data: func() (suffix, expected string) {
 				base := fmt.Sprintf("%s%s", prefix, CronJobNameBase)
-				suffix = RandString(53 - len(base))
+				suffix = utils.RandString(53 - len(base))
 
 				hash := fmt.Sprintf("%x", sha256.Sum256([]byte(suffix)))
 				return suffix, fmt.Sprintf("%s%s", base, hash[:52-len(base)])
@@ -60,7 +61,7 @@ func TestConfigMapName(t *testing.T) {
 			name: "should be prefix+base+suffix when shorter than 52 chars",
 			data: func() (suffix, expected string) {
 				base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
-				suffix = RandString(52 - len(base))
+				suffix = utils.RandString(52 - len(base))
 				return suffix, fmt.Sprintf("%s%s", base, suffix)
 			},
 		},
@@ -68,7 +69,7 @@ func TestConfigMapName(t *testing.T) {
 			name: "should be prefix+base+hash when longer than 52 chars",
 			data: func() (suffix, expected string) {
 				base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
-				suffix = RandString(53 - len(base))
+				suffix = utils.RandString(53 - len(base))
 
 				hash := fmt.Sprintf("%x", sha256.Sum256([]byte(suffix)))
 				return suffix, fmt.Sprintf("%s%s", base, hash[:52-len(base)])
@@ -85,20 +86,10 @@ func TestConfigMapName(t *testing.T) {
 }
 
 func TestInventory(t *testing.T) {
-	randName := RandString(10)
+	randName := utils.RandString(10)
 	auditConfig := v1alpha2.MondooAuditConfig{ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"}}
 
 	inventory := Inventory(corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: randName}}, auditConfig)
 	assert.False(t, strings.Contains(inventory, InventoryNodeNamePlaceholder))
 	assert.True(t, strings.Contains(inventory, randName))
-}
-
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-func RandString(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(b)
 }

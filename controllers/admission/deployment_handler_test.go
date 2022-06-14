@@ -22,7 +22,6 @@ import (
 	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
@@ -321,57 +320,6 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:                  "update scan API Deployment when changed externally",
-			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),
-			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
-				deployment := scanapi.ScanApiDeployment(testNamespace, "wrong", m)
-				return []client.Object{deployment}
-			},
-			validate: func(t *testing.T, kubeClient client.Client) {
-				deployment := &appsv1.Deployment{}
-				deploymentKey := types.NamespacedName{Name: scanapi.DeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
-				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
-				require.NoError(t, err, "expected scan API Deployment to exist")
-
-				auditConfig := &mondoov1alpha2.MondooAuditConfig{}
-				auditConfig.Name = testMondooAuditConfigName
-				auditConfig.Namespace = testNamespace
-				require.NoError(
-					t, kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(auditConfig), auditConfig), "failed to retrieve mondoo audit config")
-
-				img, err := containerImageResolver.MondooClientImage("", "", false)
-				require.NoErrorf(t, err, "failed to get mondoo operator image.")
-				expectedDeployment := scanapi.ScanApiDeployment(testNamespace, img, *auditConfig)
-				require.NoError(t, ctrl.SetControllerReference(auditConfig, expectedDeployment, kubeClient.Scheme()))
-				assert.Truef(t, k8s.AreDeploymentsEqual(*deployment, *expectedDeployment), "deployment has not been updated")
-			},
-		},
-		{
-			name:                  "update scan API Service when changed externally",
-			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),
-			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
-				service := scanapi.ScanApiService(testNamespace, m)
-				service.Spec.Type = corev1.ServiceTypeExternalName
-				return []client.Object{service}
-			},
-			validate: func(t *testing.T, kubeClient client.Client) {
-				service := &corev1.Service{}
-				serviceKey := types.NamespacedName{Name: scanapi.ServiceName(testMondooAuditConfigName), Namespace: testNamespace}
-				err := kubeClient.Get(context.TODO(), serviceKey, service)
-				require.NoError(t, err, "expected scan API Service to exist")
-
-				auditConfig := &mondoov1alpha2.MondooAuditConfig{}
-				auditConfig.Name = testMondooAuditConfigName
-				auditConfig.Namespace = testNamespace
-				require.NoError(
-					t, kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(auditConfig), auditConfig), "failed to retrieve mondoo audit config")
-
-				expectedService := scanapi.ScanApiService(testNamespace, *auditConfig)
-				require.NoError(t, ctrl.SetControllerReference(auditConfig, expectedService, kubeClient.Scheme()))
-				assert.Truef(t, k8s.AreServicesEqual(*service, *expectedService), "service has not been updated")
-			},
-		},
-		{
 			name:                  "cleanup old-style admission",
 			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),
 			// existing objects from webhooks being previously enabled
@@ -460,22 +408,6 @@ func defaultResourcesWhenEnabled() []client.Object {
 		},
 	}
 	objects = append(objects, dep)
-
-	scanApiService := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      scanapi.ServiceName(testMondooAuditConfigName),
-			Namespace: testNamespace,
-		},
-	}
-	objects = append(objects, scanApiService)
-
-	scanApiDep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      scanapi.DeploymentName(testMondooAuditConfigName),
-			Namespace: testNamespace,
-		},
-	}
-	objects = append(objects, scanApiDep)
 
 	vwcName, err := validatingWebhookName(&mondoov1alpha2.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{

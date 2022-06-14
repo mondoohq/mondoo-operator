@@ -18,8 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
-	mondoocontrollers "go.mondoo.com/mondoo-operator/controllers"
 	mondooadmission "go.mondoo.com/mondoo-operator/controllers/admission"
+	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	mondooscanapi "go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -60,34 +60,37 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 	}
 }
 
-func (s *AuditConfigBaseSuite) testMondooAuditConfigWorkloads(auditConfig mondoov2.MondooAuditConfig) {
+func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditConfig mondoov2.MondooAuditConfig) {
 	s.auditConfig = auditConfig
+
+	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
+
 	zap.S().Info("Create an audit config that enables only workloads scanning.")
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
 
-	zap.S().Info("Make sure the Mondoo k8s client is ready.")
-	workloadsLabels := []string{installer.MondooClientsK8sLabel, installer.MondooClientsLabel}
-	workloadsLabelsString := strings.Join(workloadsLabels, ",")
-	s.Truef(
-		s.testCluster.K8sHelper.IsPodReady(workloadsLabelsString, auditConfig.Namespace),
-		"Mondoo workloads clients are not in a Ready state.")
+	// Verify scan API deployment and service
+	s.validateScanApiDeployment(auditConfig)
 
-	zap.S().Info("Verify the pods are actually created from a Deployment.")
-	listOpts, err := utils.LabelSelectorListOptions(workloadsLabelsString)
-	listOpts.Namespace = auditConfig.Namespace
-	s.NoError(err)
+	zap.S().Info("Make sure the Mondoo k8s resources scan CronJob is created.")
+	cronJob := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{Name: k8s_scan.CronJobName(auditConfig.Name), Namespace: auditConfig.Namespace},
+	}
+	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		if err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(cronJob), cronJob); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	s.NoError(err, "Kubernetes resources scanning CronJob was not created.")
 
-	deployments := &appsv1.DeploymentList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
-
-	// Verify there is just 1 deployment that its name matches the name of the CR and that the
-	// replica size is 1.
-	s.Equalf(1, len(deployments.Items), "Deployments count in Mondoo namespace is incorrect.")
-	expectedWorkloadDeploymentName := fmt.Sprintf(mondoocontrollers.WorkloadDeploymentNameTemplate, auditConfig.Name)
-	s.Equalf(expectedWorkloadDeploymentName, deployments.Items[0].Name, "Deployment name does not match expected name based from audit config name.")
-	s.Equalf(int32(1), *deployments.Items[0].Spec.Replicas, "Deployment does not have 1 replica.")
+	cronJobLabels := k8s_scan.CronJobLabels(auditConfig)
+	s.True(
+		s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(utils.LabelsToLabelSelector(cronJobLabels), auditConfig.Namespace),
+		"Kubernetes resources scan CronJob did not run successfully.")
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
@@ -133,23 +136,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	}
 
 	// Make sure we have 1 successful run for each CronJob
-	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
-		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, cronJobs, listOpts))
-		for _, c := range cronJobs.Items {
-			// Make sure the job has been scheduled
-			if c.Status.LastScheduleTime == nil {
-				return false, nil
-			}
-		}
-
-		// Make sure all jobs have succeeded
-		if k8s.AreCronJobsSuccessful(cronJobs.Items) {
-			return true, nil
-		}
-		return false, nil
-	})
-
-	s.NoError(err, "Not all CronJobs have run successfully.")
+	selector := utils.LabelsToLabelSelector(cronJobLabels)
+	s.True(s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(selector, auditConfig.Namespace), "Not all CronJobs have run successfully.")
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
@@ -168,16 +156,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 	// Disable imageResolution for the webhook image to be runnable.
 	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
 	// image, and fail because we haven't pushed this image publicly.
-	operatorConfig := &mondoov2.MondooOperatorConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: mondoov2.MondooOperatorConfigName,
-		},
-		Spec: mondoov2.MondooOperatorConfigSpec{
-			SkipContainerResolution: true,
-		},
-	}
-	s.Require().NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Create(s.ctx, operatorConfig), "Failed to create MondooOperatorConfig")
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
 
 	// Enable webhook
 	zap.S().Info("Create an audit config that enables only admission control.")
@@ -193,23 +173,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 		"Mondoo webhook Pod is not in a Ready state.")
 
 	// Verify scan API deployment and service
-	var scanApiLabels []string
-	for k, v := range mondooscanapi.DeploymentLabels(auditConfig) {
-		scanApiLabels = append(scanApiLabels, fmt.Sprintf("%s=%s", k, v))
-	}
-	scanApiLabelsString := strings.Join(scanApiLabels, ",")
-	s.Truef(
-		s.testCluster.K8sHelper.IsPodReady(scanApiLabelsString, auditConfig.Namespace),
-		"Mondoo scan API Pod is not in a Ready state.")
-
-	scanApiService := mondooscanapi.ScanApiService(auditConfig.Namespace, auditConfig)
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(scanApiService), scanApiService),
-		"Failed to get scan API service.")
-
-	expectedService := mondooscanapi.ScanApiService(auditConfig.Namespace, auditConfig)
-	s.NoError(ctrl.SetControllerReference(&auditConfig, expectedService, s.testCluster.K8sHelper.Clientset.Scheme()))
-	s.Truef(k8s.AreServicesEqual(*expectedService, *scanApiService), "Scan API service is not as expected.")
+	s.validateScanApiDeployment(auditConfig)
 
 	// Change the webhook from Ignore to Fail to prove that the webhook is active
 	vwc := &webhooksv1.ValidatingWebhookConfiguration{
@@ -268,10 +232,44 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
 		"Expected update of Deployment to succeed after CA data applied to webhook")
+}
 
-	// Bring back the default image resolution behavior
+func (s *AuditConfigBaseSuite) validateScanApiDeployment(auditConfig mondoov2.MondooAuditConfig) {
+	scanApiLabelsString := utils.LabelsToLabelSelector(mondooscanapi.DeploymentLabels(auditConfig))
+	s.Truef(
+		s.testCluster.K8sHelper.IsPodReady(scanApiLabelsString, auditConfig.Namespace),
+		"Mondoo scan API Pod is not in a Ready state.")
+
+	scanApiService := mondooscanapi.ScanApiService(auditConfig.Namespace, auditConfig)
 	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Delete(s.ctx, operatorConfig),
-		"Failed to restore container resolution in MondooOperatorConfig")
+		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(scanApiService), scanApiService),
+		"Failed to get scan API service.")
 
+	expectedService := mondooscanapi.ScanApiService(auditConfig.Namespace, auditConfig)
+	s.NoError(ctrl.SetControllerReference(&auditConfig, expectedService, s.testCluster.K8sHelper.Clientset.Scheme()))
+	s.Truef(k8s.AreServicesEqual(*expectedService, *scanApiService), "Scan API service is not as expected.")
+}
+
+// disableContainerImageResolution Creates a MondooOperatorConfig that disables container image resolution. This is needed
+// in order to be able to execute the integration tests with local images. A function is returned that will cleanup the
+// operator config that was created. It is advised to call it with defer such that the operator config is always deleted
+// regardless of the test outcome.
+func (s *AuditConfigBaseSuite) disableContainerImageResolution() func() {
+	operatorConfig := &mondoov2.MondooOperatorConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: mondoov2.MondooOperatorConfigName,
+		},
+		Spec: mondoov2.MondooOperatorConfigSpec{
+			SkipContainerResolution: true,
+		},
+	}
+	s.Require().NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, operatorConfig), "Failed to create MondooOperatorConfig")
+
+	return func() {
+		// Bring back the default image resolution behavior
+		s.NoErrorf(
+			s.testCluster.K8sHelper.Clientset.Delete(s.ctx, operatorConfig),
+			"Failed to restore container resolution in MondooOperatorConfig")
+	}
 }

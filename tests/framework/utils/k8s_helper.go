@@ -23,7 +23,9 @@ import (
 	"time"
 
 	api "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.uber.org/zap"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -154,6 +156,38 @@ func (k8sh *K8sHelper) IsPodReady(labelSelector, namespace string) bool {
 					}
 				}
 			}
+		}
+		return false, nil
+	})
+	return err == nil
+}
+
+// WaitUntilCronJobsSuccessful waits for the CronJobs with the specified selector to have at least
+// one successful run.
+func (k8sh *K8sHelper) WaitUntilCronJobsSuccessful(labelSelector, namespace string) bool {
+	listOpts, err := LabelSelectorListOptions(labelSelector)
+	if err != nil {
+		return false
+	}
+	listOpts.Namespace = namespace
+	ctx := context.Background()
+	cronJobs := &batchv1.CronJobList{}
+
+	err = k8sh.ExecuteWithRetries(func() (bool, error) {
+		if err := k8sh.Clientset.List(ctx, cronJobs, listOpts); err != nil {
+			zap.S().Errorf("Failed to list CronJobs. %v", err)
+			return false, err
+		}
+		for _, c := range cronJobs.Items {
+			// Make sure the job has been scheduled
+			if c.Status.LastScheduleTime == nil {
+				return false, nil
+			}
+		}
+
+		// Make sure all jobs have succeeded
+		if k8s.AreCronJobsSuccessful(cronJobs.Items) {
+			return true, nil
 		}
 		return false, nil
 	})

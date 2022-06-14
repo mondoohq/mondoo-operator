@@ -15,7 +15,7 @@ type AuditConfigSuite struct {
 
 func (s *AuditConfigSuite) TestReconcile_KubernetesResources() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false)
-	s.testMondooAuditConfigWorkloads(auditConfig)
+	s.testMondooAuditConfigKubernetesResources(auditConfig)
 }
 
 func (s *AuditConfigSuite) TestReconcile_Nodes() {

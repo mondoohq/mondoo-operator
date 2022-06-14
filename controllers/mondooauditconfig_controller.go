@@ -47,7 +47,9 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/admission"
 	"go.mondoo.com/mondoo-operator/controllers/integration"
+	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
+	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -129,12 +131,12 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
-	if config.DeletionTimestamp != nil {
+	if !config.DeletionTimestamp.IsZero() {
 		// Going to proceed as if there is no MondooOperatorConfig
 		config = &v1alpha2.MondooOperatorConfig{}
 	}
 
-	if mondooAuditConfig.DeletionTimestamp != nil {
+	if !mondooAuditConfig.DeletionTimestamp.IsZero() {
 		log.Info("deleting")
 
 		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
@@ -178,6 +180,20 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
+	scanapi := scanapi.DeploymentHandler{
+		Mondoo:                 mondooAuditConfig,
+		KubeClient:             r.Client,
+		MondooOperatorConfig:   config,
+		ContainerImageResolver: r.ContainerImageResolver,
+	}
+	result, err := scanapi.Reconcile(ctx)
+	if err != nil {
+		log.Error(err, "Failed to set up scan API")
+	}
+	if err != nil || result.Requeue {
+		return result, err
+	}
+
 	nodes := nodes.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
@@ -185,24 +201,24 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		ContainerImageResolver: r.ContainerImageResolver,
 	}
 
-	result, err := nodes.Reconcile(ctx)
+	result, err = nodes.Reconcile(ctx)
 	if err != nil {
-		log.Error(err, "Failed to declare nodes")
+		log.Error(err, "Failed to set up nodes scanning")
 	}
 	if err != nil || result.Requeue {
 		return result, err
 	}
 
-	workloads := Workloads{
-		Enable:                 mondooAuditConfig.Spec.KubernetesResources.Enable,
+	workloads := k8s_scan.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
+		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: r.ContainerImageResolver,
 	}
 
-	result, err = workloads.Reconcile(ctx, r.Client, r.Scheme, req)
+	result, err = workloads.Reconcile(ctx)
 	if err != nil {
-		log.Error(err, "Failed to declare workloads")
+		log.Error(err, "Failed to set up Kubernetes resources scanning")
 	}
 	if err != nil || result.Requeue {
 		return result, err
@@ -449,7 +465,7 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // labelsForMondoo returns the labels for selecting the resources
 // belonging to the given mondoo CR name.
 func labelsForMondoo(name string) map[string]string {
-	return map[string]string{"app": "mondoo", "mondoo_cr": name}
+	return map[string]string{"mondoo_cr": name}
 }
 
 // getPodNames returns a Set of the pod names of the array of pods passed in
