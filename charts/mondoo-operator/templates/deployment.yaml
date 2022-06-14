@@ -35,11 +35,12 @@ spec:
     spec:
       containers:
       - args:
+        - operator
         - --health-probe-bind-address=:8081
         - --metrics-bind-address=:8080
         - --leader-elect
         command:
-        - /manager
+        - /mondoo-operator
         env:
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ .Values.kubernetesClusterDomain }}

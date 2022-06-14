@@ -24,7 +24,7 @@ import (
 // defaultMondooClientResources for Mondoo Client container
 var DefaultMondooClientResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("300M"),
+		corev1.ResourceMemory: resource.MustParse("400M"),
 		corev1.ResourceCPU:    resource.MustParse("1"),
 	},
 

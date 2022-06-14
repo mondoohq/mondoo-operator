@@ -113,7 +113,7 @@ func (n *DeploymentHandler) syncValidatingWebhookConfiguration(ctx context.Conte
 		}
 	}
 
-	return n.cleanupOldWebhook(ctx)
+	return nil
 }
 
 // For determining whether there is a meaningful difference between the existing Webhook and our desired configuration,
@@ -396,10 +396,6 @@ func (n *DeploymentHandler) down(ctx context.Context) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	if err := n.cleanupOldWebhook(ctx); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	// Cleanup ValidatingWebhooks
 	r := bytes.NewReader(webhookManifestsyaml)
 	yamlDecoder := yamlutil.NewYAMLOrJSONDecoder(r, 4096)
@@ -468,23 +464,6 @@ func (n *DeploymentHandler) down(ctx context.Context) (ctrl.Result, error) {
 func (n *DeploymentHandler) setControllerRef(obj client.Object) error {
 	if err := ctrl.SetControllerReference(n.Mondoo, obj, n.KubeClient.Scheme()); err != nil {
 		webhookLog.Error(err, "Failed to set ControllerReference", "Object", obj)
-		return err
-	}
-	return nil
-}
-
-// TODO: remove with 0.4.0 release
-// With the switch to naming the Webhook from MONDOOAUDIT_CONFIG_NAME-mondoo-webhook
-// to NAMESPACE-NAME-mondoo , we should try to clean up any old Webhooks so that they
-// are not orphaned.
-func (n *DeploymentHandler) cleanupOldWebhook(ctx context.Context) error {
-	oldWebhook := &webhooksv1.ValidatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: n.Mondoo.Name + "-mondoo-webhook",
-		},
-	}
-	if err := k8s.DeleteIfExists(ctx, n.KubeClient, oldWebhook); err != nil {
-		webhookLog.Error(err, "failed trying to clean up old-style webhook")
 		return err
 	}
 	return nil

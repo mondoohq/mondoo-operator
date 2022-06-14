@@ -319,32 +319,6 @@ func TestReconcile(t *testing.T) {
 				assert.Truef(t, k8s.AreServicesEqual(*service, *expectedService), "service has not been updated")
 			},
 		},
-		{
-			name:                  "cleanup old-style admission",
-			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),
-			// existing objects from webhooks being previously enabled
-			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
-				objects := defaultResourcesWhenEnabled()
-
-				vwc := &webhooksv1.ValidatingWebhookConfiguration{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: testMondooAuditConfigName + "-mondoo-webhook",
-					},
-				}
-				objects = append(objects, vwc)
-
-				return objects
-			},
-			validate: func(t *testing.T, kubeClient client.Client) {
-				vwc := &webhooksv1.ValidatingWebhookConfiguration{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: testMondooAuditConfigName + "-mondoo-webhook",
-					},
-				}
-				err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(vwc), vwc)
-				assert.True(t, errors.IsNotFound(err), "expected old-style named webhook %s to not be orphaned", client.ObjectKeyFromObject(vwc))
-			},
-		},
 	}
 
 	for _, test := range tests {
