@@ -273,3 +273,80 @@ func (s *AuditConfigBaseSuite) disableContainerImageResolution() func() {
 			"Failed to restore container resolution in MondooOperatorConfig")
 	}
 }
+
+func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConfig mondoov2.MondooAuditConfig) {
+	s.auditConfig = auditConfig
+	// Generate certificates manually
+	serviceDNSNames := []string{
+		// DNS names will take the form of ServiceName.ServiceNamespace.svc and .svc.cluster.local
+		fmt.Sprintf("%s-webhook-service.%s.svc", auditConfig.Name, auditConfig.Namespace),
+		fmt.Sprintf("%s-webhook-service.%s.svc.cluster.local", auditConfig.Name, auditConfig.Namespace),
+	}
+	secretName := mondooadmission.GetTLSCertificatesSecretName(auditConfig.Name)
+	_, err := s.testCluster.MondooInstaller.GenerateServiceCerts(&auditConfig, secretName, serviceDNSNames)
+
+	// Don't bother with further webhook tests if we couldnt' save the certificates
+	s.Require().NoErrorf(err, "Error while generating/saving certificates for webhook service")
+	// Disable imageResolution for the webhook image to be runnable.
+	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
+	// image, and fail because we haven't pushed this image publicly.
+	operatorConfig := &mondoov2.MondooOperatorConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: mondoov2.MondooOperatorConfigName,
+		},
+		Spec: mondoov2.MondooOperatorConfigSpec{
+			SkipContainerResolution: true,
+		},
+	}
+	s.Require().NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, operatorConfig), "Failed to create MondooOperatorConfig")
+
+	// Enable webhook
+	zap.S().Info("Create an audit config that enables only admission control.")
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
+		"Failed to create Mondoo audit config.")
+
+	// Wait for Ready Pod
+	webhookLabels := []string{mondooadmission.WebhookLabelKey + "=" + mondooadmission.WebhookLabelValue}
+	webhookLabelsString := strings.Join(webhookLabels, ",")
+	s.Truef(
+		s.testCluster.K8sHelper.IsPodReady(webhookLabelsString, auditConfig.Namespace),
+		"Mondoo webhook Pod is not in a Ready state.")
+
+	// Pod should not start, because of missing service account
+	var scanApiLabels []string
+	for k, v := range mondooscanapi.DeploymentLabels(auditConfig) {
+		scanApiLabels = append(scanApiLabels, fmt.Sprintf("%s=%s", k, v))
+	}
+	scanApiLabelsString := strings.Join(scanApiLabels, ",")
+	s.Falsef(
+		s.testCluster.K8sHelper.IsPodReady(scanApiLabelsString, auditConfig.Namespace),
+		"Mondoo scan API Pod should not be in Ready state.")
+
+	// Try and fail to Update() a Deployment
+	listOpts, err := utils.LabelSelectorListOptions(scanApiLabelsString)
+	s.NoError(err)
+	listOpts.Namespace = auditConfig.Namespace
+
+	deployments := &appsv1.DeploymentList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
+
+	s.Equalf(1, len(deployments.Items), "Deployments count for ScanAPI should be precisely one")
+
+	// Condition of MondooAuditConfig should be updated
+	foundMondooAuditConfig := &mondoov2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      auditConfig.Name,
+			Namespace: auditConfig.Namespace,
+		},
+	}
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(foundMondooAuditConfig), foundMondooAuditConfig),
+		"Failed to retrieve MondooAuditConfig")
+
+	zap.S().Debug("MondooAuditConfig: ", foundMondooAuditConfig)
+
+	s.Assert().NotEmpty(foundMondooAuditConfig.Status.Conditions)
+	s.Assert().Contains(foundMondooAuditConfig.Status.Conditions[0].Message, "error looking up service account")
+}
