@@ -122,10 +122,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	updateNodeConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs))
-	if err := n.cleanupOldConfigMaps(ctx); err != nil {
-		return err
-	}
-	return n.cleanupOldCronJobs(ctx)
+	return nil
 }
 
 // syncConfigMap syncs the inventory ConfigMap. Returns a boolean indicating whether the ConfigMap has been updated. It
@@ -243,51 +240,8 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		}
 	}
 
-	if err := n.cleanupOldCronJobs(ctx); err != nil {
-		return err
-	}
-
-	if err := n.cleanupOldConfigMaps(ctx); err != nil {
-		return err
-	}
-
 	// Update any remnant conditions
 	updateNodeConditions(n.Mondoo, false)
 
-	return nil
-}
-
-// TODO: remove in future version
-func (n *DeploymentHandler) cleanupOldCronJobs(ctx context.Context) error {
-	nodes := &corev1.NodeList{}
-	if err := n.KubeClient.List(ctx, nodes); err != nil {
-		logger.Error(err, "Failed to list nodes")
-		return err
-	}
-
-	for _, node := range nodes.Items {
-		cronJob := &batchv1.CronJob{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      OldCronJobName(n.Mondoo.Name, node.Name),
-				Namespace: n.Mondoo.Namespace,
-			},
-		}
-		if err := k8s.DeleteIfExists(ctx, n.KubeClient, cronJob); err != nil {
-			logger.Error(err, "Failed to cleanup old CronJob", "name", cronJob.Name, "namespace", cronJob.Namespace)
-			return err
-		}
-	}
-	return nil
-}
-
-// TODO: remove with 0.4.0 release
-func (n *DeploymentHandler) cleanupOldConfigMaps(ctx context.Context) error {
-	configMap := &corev1.ConfigMap{}
-	configMap.Name = OldConfigMapName(n.Mondoo.Name)
-	configMap.Namespace = n.Mondoo.Namespace
-	if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
-		logger.Error(err, "Failed to cleanup old ConfigMap", "name", configMap.Name, "namespace", configMap.Namespace)
-		return err
-	}
 	return nil
 }
