@@ -2,6 +2,7 @@ package scanapi
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -126,8 +127,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
 	s.Equal(*service, ss.Items[0])
 }
 
-/*
-// SHOULD BE REMOVED WHEN WE AGREE ON INTEGRATION TESTS
 func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
 	ns := "test-ns"
 	s.auditConfig = utils.DefaultAuditConfig(ns, false, false, true)
@@ -138,6 +137,7 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
 	s.NoError(err)
 
 	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig)
+	deployment.Status.UnavailableReplicas = 1
 	deployment.Status.Conditions = []appsv1.DeploymentCondition{
 		{
 			Type:    appsv1.DeploymentConditionType(mondoov1alpha2.ScanAPIDegraded),
@@ -157,14 +157,7 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
 	s.NoError(d.KubeClient.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
-	foundMondooAuditConfig := &mondoov1alpha2.MondooAuditConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      s.auditConfig.Name,
-			Namespace: s.auditConfig.Namespace,
-		},
-	}
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(foundMondooAuditConfig), foundMondooAuditConfig), "Error getting MondooAuditConfig")
-	conditions := foundMondooAuditConfig.Status.Conditions
+	conditions := s.auditConfig.Status.Conditions
 	foundMissingServiceAccountCondition := false
 	s.Assertions.NotEmpty(conditions)
 	for _, condition := range conditions {
@@ -175,7 +168,6 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
 	}
 	s.Assertions.Truef(foundMissingServiceAccountCondition, "No Condition for missing service account found")
 }
-*/
 
 func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	image, err := s.containerImageResolver.MondooClientImage(
