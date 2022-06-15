@@ -324,7 +324,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 		s.testCluster.K8sHelper.IsPodReady(scanApiLabelsString, auditConfig.Namespace),
 		"Mondoo scan API Pod should not be in Ready state.")
 
-	// Try and fail to Update() a Deployment
+	// Check for the ScanAPI Deployment to be present.
 	listOpts, err := utils.LabelSelectorListOptions(scanApiLabelsString)
 	s.NoError(err)
 	listOpts.Namespace = auditConfig.Namespace
@@ -344,8 +344,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(foundMondooAuditConfig), foundMondooAuditConfig),
 		"Failed to retrieve MondooAuditConfig")
-
-	zap.S().Debug("MondooAuditConfig: ", foundMondooAuditConfig)
 
 	s.Assert().NotEmpty(foundMondooAuditConfig.Status.Conditions)
 	s.Assert().Contains(foundMondooAuditConfig.Status.Conditions[0].Message, "error looking up service account")

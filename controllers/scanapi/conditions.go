@@ -1,7 +1,6 @@
 package scanapi
 
 import (
-	"fmt"
 	"regexp"
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -16,7 +15,6 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 	status := corev1.ConditionFalse
 	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
 	if degradedStatus {
-		fmt.Println("degraded state")
 		msg = "ScanAPI controller is unavailable"
 
 		// perhaps more general ReplicaFailure?

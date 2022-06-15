@@ -268,51 +268,6 @@ func TestReconcile(t *testing.T) {
 				assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, string(mondoov1alpha2.Permissive), "expected Webhook mode to be updated to 'permissive'")
 			},
 		},
-		/*
-			// SHOULD BE REMOVED WHEN WE AGREE ON INTEGRATION TESTS
-			{
-				name:                  "admission enabled with missing service account condition",
-				mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),
-				existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
-					conditionMessage := "pods \"webhook-123\" is forbidden: " +
-						"error looking up service account mondoo-operator/missing-serviceaccount: " +
-						"serviceaccount \"missing-serviceaccount\" not found"
-					dep := &appsv1.Deployment{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      webhookDeploymentName(testMondooAuditConfigName),
-							Namespace: testNamespace,
-						},
-						Status: appsv1.DeploymentStatus{
-							Replicas:      1,
-							ReadyReplicas: 0,
-							Conditions: []appsv1.DeploymentCondition{
-								{
-									Message: conditionMessage,
-									Reason:  "FailedCreate",
-									Status:  corev1.ConditionStatus(appsv1.DeploymentReplicaFailure),
-									Type:    appsv1.DeploymentReplicaFailure,
-								},
-							},
-						},
-					}
-					return []client.Object{dep}
-				},
-				validate: func(t *testing.T, kubeClient client.Client) {
-					foundMondooConfig := &mondoov1alpha2.MondooAuditConfig{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      testMondooAuditConfigName,
-							Namespace: testNamespace,
-						},
-					}
-					err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(foundMondooConfig), foundMondooConfig)
-					assert.NoError(t, err, "error retrieving Mondoo Config that should exist: %s", client.ObjectKeyFromObject(foundMondooConfig))
-
-					conditions := foundMondooConfig.Status.Conditions
-					assert.NotEmpty(t, conditions)
-					assert.Contains(t, conditions[0].Message, "error looking up service account")
-				},
-			},
-		*/
 		{
 			name:                  "update webhook Deployment when changed externally",
 			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),

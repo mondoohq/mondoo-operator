@@ -86,7 +86,7 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Admission() {
 	s.testMondooAuditConfigAdmission(auditConfig)
 }
 
-func (s *AuditConfigCustomNamespaceSuite) TestReconcile_00_AdmissionMissingSA() {
+func (s *AuditConfigCustomNamespaceSuite) TestReconcile_AdmissionMissingSA() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true)
 	auditConfig.Spec.Scanner.ServiceAccountName = "missing-serviceaccount"
 	s.testMondooAuditConfigAdmissionMissingSA(auditConfig)
