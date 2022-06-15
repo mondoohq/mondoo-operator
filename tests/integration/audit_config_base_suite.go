@@ -276,17 +276,6 @@ func (s *AuditConfigBaseSuite) disableContainerImageResolution() func() {
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConfig mondoov2.MondooAuditConfig) {
 	s.auditConfig = auditConfig
-	// Generate certificates manually
-	serviceDNSNames := []string{
-		// DNS names will take the form of ServiceName.ServiceNamespace.svc and .svc.cluster.local
-		fmt.Sprintf("%s-webhook-service.%s.svc", auditConfig.Name, auditConfig.Namespace),
-		fmt.Sprintf("%s-webhook-service.%s.svc.cluster.local", auditConfig.Name, auditConfig.Namespace),
-	}
-	secretName := mondooadmission.GetTLSCertificatesSecretName(auditConfig.Name)
-	_, err := s.testCluster.MondooInstaller.GenerateServiceCerts(&auditConfig, secretName, serviceDNSNames)
-
-	// Don't bother with further webhook tests if we couldnt' save the certificates
-	s.Require().NoErrorf(err, "Error while generating/saving certificates for webhook service")
 	// Disable imageResolution for the webhook image to be runnable.
 	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
 	// image, and fail because we haven't pushed this image publicly.
@@ -306,13 +295,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
-
-	// Wait for Ready Pod
-	webhookLabels := []string{mondooadmission.WebhookLabelKey + "=" + mondooadmission.WebhookLabelValue}
-	webhookLabelsString := strings.Join(webhookLabels, ",")
-	s.Truef(
-		s.testCluster.K8sHelper.IsPodReady(webhookLabelsString, auditConfig.Namespace),
-		"Mondoo webhook Pod is not in a Ready state.")
 
 	// Pod should not start, because of missing service account
 	var scanApiLabels []string
