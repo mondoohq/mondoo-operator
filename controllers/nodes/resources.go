@@ -89,6 +89,10 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 											Value: "on",
 										},
 									},
+									SecurityContext: &corev1.SecurityContext{
+										//RunAsUser:    pointer.Int64(9999),
+										RunAsNonRoot: pointer.Bool(true),
+									},
 								},
 							},
 							Volumes: []corev1.Volume{
@@ -175,7 +179,7 @@ func OldConfigMapName(prefix string) string {
 func Inventory(node corev1.Node, integrationMRN string, m v1alpha2.MondooAuditConfig) (string, error) {
 	inv := inventory.MondooInventory{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "mondoo-k8s-inventory",
+			Name: "mondoo-node-inventory",
 			Labels: map[string]string{
 				"environment": "production",
 			},
