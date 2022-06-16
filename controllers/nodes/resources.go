@@ -2,19 +2,20 @@ package nodes
 
 import (
 	"crypto/sha256"
-	_ "embed"
 	"fmt"
 	"math"
-	"strings"
 	"time"
 
-	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/yaml"
+
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/inventory"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
 const (
@@ -27,16 +28,9 @@ const (
 
 	// Execute hourly
 	CronTab = "0 * * * *"
-
-	InventoryNodeNamePlaceholder = "{{node-name}}"
 )
 
-var (
-	//go:embed inventory.yaml
-	inventoryYaml []byte
-)
-
-func CronJob(image string, node v1.Node, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
@@ -142,14 +136,19 @@ func CronJob(image string, node v1.Node, m v1alpha2.MondooAuditConfig) *batchv1.
 	}
 }
 
-func ConfigMap(node corev1.Node, m v1alpha2.MondooAuditConfig) *corev1.ConfigMap {
+func ConfigMap(node corev1.Node, integrationMRN string, m v1alpha2.MondooAuditConfig) (*corev1.ConfigMap, error) {
+	inv, err := Inventory(node, integrationMRN, m)
+	if err != nil {
+		return nil, err
+	}
+
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: m.Namespace,
 			Name:      ConfigMapName(m.Name, node.Name),
 		},
-		Data: map[string]string{"inventory": Inventory(node, m)},
-	}
+		Data: map[string]string{"inventory": inv},
+	}, nil
 }
 
 func CronJobName(prefix, suffix string) string {
@@ -173,9 +172,46 @@ func OldConfigMapName(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, OldInventoryConfigMapSuffix)
 }
 
-func Inventory(node corev1.Node, m v1alpha2.MondooAuditConfig) string {
-	inventory := string(inventoryYaml)
-	return strings.ReplaceAll(inventory, InventoryNodeNamePlaceholder, node.Name)
+func Inventory(node corev1.Node, integrationMRN string, m v1alpha2.MondooAuditConfig) (string, error) {
+	inv := inventory.MondooInventory{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mondoo-k8s-inventory",
+			Labels: map[string]string{
+				"environment": "production",
+			},
+		},
+		Spec: inventory.MondooInventorySpec{
+			Assets: []inventory.Asset{
+				{
+					Id:   "host",
+					Name: node.Name,
+					IdDetector: []string{
+						"machine-id",
+					},
+					Connections: []inventory.TransportConfig{
+						{
+							Host:    "/mnt/host",
+							Backend: inventory.TransportBackend_CONNECTION_FS,
+						},
+					},
+					Labels: map[string]string{},
+				},
+			},
+		},
+	}
+
+	if integrationMRN != "" {
+		for i := range inv.Spec.Assets {
+			inv.Spec.Assets[i].Labels[constants.MondooAssetsIntegrationLabel] = integrationMRN
+		}
+	}
+
+	invBytes, err := yaml.Marshal(inv)
+	if err != nil {
+		return "", err
+	}
+
+	return string(invBytes), nil
 }
 
 func CronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {

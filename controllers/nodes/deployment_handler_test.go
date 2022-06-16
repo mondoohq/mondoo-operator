@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
@@ -38,6 +39,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+const testNamespace = "mondoo-operator"
 
 type DeploymentHandlerSuite struct {
 	suite.Suite
@@ -57,7 +60,7 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 }
 
 func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
-	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", false, true, false)
+	s.auditConfig = utils.DefaultAuditConfig(testNamespace, false, true, false)
 	s.fakeClientBuilder = fake.NewClientBuilder()
 }
 
@@ -73,7 +76,54 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMap() {
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	for _, node := range nodes.Items {
-		expected := ConfigMap(node, s.auditConfig)
+		expected, err := ConfigMap(node, "", s.auditConfig)
+		s.Require().NoError(err, "unexpected error while generating ConfigMap")
+		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+
+		// Set some fields that the kube client sets
+		gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
+		s.NoError(err)
+		expected.SetGroupVersionKind(gvk)
+		expected.ResourceVersion = "1"
+
+		created := &corev1.ConfigMap{}
+		created.Name = expected.Name
+		created.Namespace = expected.Namespace
+		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+
+		s.Equal(expected, created)
+	}
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN() {
+	const testIntegrationMRN = "//test-integration-MRN"
+
+	s.seedNodes()
+
+	s.auditConfig.Spec.ConsoleIntegration.Enable = true
+	credsWithIntegration := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      utils.MondooClientSecret,
+			Namespace: testNamespace,
+		},
+		Data: map[string][]byte{
+			constants.MondooCredsSecretIntegrationMRNKey: []byte(testIntegrationMRN),
+		},
+	}
+	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(credsWithIntegration)
+
+	d := s.createDeploymentHandler()
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
+
+	for _, node := range nodes.Items {
+		expected, err := ConfigMap(node, testIntegrationMRN, s.auditConfig)
+		s.Require().NoError(err, "unexpected error while generating ConfigMap")
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 		// Set some fields that the kube client sets
@@ -99,7 +149,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	for _, node := range nodes.Items {
-		existing := ConfigMap(node, s.auditConfig)
+		existing, err := ConfigMap(node, "", s.auditConfig)
+		s.Require().NoError(err, "unexpected error while generating ConfigMap")
 		existing.Data["inventory"] = ""
 		s.NoError(d.KubeClient.Create(s.ctx, existing))
 	}
@@ -109,7 +160,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
 	s.True(result.IsZero())
 
 	for _, node := range nodes.Items {
-		expected := ConfigMap(node, s.auditConfig)
+		expected, err := ConfigMap(node, "", s.auditConfig)
+		s.Require().NoError(err, "unexpected error while generating ConfigMap")
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 		// Set some fields that the kube client sets
@@ -152,7 +204,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanConfigMapsForDeletedNodes() 
 
 	s.Equal(1, len(configMaps.Items))
 
-	expected := ConfigMap(nodes.Items[0], s.auditConfig)
+	expected, err := ConfigMap(nodes.Items[0], "", s.auditConfig)
+	s.Require().NoError(err, "unexpected error while generating ConfigMap")
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets

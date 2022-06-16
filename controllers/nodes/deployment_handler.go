@@ -130,7 +130,19 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 // desired state.
 func (n *DeploymentHandler) syncConfigMap(ctx context.Context, node corev1.Node) (bool, error) {
 	existing := &corev1.ConfigMap{}
-	desired := ConfigMap(node, *n.Mondoo)
+
+	integrationMRN, err := k8s.GetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
+	if err != nil {
+		logger.Error(err, "failed to retrieve IntegrationMRN")
+		return false, err
+	}
+
+	desired, err := ConfigMap(node, integrationMRN, *n.Mondoo)
+	if err != nil {
+		logger.Error(err, "failed to generate desired ConfigMap with inventory")
+		return false, err
+	}
+
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 		return false, err
