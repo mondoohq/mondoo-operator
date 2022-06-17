@@ -36,6 +36,7 @@ func AreDeploymentsEqual(a, b appsv1.Deployment) bool {
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Args, b.Spec.Template.Spec.Containers[0].Args) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].VolumeMounts, b.Spec.Template.Spec.Containers[0].VolumeMounts) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Env, b.Spec.Template.Spec.Containers[0].Env) &&
+		AreResouceRequirementsEqual(a.Spec.Template.Spec.Containers[0].Resources, b.Spec.Template.Spec.Containers[0].Resources) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Volumes, b.Spec.Template.Spec.Volumes) &&
 		reflect.DeepEqual(a.GetOwnerReferences(), b.GetOwnerReferences())
 }
@@ -64,6 +65,7 @@ func AreCronJobsEqual(a, b batchv1.CronJob) bool {
 		reflect.DeepEqual(aPodSpec.Containers[0].Args, bPodSpec.Containers[0].Args) &&
 		reflect.DeepEqual(aPodSpec.Containers[0].VolumeMounts, bPodSpec.Containers[0].VolumeMounts) &&
 		reflect.DeepEqual(aPodSpec.Containers[0].Env, bPodSpec.Containers[0].Env) &&
+		AreResouceRequirementsEqual(aPodSpec.Containers[0].Resources, bPodSpec.Containers[0].Resources) &&
 		reflect.DeepEqual(aPodSpec.Volumes, bPodSpec.Volumes) &&
 		reflect.DeepEqual(a.Spec.SuccessfulJobsHistoryLimit, b.Spec.SuccessfulJobsHistoryLimit) &&
 		reflect.DeepEqual(a.Spec.FailedJobsHistoryLimit, b.Spec.FailedJobsHistoryLimit) &&
