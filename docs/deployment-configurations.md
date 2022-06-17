@@ -19,7 +19,7 @@ To enable metrics reporting via Prometheus and to disable the translation of con
 
 ```yaml
 apiVersion: k8s.mondoo.com/v1alpha2
-Kind: MondooOperatorConfig
+kind: MondooOperatorConfig
 metadata:
   name: mondoo-operator-config
 spec:
