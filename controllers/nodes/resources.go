@@ -89,10 +89,6 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 											Value: "on",
 										},
 									},
-									SecurityContext: &corev1.SecurityContext{
-										//RunAsUser:    pointer.Int64(9999),
-										RunAsNonRoot: pointer.Bool(true),
-									},
 								},
 							},
 							Volumes: []corev1.Volume{
