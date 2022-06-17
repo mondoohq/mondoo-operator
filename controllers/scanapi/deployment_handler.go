@@ -73,6 +73,10 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		logger.Error(err, "failed to clean up scan API Service resource")
 		return err
 	}
+
+	// Make sure to clear any degraded status
+	updateScanAPIConditions(n.Mondoo, false, []appsv1.DeploymentCondition{})
+
 	return nil
 }
 
@@ -116,6 +120,8 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 
 	if created {
 		logger.Info("Created Deployment for scan API")
+		// set conditions on next iteration to not set to unavailable during initialisation
+		return nil
 	} else if !k8s.AreDeploymentsEqual(*deployment, existingDeployment) {
 		logger.Info("Updated needed for scan API Deployment")
 		// If the deployment exists but it is different from what we actually want it to be, then update.
@@ -124,6 +130,9 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 			return err
 		}
 	}
+
+	updateScanAPIConditions(n.Mondoo, existingDeployment.Status.UnavailableReplicas != 0, existingDeployment.Status.Conditions)
+
 	return nil
 }
 

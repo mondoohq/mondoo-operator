@@ -86,6 +86,12 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Admission() {
 	s.testMondooAuditConfigAdmission(auditConfig)
 }
 
+func (s *AuditConfigCustomNamespaceSuite) TestReconcile_AdmissionMissingSA() {
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true)
+	auditConfig.Spec.Scanner.ServiceAccountName = "missing-serviceaccount"
+	s.testMondooAuditConfigAdmissionMissingSA(auditConfig)
+}
+
 func TestAuditConfigCustomNamespaceSuite(t *testing.T) {
 	s := new(AuditConfigCustomNamespaceSuite)
 	defer func(s *AuditConfigCustomNamespaceSuite) {

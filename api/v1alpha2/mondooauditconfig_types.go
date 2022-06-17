@@ -144,6 +144,8 @@ const (
 	K8sResourcesScanningDegraded MondooAuditConfigConditionType = "K8sResourcesScanningDegraded"
 	// Indicates weather Admission controller is Degraded
 	AdmissionDegraded MondooAuditConfigConditionType = "AdmissionDegraded"
+	// Indicates weather Admission controller is Degraded because of the ScanAPI
+	ScanAPIDegraded MondooAuditConfigConditionType = "ScanAPIDegraded"
 	// MondooIntegrationDegraded will hold the status for any issues encountered while trying to CheckIn()
 	// on behalf of the Mondoo integration MRN
 	MondooIntegrationDegraded MondooAuditConfigConditionType = "IntegrationDegraded"

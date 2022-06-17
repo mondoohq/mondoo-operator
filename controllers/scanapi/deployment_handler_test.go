@@ -2,6 +2,7 @@ package scanapi
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -11,7 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	appsv1 "k8s.io/api/apps/v1"
@@ -29,7 +29,7 @@ type DeploymentHandlerSuite struct {
 	scheme                 *runtime.Scheme
 	containerImageResolver mondoo.ContainerImageResolver
 
-	auditConfig       v1alpha2.MondooAuditConfig
+	auditConfig       mondoov1alpha2.MondooAuditConfig
 	fakeClientBuilder *fake.ClientBuilder
 }
 
@@ -125,6 +125,48 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
 	service.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, service, s.scheme))
 	s.Equal(*service, ss.Items[0])
+}
+
+func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
+	ns := "test-ns"
+	s.auditConfig = utils.DefaultAuditConfig(ns, false, false, true)
+	s.auditConfig.Spec.Scanner.ServiceAccountName = "missing-serviceaccount"
+
+	image, err := s.containerImageResolver.MondooClientImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig)
+	deployment.Status.UnavailableReplicas = 1
+	deployment.Status.Conditions = []appsv1.DeploymentCondition{
+		{
+			Type:    appsv1.DeploymentConditionType(mondoov1alpha2.ScanAPIDegraded),
+			Status:  "ScanAPI degarded",
+			Message: "pods \"scan-api-123\" is forbidden: error looking up service account test-ns/missing-serviceaccount: serviceaccount \"missing-serviceaccount\" not found",
+		},
+	}
+
+	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(&s.auditConfig, deployment)
+
+	d := s.createDeploymentHandler()
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, ds))
+	s.Equal(1, len(ds.Items))
+
+	conditions := s.auditConfig.Status.Conditions
+	foundMissingServiceAccountCondition := false
+	s.Assertions.NotEmpty(conditions)
+	for _, condition := range conditions {
+		if strings.Contains(condition.Message, "error looking up service account") {
+			foundMissingServiceAccountCondition = true
+			break
+		}
+	}
+	s.Assertions.Truef(foundMissingServiceAccountCondition, "No Condition for missing service account found")
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Update() {
