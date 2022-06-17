@@ -91,6 +91,19 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	s.True(
 		s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(utils.LabelsToLabelSelector(cronJobLabels), auditConfig.Namespace),
 		"Kubernetes resources scan CronJob did not run successfully.")
+
+	// Condition of MondooAuditConfig should be updated
+	foundMondooAuditConfig := s.getMondooAuditConfigFromCluster()
+
+	foundK8sScanPod := false
+	for _, podName := range foundMondooAuditConfig.Status.Pods {
+		if strings.Contains(podName, "client-k8s-scan") {
+			foundK8sScanPod = true
+			break
+		}
+	}
+
+	s.Assert().Truef(foundK8sScanPod, "Couldn't find KubernetesResourceScan in Podlist of the MondooAuditConfig Status")
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
@@ -138,6 +151,20 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	// Make sure we have 1 successful run for each CronJob
 	selector := utils.LabelsToLabelSelector(cronJobLabels)
 	s.True(s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(selector, auditConfig.Namespace), "Not all CronJobs have run successfully.")
+
+	// Condition of MondooAuditConfig should be updated
+	foundMondooAuditConfig := s.getMondooAuditConfigFromCluster()
+
+	for _, node := range nodes.Items {
+		foundNodeScanPod := false
+		for _, podName := range foundMondooAuditConfig.Status.Pods {
+			if strings.Contains(podName, "client-node-"+node.Name) {
+				foundNodeScanPod = true
+				break
+			}
+		}
+		s.Assert().Truef(foundNodeScanPod, "Couldn't find NodeScan Pod for node "+node.Name+" in Podlist of the MondooAuditConfig Status")
+	}
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
@@ -232,6 +259,12 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
 		"Expected update of Deployment to succeed after CA data applied to webhook")
+
+	// Condition of MondooAuditConfig should be updated
+	foundMondooAuditConfig := s.getMondooAuditConfigFromCluster()
+
+	condition := s.getMondooAuditConfigConditionByType(foundMondooAuditConfig, mondoov2.AdmissionDegraded)
+	s.Assert().Equalf(condition.Status, corev1.ConditionFalse, "Admission shouldn't be in degraded state")
 }
 
 func (s *AuditConfigBaseSuite) validateScanApiDeployment(auditConfig mondoov2.MondooAuditConfig) {
@@ -248,6 +281,21 @@ func (s *AuditConfigBaseSuite) validateScanApiDeployment(auditConfig mondoov2.Mo
 	expectedService := mondooscanapi.ScanApiService(auditConfig.Namespace, auditConfig)
 	s.NoError(ctrl.SetControllerReference(&auditConfig, expectedService, s.testCluster.K8sHelper.Clientset.Scheme()))
 	s.Truef(k8s.AreServicesEqual(*expectedService, *scanApiService), "Scan API service is not as expected.")
+
+	// Condition of MondooAuditConfig should be updated
+	foundMondooAuditConfig := s.getMondooAuditConfigFromCluster()
+
+	condition := s.getMondooAuditConfigConditionByType(foundMondooAuditConfig, mondoov2.ScanAPIDegraded)
+	s.Assert().Equalf(condition.Status, corev1.ConditionFalse, "ScanAPI shouldn't be in degraded state")
+
+	foundScanApiPod := false
+	for _, podName := range foundMondooAuditConfig.Status.Pods {
+		if strings.Contains(podName, "client-scan-api") {
+			foundScanApiPod = true
+			break
+		}
+	}
+	s.Assert().Truef(foundScanApiPod, "Couldn't find ScanAPI in Podlist of the MondooAuditConfig Status")
 }
 
 // disableContainerImageResolution Creates a MondooOperatorConfig that disables container image resolution. This is needed
@@ -272,6 +320,38 @@ func (s *AuditConfigBaseSuite) disableContainerImageResolution() func() {
 			s.testCluster.K8sHelper.Clientset.Delete(s.ctx, operatorConfig),
 			"Failed to restore container resolution in MondooOperatorConfig")
 	}
+}
+
+// getMondooAuditConfigFromCluster Fetches current MondooAuditConfig from Cluster
+func (s *AuditConfigBaseSuite) getMondooAuditConfigFromCluster() *mondoov2.MondooAuditConfig {
+	foundMondooAuditConfig := &mondoov2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      s.auditConfig.Name,
+			Namespace: s.auditConfig.Namespace,
+		},
+	}
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(foundMondooAuditConfig), foundMondooAuditConfig),
+		"Failed to retrieve MondooAuditConfig")
+
+	return foundMondooAuditConfig
+}
+
+// getMondooAuditConfigConditionByType Fetches Condition from MondooAuditConfig Status for the specified Type.
+func (s *AuditConfigBaseSuite) getMondooAuditConfigConditionByType(auditConfig *mondoov2.MondooAuditConfig, conditionType mondoov2.MondooAuditConfigConditionType) mondoov2.MondooAuditConfigCondition {
+	conditions := auditConfig.Status.Conditions
+	s.Assert().NotEmpty(conditions)
+	searchedForCondition := mondoov2.MondooAuditConfigCondition{}
+	for _, condition := range conditions {
+		if condition.Type == mondoov2.ScanAPIDegraded {
+			searchedForCondition = condition
+			break
+		}
+	}
+	errorMsg := fmt.Sprintf("Couldn't find condition of type %v", conditionType)
+	s.Assert().NotEmptyf(searchedForCondition, errorMsg)
+
+	return searchedForCondition
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConfig mondoov2.MondooAuditConfig) {
@@ -317,16 +397,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 	s.Equalf(1, len(deployments.Items), "Deployments count for ScanAPI should be precisely one")
 
 	// Condition of MondooAuditConfig should be updated
-	foundMondooAuditConfig := &mondoov2.MondooAuditConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      auditConfig.Name,
-			Namespace: auditConfig.Namespace,
-		},
-	}
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(foundMondooAuditConfig), foundMondooAuditConfig),
-		"Failed to retrieve MondooAuditConfig")
+	foundMondooAuditConfig := s.getMondooAuditConfigFromCluster()
 
-	s.Assert().NotEmpty(foundMondooAuditConfig.Status.Conditions)
-	s.Assert().Contains(foundMondooAuditConfig.Status.Conditions[0].Message, "error looking up service account")
+	condition := s.getMondooAuditConfigConditionByType(foundMondooAuditConfig, mondoov2.ScanAPIDegraded)
+	s.Assert().Contains(condition.Message, "error looking up service account")
 }
