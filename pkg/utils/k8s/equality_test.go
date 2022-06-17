@@ -209,6 +209,15 @@ func TestAreDeploymentsEqual(t *testing.T) {
 			shouldBeEqual: false,
 		},
 		{
+			name: "should not be equal when container resource requirements differ",
+			createB: func(a appsv1.Deployment) appsv1.Deployment {
+				b := *a.DeepCopy()
+				b.Spec.Template.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("233m")
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
 			name: "should not be equal when owner references differ",
 			createB: func(a appsv1.Deployment) appsv1.Deployment {
 				b := *a.DeepCopy()
@@ -501,6 +510,15 @@ func TestAreCronJobsEqual(t *testing.T) {
 			createB: func(a batchv1.CronJob) batchv1.CronJob {
 				b := *a.DeepCopy()
 				b.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env = make([]corev1.EnvVar, 0)
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when container resource requirements differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("233m")
 				return b
 			},
 			shouldBeEqual: false,
