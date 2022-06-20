@@ -61,6 +61,9 @@ UNIT_TEST_PACKAGES=$(shell go list ./... | grep -v /tests/integration)
 TARGET_ARCH?=$(shell go env GOARCH)
 TARGET_OS?=$(shell go env GOOS)
 
+# Linker flags to build the operator binary
+LDFLAGS="-s -w -X go.mondoo.com/mondoo-operator/pkg/version.Version=$(VERSION)"
+
 all: build
 
 ##@ General
@@ -105,7 +108,7 @@ test/ci: manifests generate fmt vet envtest gotestsum
 
 # Integration tests are run synchronously to avoid race conditions
 test/integration: manifests generate generate-manifests load-minikube
-	go test -v -timeout 900s -p 1 ./tests/integration/...
+	go test -ldflags $(LDFLAGS) -v -timeout 900s -p 1 ./tests/integration/...
 
 test/integration/ci: manifests generate generate-manifests load-minikube gotestsum
 	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -v -timeout 900s -p 1
@@ -113,7 +116,7 @@ test/integration/ci: manifests generate generate-manifests load-minikube gotests
 ##@ Build
 
 build: generate fmt vet ## Build manager binary.
-	CGO_ENABLED=0 GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build -o bin/mondoo-operator -ldflags "-s -w -X go.mondoo.com/mondoo-operator/pkg/version.Version=${VERSION}" cmd/mondoo-operator/main.go
+	CGO_ENABLED=0 GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build -o bin/mondoo-operator -ldflags $(LDFLAGS) cmd/mondoo-operator/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	MONDOO_OPERATOR_NAMESPACE=mondoo-operator go run ./cmd/mondoo-operator/main.go

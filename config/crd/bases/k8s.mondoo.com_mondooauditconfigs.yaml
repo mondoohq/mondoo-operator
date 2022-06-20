@@ -193,6 +193,10 @@ spec:
                 items:
                   type: string
                 type: array
+              reconciledByOperatorVersion:
+                description: ReconciledByOperatorVersion contains the version of the
+                  operator which reconciled this MondooAuditConfig
+                type: string
             type: object
         type: object
     served: true

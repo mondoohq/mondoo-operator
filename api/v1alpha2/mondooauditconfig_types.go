@@ -113,6 +113,9 @@ type MondooAuditConfigStatus struct {
 
 	// Conditions includes detailed status for the MondooAuditConfig
 	Conditions []MondooAuditConfigCondition `json:"conditions,omitempty"`
+
+	// ReconciledByOperatorVersion contains the version of the operator which reconciled this MondooAuditConfig
+	ReconciledByOperatorVersion string `json:"reconciledByOperatorVersion,omitempty"`
 }
 
 type MondooAuditConfigCondition struct {

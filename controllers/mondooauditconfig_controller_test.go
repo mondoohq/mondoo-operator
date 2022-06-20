@@ -26,6 +26,7 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	mockmondoo "go.mondoo.com/mondoo-operator/pkg/mondooclient/mock"
+	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/credentials"
 )
 
@@ -292,6 +293,49 @@ func TestTokenRegistration(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMondooAuditConfigStatus(t *testing.T) {
+	utilruntime.Must(v1alpha2.AddToScheme(scheme.Scheme))
+
+	testTokenData = credentials.MondooToken(t, "")
+	testIntegrationTokenData = credentials.MondooToken(t, testIntegrationMRN)
+	testMondooServiceAccount.PrivateKey = credentials.MondooServiceAccount(t)
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mClient := mockmondoo.NewMockClient(mockCtrl)
+	mClient.EXPECT().ExchangeRegistrationToken(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.ExchangeRegistrationTokenOutput{
+		ServiceAccount: testServiceAccountData,
+	}, nil)
+
+	testMondooClientBuilder := func(mondooclient.ClientOptions) mondooclient.Client {
+		return mClient
+	}
+
+	mondooAuditConfig := testMondooAuditConfig()
+	testToken := testTokenSecret()
+
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(mondooAuditConfig, testToken).Build()
+
+	reconciler := &MondooAuditConfigReconciler{
+		MondooClientBuilder: testMondooClientBuilder,
+		Client:              fakeClient,
+		MondooAuditConfig:   mondooAuditConfig,
+	}
+
+	_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      testMondooAuditConfigName,
+			Namespace: testNamespace,
+		},
+	})
+	assert.NoError(t, err)
+
+	assert.NotEmptyf(t, reconciler.MondooAuditConfig.Status, "Status shouldn't be empty")
+	assert.NotEmptyf(t, reconciler.MondooAuditConfig.Status.ReconciledByOperatorVersion, "ReconciledByOperatorVersion shouldn't be empty")
+	assert.Equalf(t, reconciler.MondooAuditConfig.Status.ReconciledByOperatorVersion, version.Version, "expected versions to be equal")
 }
 
 func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {
