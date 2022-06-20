@@ -301,6 +301,32 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 	s.Assert().NoErrorf(err, "Couldn't find condition message about missing service account")
 }
 
+func (s *AuditConfigBaseSuite) testMondooAuditConfigEmpty(auditConfig mondoov2.MondooAuditConfig) {
+	s.auditConfig = auditConfig
+	// Disable imageResolution for the webhook image to be runnable.
+	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
+	// image, and fail because we haven't pushed this image publicly.
+	operatorConfig := &mondoov2.MondooOperatorConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: mondoov2.MondooOperatorConfigName,
+		},
+		Spec: mondoov2.MondooOperatorConfigSpec{
+			SkipContainerResolution: true,
+		},
+	}
+	s.Require().NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, operatorConfig), "Failed to create MondooOperatorConfig")
+
+	// Enable nothing
+	zap.S().Info("Create an audit config that enables nothing.")
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
+		"Failed to create Mondoo audit config.")
+
+	err := s.checkForReconciledOperatorVersion()
+	s.Assert().NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+}
+
 func (s *AuditConfigBaseSuite) validateScanApiDeployment(auditConfig mondoov2.MondooAuditConfig) {
 	scanApiLabelsString := utils.LabelsToLabelSelector(mondooscanapi.DeploymentLabels(auditConfig))
 	s.Truef(
@@ -410,32 +436,6 @@ func (s *AuditConfigBaseSuite) checkForPodInStatus(podName string) error {
 	return err
 }
 
-func (s *AuditConfigBaseSuite) testMondooAuditConfigEmpty(auditConfig mondoov2.MondooAuditConfig) {
-	s.auditConfig = auditConfig
-	// Disable imageResolution for the webhook image to be runnable.
-	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
-	// image, and fail because we haven't pushed this image publicly.
-	operatorConfig := &mondoov2.MondooOperatorConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: mondoov2.MondooOperatorConfigName,
-		},
-		Spec: mondoov2.MondooOperatorConfigSpec{
-			SkipContainerResolution: true,
-		},
-	}
-	s.Require().NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Create(s.ctx, operatorConfig), "Failed to create MondooOperatorConfig")
-
-	// Enable nothing
-	zap.S().Info("Create an audit config that enables nothing.")
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
-		"Failed to create Mondoo audit config.")
-
-	err := s.checkForReconciledOperatorVersion()
-	s.Assert().NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
-}
-
 // checkForReconciledOperatorVersion Check whether the MondooAuditConfig Status contains the current operator Version after Reconcile.
 func (s *AuditConfigBaseSuite) checkForReconciledOperatorVersion() error {
 	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
@@ -449,19 +449,4 @@ func (s *AuditConfigBaseSuite) checkForReconciledOperatorVersion() error {
 	})
 
 	return err
-}
-
-// getMondooAuditConfigFromCluster Fetches current MondooAuditConfig from Cluster
-func (s *AuditConfigBaseSuite) getMondooAuditConfigFromCluster() *mondoov2.MondooAuditConfig {
-	foundMondooAuditConfig := &mondoov2.MondooAuditConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      s.auditConfig.Name,
-			Namespace: s.auditConfig.Namespace,
-		},
-	}
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(foundMondooAuditConfig), foundMondooAuditConfig),
-		"Failed to retrieve MondooAuditConfig")
-
-	return foundMondooAuditConfig
 }
