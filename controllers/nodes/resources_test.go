@@ -4,12 +4,12 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/rand"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,7 +89,15 @@ func TestInventory(t *testing.T) {
 	randName := utils.RandString(10)
 	auditConfig := v1alpha2.MondooAuditConfig{ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"}}
 
-	inventory := Inventory(corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: randName}}, auditConfig)
-	assert.False(t, strings.Contains(inventory, InventoryNodeNamePlaceholder))
-	assert.True(t, strings.Contains(inventory, randName))
+	inventory, err := Inventory(corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: randName}}, "", auditConfig)
+	assert.NoError(t, err, "unexpected error generating inventory")
+	assert.Contains(t, inventory, randName)
+	assert.NotContains(t, inventory, constants.MondooAssetsIntegrationLabel)
+
+	const integrationMRN = "//test-MRN"
+	inventory, err = Inventory(corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: randName}}, integrationMRN, auditConfig)
+	assert.NoError(t, err, "unexpected error generating inventory")
+	assert.Contains(t, inventory, randName)
+	assert.Contains(t, inventory, constants.MondooAssetsIntegrationLabel)
+	assert.Contains(t, inventory, integrationMRN)
 }
