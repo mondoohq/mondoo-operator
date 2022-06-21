@@ -109,7 +109,7 @@ func (i *MondooInstaller) UninstallOperator() error {
 	if err := i.K8sHelper.DeleteResourceIfExists(secret); err != nil {
 		return err
 	}
-	zap.S().Info("Deleted Mondoo client secret %s/%s.", secret.Namespace, secret.Name)
+	zap.S().Infof("Deleted Mondoo client secret %s/%s.", secret.Namespace, secret.Name)
 
 	if i.isInstalledExternally {
 		zap.S().Info("The Mondoo operator has been installed externally. Skipping uninstall...")
