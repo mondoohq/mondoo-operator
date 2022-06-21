@@ -271,11 +271,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// Update status.ReconciledByOperatorVersion to the running operator version
 	if mondooAuditConfig.Status.ReconciledByOperatorVersion != version.Version {
 		mondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
-		err := r.Status().Update(ctx, mondooAuditConfig)
-		if err != nil {
-			log.Error(err, "Failed to update mondoo status")
-			return ctrl.Result{}, err
-		}
 	}
 
 	if err := mondoo.UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log); err != nil {

@@ -95,6 +95,9 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 
 	err = s.checkForPodInStatus("client-k8s-scan")
 	s.Assert().NoErrorf(err, "Couldn't find KubernetesResourceScan in Podlist of the MondooAuditConfig Status")
+
+	err = s.checkForReconciledOperatorVersion()
+	s.Assert().NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
@@ -147,6 +150,9 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 		err := s.checkForPodInStatus("client-node-" + node.Name)
 		s.Assert().NoErrorf(err, "Couldn't find NodeScan Pod for node "+node.Name+" in Podlist of the MondooAuditConfig Status")
 	}
+
+	err = s.checkForReconciledOperatorVersion()
+	s.Assert().NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
@@ -244,6 +250,9 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 
 	err = s.checkForDegradedCondition(mondoov2.AdmissionDegraded)
 	s.Assert().NoErrorf(err, "Admission shouldn't be in degraded state")
+
+	err = s.checkForReconciledOperatorVersion()
+	s.Assert().NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConfig mondoov2.MondooAuditConfig) {
@@ -299,9 +308,13 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 	})
 
 	s.Assert().NoErrorf(err, "Couldn't find condition message about missing service account")
+
+	// The SA is missing, but the actual reconcile loop gets finished. The SA is outside of the operators scope.
+	err = s.checkForReconciledOperatorVersion()
+	s.Assert().NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 }
 
-func (s *AuditConfigBaseSuite) testMondooAuditConfigEmpty(auditConfig mondoov2.MondooAuditConfig) {
+func (s *AuditConfigBaseSuite) testMondooAuditConfigAllDisabled(auditConfig mondoov2.MondooAuditConfig) {
 	s.auditConfig = auditConfig
 	// Disable imageResolution for the webhook image to be runnable.
 	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
@@ -320,7 +333,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigEmpty(auditConfig mondoov2.M
 	// Enable nothing
 	zap.S().Info("Create an audit config that enables nothing.")
 	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &s.auditConfig),
 		"Failed to create Mondoo audit config.")
 
 	err := s.checkForReconciledOperatorVersion()
