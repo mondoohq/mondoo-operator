@@ -439,7 +439,7 @@ func (k8sh *K8sHelper) GetMondooAuditConfigConditionByType(auditConfig *api.Mond
 		}
 	}
 
-	return api.MondooAuditConfigCondition{}, fmt.Errorf("couldn't find condition of type %v", conditionType)
+	return searchedForCondition, fmt.Errorf("couldn't find condition of type %v", conditionType)
 }
 
 // CheckForDegradedCondition Check whether specified Condition is in degraded state in a MondooAuditConfig with retries.
