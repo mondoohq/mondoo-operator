@@ -18,6 +18,7 @@ jobs:
         with:
           go-version: "${{ env.golang-version }}"
       - run: |
-          curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+          curl -O https://raw.githubusercontent.com/nektos/act/master/install.sh
+          sudo bash -c ./install.sh v0.2.26
           export PATH=$PATH:./bin
           make test/github-actions
