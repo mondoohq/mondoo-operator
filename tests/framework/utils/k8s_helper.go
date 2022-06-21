@@ -387,6 +387,12 @@ func (k8sh *K8sHelper) appendContainerLogs(file *os.File, pod v1.Pod, containerN
 	res := k8sh.kubeClient.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, logOpts).Do(ctx)
 	rawData, err := res.Raw()
 	if err != nil {
+		// We have test cases where containers intentionally will not start, e.g. the webhook
+		// These cases creating disturbing stack traces, so ignore them
+		if strings.Contains(res.Error().Error(), "ContainerCreating") {
+			zap.S().Infof("Cannot get logs for pod %s and container %s. Container is in state ContainerCreating", pod.Name, containerName)
+			return
+		}
 		// Sometimes we fail to get logs for pods using this method, notably the operator pod. It is
 		// unknown why this happens. Pod logs are VERY important, so try again using kubectl.
 		l, err := k8sh.Kubectl("-n", pod.Namespace, "logs", pod.Name, "-c", containerName)

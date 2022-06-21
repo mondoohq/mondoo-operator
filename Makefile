@@ -150,15 +150,21 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	cp config/manager/kustomization.yaml config/manager/kustomization.yaml.before_kustomize
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
+	mv config/manager/kustomization.yaml.before_kustomize config/manager/kustomization.yaml
 
-.PHONY: undeploy
+.PHONY: generate-manifests
 generate-manifests: manifests kustomize ## Generates manifests and pipes into a yaml file
+	cp config/manager/kustomization.yaml config/manager/kustomization.yaml.before_kustomize
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > mondoo-operator-manifests.yaml
+	cp config/webhook/kustomization.yaml config/webhook/kustomization.yaml.before_kustomize
 	cd config/webhook && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/webhook > controllers/admission/webhook-manifests.yaml
+	mv config/webhook/kustomization.yaml.before_kustomize config/webhook/kustomization.yaml
+	mv config/manager/kustomization.yaml.before_kustomize config/manager/kustomization.yaml
 
 .PHONY: deploy-olm
 deploy-olm: manifests kustomize ## Deploy using operator-sdk OLM 
@@ -197,7 +203,7 @@ GOMOCKGEN = $(shell pwd)/bin/mockgen
 .PHONY: gomockgen
 gomockgen: ## Download go mockgen locally if necessary.
 	$(call go-get-tool,$(GOMOCKGEN),github.com/golang/mock/mockgen@v1.6.0)
-	# mockgen binary needs to be in $PATH
+	# mockgen binary needs to be in $$PATH
 	cp $(GOMOCKGEN) /usr/local/bin/
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
