@@ -54,6 +54,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
+	"go.mondoo.com/mondoo-operator/pkg/version"
 )
 
 const finalizerString = "k8s.mondoo.com/delete"
@@ -64,6 +65,7 @@ type MondooAuditConfigReconciler struct {
 	Scheme                 *runtime.Scheme
 	MondooClientBuilder    func(mondooclient.ClientOptions) mondooclient.Client
 	ContainerImageResolver mondoo.ContainerImageResolver
+	MondooAuditConfig      *v1alpha2.MondooAuditConfig
 }
 
 // Embed the Default Inventory for CronJob and Deployment Configurations
@@ -108,6 +110,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	mondooAuditConfig := &v1alpha2.MondooAuditConfig{}
 
 	err := r.Get(ctx, req.NamespacedName, mondooAuditConfig)
+	r.MondooAuditConfig = mondooAuditConfig
 
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -263,6 +266,11 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			log.Error(err, "Failed to update mondoo status")
 			return ctrl.Result{}, err
 		}
+	}
+
+	// Update status.ReconciledByOperatorVersion to the running operator version
+	if mondooAuditConfig.Status.ReconciledByOperatorVersion != version.Version {
+		mondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
 	}
 
 	if err := mondoo.UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log); err != nil {

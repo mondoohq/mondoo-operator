@@ -13,6 +13,11 @@ type AuditConfigSuite struct {
 	AuditConfigBaseSuite
 }
 
+func (s *AuditConfigSuite) TestReconcile_AllDisabled() {
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false)
+	s.testMondooAuditConfigAllDisabled(auditConfig)
+}
+
 func (s *AuditConfigSuite) TestReconcile_KubernetesResources() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false)
 	s.testMondooAuditConfigKubernetesResources(auditConfig)

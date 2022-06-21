@@ -22,6 +22,7 @@ import (
 	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers"
 	"go.mondoo.com/mondoo-operator/controllers/integration"
+	"go.mondoo.com/mondoo-operator/pkg/health"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
@@ -100,9 +101,11 @@ func init() {
 			return err
 		}
 
-		// TODO: add a ready check that verifies whether all CRD statuses state they are upgraded to
-		// the current version of the operator
-		if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		reconcileCheck := &health.HealthChecks{
+			Client: mgr.GetClient(),
+			Log:    setupLog,
+		}
+		if err := mgr.AddReadyzCheck("readyz", reconcileCheck.AreAllMondooAuditConfigsReconciled); err != nil {
 			setupLog.Error(err, "unable to set up ready check")
 			return err
 		}
