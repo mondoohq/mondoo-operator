@@ -70,7 +70,7 @@ func (s *IntegrationCheckInSuite) TestReconciledMondooAuditConfig() {
 	}
 
 	// Act
-	err := hc.CheckMondooAuditConfigsForOperatorVersion(&http.Request{})
+	err := hc.AreAllMondooAuditConfigsReconciled(&http.Request{})
 
 	// Assert
 	s.NoError(err, "should not error while processing reconciled MondooAuditConfig")
@@ -94,7 +94,7 @@ func (s *IntegrationCheckInSuite) TestReconciledMondooAuditConfigs() {
 	}
 
 	// Act
-	err := hc.CheckMondooAuditConfigsForOperatorVersion(&http.Request{})
+	err := hc.AreAllMondooAuditConfigsReconciled(&http.Request{})
 
 	// Assert
 	s.NoError(err, "should not error while processing reconciled MondooAuditConfigs across namespaces")
@@ -118,7 +118,7 @@ func (s *IntegrationCheckInSuite) TestUnfinishedMondooAuditConfig() {
 	}
 
 	// Act
-	err := hc.CheckMondooAuditConfigsForOperatorVersion(&http.Request{})
+	err := hc.AreAllMondooAuditConfigsReconciled(&http.Request{})
 
 	// Assert
 	s.Error(err, "should error while processing not yet reconciled MondooAuditConfig")

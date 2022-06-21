@@ -2,7 +2,6 @@ package health
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -17,8 +16,8 @@ type HealthChecks struct {
 	Log    logr.Logger
 }
 
-func (h *HealthChecks) CheckMondooAuditConfigsForOperatorVersion(req *http.Request) error {
-	ctx := context.TODO()
+func (h *HealthChecks) AreAllMondooAuditConfigsReconciled(req *http.Request) error {
+	ctx := context.Background()
 	mondooAuditConfigs := &v1alpha2.MondooAuditConfigList{}
 	if err := h.Client.List(ctx, mondooAuditConfigs); err != nil {
 		h.Log.Error(err, "error listing MondooAuditConfigs")
@@ -27,12 +26,9 @@ func (h *HealthChecks) CheckMondooAuditConfigsForOperatorVersion(req *http.Reque
 
 	for _, mac := range mondooAuditConfigs.Items {
 		if mac.Status.ReconciledByOperatorVersion != version.Version {
-			errorMsg := fmt.Sprintf("MondooAuditConfig not yet completly reconciled: namespace=%s MondooAuditConfig=%s", mac.Namespace, mac.Name)
+			errorMsg := fmt.Sprintf("MondooAuditConfig %s/%s not yet completly reconciled by operator. Current value of ReconciledByOperatorVersion: '%s', expected: '%s'", mac.Namespace, mac.Name, mac.Status.ReconciledByOperatorVersion, version.Version)
 			h.Log.Info(errorMsg)
-			return errors.New(errorMsg)
-		} else {
-			infoMsg := fmt.Sprintf("MondooAuditconfig reconciled: namespace=%s MondooAuditConfig=%s", mac.Namespace, mac.Name)
-			h.Log.Info(infoMsg)
+			return fmt.Errorf(errorMsg)
 		}
 	}
 

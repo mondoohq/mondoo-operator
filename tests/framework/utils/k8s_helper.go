@@ -24,6 +24,7 @@ import (
 
 	api "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -406,4 +407,95 @@ func writeHeader(file *os.File, message string) error {
 	file.WriteString("\n-----------------------------------------\n") //nolint // ok to ignore this test logging
 
 	return nil
+}
+
+// GetMondooAuditConfigFromCluster Fetches current MondooAuditConfig from Cluster
+func (k8sh *K8sHelper) GetMondooAuditConfigFromCluster(auditConfigName, auditConfigNamespace string) (*api.MondooAuditConfig, error) {
+	foundMondooAuditConfig := &api.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      auditConfigName,
+			Namespace: auditConfigNamespace,
+		},
+	}
+	err := k8sh.Clientset.Get(context.Background(), client.ObjectKeyFromObject(foundMondooAuditConfig), foundMondooAuditConfig)
+	if err != nil {
+		return &api.MondooAuditConfig{}, err
+	}
+
+	return foundMondooAuditConfig, nil
+}
+
+// GetMondooAuditConfigConditionByType Fetches Condition from MondooAuditConfig Status for the specified Type.
+func (k8sh *K8sHelper) GetMondooAuditConfigConditionByType(auditConfig *api.MondooAuditConfig, conditionType api.MondooAuditConfigConditionType) (api.MondooAuditConfigCondition, error) {
+	conditions := auditConfig.Status.Conditions
+	if len(conditions) == 0 {
+		return api.MondooAuditConfigCondition{}, fmt.Errorf("Status.Conditions is empty")
+	}
+	searchedForCondition := api.MondooAuditConfigCondition{}
+	for _, condition := range conditions {
+		if condition.Type == conditionType {
+			searchedForCondition = condition
+			return searchedForCondition, nil
+		}
+	}
+
+	return api.MondooAuditConfigCondition{}, fmt.Errorf("couldn't find condition of type %v", conditionType)
+}
+
+// CheckForDegradedCondition Check whether specified Condition is in degraded state in a MondooAuditConfig with retries.
+func (k8sh *K8sHelper) CheckForDegradedCondition(auditConfig *api.MondooAuditConfig, conditionType api.MondooAuditConfigConditionType) error {
+	err := k8sh.ExecuteWithRetries(func() (bool, error) {
+		// Condition of MondooAuditConfig should be updated
+		foundMondooAuditConfig, err := k8sh.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+		if err != nil {
+			return false, err
+		}
+		condition, err := k8sh.GetMondooAuditConfigConditionByType(foundMondooAuditConfig, conditionType)
+		if err != nil {
+			return false, err
+		}
+		if condition.Status == v1.ConditionFalse {
+			return true, nil
+		}
+		return false, nil
+	})
+
+	return err
+}
+
+// CheckForPodInStatus Check whether a give PodName is an element of the PodList saved in the Status part of MondooAuditConfig
+func (k8sh *K8sHelper) CheckForPodInStatus(auditConfig *api.MondooAuditConfig, podName string) error {
+	err := k8sh.ExecuteWithRetries(func() (bool, error) {
+		// Condition of MondooAuditConfig should be updated
+		foundMondooAuditConfig, err := k8sh.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+		if err != nil {
+			return false, err
+		}
+		for _, currentPodName := range foundMondooAuditConfig.Status.Pods {
+			if strings.Contains(currentPodName, podName) {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+
+	return err
+}
+
+// CheckForReconciledOperatorVersion Check whether the MondooAuditConfig Status contains the current operator Version after Reconcile.
+func (k8sh *K8sHelper) CheckForReconciledOperatorVersion(auditConfig *api.MondooAuditConfig) error {
+	err := k8sh.ExecuteWithRetries(func() (bool, error) {
+		// Condition of MondooAuditConfig should be updated
+		foundMondooAuditConfig, err := k8sh.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+		if err != nil {
+			return false, err
+		}
+		reconciledVersion := foundMondooAuditConfig.Status.ReconciledByOperatorVersion
+		if reconciledVersion == version.Version {
+			return true, nil
+		}
+		return false, nil
+	})
+
+	return err
 }

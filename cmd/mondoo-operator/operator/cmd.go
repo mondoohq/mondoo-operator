@@ -105,7 +105,7 @@ func init() {
 			Client: mgr.GetClient(),
 			Log:    setupLog,
 		}
-		if err := mgr.AddReadyzCheck("readyz", reconcileCheck.CheckMondooAuditConfigsForOperatorVersion); err != nil {
+		if err := mgr.AddReadyzCheck("readyz", reconcileCheck.AreAllMondooAuditConfigsReconciled); err != nil {
 			setupLog.Error(err, "unable to set up ready check")
 			return err
 		}
