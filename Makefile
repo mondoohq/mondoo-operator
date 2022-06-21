@@ -200,11 +200,19 @@ golangci-lint: ## Download golangci-lint locally if necessary.
 	$(call go-get-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45)
 
 GOMOCKGEN = $(shell pwd)/bin/mockgen
+# mockgen binary needs to be in $PATH
+PATH := $(PATH):$(shell dirname $(GOMOCKGEN))
 .PHONY: gomockgen
 gomockgen: ## Download go mockgen locally if necessary.
 	$(call go-get-tool,$(GOMOCKGEN),github.com/golang/mock/mockgen@v1.6.0)
+<<<<<<< HEAD
 	# mockgen binary needs to be in $$PATH
 	cp $(GOMOCKGEN) /usr/local/bin/
+||||||| parent of 0db42b3 (Add mockgen to $PATH without copy)
+	# mockgen binary needs to be in $PATH
+	cp $(GOMOCKGEN) /usr/local/bin/
+=======
+>>>>>>> 0db42b3 (Add mockgen to $PATH without copy)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
