@@ -1,6 +1,6 @@
 module go.mondoo.com/mondoo-operator
 
-go 1.17
+go 1.18
 
 require (
 	github.com/golang-jwt/jwt/v4 v4.3.0
