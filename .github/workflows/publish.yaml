@@ -30,6 +30,9 @@ jobs:
       # This is used to complete the identity challenge
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
+
+    outputs:
+      version: ${{ steps.get_version.outputs.VERSION }}
     
     strategy:
       matrix:
@@ -280,9 +283,6 @@ jobs:
       - uses: actions/checkout@v2
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
-      - name: extract tag/version
-        id: get_version
-        run: echo ::set-output name=VERSION::$(echo ${GITHUB_REF##refs/tags/})
       - name: Install Go
         uses: actions/setup-go@v2
         with:
@@ -332,7 +332,7 @@ jobs:
         run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
       - name: Run integration tests
-        run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.get_version.outputs.VERSION }} make test/integration/ci
+        run: EXTERNAL_INSTALLATION=1 VERSION=${{ needs.build-operator.outputs.version }} make test/integration/ci
 
       - name: Clean up
         run: |
@@ -378,10 +378,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: extract tag/version
-        id: get_version
-        run: echo ::set-output name=VERSION::$(echo ${GITHUB_REF##refs/tags/})
-
       - name: Install Go
         uses: actions/setup-go@v2
         with:
@@ -412,7 +408,7 @@ jobs:
         run: sleep 60
 
       - name: Run integration tests
-        run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.get_version.outputs.VERSION }} make test/integration/ci
+        run: EXTERNAL_INSTALLATION=1 VERSION=${{ needs.build-operator.outputs.version }} make test/integration/ci
 
       - name: Upload test logs artifact
         uses: actions/upload-artifact@v3
