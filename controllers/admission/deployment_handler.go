@@ -313,7 +313,7 @@ func (n *DeploymentHandler) applyWebhooks(ctx context.Context) (ctrl.Result, err
 		// Decode into a runtime Object
 		obj, gvk, err := objectDecoder.Decode(rawObject.Raw, nil, nil)
 		if err != nil {
-			webhookLog.Error(err, "Failed to decode RawExtension")
+			webhookLog.Error(err, "failed to decode RawExtension")
 			return ctrl.Result{}, err
 		}
 
@@ -325,11 +325,11 @@ func (n *DeploymentHandler) applyWebhooks(ctx context.Context) (ctrl.Result, err
 		case "ValidatingWebhookConfiguration":
 			vwc, ok := obj.(*webhooksv1.ValidatingWebhookConfiguration)
 			if !ok {
-				return ctrl.Result{}, fmt.Errorf("Failed to convert to ValidatingWebhookConfiguration")
+				return ctrl.Result{}, fmt.Errorf("failed to convert to ValidatingWebhookConfiguration")
 			}
 			syncErr = n.prepareValidatingWebhook(ctx, vwc)
 		default:
-			err := fmt.Errorf("Unexpected type %s to decode", gvk.Kind)
+			err := fmt.Errorf("unexpected type %s to decode", gvk.Kind)
 			webhookLog.Error(err, "Failed to convert type")
 			return ctrl.Result{}, err
 		}
@@ -416,18 +416,18 @@ func (n *DeploymentHandler) down(ctx context.Context) (ctrl.Result, error) {
 			if err == io.EOF {
 				break
 			}
-			webhookLog.Error(err, "Failed to decode object")
+			webhookLog.Error(err, "failed to decode object")
 			return ctrl.Result{}, err
 		}
 
 		// Decode into a runtime Object
 		obj, gvk, err := objectDecoder.Decode(rawObject.Raw, nil, nil)
 		if err != nil {
-			webhookLog.Error(err, "Failed to decode RawExtension")
+			webhookLog.Error(err, "failed to decode RawExtension")
 			return ctrl.Result{}, err
 		}
 
-		webhookLog.Info("Decoding object", "GVK", gvk)
+		webhookLog.Info("decoding object", "GVK", gvk)
 
 		// Cast the runtime to the actual type and delete the resources
 		var genericObject client.Object
@@ -439,17 +439,17 @@ func (n *DeploymentHandler) down(ctx context.Context) (ctrl.Result, error) {
 				genericObject.SetName(vwcName)
 			}
 		default:
-			err := fmt.Errorf("Unexpected type %s to decode", gvk.Kind)
+			err := fmt.Errorf("unexpected type %s to decode", gvk.Kind)
 			webhookLog.Error(err, "Failed to convert type")
 			return ctrl.Result{}, err
 		}
 
 		if !conversionOK {
-			return ctrl.Result{}, fmt.Errorf("Failed to convert to resource")
+			return ctrl.Result{}, fmt.Errorf("failed to convert to resource")
 		}
 
 		if err := k8s.DeleteIfExists(ctx, n.KubeClient, genericObject); err != nil {
-			webhookLog.Error(err, "Failed to clean up resource")
+			webhookLog.Error(err, "failed to clean up resource")
 			return ctrl.Result{}, err
 		}
 
@@ -463,7 +463,7 @@ func (n *DeploymentHandler) down(ctx context.Context) (ctrl.Result, error) {
 
 func (n *DeploymentHandler) setControllerRef(obj client.Object) error {
 	if err := ctrl.SetControllerReference(n.Mondoo, obj, n.KubeClient.Scheme()); err != nil {
-		webhookLog.Error(err, "Failed to set ControllerReference", "Object", obj)
+		webhookLog.Error(err, "failed to set ControllerReference", "Object", obj)
 		return err
 	}
 	return nil

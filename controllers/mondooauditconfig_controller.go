@@ -331,7 +331,7 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 	}
 	mondooTokenExists, err := k8s.CheckIfExists(ctx, r.Client, mondooTokenSecret, mondooTokenSecret)
 	if err != nil {
-		log.Error(err, "failed to cehck whether Mondoo token secret exists")
+		log.Error(err, "failed to check whether Mondoo token secret exists")
 		return err
 	}
 

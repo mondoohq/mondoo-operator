@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -48,7 +47,7 @@ type DeploymentHandlerSuite struct {
 	scheme                 *runtime.Scheme
 	containerImageResolver mondoo.ContainerImageResolver
 
-	auditConfig       v1alpha2.MondooAuditConfig
+	auditConfig       mondoov1alpha2.MondooAuditConfig
 	fakeClientBuilder *fake.ClientBuilder
 }
 

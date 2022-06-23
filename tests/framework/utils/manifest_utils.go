@@ -43,7 +43,7 @@ func FindRootFolder() (string, error) {
 		return parentPath, nil
 	}
 
-	return "", fmt.Errorf("Mondoo operator root not found above directory %s", workingDirectory)
+	return "", fmt.Errorf("mondoo operator root not found above directory %s", workingDirectory)
 }
 
 func ReadFile(filename string) string {
