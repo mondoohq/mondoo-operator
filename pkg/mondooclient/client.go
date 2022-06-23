@@ -22,7 +22,7 @@ const (
 	maxIdleConnections         = 100
 )
 
-//go:generate mockgen -source=./client.go -destination=./mock/client_generated.go -package=mock
+//go:generate ./../../bin/mockgen -source=./client.go -destination=./mock/client_generated.go -package=mock
 
 type Client interface {
 	ExchangeRegistrationToken(context.Context, *ExchangeRegistrationTokenInput) (*ExchangeRegistrationTokenOutput, error)

@@ -203,8 +203,6 @@ GOMOCKGEN = $(shell pwd)/bin/mockgen
 .PHONY: gomockgen
 gomockgen: ## Download go mockgen locally if necessary.
 	$(call go-install-tool,$(GOMOCKGEN),github.com/golang/mock/mockgen@v1.6.0)
-	# mockgen binary needs to be in $$PATH
-	cp $(GOMOCKGEN) /usr/local/bin/
 
 # go-install-tool will 'go install' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
