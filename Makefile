@@ -100,6 +100,9 @@ vet: ## Run go vet against code.
 lint: golangci-lint
 	$(GOLANGCI_LINT) run
 
+staticcheck: go-staticcheck
+	$(GO_STATICCHECK) ./...
+
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) --arch=amd64 use $(ENVTEST_K8S_VERSION) -p path)" go test $(UNIT_TEST_PACKAGES) -coverprofile cover.out
 
@@ -198,6 +201,10 @@ gotestsum: ## Download gotestsum locally if necessary.
 GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45)
+
+GO_STATICCHECK = $(shell pwd)/bin/staticcheck
+go-staticcheck: ## Download go-staticcheck locally if necessary.
+	$(call go-get-tool,$(GO_STATICCHECK),honnef.co/go/tools/cmd/staticcheck@latest)
 
 GOMOCKGEN = $(shell pwd)/bin/mockgen
 .PHONY: gomockgen
