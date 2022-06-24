@@ -204,7 +204,7 @@ golangci-lint: ## Download golangci-lint locally if necessary.
 
 GO_STATICCHECK = $(shell pwd)/bin/staticcheck
 go-staticcheck: ## Download go-staticcheck locally if necessary.
-	$(call go-get-tool,$(GO_STATICCHECK),honnef.co/go/tools/cmd/staticcheck@latest)
+	$(call go-install-tool,$(GO_STATICCHECK),honnef.co/go/tools/cmd/staticcheck@latest)
 
 GOMOCKGEN = $(shell pwd)/bin/mockgen
 .PHONY: gomockgen
