@@ -38,7 +38,7 @@ If there **is** more than one minor version difference between the installed Mon
     ```bash
     kubectl get mondooauditconfigs.k8s.mondoo.com -n mondoo-operator mondoo-client -o jsonpath='{.status.reconciledByOperatorVersion}'
     ```
-    The version of your running Mondoo Operator and the version in the `Status` field have to be the same before you can preoceed with the next version update.
+    The version of your running Mondoo Operator and the version in the `Status` field have to be the same before you can proceed with the next version update.
 
 3. Apply the manifest for `v0.4.3` (the latest version):
     ```bash
