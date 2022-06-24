@@ -70,13 +70,13 @@ func (i *MondooInstaller) InstallOperator() error {
 	}
 
 	if _, err := os.Stat(filepath.Join(rootFolder, OperatorManifest)); errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("File %q does not exist. Run %q!", OperatorManifest, "make generate-manifests")
+		return fmt.Errorf("file %q does not exist. Run %q", OperatorManifest, "make generate-manifests")
 	}
 
 	_, err = i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.CreateFromStdinArgs...)
 	i.isInstalled = true // If the command above has run there is a change things have been partially created.
 	if err != nil {
-		return fmt.Errorf("Failed to create mondoo-operator manifest(s): %v ", err)
+		return fmt.Errorf("failed to create mondoo-operator manifest(s): %v ", err)
 	}
 
 	if err := i.CreateClientSecret(i.Settings.Namespace); err != nil {
@@ -84,7 +84,7 @@ func (i *MondooInstaller) InstallOperator() error {
 	}
 
 	if !i.K8sHelper.IsPodReady("control-plane=controller-manager", i.Settings.Namespace) {
-		return fmt.Errorf("Mondoo operator is not in a ready state.")
+		return fmt.Errorf("mondoo operator is not in a ready state")
 	}
 	zap.S().Info("Mondoo operator is ready.")
 
@@ -118,7 +118,7 @@ func (i *MondooInstaller) UninstallOperator() error {
 
 	_, err := i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.DeleteIngoreNotFoundFromStdinArgs...)
 	if err != nil {
-		return fmt.Errorf("Failed to delete mondoo-operator manifest(s): %v ", err)
+		return fmt.Errorf("failed to delete mondoo-operator manifest(s): %v ", err)
 	}
 	return nil
 }
@@ -128,12 +128,12 @@ func (i *MondooInstaller) CleanupAuditConfigs() error {
 	// audit configs will result in a stuck namespace.
 	cfgs := &mondoov2.MondooAuditConfigList{}
 	if err := i.K8sHelper.Clientset.List(i.ctx, cfgs); err != nil {
-		return fmt.Errorf("Failed to get Mondoo audit configs. %v", err)
+		return fmt.Errorf("failed to get Mondoo audit configs. %v", err)
 	}
 
 	for _, c := range cfgs.Items {
 		if err := i.K8sHelper.Clientset.Delete(i.ctx, &c); err != nil {
-			return fmt.Errorf("Failed to delete Mondoo audit config %s/%s. %v", c.Namespace, c.Name, err)
+			return fmt.Errorf("failed to delete Mondoo audit config %s/%s. %v", c.Namespace, c.Name, err)
 		}
 
 		// Wait until the CRs are fully deleted.
@@ -154,7 +154,7 @@ func (i *MondooInstaller) CreateClientSecret(ns string) error {
 	secret.Name = utils.MondooClientSecret
 	secret.Namespace = ns
 	if err := i.K8sHelper.Clientset.Create(i.ctx, &secret); err != nil {
-		return fmt.Errorf("Failed to create Мondoo secret in namespace %s. %v", ns, err)
+		return fmt.Errorf("failed to create Мondoo secret in namespace %s. %v", ns, err)
 	}
 	zap.S().Infof("Created Мondoo client secret %q.", utils.MondooClientSecret)
 	return nil

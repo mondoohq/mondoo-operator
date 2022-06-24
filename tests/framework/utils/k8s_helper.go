@@ -68,10 +68,10 @@ func CreateK8sHelper() (*K8sHelper, error) {
 	}
 	clientset, err := client.New(config, client.Options{})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get clientset. %+v", err)
+		return nil, fmt.Errorf("failed to get clientset. %+v", err)
 	}
 	if err := api.AddToScheme(clientset.Scheme()); err != nil {
-		return nil, fmt.Errorf("Failed to register schemes for Kube client. %+v", err)
+		return nil, fmt.Errorf("failed to register schemes for Kube client. %+v", err)
 	}
 	kubeClient, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -89,12 +89,12 @@ func CreateK8sHelper() (*K8sHelper, error) {
 func (k8sh *K8sHelper) Kubectl(args ...string) (string, error) {
 	result, err := k8sh.executor.ExecuteCommandWithTimeout(15*time.Second, "kubectl", args...)
 	if err != nil {
-		zap.S().Errorf("Failed to execute: %s %+v : %+v. %s", cmd, args, err, result)
+		zap.S().Errorf("failed to execute: %s %+v : %+v. %s", cmd, args, err, result)
 		if args[0] == "delete" {
 			// allow the tests to continue if we were deleting a resource that timed out
 			return result, nil
 		}
-		return result, fmt.Errorf("Failed to run: %s %v : %v", cmd, args, err)
+		return result, fmt.Errorf("failed to run: %s %v : %v", cmd, args, err)
 	}
 	return result, nil
 }
@@ -110,7 +110,7 @@ func (k8sh *K8sHelper) KubectlWithStdin(stdin string, args ...string) (string, e
 		if strings.Contains(cmdOut.Err.Error(), "(NotFound)") || strings.Contains(cmdOut.StdErr, "(NotFound)") {
 			return cmdOut.StdErr, kerrors.NewNotFound(schema.GroupResource{}, "")
 		}
-		return cmdOut.StdErr, fmt.Errorf("Failed to run stdin: %s %v : %v", cmd, args, cmdOut.StdErr)
+		return cmdOut.StdErr, fmt.Errorf("failed to run stdin: %s %v : %v", cmd, args, cmdOut.StdErr)
 	}
 	if cmdOut.StdOut == "" {
 		return cmdOut.StdErr, nil
@@ -125,7 +125,7 @@ func (k8sh *K8sHelper) DeleteResourceIfExists(r client.Object) error {
 	ctx := context.Background()
 	if err := k8sh.Clientset.Delete(ctx, r); err != nil && !kerrors.IsNotFound(err) {
 		return fmt.Errorf(
-			"Failed to delete %s %s/%s. %v",
+			"failed to delete %s %s/%s. %v",
 			r.GetObjectKind().GroupVersionKind().String(),
 			r.GetNamespace(),
 			r.GetName(),
@@ -273,7 +273,7 @@ func (k8sh *K8sHelper) WaitForResourceDeletion(r client.Object) error {
 			zap.S().Infof("Resource %s %s/%s deleted.", kind, key.Namespace, key.Name)
 			return true, nil
 		}
-		return false, fmt.Errorf("Gave up deleting %s %s/%s. %v", kind, key.Namespace, key.Name, err)
+		return false, fmt.Errorf("gave up deleting %s %s/%s. %v", kind, key.Namespace, key.Name, err)
 	})
 }
 
@@ -289,7 +289,7 @@ func (k8sh *K8sHelper) ExecuteWithRetries(f func() (bool, error)) error {
 		}
 		time.Sleep(RetryInterval * time.Second)
 	}
-	return fmt.Errorf("Test did not succeed after %d retries.", RetryLoop)
+	return fmt.Errorf("test did not succeed after %d retries", RetryLoop)
 }
 
 func (k8sh *K8sHelper) appendPodDescribe(file *os.File, namespace, name string) {
