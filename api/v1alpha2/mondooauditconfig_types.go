@@ -84,6 +84,7 @@ type Admission struct {
 	// +kubebuilder:validation:Enum=permissive;enforcing
 	// +kubebuilder:default=permissive
 	Mode                    AdmissionMode           `json:"mode,omitempty"`
+	Replicas                *int32                  `json:"replicas,omitempty"`
 	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
 }
 

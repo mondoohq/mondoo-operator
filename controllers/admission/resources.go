@@ -66,6 +66,13 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 		containerArgs = append(containerArgs, []string{"--integration-mrn", integrationMRN}...)
 	}
 
+	replicas := pointer.Int32(1)
+	if m.Spec.Admission.Replicas == nil && m.Spec.Admission.Mode == mondoov1alpha2.Enforcing {
+		replicas = pointer.Int32(2)
+	} else if *m.Spec.Admission.Replicas > 0 {
+		replicas = m.Spec.Admission.Replicas
+	}
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      webhookDeploymentName(m.Name),
@@ -75,7 +82,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: pointer.Int32(1),
+			Replicas: replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					WebhookLabelKey: WebhookLabelValue,
@@ -168,6 +175,21 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 								Secret: &corev1.SecretVolumeSource{
 									DefaultMode: pointer.Int32(0o444),
 									SecretName:  scanapi.SecretName(m.Name),
+								},
+							},
+						},
+					},
+					Affinity: &corev1.Affinity{
+						PodAntiAffinity: &corev1.PodAntiAffinity{
+							// might we need DesiredDuringSchedulingIgnoredDuringExecution for single node clusters?
+							RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											WebhookLabelKey: WebhookLabelValue,
+										},
+									},
+									TopologyKey: "kubernetes.io/hostname",
 								},
 							},
 						},

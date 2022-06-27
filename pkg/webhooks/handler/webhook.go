@@ -30,6 +30,8 @@ var handlerlog = logf.Log.WithName("webhook-validator")
 const (
 	// defaultScanPass is our default Allowed result in the event that we never even made it to the scan
 	defaultScanPass = "DEFAULT MONDOO PASSED"
+	// defaultScanFail is our default Failed result in the event that we never even made it to the scan
+	defaultScanFail = "DEFAULT MONDOO FAILED"
 	// passedScan is the Allowed result when the sacn came back with a passing result
 	passedScan = "PASSED MONDOO SCAN"
 	// failedScanPermitted is the Allowed result when in Permissive mode but the scan result was a failing result
@@ -90,6 +92,9 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 
 	// the default/safe response
 	response = admission.Allowed(defaultScanPass)
+	if a.mode == mondoov1alpha2.Enforcing {
+		response = admission.Denied(defaultScanFail)
+	}
 
 	// Call into Mondoo Scan Service to scan the resource
 	k8sObjectData, err := yaml.Marshal(req.Object)

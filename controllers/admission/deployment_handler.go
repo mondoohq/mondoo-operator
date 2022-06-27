@@ -234,6 +234,10 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 		return err
 	}
 
+	if *desiredDeployment.Spec.Replicas < 2 && n.Mondoo.Spec.Admission.Mode == mondoov1alpha2.Enforcing {
+		webhookLog.Info("WARNING: Webhook deployment is only scaled to 1 replica, but the webhook mode is set to 'enforcing'. This might be problematic if the API server is not able to connect to the webhook. Please consider increasing the replicas.")
+	}
+
 	deployment := &appsv1.Deployment{}
 	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, deployment, desiredDeployment)
 	if err != nil {
@@ -245,7 +249,20 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 		webhookLog.Info("Created Deployment for webhook")
 		return nil
 	}
-	updateAdmissionConditions(n.Mondoo, deployment.Status.Replicas != deployment.Status.ReadyReplicas)
+	scanApiDegraded := false
+	for _, condition := range n.Mondoo.Status.Conditions {
+		if condition.Type == mondoov1alpha2.ScanAPIDegraded {
+			if condition.Status == corev1.ConditionTrue {
+				webhookLog.Info("Webhook is degraded, becasue ScanAPI is degraded. Please check the ScanAPI status.")
+				scanApiDegraded = true
+			}
+		}
+	}
+	webhookDegraded := false
+	if scanApiDegraded || deployment.Status.Replicas != deployment.Status.ReadyReplicas {
+		webhookDegraded = true
+	}
+	updateAdmissionConditions(n.Mondoo, webhookDegraded)
 
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.
@@ -291,6 +308,12 @@ func (n *DeploymentHandler) prepareValidatingWebhook(ctx context.Context, vwc *w
 		// So just apply the ValidatingWebhookConfiguration as-is
 		annotationKey = manualTLSAnnotationKey
 		annotationValue = "manual"
+	}
+
+	if n.Mondoo.Spec.Admission.Mode == mondoov1alpha2.Enforcing {
+		*vwc.Webhooks[0].FailurePolicy = webhooksv1.Fail
+	} else {
+		*vwc.Webhooks[0].FailurePolicy = webhooksv1.Ignore
 	}
 
 	return n.syncValidatingWebhookConfiguration(ctx, vwc, annotationKey, annotationValue)
