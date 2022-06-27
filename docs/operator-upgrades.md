@@ -36,7 +36,7 @@ If there **is** more than one minor version difference between the installed Mon
 
     Check the `Status.ReconciledByOperatorVersion` field (introduced with v0.4.1)  of your `MondooAuditConfig` to be sure the new operator version reconciled every object:
     ```bash
-    kubectl get mondooauditconfigs.k8s.mondoo.com -n mondoo-operator mondoo-client -o jsonpath='{.status.reconciledByOperatorVersion}'
+    kubectl get mondooauditconfigs.k8s.mondoo.com -o jsonpath='{.items[*].status.reconciledByOperatorVersion}'
     ```
     The version of your running Mondoo Operator and the version in the `Status` field have to be the same before you can proceed with the next version update.
 
