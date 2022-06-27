@@ -9,7 +9,7 @@ You can skip Mondoo Operator patch versions, however we don't recommend skipping
 Follow these steps for a smooth Mondoo Operator upgrade:
 1. Verify the Mondoo Operator version currently running in the cluster:
     ```bash
-    kubectl get deployments -n mondoo-operator -o jsonpath='{.items[*].spec.template.spec.containers[0].image}'
+    kubectl get deployment -n mondoo-operator mondoo-operator-controller-manager -o jsonpath='{.spec.template.spec.containers[0].image}'
     ```
 2. Check the latest version of the Mondoo Operator on our [Releases](https://github.com/mondoohq/mondoo-operator/releases/latest) GitHub page.
 
@@ -33,6 +33,13 @@ If there **is** more than one minor version difference between the installed Mon
     kubectl logs -n mondoo-operator deployment/mondoo-operator-controller-manager
     ```
     It's essential to check the logs and wait for the new version of the operator to run; directly upgrading to the next version can result in skipped internal upgrade procedures and unexpected behavior.
+
+    Check the `Status.ReconciledByOperatorVersion` field (introduced with v0.4.1)  of your `MondooAuditConfig` to be sure the new operator version reconciled every object:
+    ```bash
+    kubectl get mondooauditconfigs.k8s.mondoo.com -o jsonpath='{range .items[*]}{.status.reconciledByOperatorVersion}{"\n"}{end}' -A | uniq
+    ```
+    The version of your running Mondoo Operator and the version in the `Status` field have to be the same before you can proceed with the next version update.
+
 3. Apply the manifest for `v0.4.3` (the latest version):
     ```bash
     kubectl apply -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml
