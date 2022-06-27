@@ -83,7 +83,11 @@ type Admission struct {
 	// on the scan results may reject the k8s resource creation/modification.
 	// +kubebuilder:validation:Enum=permissive;enforcing
 	// +kubebuilder:default=permissive
-	Mode                    AdmissionMode           `json:"mode,omitempty"`
+	Mode AdmissionMode `json:"mode,omitempty"`
+	// Number of replicas for the admission webhook. When not set and mode is "enforcing", it will
+	// automtically be set to two. When not set and mode is "permissive, it will be set to one.
+	// For enforcing mode, the minimum should be two to prevent problems during Pod failures,
+	// e.g. node failure, node scaling, etc.
 	Replicas                *int32                  `json:"replicas,omitempty"`
 	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
 }
