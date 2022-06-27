@@ -175,48 +175,45 @@ deploy-olm: manifests kustomize ## Deploy using operator-sdk OLM
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
+## Location to install dependencies to
+LOCALBIN ?= $(LOCALBIN)
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
 
-CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
+## Tool Versions
+KUSTOMIZE_VERSION ?= v4.5.5
+CONTROLLER_TOOLS_VERSION ?= v0.9.0
+
 .PHONY: controller-gen
-controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.9.0)
+controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
+$(CONTROLLER_GEN): $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
-KUSTOMIZE = $(shell pwd)/bin/kustomize
+KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
-kustomize: ## Download kustomize locally if necessary.
-	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.5)
+kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
+$(KUSTOMIZE): $(LOCALBIN)
+	curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN)
 
-ENVTEST = $(shell pwd)/bin/setup-envtest
+ENVTEST = $(LOCALBIN)/setup-envtest
 .PHONY: envtest
-envtest: ## Download envtest-setup locally if necessary.
-	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
+envtest: $(LOCALBIN) ## Download envtest-setup locally if necessary.
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
-GOTESTSUM = $(shell pwd)/bin/gotestsum
-gotestsum: ## Download gotestsum locally if necessary.
-	$(call go-install-tool,$(GOTESTSUM),gotest.tools/gotestsum@latest)
+GOTESTSUM = $(LOCALBIN)/gotestsum
+gotestsum: $(LOCALBIN) ## Download gotestsum locally if necessary.
+	GOBIN=$(LOCALBIN) go install gotest.tools/gotestsum@latest
 
-GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
-golangci-lint: ## Download golangci-lint locally if necessary.
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45)
+GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+golangci-lint: $(LOCALBIN) ## Download golangci-lint locally if necessary.
+	GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45
 
-GOMOCKGEN = $(shell pwd)/bin/mockgen
+GOMOCKGEN = $(LOCALBIN)/mockgen
 .PHONY: gomockgen
-gomockgen: ## Download go mockgen locally if necessary.
-	$(call go-install-tool,$(GOMOCKGEN),github.com/golang/mock/mockgen@v1.6.0)
+gomockgen: $(LOCALBIN) ## Download go mockgen locally if necessary.
+	GOBIN=$(LOCALBIN) go install github.com/golang/mock/mockgen@v1.6.0
 
-# go-install-tool will 'go install' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-define go-install-tool
-@[ -f $(1) ] || { \
-set -e ;\
-TMP_DIR=$$(mktemp -d) ;\
-cd $$TMP_DIR ;\
-go mod init tmp ;\
-echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
-rm -rf $$TMP_DIR ;\
-}
-endef
 
 .PHONY: bundle
 bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
@@ -293,9 +290,9 @@ catalog-build: opm ## Build a catalog image.
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
-HELMIFY = $(shell pwd)/bin/helmify
-helmify:
-	$(call go-install-tool,$(HELMIFY),github.com/arttor/helmify/cmd/helmify@latest)
+HELMIFY = $(LOCALBIN)/helmify
+helmify: $(LOCALBIN) ## Download helmify locally if necessary.
+	GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@latest
 
 helm: manifests kustomize helmify
 	$(KUSTOMIZE) build config/default | $(HELMIFY) $(CHART_NAME)
