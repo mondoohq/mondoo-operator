@@ -126,9 +126,27 @@ func TestWebhookValidate(t *testing.T) {
 			object:        testExampleDeployment(),
 		},
 		{
+			name:          "example Deployment - enforcing",
+			mode:          mondoov1alpha2.Enforcing,
+			expectAllowed: true,
+			expectReason:  passedScan,
+			object:        testExampleDeployment(),
+		},
+		{
 			name:          "malformed object",
 			expectAllowed: true,
 			expectReason:  defaultScanPass,
+			object: func() runtime.RawExtension {
+				var pod runtime.RawExtension
+				pod.Raw = []byte("not valid json")
+				return pod
+			}(),
+		},
+		{
+			name:          "malformed object - enforcing",
+			mode:          mondoov1alpha2.Enforcing,
+			expectAllowed: false,
+			expectReason:  defaultScanFail,
 			object: func() runtime.RawExtension {
 				var pod runtime.RawExtension
 				pod.Raw = []byte("not valid json")

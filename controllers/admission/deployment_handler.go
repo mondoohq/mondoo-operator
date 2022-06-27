@@ -310,10 +310,12 @@ func (n *DeploymentHandler) prepareValidatingWebhook(ctx context.Context, vwc *w
 		annotationValue = "manual"
 	}
 
-	if n.Mondoo.Spec.Admission.Mode == mondoov1alpha2.Enforcing {
-		*vwc.Webhooks[0].FailurePolicy = webhooksv1.Fail
-	} else {
-		*vwc.Webhooks[0].FailurePolicy = webhooksv1.Ignore
+	for i := range vwc.Webhooks {
+		if n.Mondoo.Spec.Admission.Mode == mondoov1alpha2.Enforcing {
+			*vwc.Webhooks[i].FailurePolicy = webhooksv1.Fail
+		} else {
+			*vwc.Webhooks[i].FailurePolicy = webhooksv1.Ignore
+		}
 	}
 
 	return n.syncValidatingWebhookConfiguration(ctx, vwc, annotationKey, annotationValue)
