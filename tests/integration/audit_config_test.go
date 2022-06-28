@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 )
 
@@ -29,8 +30,14 @@ func (s *AuditConfigSuite) TestReconcile_Nodes() {
 	s.testMondooAuditConfigNodes(auditConfig)
 }
 
-func (s *AuditConfigSuite) TestReconcile_Admission() {
+func (s *AuditConfigSuite) TestReconcile_AdmissionPermissive() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true)
+	s.testMondooAuditConfigAdmission(auditConfig)
+}
+
+func (s *AuditConfigSuite) TestReconcile_AdmissionEnforcing() {
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true)
+	auditConfig.Spec.Admission.Mode = v1alpha2.Enforcing
 	s.testMondooAuditConfigAdmission(auditConfig)
 }
 

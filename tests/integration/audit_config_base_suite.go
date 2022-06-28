@@ -212,6 +212,18 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 	// Verify scan API deployment and service
 	s.validateScanApiDeployment(auditConfig)
 
+	// Check number of Pods depending on mode
+	webhookListOpts, err := utils.LabelSelectorListOptions(webhookLabelsString)
+	s.NoError(err)
+	webhookListOpts.Namespace = auditConfig.Namespace
+	pods := &corev1.PodList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, pods, webhookListOpts))
+	if auditConfig.Spec.Admission.Mode == mondoov2.Enforcing {
+		s.Equalf(2, len(pods.Items), "Pods count for webhook should be precisely two because of enforcing mode")
+	} else {
+		s.Equalf(1, len(pods.Items), "Pods count for webhook should be precisely one because of permissive mode")
+	}
+
 	// Change the webhook from Ignore to Fail to prove that the webhook is active
 	vwc := &webhooksv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
@@ -223,6 +235,11 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(vwc), vwc),
 		"Failed to retrieve ValidatingWebhookConfiguration")
 
+	if auditConfig.Spec.Admission.Mode == mondoov2.Enforcing {
+		s.Equalf(*vwc.Webhooks[0].FailurePolicy, webhooksv1.Fail, "Webhook failurePolicy should be 'Fail' because of enforcing mode")
+	} else {
+		s.Equalf(*vwc.Webhooks[0].FailurePolicy, webhooksv1.Ignore, "Webhook failurePolicy should be 'Ignore' because of permissive mode")
+	}
 	fail := webhooksv1.Fail
 	for i := range vwc.Webhooks {
 		vwc.Webhooks[i].FailurePolicy = &fail
@@ -233,12 +250,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 		"Failed to change Webhook FailurePolicy to Fail")
 
 	// Try and fail to Update() a Deployment
-	listOpts, err := utils.LabelSelectorListOptions(webhookLabelsString)
-	s.NoError(err)
-	listOpts.Namespace = auditConfig.Namespace
-
 	deployments := &appsv1.DeploymentList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts))
 
 	s.Equalf(1, len(deployments.Items), "Deployments count for webhook should be precisely one")
 

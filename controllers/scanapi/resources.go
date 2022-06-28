@@ -187,6 +187,22 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 							},
 						},
 					},
+					Affinity: &corev1.Affinity{
+						PodAntiAffinity: &corev1.PodAntiAffinity{
+							// RequiredDuringSchedulingIgnoredDuringExecution would require at least two nodes
+							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+								{
+									PodAffinityTerm: corev1.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: labels,
+										},
+										TopologyKey: "kubernetes.io/hostname",
+									},
+									Weight: 100,
+								},
+							},
+						},
+					},
 				},
 			},
 		},

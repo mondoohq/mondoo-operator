@@ -181,15 +181,18 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 					},
 					Affinity: &corev1.Affinity{
 						PodAntiAffinity: &corev1.PodAntiAffinity{
-							// might we need DesiredDuringSchedulingIgnoredDuringExecution for single node clusters?
-							RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+							// RequiredDuringSchedulingIgnoredDuringExecution would require at least two nodes
+							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
 								{
-									LabelSelector: &metav1.LabelSelector{
-										MatchLabels: map[string]string{
-											WebhookLabelKey: WebhookLabelValue,
+									PodAffinityTerm: corev1.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: map[string]string{
+												WebhookLabelKey: WebhookLabelValue,
+											},
 										},
+										TopologyKey: "kubernetes.io/hostname",
 									},
-									TopologyKey: "kubernetes.io/hostname",
+									Weight: 100,
 								},
 							},
 						},
