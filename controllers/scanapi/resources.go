@@ -55,6 +55,12 @@ func ScanApiSecret(mondoo v1alpha2.MondooAuditConfig) *corev1.Secret {
 
 func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.Deployment {
 	labels := DeploymentLabels(m)
+
+	replicas := pointer.Int32(1)
+	if m.Spec.Admission.Mode == v1alpha2.Enforcing {
+		replicas = pointer.Int32(2)
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DeploymentName(m.Name),
@@ -65,7 +71,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
-			Replicas: pointer.Int32(1),
+			Replicas: replicas,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
