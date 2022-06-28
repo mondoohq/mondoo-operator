@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -203,11 +204,13 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 		"Failed to create Mondoo audit config.")
 
 	// Wait for Ready Pod
+	zap.S().Info("Waiting for webhook Pod to become ready.")
 	webhookLabels := []string{mondooadmission.WebhookLabelKey + "=" + mondooadmission.WebhookLabelValue}
 	webhookLabelsString := strings.Join(webhookLabels, ",")
 	s.Truef(
 		s.testCluster.K8sHelper.IsPodReady(webhookLabelsString, auditConfig.Namespace),
 		"Mondoo webhook Pod is not in a Ready state.")
+	zap.S().Info("Webhook Pod is ready.")
 
 	// Verify scan API deployment and service
 	s.validateScanApiDeployment(auditConfig)
@@ -218,11 +221,15 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 	webhookListOpts.Namespace = auditConfig.Namespace
 	pods := &corev1.PodList{}
 	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, pods, webhookListOpts))
+	numPods := 1
 	if auditConfig.Spec.Admission.Mode == mondoov2.Enforcing {
-		s.Equalf(2, len(pods.Items), "Pods count for webhook should be precisely two because of enforcing mode")
-	} else {
-		s.Equalf(1, len(pods.Items), "Pods count for webhook should be precisely one because of permissive mode")
+		numPods = 2
 	}
+	if auditConfig.Spec.Admission.Replicas != nil {
+		numPods = int(*auditConfig.Spec.Admission.Replicas)
+	}
+	failMessage := fmt.Sprintf("Pods count for webhook should be precisely %d because of mode and replicas", numPods)
+	s.Equalf(numPods, len(pods.Items), failMessage)
 
 	// Change the webhook from Ignore to Fail to prove that the webhook is active
 	vwc := &webhooksv1.ValidatingWebhookConfiguration{
@@ -288,6 +295,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+
+	s.checkDeployments(&auditConfig)
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConfig mondoov2.MondooAuditConfig) {
@@ -383,9 +392,11 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAllDisabled(auditConfig mond
 
 func (s *AuditConfigBaseSuite) validateScanApiDeployment(auditConfig mondoov2.MondooAuditConfig) {
 	scanApiLabelsString := utils.LabelsToLabelSelector(mondooscanapi.DeploymentLabels(auditConfig))
+	zap.S().Info("Waiting for scan API Pod to become ready.")
 	s.Truef(
 		s.testCluster.K8sHelper.IsPodReady(scanApiLabelsString, auditConfig.Namespace),
 		"Mondoo scan API Pod is not in a Ready state.")
+	zap.S().Info("Scan API Pod is ready.")
 
 	scanApiService := mondooscanapi.ScanApiService(auditConfig.Namespace, auditConfig)
 	s.NoErrorf(
@@ -425,4 +436,71 @@ func (s *AuditConfigBaseSuite) disableContainerImageResolution() func() {
 			s.testCluster.K8sHelper.Clientset.Delete(s.ctx, operatorConfig),
 			"Failed to restore container resolution in MondooOperatorConfig")
 	}
+}
+
+func getPassingDeployment() *appsv1.Deployment {
+	labels := map[string]string{
+		"testLabel": "testing-webhook",
+	}
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "passing-deployment",
+			Namespace: "default",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "ubuntu",
+							Image: "ubuntu:20.04",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func getFailingDeployment() *appsv1.Deployment {
+	deployment := getPassingDeployment().DeepCopy()
+	deployment.ObjectMeta.Name = "failing-deployment"
+	deployment.Spec.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
+		Privileged:               pointer.Bool(true),
+		RunAsNonRoot:             pointer.Bool(false),
+		AllowPrivilegeEscalation: pointer.Bool(true),
+		Capabilities: &corev1.Capabilities{
+			Add: []corev1.Capability{"CAP_SYS_ADMIN"},
+		},
+	}
+	return deployment
+}
+
+func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAuditConfig) {
+	passingDeployment := getPassingDeployment()
+	failingDeployment := getFailingDeployment()
+
+	zap.S().Info("Create a Deployment which should pass.")
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, passingDeployment),
+		"Failed to create Deployment which should pass.")
+
+	zap.S().Info("Create a Deployment which should be denied in enforcing mode.")
+	zap.S().Debug(failingDeployment)
+	err := s.testCluster.K8sHelper.Clientset.Create(s.ctx, failingDeployment)
+
+	if auditConfig.Spec.Admission.Mode == mondoov2.Enforcing {
+		s.Errorf(err, "Created Deployment which should have been denied.")
+	} else {
+		s.NoErrorf(err, "Failed creating a Deployment in permissive mode.")
+	}
+
+	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(passingDeployment), "Failed to delete passingDeployment")
+	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(failingDeployment), "Failed to delete failingDeployment")
 }

@@ -8,8 +8,6 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"go.mondoo.com/mondoo-operator/tests/framework/utils"
-
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 )
@@ -68,6 +66,7 @@ func (s *AuditConfigCustomNamespaceSuite) TearDownSuite() {
 	s.AuditConfigBaseSuite.TearDownSuite()
 }
 
+/*
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_KubernetesResources() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, true, false, false)
 	auditConfig.Spec.KubernetesResources.ContainerImageScanning = true
@@ -92,7 +91,7 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_AdmissionMissingSA() {
 	auditConfig.Spec.Scanner.ServiceAccountName = "missing-serviceaccount"
 	s.testMondooAuditConfigAdmissionMissingSA(auditConfig)
 }
-
+*/
 func TestAuditConfigCustomNamespaceSuite(t *testing.T) {
 	s := new(AuditConfigCustomNamespaceSuite)
 	defer func(s *AuditConfigCustomNamespaceSuite) {
