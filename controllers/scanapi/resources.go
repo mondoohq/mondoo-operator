@@ -90,7 +90,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 								},
 							},
 							InitialDelaySeconds: 5,
-							PeriodSeconds:       300,
+							PeriodSeconds:       10,
 							TimeoutSeconds:      5,
 						},
 						StartupProbe: &corev1.Probe{

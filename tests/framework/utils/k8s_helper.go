@@ -39,8 +39,8 @@ import (
 
 const (
 	cmd           = "kubectl"
-	RetryInterval = 5
-	RetryLoop     = 30
+	RetryInterval = 2
+	RetryLoop     = 75
 )
 
 var (
@@ -460,6 +460,27 @@ func (k8sh *K8sHelper) CheckForDegradedCondition(auditConfig *api.MondooAuditCon
 		condition, err := k8sh.GetMondooAuditConfigConditionByType(foundMondooAuditConfig, conditionType)
 		if err != nil {
 			return false, err
+		}
+		if condition.Status == v1.ConditionFalse {
+			return true, nil
+		}
+		return false, nil
+	})
+
+	return err
+}
+
+// CheckForDegradedCondition Check whether specified Condition is in degraded state in a MondooAuditConfig with retries.
+func (k8sh *K8sHelper) WaitForGoodCondition(auditConfig *api.MondooAuditConfig, conditionType api.MondooAuditConfigConditionType) error {
+	err := k8sh.ExecuteWithRetries(func() (bool, error) {
+		// Condition of MondooAuditConfig should be updated
+		foundMondooAuditConfig, err := k8sh.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+		if err != nil {
+			return false, err
+		}
+		condition, err := k8sh.GetMondooAuditConfigConditionByType(foundMondooAuditConfig, conditionType)
+		if err != nil {
+			return false, nil
 		}
 		if condition.Status == v1.ConditionFalse {
 			return true, nil

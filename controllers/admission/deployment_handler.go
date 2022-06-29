@@ -249,20 +249,8 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 		webhookLog.Info("Created Deployment for webhook")
 		return nil
 	}
-	scanApiDegraded := false
-	for _, condition := range n.Mondoo.Status.Conditions {
-		if condition.Type == mondoov1alpha2.ScanAPIDegraded {
-			if condition.Status == corev1.ConditionTrue {
-				webhookLog.Info("Webhook is degraded, becasue ScanAPI is degraded. Please check the ScanAPI status.")
-				scanApiDegraded = true
-			}
-		}
-	}
-	webhookDegraded := false
-	if scanApiDegraded || deployment.Status.Replicas != deployment.Status.ReadyReplicas {
-		webhookDegraded = true
-	}
-	updateAdmissionConditions(n.Mondoo, webhookDegraded)
+	updateAdmissionConditions(n.Mondoo, n.isWebhookDegraded(deployment))
+	webhookLog.Info("Updated status for MondooAuditConfig")
 
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.
@@ -275,6 +263,23 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (n *DeploymentHandler) isWebhookDegraded(deployment *appsv1.Deployment) bool {
+	for _, condition := range n.Mondoo.Status.Conditions {
+		if condition.Type == mondoov1alpha2.ScanAPIDegraded {
+			if condition.Status == corev1.ConditionTrue {
+				webhookLog.Info("Webhook is degraded, becasue ScanAPI is degraded. Please check the ScanAPI status.")
+				return true
+			}
+		}
+	}
+	if reflect.DeepEqual(deployment.Status, appsv1.DeploymentStatus{}) {
+		webhookLog.Info("No status present for webhook deployment. Assuming it is starting.")
+		return true
+	}
+
+	return deployment.Status.Replicas != deployment.Status.ReadyReplicas
 }
 
 func (n *DeploymentHandler) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1.ValidatingWebhookConfiguration) error {
@@ -328,6 +333,24 @@ func (n *DeploymentHandler) applyWebhooks(ctx context.Context) (ctrl.Result, err
 
 	if err := n.syncWebhookDeployment(ctx); err != nil {
 		return ctrl.Result{}, err
+	}
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: n.Mondoo.Namespace,
+			Name:      webhookDeploymentName(n.Mondoo.Name),
+		},
+	}
+	exists, err := k8s.CheckIfExists(ctx, n.KubeClient, deployment, deployment)
+	if err != nil || !exists {
+		webhookLog.Info("Cannot get webhook deployment.")
+		return ctrl.Result{}, nil
+	}
+	// The ValidatingWebhook must be created after Scan API and Webhook are running. Otherwise it will reject their creation.
+	if n.Mondoo.Spec.Admission.Mode == mondoov1alpha2.Enforcing && n.isWebhookDegraded(deployment) {
+		webhookLog.Info("Waiting for Webhook and Scan API deployment before creating the ValidationWebhook.")
+		//return reconcile.Result{Requeue: true}, nil
+		return ctrl.Result{}, nil
 	}
 
 	r := bytes.NewReader(webhookManifestsyaml)

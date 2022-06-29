@@ -1,7 +1,9 @@
 package integration
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
 	"fmt"
 	"strings"
 	"time"
@@ -13,8 +15,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -28,7 +33,12 @@ import (
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 )
+
+//go:embed passing-pod.yaml
+var passingPodyaml []byte
 
 type AuditConfigBaseSuite struct {
 	suite.Suite
@@ -247,48 +257,38 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 	} else {
 		s.Equalf(*vwc.Webhooks[0].FailurePolicy, webhooksv1.Ignore, "Webhook failurePolicy should be 'Ignore' because of permissive mode")
 	}
-	fail := webhooksv1.Fail
-	for i := range vwc.Webhooks {
-		vwc.Webhooks[i].FailurePolicy = &fail
+
+	if *vwc.Webhooks[0].FailurePolicy == webhooksv1.Fail {
+		// Try and fail to Update() a Deployment
+		deployments := &appsv1.DeploymentList{}
+		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts))
+
+		s.Equalf(1, len(deployments.Items), "Deployments count for webhook should be precisely one")
+
+		deployments.Items[0].Labels["testLabel"] = "testValue"
+
+		s.Errorf(
+			s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
+			"Expected failed updated of Deployment because certificate setup is incomplete")
+
 	}
-
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
-		"Failed to change Webhook FailurePolicy to Fail")
-
-	// Try and fail to Update() a Deployment
-	deployments := &appsv1.DeploymentList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts))
-
-	s.Equalf(1, len(deployments.Items), "Deployments count for webhook should be precisely one")
-
-	deployments.Items[0].Labels["testLabel"] = "testValue"
-
-	s.Errorf(
-		s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
-		"Expected failed updated of Deployment because certificate setup is incomplete")
-
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(vwc), vwc),
-		"Failed to retrieve ValidatingWebhookConfiguration")
 
 	// Now put the CA data into the webhook
 	for i := range vwc.Webhooks {
 		vwc.Webhooks[i].ClientConfig.CABundle = caCert.Bytes()
 	}
 
+	zap.S().Info("Update the webhook with the CA data.")
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
 		"Failed to add CA data to Webhook")
 
 	// Some time is needed before the webhook starts working. Might be a better way to check this but
 	// will have to do with a sleep for now.
+	zap.S().Info("Wait for webhook to start working.")
 	time.Sleep(10 * time.Second)
 
-	// Now the Deployment Update() should work
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
-		"Expected update of Deployment to succeed after CA data applied to webhook")
+	zap.S().Info("Webhook should be working by now.")
 
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded)
 	s.NoErrorf(err, "Admission shouldn't be in degraded state")
@@ -399,15 +399,22 @@ func (s *AuditConfigBaseSuite) validateScanApiDeployment(auditConfig mondoov2.Mo
 	zap.S().Info("Scan API Pod is ready.")
 
 	scanApiService := mondooscanapi.ScanApiService(auditConfig.Namespace, auditConfig)
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(scanApiService), scanApiService),
-		"Failed to get scan API service.")
+	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(scanApiService), scanApiService)
+		if err == nil {
+			return true, nil
+		}
+		return false, nil
+	})
+	s.NoErrorf(err, "Failed to get scan API service.")
 
 	expectedService := mondooscanapi.ScanApiService(auditConfig.Namespace, auditConfig)
 	s.NoError(ctrl.SetControllerReference(&auditConfig, expectedService, s.testCluster.K8sHelper.Clientset.Scheme()))
 	s.Truef(k8s.AreServicesEqual(*expectedService, *scanApiService), "Scan API service is not as expected.")
 
-	err := s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.ScanAPIDegraded)
+	// might take some time because of reconcile loop
+	zap.S().Info("Waiting for good condition of Scan API")
+	err = s.testCluster.K8sHelper.WaitForGoodCondition(&auditConfig, mondoov2.ScanAPIDegraded)
 	s.NoErrorf(err, "ScanAPI shouldn't be in degraded state")
 
 	err = s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-scan-api")
@@ -438,32 +445,97 @@ func (s *AuditConfigBaseSuite) disableContainerImageResolution() func() {
 	}
 }
 
-func getPassingPod() *corev1.Pod {
+func (s *AuditConfigBaseSuite) getPassingPodYaml() *corev1.Pod {
+	r := bytes.NewReader(passingPodyaml)
+	yamlDecoder := yamlutil.NewYAMLOrJSONDecoder(r, 4096)
+	objectDecoder := scheme.Codecs.UniversalDeserializer()
+
+	// First just read a single YAML object from the list
+	rawObject := runtime.RawExtension{}
+
+	if err := yamlDecoder.Decode(&rawObject); err != nil {
+		zap.S().Info("Failed to decode object")
+	}
+
+	// Decode into a runtime Object
+	obj, gvk, err := objectDecoder.Decode(rawObject.Raw, nil, nil)
+	if err != nil {
+		zap.S().Info("failed to decode RawExtension")
+	}
+
+	zap.S().Info("Decoding object", "GVK", gvk)
+
+	// Cast the runtime to the actual type and apply the resources
+	passingPodYaml, ok := obj.(*corev1.Pod)
+	if !ok {
+		zap.S().Info("Failed to cast to Pod")
+	}
+	return passingPodYaml
+}
+
+func (s *AuditConfigBaseSuite) getPassingPod() *corev1.Pod {
 	labels := map[string]string{
 		"admission-result": "pass",
 	}
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "passing-pod",
-			Namespace: "default",
+			Namespace: s.auditConfig.Namespace,
 			Labels:    labels,
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Name:  "ubuntu",
-					Image: "ubuntu:20.04",
+					Name:            "ubuntu",
+					Image:           "ubuntu:20.04",
+					Command:         []string{"/bin/sh", "-c"},
+					Args:            []string{"sleep 6000"},
+					ImagePullPolicy: corev1.PullAlways,
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+					SecurityContext: &corev1.SecurityContext{
+						RunAsNonRoot:             pointer.Bool(true),
+						RunAsUser:                pointer.Int64(1000),
+						ReadOnlyRootFilesystem:   pointer.Bool(true),
+						AllowPrivilegeEscalation: pointer.Bool(false),
+						Privileged:               pointer.Bool(false),
+					},
+					ReadinessProbe: &corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							Exec: &corev1.ExecAction{
+								Command: []string{"/bin/sh", "-c", "exit 0"},
+							},
+						},
+					},
+					LivenessProbe: &corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							Exec: &corev1.ExecAction{
+								Command: []string{"/bin/sh", "-c", "exit 0"},
+							},
+						},
+					},
 				},
 			},
+			AutomountServiceAccountToken: pointer.Bool(false),
+			ServiceAccountName:           "mondoo-operator-controller-manager",
+			DeprecatedServiceAccount:     "",
 		},
 	}
 }
 
-func getFailingPod() *corev1.Pod {
+func (s *AuditConfigBaseSuite) getFailingPod() *corev1.Pod {
 	labels := map[string]string{
 		"admission-result": "fail",
 	}
-	pod := getPassingPod().DeepCopy()
+	pod := s.getPassingPod().DeepCopy()
 	pod.ObjectMeta.Name = "failing-pod"
 	pod.ObjectMeta.Labels = labels
 	pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
@@ -478,16 +550,22 @@ func getFailingPod() *corev1.Pod {
 }
 
 func (s *AuditConfigBaseSuite) checkPods(auditConfig *mondoov2.MondooAuditConfig) {
-	passingPod := getPassingPod()
-	failingPod := getFailingPod()
+	passingPod := s.getPassingPod()
+	//passingPod := s.getPassingPodYaml()
+	failingPod := s.getFailingPod()
 
 	zap.S().Info("Create a Pod which should pass.")
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Create(s.ctx, passingPod),
+	/*
+		s.NoErrorf(
+			s.testCluster.K8sHelper.Clientset.Create(s.ctx, passingPod),
+			"Failed to create Pod which should pass.")
+	*/
+	_, err := s.testCluster.K8sHelper.Kubectl("apply", "-f", "./passing-pod.yaml")
+	s.NoErrorf(err,
 		"Failed to create Pod which should pass.")
 
 	zap.S().Info("Create a Pod which should be denied in enforcing mode.")
-	err := s.testCluster.K8sHelper.Clientset.Create(s.ctx, failingPod)
+	err = s.testCluster.K8sHelper.Clientset.Create(s.ctx, failingPod)
 
 	if auditConfig.Spec.Admission.Mode == mondoov2.Enforcing {
 		s.Errorf(err, "Created Pod which should have been denied.")
@@ -495,6 +573,7 @@ func (s *AuditConfigBaseSuite) checkPods(auditConfig *mondoov2.MondooAuditConfig
 		s.NoErrorf(err, "Failed creating a Pod in permissive mode.")
 	}
 
+	time.Sleep(120 * time.Second)
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(passingPod), "Failed to delete passingPod")
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(failingPod), "Failed to delete failingPod")
 }
