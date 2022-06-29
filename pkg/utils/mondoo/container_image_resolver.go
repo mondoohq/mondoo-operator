@@ -29,7 +29,7 @@ import (
 
 const (
 	MondooClientImage   = "docker.io/mondoo/client"
-	MondooClientTag     = "latest"
+	MondooClientTag     = "6"
 	MondooOperatorImage = "ghcr.io/mondoohq/mondoo-operator"
 )
 
