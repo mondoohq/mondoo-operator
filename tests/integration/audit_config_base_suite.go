@@ -364,15 +364,21 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 		scanApiLabels = append(scanApiLabels, fmt.Sprintf("%s=%s", k, v))
 	}
 	scanApiLabelsString := strings.Join(scanApiLabels, ",")
-	s.Falsef(
-		s.testCluster.K8sHelper.IsPodReady(scanApiLabelsString, auditConfig.Namespace),
-		"Mondoo scan API Pod should not be in Ready state.")
-
-	// Check for the ScanAPI Deployment to be present.
+	// do not wait until IsPodReady timeout, pod will not be present
+	// something like eventually from ginko would be nice, first iteration just with a sleep.
+	// just a grace period
+	time.Sleep(10 * time.Second)
 	listOpts, err := utils.LabelSelectorListOptions(scanApiLabelsString)
 	s.NoError(err)
 	listOpts.Namespace = auditConfig.Namespace
+	podList := &corev1.PodList{}
 
+	zap.S().Info(listOpts)
+	err = s.testCluster.K8sHelper.Clientset.List(s.ctx, podList, listOpts)
+	s.NoErrorf(err, "Couldn't list scan API pod.")
+	s.Equalf(0, len(podList.Items), "No ScanAPI Pod should be present")
+
+	// Check for the ScanAPI Deployment to be present.
 	deployments := &appsv1.DeploymentList{}
 	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
 
