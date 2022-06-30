@@ -578,6 +578,6 @@ func (s *AuditConfigBaseSuite) checkPods(auditConfig *mondoov2.MondooAuditConfig
 
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(passingPod), "Failed to delete passingPod")
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(failingPod), "Failed to delete failingPod")
-	s.testCluster.K8sHelper.WaitForResourceDeletion(passingPod)
-	s.testCluster.K8sHelper.WaitForResourceDeletion(failingPod)
+	s.NoErrorf(s.testCluster.K8sHelper.WaitForResourceDeletion(passingPod), "Error waiting for deleteion of passingPod")
+	s.NoErrorf(s.testCluster.K8sHelper.WaitForResourceDeletion(failingPod), "Error waiting for deleteion of failingPod")
 }
