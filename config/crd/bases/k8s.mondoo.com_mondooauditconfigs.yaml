@@ -160,6 +160,15 @@ spec:
                       tag:
                         type: string
                     type: object
+                  replicas:
+                    description: Number of replicas for the scanner. When not set
+                      and admission mode is "enforcing", it will automtically be set
+                      to two. When not set and admission mode is "permissive, it will
+                      be set to one. For enforcing mode, the minimum should be two
+                      to prevent problems during Pod failures, e.g. node failure,
+                      node scaling, etc.
+                    format: int32
+                    type: integer
                   resources:
                     description: ResourceRequirements describes the compute resource
                       requirements.

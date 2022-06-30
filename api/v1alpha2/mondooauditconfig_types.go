@@ -60,6 +60,11 @@ type Scanner struct {
 	ServiceAccountName string                      `json:"serviceAccountName,omitempty"`
 	Image              Image                       `json:"image,omitempty"`
 	Resources          corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Number of replicas for the scanner. When not set and admission mode is "enforcing", it will
+	// automtically be set to two. When not set and admission mode is "permissive, it will be set to one.
+	// For enforcing mode, the minimum should be two to prevent problems during Pod failures,
+	// e.g. node failure, node scaling, etc.
+	Replicas *int32 `json:"replicas,omitempty"`
 }
 
 type KubernetesResources struct {
