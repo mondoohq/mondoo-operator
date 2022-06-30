@@ -1,8 +1,8 @@
 package integration
 
 import (
+	"bytes"
 	"context"
-	_ "embed"
 	"fmt"
 	"strings"
 	"time"
@@ -228,13 +228,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
 	s.auditConfig = auditConfig
 	// Generate certificates manually
-	serviceDNSNames := []string{
-		// DNS names will take the form of ServiceName.ServiceNamespace.svc and .svc.cluster.local
-		fmt.Sprintf("%s-webhook-service.%s.svc", auditConfig.Name, auditConfig.Namespace),
-		fmt.Sprintf("%s-webhook-service.%s.svc.cluster.local", auditConfig.Name, auditConfig.Namespace),
-	}
-	secretName := mondooadmission.GetTLSCertificatesSecretName(auditConfig.Name)
-	caCert, err := s.testCluster.MondooInstaller.GenerateServiceCerts(&auditConfig, secretName, serviceDNSNames)
+	caCert, err := s.manuallyCreateCertificates()
 
 	// Don't bother with further webhook tests if we couldnt' save the certificates
 	s.Require().NoErrorf(err, "Error while generating/saving certificates for webhook service")
@@ -252,8 +246,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 
 	// Wait for Ready Pod
 	zap.S().Info("Waiting for webhook Pod to become ready.")
-	webhookLabels := []string{mondooadmission.WebhookLabelKey + "=" + mondooadmission.WebhookLabelValue}
-	webhookLabelsString := strings.Join(webhookLabels, ",")
+	webhookLabelsString := s.getWebhookLabelsString()
 	s.Truef(
 		s.testCluster.K8sHelper.IsPodReady(webhookLabelsString, auditConfig.Namespace),
 		"Mondoo webhook Pod is not in a Ready state.")
@@ -263,9 +256,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 	s.validateScanApiDeployment(auditConfig)
 
 	// Check number of Pods depending on mode
-	webhookListOpts, err := utils.LabelSelectorListOptions(webhookLabelsString)
+	webhookListOpts, err := s.getWebhookListOps()
 	s.NoError(err)
-	webhookListOpts.Namespace = auditConfig.Namespace
 	pods := &corev1.PodList{}
 	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, pods, webhookListOpts))
 	numPods := 1
@@ -278,51 +270,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 	failMessage := fmt.Sprintf("Pods count for webhook should be precisely %d because of mode and replicas", numPods)
 	s.Equalf(numPods, len(pods.Items), failMessage)
 
-	vwc := &webhooksv1.ValidatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			// namespace-name-mondoo
-			Name: fmt.Sprintf("%s-%s-mondoo", auditConfig.Namespace, auditConfig.Name),
-		},
-	}
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(vwc), vwc),
-		"Failed to retrieve ValidatingWebhookConfiguration")
-
-	if auditConfig.Spec.Admission.Mode == mondoov2.Enforcing {
-		s.Equalf(*vwc.Webhooks[0].FailurePolicy, webhooksv1.Fail, "Webhook failurePolicy should be 'Fail' because of enforcing mode")
-	} else {
-		s.Equalf(*vwc.Webhooks[0].FailurePolicy, webhooksv1.Ignore, "Webhook failurePolicy should be 'Ignore' because of permissive mode")
-	}
-
-	if *vwc.Webhooks[0].FailurePolicy == webhooksv1.Fail {
-		// Try and fail to Update() a Deployment
-		deployments := &appsv1.DeploymentList{}
-		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts))
-
-		s.Equalf(1, len(deployments.Items), "Deployments count for webhook should be precisely one")
-
-		deployments.Items[0].Labels["testLabel"] = "testValue"
-
-		s.Errorf(
-			s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
-			"Expected failed updated of Deployment because certificate setup is incomplete")
-
-	}
-
-	// Now put the CA data into the webhook
-	for i := range vwc.Webhooks {
-		vwc.Webhooks[i].ClientConfig.CABundle = caCert.Bytes()
-	}
-
-	zap.S().Info("Update the webhook with the CA data.")
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
-		"Failed to add CA data to Webhook")
-
-	// Some time is needed before the webhook starts working. Might be a better way to check this but
-	// will have to do with a sleep for now.
-	zap.S().Info("Wait for webhook to start working.")
-	time.Sleep(10 * time.Second)
+	s.verifyWebhookAndStart(webhookListOpts, caCert)
 
 	zap.S().Info("Webhook should be working by now.")
 
@@ -336,100 +284,10 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionScaleDownScanApi(auditConfig mondoov2.MondooAuditConfig) {
-	s.auditConfig = auditConfig
-	// Generate certificates manually
-	serviceDNSNames := []string{
-		// DNS names will take the form of ServiceName.ServiceNamespace.svc and .svc.cluster.local
-		fmt.Sprintf("%s-webhook-service.%s.svc", auditConfig.Name, auditConfig.Namespace),
-		fmt.Sprintf("%s-webhook-service.%s.svc.cluster.local", auditConfig.Name, auditConfig.Namespace),
-	}
-	secretName := mondooadmission.GetTLSCertificatesSecretName(auditConfig.Name)
-	caCert, err := s.testCluster.MondooInstaller.GenerateServiceCerts(&auditConfig, secretName, serviceDNSNames)
+	// first verify admission is working
+	s.testMondooAuditConfigAdmission(auditConfig)
 
-	// Don't bother with further webhook tests if we couldnt' save the certificates
-	s.Require().NoErrorf(err, "Error while generating/saving certificates for webhook service")
-	// Disable imageResolution for the webhook image to be runnable.
-	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
-	// image, and fail because we haven't pushed this image publicly.
-	cleanup := s.disableContainerImageResolution()
-	defer cleanup()
-
-	// Enable webhook
-	zap.S().Info("Create an audit config that enables only admission control.")
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
-		"Failed to create Mondoo audit config.")
-
-	// Wait for Ready Pod
-	zap.S().Info("Waiting for webhook Pod to become ready.")
-	webhookLabels := []string{mondooadmission.WebhookLabelKey + "=" + mondooadmission.WebhookLabelValue}
-	webhookLabelsString := strings.Join(webhookLabels, ",")
-	s.Truef(
-		s.testCluster.K8sHelper.IsPodReady(webhookLabelsString, auditConfig.Namespace),
-		"Mondoo webhook Pod is not in a Ready state.")
-	zap.S().Info("Webhook Pod is ready.")
-
-	// Verify scan API deployment and service
-	s.validateScanApiDeployment(auditConfig)
-
-	vwc := &webhooksv1.ValidatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			// namespace-name-mondoo
-			Name: fmt.Sprintf("%s-%s-mondoo", auditConfig.Namespace, auditConfig.Name),
-		},
-	}
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(vwc), vwc),
-		"Failed to retrieve ValidatingWebhookConfiguration")
-
-	if auditConfig.Spec.Admission.Mode == mondoov2.Enforcing {
-		s.Equalf(*vwc.Webhooks[0].FailurePolicy, webhooksv1.Fail, "Webhook failurePolicy should be 'Fail' because of enforcing mode")
-	} else {
-		s.Equalf(*vwc.Webhooks[0].FailurePolicy, webhooksv1.Ignore, "Webhook failurePolicy should be 'Ignore' because of permissive mode")
-	}
-
-	webhookListOpts, err := utils.LabelSelectorListOptions(webhookLabelsString)
-	s.NoError(err)
-	webhookListOpts.Namespace = auditConfig.Namespace
-	if *vwc.Webhooks[0].FailurePolicy == webhooksv1.Fail {
-		// Try and fail to Update() a Deployment
-		deployments := &appsv1.DeploymentList{}
-		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts))
-
-		s.Equalf(1, len(deployments.Items), "Deployments count for webhook should be precisely one")
-
-		deployments.Items[0].Labels["testLabel"] = "testValue"
-
-		s.Errorf(
-			s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
-			"Expected failed updated of Deployment because certificate setup is incomplete")
-	}
-
-	// Now put the CA data into the webhook
-	for i := range vwc.Webhooks {
-		vwc.Webhooks[i].ClientConfig.CABundle = caCert.Bytes()
-	}
-
-	zap.S().Info("Update the webhook with the CA data.")
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
-		"Failed to add CA data to Webhook")
-
-	// Some time is needed before the webhook starts working. Might be a better way to check this but
-	// will have to do with a sleep for now.
-	zap.S().Info("Wait for webhook to start working.")
-	time.Sleep(10 * time.Second)
-
-	zap.S().Info("Webhook should be working by now.")
-
-	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionFalse)
-	s.NoErrorf(err, "Admission shouldn't be in degraded state")
-
-	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig)
-	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
-
-	s.checkPods(&auditConfig)
-
+	// now check what happens when it is degraded
 	var scanApiLabels []string
 	for k, v := range mondooscanapi.DeploymentLabels(auditConfig) {
 		scanApiLabels = append(scanApiLabels, fmt.Sprintf("%s=%s", k, v))
@@ -446,25 +304,26 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionScaleDownScanApi(au
 	err = s.testCluster.K8sHelper.Clientset.Delete(s.ctx, &podList.Items[0], &client.DeleteOptions{})
 	s.NoErrorf(err, "Scan API Pod could not be deleted")
 
-	// check degraded
+	err = s.testCluster.K8sHelper.WaitForResourceDeletion(&podList.Items[0])
+	s.NoErrorf(err, "Scan API Pod did not get deleted")
+
 	zap.S().Info("MondooAuditConfig condition should be updated to degraded.")
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionTrue)
-	s.NoErrorf(err, "Admission should be in degraded state")
+	s.NoErrorf(err, "Scan API should be in degraded state")
 
 	// try to change deployment => should fail
-	if *vwc.Webhooks[0].FailurePolicy == webhooksv1.Fail {
-		// Try and fail to Update() a Deployment
-		deployments := &appsv1.DeploymentList{}
-		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts))
+	deployments := &appsv1.DeploymentList{}
+	webhookListOpts, err := s.getWebhookListOps()
+	s.NoError(err)
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts))
 
-		s.Equalf(1, len(deployments.Items), "Deployments count for webhook should be precisely one")
+	s.Equalf(1, len(deployments.Items), "Deployments count for webhook should be precisely one")
 
-		deployments.Items[0].Labels["testLabel"] = "testValue"
+	deployments.Items[0].Labels["testLabel"] = "testValue"
 
-		s.Errorf(
-			s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
-			"Expected failed updated of Deployment because Scan API is unreachable")
-	}
+	s.Errorf(
+		s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
+		"Expected failed updated of Deployment because Scan API is unreachable")
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConfig mondoov2.MondooAuditConfig) {
@@ -672,7 +531,6 @@ func (s *AuditConfigBaseSuite) getPassingPod() *corev1.Pod {
 			},
 			AutomountServiceAccountToken: pointer.Bool(false),
 			ServiceAccountName:           "mondoo-operator-controller-manager",
-			DeprecatedServiceAccount:     "",
 		},
 	}
 }
@@ -685,12 +543,7 @@ func (s *AuditConfigBaseSuite) getFailingPod() *corev1.Pod {
 	pod.ObjectMeta.Name = "failing-pod"
 	pod.ObjectMeta.Labels = labels
 	pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
-		Privileged:               pointer.Bool(true),
-		RunAsNonRoot:             pointer.Bool(false),
-		AllowPrivilegeEscalation: pointer.Bool(true),
-		Capabilities: &corev1.Capabilities{
-			Add: []corev1.Capability{"CAP_SYS_ADMIN"},
-		},
+		Privileged: pointer.Bool(true),
 	}
 	return pod
 }
@@ -717,4 +570,74 @@ func (s *AuditConfigBaseSuite) checkPods(auditConfig *mondoov2.MondooAuditConfig
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(failingPod), "Failed to delete failingPod")
 	s.NoErrorf(s.testCluster.K8sHelper.WaitForResourceDeletion(passingPod), "Error waiting for deleteion of passingPod")
 	s.NoErrorf(s.testCluster.K8sHelper.WaitForResourceDeletion(failingPod), "Error waiting for deleteion of failingPod")
+}
+
+func (s *AuditConfigBaseSuite) getWebhookLabelsString() string {
+	webhookLabels := []string{mondooadmission.WebhookLabelKey + "=" + mondooadmission.WebhookLabelValue}
+	webhookLabelsString := strings.Join(webhookLabels, ",")
+	return webhookLabelsString
+}
+
+func (s *AuditConfigBaseSuite) getWebhookListOps() (*client.ListOptions, error) {
+	webhookListOpts, err := utils.LabelSelectorListOptions(s.getWebhookLabelsString())
+	if err != nil {
+		return webhookListOpts, err
+	}
+	webhookListOpts.Namespace = s.auditConfig.Namespace
+	return webhookListOpts, nil
+}
+
+func (s *AuditConfigBaseSuite) manuallyCreateCertificates() (*bytes.Buffer, error) {
+	serviceDNSNames := []string{
+		// DNS names will take the form of ServiceName.ServiceNamespace.svc and .svc.cluster.local
+		fmt.Sprintf("%s-webhook-service.%s.svc", s.auditConfig.Name, s.auditConfig.Namespace),
+		fmt.Sprintf("%s-webhook-service.%s.svc.cluster.local", s.auditConfig.Name, s.auditConfig.Namespace),
+	}
+	secretName := mondooadmission.GetTLSCertificatesSecretName(s.auditConfig.Name)
+	return s.testCluster.MondooInstaller.GenerateServiceCerts(&s.auditConfig, secretName, serviceDNSNames)
+}
+
+// verifyWebhookAndStart Checks the ValidatingWebhookConfiguration, adds the CA data and waits for webhook to start working
+func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.ListOptions, caCert *bytes.Buffer) {
+	vwc := &webhooksv1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("%s-%s-mondoo", s.auditConfig.Namespace, s.auditConfig.Name),
+		},
+	}
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(vwc), vwc),
+		"Failed to retrieve ValidatingWebhookConfiguration")
+
+	if s.auditConfig.Spec.Admission.Mode == mondoov2.Enforcing {
+		s.Equalf(*vwc.Webhooks[0].FailurePolicy, webhooksv1.Fail, "Webhook failurePolicy should be 'Fail' because of enforcing mode")
+	} else {
+		s.Equalf(*vwc.Webhooks[0].FailurePolicy, webhooksv1.Ignore, "Webhook failurePolicy should be 'Ignore' because of permissive mode")
+	}
+
+	if *vwc.Webhooks[0].FailurePolicy == webhooksv1.Fail {
+
+		deployments := &appsv1.DeploymentList{}
+		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts))
+
+		s.Equalf(1, len(deployments.Items), "Deployments count for webhook should be precisely one")
+
+		deployments.Items[0].Labels["testLabel"] = "testValue"
+
+		s.Errorf(
+			s.testCluster.K8sHelper.Clientset.Update(s.ctx, &deployments.Items[0]),
+			"Expected failed updated of Deployment because certificate setup is incomplete")
+
+	}
+
+	for i := range vwc.Webhooks {
+		vwc.Webhooks[i].ClientConfig.CABundle = caCert.Bytes()
+	}
+
+	zap.S().Info("Update the webhook with the CA data.")
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
+		"Failed to add CA data to Webhook")
+
+	zap.S().Info("Wait for webhook to start working.")
+	time.Sleep(10 * time.Second)
 }

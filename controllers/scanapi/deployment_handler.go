@@ -127,7 +127,16 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		logger.Info("Created Deployment for scan API")
 		// set conditions on next iteration to not set to unavailable during initialisation
 		return nil
-	} else if !k8s.AreDeploymentsEqual(*deployment, existingDeployment) {
+	}
+
+	mondooAuditConfigCopy := n.Mondoo.DeepCopy()
+	updateScanAPIConditions(n.Mondoo, existingDeployment.Status.UnavailableReplicas != 0, existingDeployment.Status.Conditions)
+	logger.Info("Updated status for MondooAuditConfig")
+	if err := mondoo.UpdateMondooAuditStatus(ctx, n.KubeClient, mondooAuditConfigCopy, n.Mondoo, logger); err != nil {
+		return err
+	}
+
+	if !k8s.AreDeploymentsEqual(*deployment, existingDeployment) {
 		logger.Info("Update needed for scan API Deployment")
 		// If the deployment exists but it is different from what we actually want it to be, then update.
 		k8s.UpdateDeployment(&existingDeployment, *deployment)
@@ -135,8 +144,6 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 			return err
 		}
 	}
-
-	updateScanAPIConditions(n.Mondoo, existingDeployment.Status.UnavailableReplicas != 0, existingDeployment.Status.Conditions)
 
 	return nil
 }

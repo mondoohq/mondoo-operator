@@ -249,8 +249,13 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 		webhookLog.Info("Created Deployment for webhook")
 		return nil
 	}
+
+	mondooAuditConfigCopy := n.Mondoo.DeepCopy()
 	updateAdmissionConditions(n.Mondoo, n.isWebhookDegraded(deployment))
 	webhookLog.Info("Updated status for MondooAuditConfig")
+	if err := mondoo.UpdateMondooAuditStatus(ctx, n.KubeClient, mondooAuditConfigCopy, n.Mondoo, webhookLog); err != nil {
+		return err
+	}
 
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.

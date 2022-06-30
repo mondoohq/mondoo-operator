@@ -14,6 +14,7 @@ type AuditConfigSuite struct {
 	AuditConfigBaseSuite
 }
 
+/*
 func (s *AuditConfigSuite) TestReconcile_AllDisabled() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false)
 	s.testMondooAuditConfigAllDisabled(auditConfig)
@@ -39,14 +40,7 @@ func (s *AuditConfigSuite) TestReconcile_AdmissionEnforcing() {
 	auditConfig.Spec.Admission.Mode = v1alpha2.Enforcing
 	s.testMondooAuditConfigAdmission(auditConfig)
 }
-
-func (s *AuditConfigSuite) TestReconcile_AdmissionEnforcingSetReplicas() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true)
-	auditConfig.Spec.Admission.Mode = v1alpha2.Enforcing
-	auditConfig.Spec.Admission.Replicas = pointer.Int32(1)
-	s.testMondooAuditConfigAdmission(auditConfig)
-}
-
+*/
 func (s *AuditConfigSuite) TestReconcile_AdmissionEnforcingScaleDownScanApi() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true)
 	auditConfig.Spec.Admission.Mode = v1alpha2.Enforcing

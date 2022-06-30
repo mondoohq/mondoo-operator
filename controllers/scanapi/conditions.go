@@ -35,4 +35,16 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 	}
 
 	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha2.ScanAPIDegraded, status, reason, msg, updateCheck)
+	if degradedStatus {
+		// also admission is degraded
+		for _, condition := range config.Status.Conditions {
+			if condition.Type == mondoov1alpha2.AdmissionDegraded {
+				condition.Status = status
+				condition.Reason = reason
+				condition.Message = msg
+				config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha2.AdmissionDegraded, corev1.ConditionTrue, "Admission is degraded because the Scan API is degraded", msg, updateCheck)
+				break
+			}
+		}
+	}
 }

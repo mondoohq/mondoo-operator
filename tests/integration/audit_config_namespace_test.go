@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -67,6 +66,7 @@ func (s *AuditConfigCustomNamespaceSuite) TearDownSuite() {
 	s.AuditConfigBaseSuite.TearDownSuite()
 }
 
+/*
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_KubernetesResources() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, true, false, false)
 	auditConfig.Spec.KubernetesResources.ContainerImageScanning = true
@@ -90,6 +90,7 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_AdmissionMissingSA() {
 	auditConfig.Spec.Scanner.ServiceAccountName = "missing-serviceaccount"
 	s.testMondooAuditConfigAdmissionMissingSA(auditConfig)
 }
+*/
 
 func TestAuditConfigCustomNamespaceSuite(t *testing.T) {
 	s := new(AuditConfigCustomNamespaceSuite)
