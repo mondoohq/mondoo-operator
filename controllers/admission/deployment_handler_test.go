@@ -84,6 +84,61 @@ func TestReconcile(t *testing.T) {
 				mac.Admission.Mode = mondoov1alpha2.Enforcing
 				return mac
 			}(),
+			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
+				deployment := &appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      webhookDeploymentName(testMondooAuditConfigName),
+						Namespace: testNamespace,
+					},
+					Spec: appsv1.DeploymentSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Args: []string{
+											"--enforcement-mode",
+											string(mondoov1alpha2.Enforcing),
+										},
+									},
+								},
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
+						ReadyReplicas:     1,
+						Replicas:          1,
+					},
+				}
+
+				deploymentScanApi := &appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mondoo-client-scan-api",
+						Namespace: testNamespace,
+					},
+					Spec: appsv1.DeploymentSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Args: []string{
+											"--enforcement-mode",
+											string(mondoov1alpha2.Enforcing),
+										},
+									},
+								},
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
+						ReadyReplicas:     1,
+						Replicas:          1,
+					},
+				}
+
+				return []client.Object{deployment, deploymentScanApi}
+			},
 			validate: func(t *testing.T, kubeClient client.Client) {
 				deployment := &appsv1.Deployment{}
 				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
