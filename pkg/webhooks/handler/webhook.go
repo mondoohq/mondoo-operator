@@ -1,7 +1,6 @@
 package webhookhandler
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
@@ -10,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -21,7 +19,6 @@ import (
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
-	customobject "go.mondoo.com/mondoo-operator/pkg/utils/genericobjectdecoder"
 	"go.mondoo.com/mondoo-operator/pkg/webhooks/utils"
 )
 
@@ -94,7 +91,6 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 	// the default/safe response
 	response = admission.Allowed(defaultScanPass)
 
-	// TODO: do even need to marshal this when we have req.Object.Object??
 	// Call into Mondoo Scan Service to scan the resource
 	k8sObjectData, err := yaml.Marshal(req.Object)
 	if err != nil {
@@ -111,7 +107,7 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		}
 	}
 
-	k8sLabels, err := a.generateLabels(req)
+	k8sLabels, err := a.generateLabels(req, obj)
 	if err != nil {
 		handlerlog.Error(err, "failed to set labels for incoming request")
 		return
@@ -166,8 +162,8 @@ func (a *webhookValidator) InjectDecoder(d *admission.Decoder) error {
 	return nil
 }
 
-func (a *webhookValidator) generateLabels(req admission.Request) (map[string]string, error) {
-	labels, err := generateLabelsFromAdmissionRequest(req)
+func (a *webhookValidator) generateLabels(req admission.Request, obj runtime.Object) (map[string]string, error) {
+	labels, err := generateLabelsFromAdmissionRequest(req, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -191,29 +187,18 @@ func (a *webhookValidator) objFromRaw(rawObj runtime.RawExtension) (runtime.Obje
 	return obj, err
 }
 
-func generateLabelsFromAdmissionRequest(req admission.Request) (map[string]string, error) {
-
-	k8sObjectData, err := yaml.Marshal(req.Object)
+func generateLabelsFromAdmissionRequest(req admission.Request, obj runtime.Object) (map[string]string, error) {
+	objMeta, err := meta.Accessor(obj)
 	if err != nil {
-		handlerlog.Error(err, "failed to marshal incoming request")
-		return nil, err
-	}
-
-	r := bytes.NewReader(k8sObjectData)
-	objMeta := &customobject.CustomObjectMeta{}
-
-	yamlDecoder := yamlutil.NewYAMLOrJSONDecoder(r, 4096)
-
-	if err := yamlDecoder.Decode(objMeta); err != nil {
 		return nil, err
 	}
 
 	labels := map[string]string{
-		mondooNamespaceLabel:       objMeta.Namespace,
-		mondooUIDLabel:             string(objMeta.UID),
-		mondooResourceVersionLabel: objMeta.ResourceVersion,
-		mondooNameLabel:            objMeta.Name,
-		mondooKindLabel:            objMeta.Kind,
+		mondooNamespaceLabel:       objMeta.GetNamespace(),
+		mondooUIDLabel:             string(objMeta.GetUID()),
+		mondooResourceVersionLabel: objMeta.GetResourceVersion(),
+		mondooNameLabel:            objMeta.GetName(),
+		mondooKindLabel:            obj.GetObjectKind().GroupVersionKind().Kind,
 		mondooAuthorLabel:          req.UserInfo.Username,
 		mondooOperationLabel:       string(req.Operation),
 	}

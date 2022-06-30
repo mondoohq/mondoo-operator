@@ -113,9 +113,13 @@ func TestLabels(t *testing.T) {
 	webhook := &webhookValidator{
 		integrationMRN: "testIntegrationMRN",
 		clusterID:      "testClusterID",
+		uniDecoder:     serializer.NewCodecFactory(clientgoscheme.Scheme).UniversalDeserializer(),
 	}
 
-	labels, err := webhook.generateLabels(req)
+	obj, err := webhook.objFromRaw(req.Object)
+	require.NoError(t, err, "unexpected error while converting request object")
+
+	labels, err := webhook.generateLabels(req, obj)
 
 	require.NoError(t, err, "unexpected error while testing label creation")
 	assert.Contains(t, labels, mondooClusterIDLabel, "cluster ID label missing")
@@ -182,6 +186,7 @@ func testExamplePod() runtime.RawExtension {
 
 func testExampleDeployment() runtime.RawExtension {
 	dep := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testDeployment",
 			Namespace: testNamespace,
