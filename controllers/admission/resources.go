@@ -67,9 +67,10 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 	}
 
 	replicas := pointer.Int32(1)
-	if m.Spec.Admission.Replicas == nil && m.Spec.Admission.Mode == mondoov1alpha2.Enforcing {
+	if m.Spec.Admission.Mode == mondoov1alpha2.Enforcing {
 		replicas = pointer.Int32(2)
-	} else if m.Spec.Admission.Replicas != nil && *m.Spec.Admission.Replicas > 0 {
+	}
+	if m.Spec.Admission.Replicas != nil {
 		replicas = m.Spec.Admission.Replicas
 	}
 

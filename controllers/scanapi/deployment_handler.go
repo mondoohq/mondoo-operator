@@ -111,6 +111,11 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	if err := ctrl.SetControllerReference(n.Mondoo, deployment, n.KubeClient.Scheme()); err != nil {
 		return err
 	}
+
+	if *deployment.Spec.Replicas < 2 && n.Mondoo.Spec.Admission.Mode == v1alpha2.Enforcing {
+		logger.Info("WARNING: Scan API deployment is only scaled to 1 replica, but the admission mode is set to 'enforcing'. This might be problematic if the API server is not able to connect to the admission webhook. Please consider increasing the replicas.")
+	}
+
 	existingDeployment := appsv1.Deployment{}
 	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, &existingDeployment, deployment)
 	if err != nil {
@@ -123,7 +128,7 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		// set conditions on next iteration to not set to unavailable during initialisation
 		return nil
 	} else if !k8s.AreDeploymentsEqual(*deployment, existingDeployment) {
-		logger.Info("Updated needed for scan API Deployment")
+		logger.Info("Update needed for scan API Deployment")
 		// If the deployment exists but it is different from what we actually want it to be, then update.
 		k8s.UpdateDeployment(&existingDeployment, *deployment)
 		if err := n.KubeClient.Update(ctx, &existingDeployment); err != nil {

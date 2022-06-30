@@ -47,6 +47,14 @@ func (s *AuditConfigSuite) TestReconcile_AdmissionEnforcingSetReplicas() {
 	s.testMondooAuditConfigAdmission(auditConfig)
 }
 
+func (s *AuditConfigSuite) TestReconcile_AdmissionEnforcingScaleDownScanApi() {
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true)
+	auditConfig.Spec.Admission.Mode = v1alpha2.Enforcing
+	auditConfig.Spec.Admission.Replicas = pointer.Int32(1)
+	auditConfig.Spec.Scanner.Replicas = pointer.Int32(1)
+	s.testMondooAuditConfigAdmissionScaleDownScanApi(auditConfig)
+}
+
 func TestAuditConfigSuite(t *testing.T) {
 	s := new(AuditConfigSuite)
 	defer func(s *AuditConfigSuite) {

@@ -450,7 +450,7 @@ func (k8sh *K8sHelper) GetMondooAuditConfigConditionByType(auditConfig *api.Mond
 }
 
 // CheckForDegradedCondition Check whether specified Condition is in degraded state in a MondooAuditConfig with retries.
-func (k8sh *K8sHelper) CheckForDegradedCondition(auditConfig *api.MondooAuditConfig, conditionType api.MondooAuditConfigConditionType) error {
+func (k8sh *K8sHelper) CheckForDegradedCondition(auditConfig *api.MondooAuditConfig, conditionType api.MondooAuditConfigConditionType, conditionStatus v1.ConditionStatus) error {
 	err := k8sh.ExecuteWithRetries(func() (bool, error) {
 		// Condition of MondooAuditConfig should be updated
 		foundMondooAuditConfig, err := k8sh.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
@@ -461,7 +461,7 @@ func (k8sh *K8sHelper) CheckForDegradedCondition(auditConfig *api.MondooAuditCon
 		if err != nil {
 			return false, err
 		}
-		if condition.Status == v1.ConditionFalse {
+		if condition.Status == conditionStatus {
 			return true, nil
 		}
 		return false, nil

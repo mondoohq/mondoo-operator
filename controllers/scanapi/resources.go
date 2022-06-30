@@ -57,8 +57,13 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 	labels := DeploymentLabels(m)
 
 	replicas := pointer.Int32(1)
-	if m.Spec.Admission.Mode == v1alpha2.Enforcing {
-		replicas = pointer.Int32(2)
+	if m.Spec.Admission.Enable {
+		if m.Spec.Admission.Mode == v1alpha2.Enforcing {
+			replicas = pointer.Int32(2)
+		}
+	}
+	if m.Spec.Scanner.Replicas != nil {
+		replicas = m.Spec.Scanner.Replicas
 	}
 
 	return &appsv1.Deployment{
