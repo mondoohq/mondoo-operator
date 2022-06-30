@@ -9,9 +9,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/pointer"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,6 +48,77 @@ func TestWebhookValidate(t *testing.T) {
 			expectAllowed: true,
 			expectReason:  passedScan,
 			object:        testExamplePod(),
+		},
+		{
+			name:          "pod from replicaset test",
+			expectAllowed: true,
+			expectReason:  defaultScanPass,
+			object: testExamplePod(func(p *corev1.Pod) {
+				p.OwnerReferences = append(p.OwnerReferences, metav1.OwnerReference{
+					Kind:       "ReplicaSet",
+					Name:       "testReplicaSet",
+					UID:        types.UID("abcd-1234"),
+					Controller: pointer.Bool(true),
+				})
+			}),
+		},
+		{
+			name:          "pod from statefulset test",
+			expectAllowed: true,
+			expectReason:  defaultScanPass,
+			object: testExamplePod(func(p *corev1.Pod) {
+				p.OwnerReferences = append(p.OwnerReferences, metav1.OwnerReference{
+					Kind:       "StatefulSet",
+					Name:       "testStatefulSet",
+					UID:        types.UID("abcd-1234"),
+					Controller: pointer.Bool(true),
+				})
+			}),
+		},
+		{
+			name:          "pod from daemonset test",
+			expectAllowed: true,
+			expectReason:  defaultScanPass,
+			object: testExamplePod(func(p *corev1.Pod) {
+				p.OwnerReferences = append(p.OwnerReferences, metav1.OwnerReference{
+					Kind:       "DaemonSet",
+					Name:       "testDaemonSet",
+					UID:        types.UID("abcd-1234"),
+					Controller: pointer.Bool(true),
+				})
+			}),
+		},
+		{
+			name:          "pod from job test",
+			expectAllowed: true,
+			expectReason:  defaultScanPass,
+			object: testExamplePod(func(p *corev1.Pod) {
+				p.OwnerReferences = append(p.OwnerReferences, metav1.OwnerReference{
+					Kind:       "Job",
+					Name:       "testJob",
+					UID:        types.UID("abcd-1234"),
+					Controller: pointer.Bool(true),
+				})
+			}),
+		},
+		{
+			name:          "job test",
+			expectAllowed: true,
+			expectReason:  passedScan,
+			object:        testExampleJob(),
+		},
+		{
+			name:          "job from cronjob test",
+			expectAllowed: true,
+			expectReason:  defaultScanPass,
+			object: testExampleJob(func(j *batchv1.Job) {
+				j.OwnerReferences = append(j.OwnerReferences, metav1.OwnerReference{
+					Kind:       "CronJob",
+					Name:       "testCronJob",
+					UID:        types.UID("abcd-1234"),
+					Controller: pointer.Bool(true),
+				})
+			}),
 		},
 		{
 			name:          "example Deployment",
@@ -148,7 +221,7 @@ func TestLabels(t *testing.T) {
 	require.Equal(t, "", labels[mondooResourceVersionLabel], "Expect empty value for a CREATE webhook")
 }
 
-func testExamplePod() runtime.RawExtension {
+func testExamplePod(modifiers ...func(*corev1.Pod)) runtime.RawExtension {
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "Pod",
@@ -163,14 +236,12 @@ func testExamplePod() runtime.RawExtension {
 					Name: "notControllerOwner",
 					UID:  "another-uid",
 				},
-				// {
-				// 	Kind:       "ReplicaSet",
-				// 	Name:       "testPod",
-				// 	UID:        types.UID("abcd-1234"),
-				// 	Controller: pointer.Bool(true),
-				// },
 			},
 		},
+	}
+
+	for _, m := range modifiers {
+		m(pod)
 	}
 
 	data, err := json.Marshal(pod)
@@ -181,6 +252,40 @@ func testExamplePod() runtime.RawExtension {
 	return runtime.RawExtension{
 		Raw:    data,
 		Object: pod,
+	}
+}
+
+func testExampleJob(modifiers ...func(*batchv1.Job)) runtime.RawExtension {
+	job := &batchv1.Job{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Pod",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testPod-abcd",
+			Namespace: testNamespace,
+			UID:       types.UID("1234-abcd"),
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Kind: "Pod",
+					Name: "notControllerOwner",
+					UID:  "another-uid",
+				},
+			},
+		},
+	}
+
+	for _, m := range modifiers {
+		m(job)
+	}
+
+	data, err := json.Marshal(job)
+	if err != nil {
+		panic(err)
+	}
+
+	return runtime.RawExtension{
+		Raw:    data,
+		Object: job,
 	}
 }
 

@@ -142,6 +142,21 @@ func deepEqualsValidatingWebhookConfiguration(existing, desired *webhooksv1.Vali
 		if existing.Webhooks[i].Name != desired.Webhooks[i].Name {
 			return false
 		}
+
+		if len(existing.Webhooks[i].Rules) != len(desired.Webhooks[i].Rules) {
+			return false
+		}
+
+		for j := range existing.Webhooks[i].Rules {
+			existingRule := existing.Webhooks[i].Rules[j]
+			desiredRule := desired.Webhooks[i].Rules[j]
+			if !reflect.DeepEqual(existingRule.APIGroups, desiredRule.APIGroups) ||
+				!reflect.DeepEqual(existingRule.APIVersions, desiredRule.APIVersions) ||
+				!reflect.DeepEqual(existingRule.Operations, desiredRule.Operations) ||
+				!reflect.DeepEqual(existingRule.Resources, desiredRule.Resources) {
+				return false
+			}
+		}
 	}
 
 	return true
