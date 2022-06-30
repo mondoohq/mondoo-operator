@@ -2,20 +2,22 @@ package webhookhandler
 
 import (
 	"context"
+	"encoding/json"
 	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/yaml"
 
@@ -77,6 +79,7 @@ func TestWebhookValidate(t *testing.T) {
 				scanner: mondooclient.NewClient(mondooclient.ClientOptions{
 					ApiEndpoint: testserver.URL,
 				}),
+				uniDecoder: serializer.NewCodecFactory(clientgoscheme.Scheme).UniversalDeserializer(),
 			}
 
 			request := admission.Request{
@@ -156,17 +159,23 @@ func testExamplePod() runtime.RawExtension {
 					Name: "notControllerOwner",
 					UID:  "another-uid",
 				},
-				{
-					Kind:       "ReplicaSet",
-					Name:       "testPod",
-					UID:        types.UID("abcd-1234"),
-					Controller: pointer.Bool(true),
-				},
+				// {
+				// 	Kind:       "ReplicaSet",
+				// 	Name:       "testPod",
+				// 	UID:        types.UID("abcd-1234"),
+				// 	Controller: pointer.Bool(true),
+				// },
 			},
 		},
 	}
 
+	data, err := json.Marshal(pod)
+	if err != nil {
+		panic(err)
+	}
+
 	return runtime.RawExtension{
+		Raw:    data,
 		Object: pod,
 	}
 }
@@ -179,7 +188,13 @@ func testExampleDeployment() runtime.RawExtension {
 		},
 	}
 
+	data, err := json.Marshal(dep)
+	if err != nil {
+		panic(err)
+	}
+
 	return runtime.RawExtension{
+		Raw:    data,
 		Object: dep,
 	}
 }
