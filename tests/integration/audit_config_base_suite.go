@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"fmt"
@@ -18,8 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,12 +30,7 @@ import (
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
-
-	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 )
-
-//go:embed passing-pod.yaml
-var passingPodyaml []byte
 
 type AuditConfigBaseSuite struct {
 	suite.Suite
@@ -69,6 +61,51 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 			ObjectMeta: metav1.ObjectMeta{Name: mondoov2.MondooOperatorConfigName},
 		}
 		s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(operatorConfig), "Failed to delete MondooOperatorConfig")
+
+		zap.S().Info("Waiting for cleanup of the test cluster.")
+		// wait for deployments to be gone
+		// sometimes the operator still terminates ,e.g. the webhook, while the next test already started
+		// the new test then fails because resources vanish during the test
+		// Check for the ScanAPI Deployment to be present.
+		/*
+			listOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(mondooscanapi.DeploymentLabels(s.auditConfig))}
+			zap.S().Info("Searching for ScanAPI Deployment.", "listOpts=", listOpts)
+
+			err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+				deployments := &appsv1.DeploymentList{}
+				err := s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts)
+				if err == nil {
+					if len(deployments.Items) == 0 {
+						return true, nil
+					}
+				} else {
+					return false, err
+				}
+				return false, nil
+			})
+			s.NoErrorf(err, "Failed to wait for ScanAPI Deployment to be gone")
+
+			webhookLabels := map[string]string{mondooadmission.WebhookLabelKey: mondooadmission.WebhookLabelValue}
+			webhookListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(webhookLabels)}
+			zap.S().Info("Searching for Webhook Deployment.", "listOpts=", webhookListOpts)
+			err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+				deployments := &appsv1.DeploymentList{}
+				err := s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts)
+				if err == nil {
+					if len(deployments.Items) == 0 {
+						return true, nil
+					}
+				} else {
+					return false, err
+				}
+				return false, nil
+			})
+			s.NoErrorf(err, "Failed to wait for ScanAPI Deployment to be gone")
+		*/
+
+		// not sure why the above list does not work. It returns zero deployments. So, first a plain sleep to stabilize the test.
+		time.Sleep(time.Second * 5)
+		zap.S().Info("Cleanup done. Cluster should be good to go for the next test.")
 	}
 }
 
@@ -445,34 +482,6 @@ func (s *AuditConfigBaseSuite) disableContainerImageResolution() func() {
 	}
 }
 
-func (s *AuditConfigBaseSuite) getPassingPodYaml() *corev1.Pod {
-	r := bytes.NewReader(passingPodyaml)
-	yamlDecoder := yamlutil.NewYAMLOrJSONDecoder(r, 4096)
-	objectDecoder := scheme.Codecs.UniversalDeserializer()
-
-	// First just read a single YAML object from the list
-	rawObject := runtime.RawExtension{}
-
-	if err := yamlDecoder.Decode(&rawObject); err != nil {
-		zap.S().Info("Failed to decode object")
-	}
-
-	// Decode into a runtime Object
-	obj, gvk, err := objectDecoder.Decode(rawObject.Raw, nil, nil)
-	if err != nil {
-		zap.S().Info("failed to decode RawExtension")
-	}
-
-	zap.S().Info("Decoding object", "GVK", gvk)
-
-	// Cast the runtime to the actual type and apply the resources
-	passingPodYaml, ok := obj.(*corev1.Pod)
-	if !ok {
-		zap.S().Info("Failed to cast to Pod")
-	}
-	return passingPodYaml
-}
-
 func (s *AuditConfigBaseSuite) getPassingPod() *corev1.Pod {
 	labels := map[string]string{
 		"admission-result": "pass",
@@ -480,7 +489,7 @@ func (s *AuditConfigBaseSuite) getPassingPod() *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "passing-pod",
-			Namespace: s.auditConfig.Namespace,
+			Namespace: "mondoo-operator",
 			Labels:    labels,
 		},
 		Spec: corev1.PodSpec{
@@ -489,7 +498,7 @@ func (s *AuditConfigBaseSuite) getPassingPod() *corev1.Pod {
 					Name:            "ubuntu",
 					Image:           "ubuntu:20.04",
 					Command:         []string{"/bin/sh", "-c"},
-					Args:            []string{"sleep 6000"},
+					Args:            []string{"exit 0"},
 					ImagePullPolicy: corev1.PullAlways,
 					Resources: corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
@@ -551,21 +560,15 @@ func (s *AuditConfigBaseSuite) getFailingPod() *corev1.Pod {
 
 func (s *AuditConfigBaseSuite) checkPods(auditConfig *mondoov2.MondooAuditConfig) {
 	passingPod := s.getPassingPod()
-	//passingPod := s.getPassingPodYaml()
 	failingPod := s.getFailingPod()
 
 	zap.S().Info("Create a Pod which should pass.")
-	/*
-		s.NoErrorf(
-			s.testCluster.K8sHelper.Clientset.Create(s.ctx, passingPod),
-			"Failed to create Pod which should pass.")
-	*/
-	_, err := s.testCluster.K8sHelper.Kubectl("apply", "-f", "./passing-pod.yaml")
-	s.NoErrorf(err,
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, passingPod),
 		"Failed to create Pod which should pass.")
 
 	zap.S().Info("Create a Pod which should be denied in enforcing mode.")
-	err = s.testCluster.K8sHelper.Clientset.Create(s.ctx, failingPod)
+	err := s.testCluster.K8sHelper.Clientset.Create(s.ctx, failingPod)
 
 	if auditConfig.Spec.Admission.Mode == mondoov2.Enforcing {
 		s.Errorf(err, "Created Pod which should have been denied.")
@@ -573,7 +576,8 @@ func (s *AuditConfigBaseSuite) checkPods(auditConfig *mondoov2.MondooAuditConfig
 		s.NoErrorf(err, "Failed creating a Pod in permissive mode.")
 	}
 
-	time.Sleep(120 * time.Second)
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(passingPod), "Failed to delete passingPod")
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(failingPod), "Failed to delete failingPod")
+	s.testCluster.K8sHelper.WaitForResourceDeletion(passingPod)
+	s.testCluster.K8sHelper.WaitForResourceDeletion(failingPod)
 }

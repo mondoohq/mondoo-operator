@@ -4,11 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
-	"k8s.io/utils/pointer"
-
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
+	"go.uber.org/zap"
+	"k8s.io/utils/pointer"
 )
 
 type AuditConfigSuite struct {
