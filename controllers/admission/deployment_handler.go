@@ -213,10 +213,7 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 			Scheme:          n.KubeClient.Scheme(),
 		}
 
-		err := cm.Setup(ctx)
-		if err != nil {
-			return err
-		}
+		return cm.Setup(ctx)
 	}
 
 	namespace := &corev1.Namespace{
