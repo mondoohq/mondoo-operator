@@ -28,3 +28,4 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: mondoo-operator-manifests.yaml
+          generate_release_notes: true
