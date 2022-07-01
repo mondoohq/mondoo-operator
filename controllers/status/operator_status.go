@@ -1,110 +1,100 @@
 package status
 
+/*
+Copyright 2022 Mondoo, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	v1 "k8s.io/api/core/v1"
 )
 
-// operator release
-// kubernetes version
-// node count
-
-// message ReportStatusRequest {
-// 	string mrn = 1;
-// 	 // this is the status of the integration itself (is it active/checking in, errored, etc)
-// 	Status status = 2;
-// 	// FIXME: should be deprecated and removed, the IntegrationMessages can be used to report an error.
-// 	google.protobuf.Struct error = 3; // if the integration is in an errored state, this field should hold the error info
-// 	// this can be any information about the current state of the integration. it will be displayed to the user as-is where supported
-// 	google.protobuf.Struct last_state = 4;
-// 	// Allows the agent to report its current version
-// 	string version = 5;
-// 	// scan status conveys information about the status of various types of scans
-// 	// FIXME: deprecated, can be replaced by IntegrationMessages. remove once lambda is updated.
-// 	repeated ScanMessage scan_status = 6;
-// 	// messages that convey extra information about the integration - these messages can be informational, warnings or errors. Can be used
-// 	// to report non-critical errors/warnings without neccesarily changing the whole integration status.
-// 	IntegrationMessages messages = 7;
-//   }
-
-type OperatorStatus struct {
-	OperatorVersion           string
-	KubernetesVersion         string
-	Nodes                     []string
-	K8sResourcesScannerStatus ScannerStatus
-	NodeScannerStatus         ScannerStatus
-	AdmissionControllerStatus ScannerStatus
+type OperatorCustomState struct {
+	KubernetesVersion string
+	Nodes             []string
 }
 
-type ScannerStatus struct {
-	Status   ComponentStatus
-	Messages []string
-}
-
-type ComponentStatus string
-
-const (
-	HealthyStatus  ComponentStatus = "healthy"
-	DegradedStatus ComponentStatus = "degraded"
-	DisabledStatus ComponentStatus = "disabled"
-)
-
-func OperatorStatusFromAuditConfig(m v1alpha2.MondooAuditConfig, nodes []v1.Node) OperatorStatus {
+func ReportStatusRequestFromAuditConfig(integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node) mondooclient.ReportStatusRequest {
 	nodeNames := make([]string, len(nodes))
 	for i := range nodes {
 		nodeNames[i] = nodes[i].Name
 	}
 
+	messages := make([]mondooclient.IntegrationMessage, 3)
+
 	// Kubernetes resources scanning status
-	k8sResourcesScannerStatus := ScannerStatus{}
+	messages[0].Identifier = "k8s-resources-scanning"
 	if m.Spec.KubernetesResources.Enable {
 		k8sResourcesScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.K8sResourcesScanningDegraded)
 		if k8sResourcesScanning.Status == v1.ConditionTrue {
-			k8sResourcesScannerStatus.Status = DegradedStatus
+			messages[0].Status = mondooclient.MessageStatus_MESSAGE_ERROR
 		} else {
-			k8sResourcesScannerStatus.Status = HealthyStatus
+			messages[0].Status = mondooclient.MessageStatus_MESSAGE_INFO
 		}
-		k8sResourcesScannerStatus.Messages = []string{k8sResourcesScanning.Message}
+		messages[0].Message = k8sResourcesScanning.Message
 	} else {
-		k8sResourcesScannerStatus.Status = DisabledStatus
+		messages[0].Status = mondooclient.MessageStatus_MESSAGE_INFO
+		messages[0].Message = "Kubernetes resources scanning is disabled"
 	}
 
 	// Node scanning status
-	nodeScannerStatus := ScannerStatus{}
+	messages[1].Identifier = "node-scanning"
 	if m.Spec.Nodes.Enable {
 		nodeScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.NodeScanningDegraded)
 		if nodeScanning.Status == v1.ConditionTrue {
-			nodeScannerStatus.Status = DegradedStatus
+			messages[1].Status = mondooclient.MessageStatus_MESSAGE_ERROR
 		} else {
-			nodeScannerStatus.Status = HealthyStatus
+			messages[1].Status = mondooclient.MessageStatus_MESSAGE_INFO
 		}
-		nodeScannerStatus.Messages = []string{nodeScanning.Message}
+		messages[1].Message = nodeScanning.Message
 	} else {
-		nodeScannerStatus.Status = DisabledStatus
+		messages[1].Status = mondooclient.MessageStatus_MESSAGE_INFO
+		messages[1].Message = "Node scanning is disabled"
 	}
 
 	// Admission controller status
-	admissionControllerStatus := ScannerStatus{}
+	messages[2].Identifier = "admission-controller"
 	if m.Spec.Admission.Enable {
 		admissionControllerScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.AdmissionDegraded)
 		if admissionControllerScanning.Status == v1.ConditionTrue {
-			admissionControllerStatus.Status = DegradedStatus
+			messages[2].Status = mondooclient.MessageStatus_MESSAGE_ERROR
 		} else {
-			admissionControllerStatus.Status = HealthyStatus
+			messages[2].Status = mondooclient.MessageStatus_MESSAGE_INFO
 		}
-		admissionControllerStatus.Messages = []string{admissionControllerScanning.Message}
+		messages[2].Message = admissionControllerScanning.Message
 	} else {
-		admissionControllerStatus.Status = DisabledStatus
+		messages[2].Status = mondooclient.MessageStatus_MESSAGE_INFO
+		messages[2].Message = "Admission controller is disabled"
 	}
 
-	return OperatorStatus{
-		OperatorVersion:           version.Version,
-		KubernetesVersion:         "TODO", // We only need to resolve this once at the startup of the operator
-		Nodes:                     nodeNames,
-		K8sResourcesScannerStatus: k8sResourcesScannerStatus,
-		NodeScannerStatus:         nodeScannerStatus,
-		AdmissionControllerStatus: admissionControllerStatus,
+	// If there were any error messages, the overall status is error
+	status := mondooclient.Status_ACTIVE
+	for _, m := range messages {
+		if m.Status == mondooclient.MessageStatus_MESSAGE_ERROR {
+			status = mondooclient.Status_ERROR
+		}
+	}
+
+	return mondooclient.ReportStatusRequest{
+		Mrn:       integrationMrn,
+		Status:    status,
+		LastState: OperatorCustomState{Nodes: nodeNames, KubernetesVersion: "TODO"},
+		Messages:  messages,
+		Version:   version.Version,
 	}
 }

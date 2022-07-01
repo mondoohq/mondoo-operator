@@ -95,6 +95,20 @@ func (mr *MockClientMockRecorder) IntegrationRegister(arg0, arg1 interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IntegrationRegister", reflect.TypeOf((*MockClient)(nil).IntegrationRegister), arg0, arg1)
 }
 
+// IntegrationReportStatus mocks base method.
+func (m *MockClient) IntegrationReportStatus(arg0 context.Context, arg1 *mondooclient.ReportStatusRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IntegrationReportStatus", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// IntegrationReportStatus indicates an expected call of IntegrationReportStatus.
+func (mr *MockClientMockRecorder) IntegrationReportStatus(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IntegrationReportStatus", reflect.TypeOf((*MockClient)(nil).IntegrationReportStatus), arg0, arg1)
+}
+
 // RunKubernetesManifest mocks base method.
 func (m *MockClient) RunKubernetesManifest(arg0 context.Context, arg1 *mondooclient.KubernetesManifestJob) (*mondooclient.ScanResult, error) {
 	m.ctrl.T.Helper()

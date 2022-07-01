@@ -80,7 +80,6 @@ var _ = BeforeSuite(func() {
 
 	err = (&MondooAuditConfigReconciler{
 		Client:                 k8sManager.GetClient(),
-		Scheme:                 k8sManager.GetScheme(),
 		MondooClientBuilder:    MondooClientBuilder,
 		ContainerImageResolver: fake.NewNoOpContainerImageResolver(),
 	}).SetupWithManager(k8sManager)

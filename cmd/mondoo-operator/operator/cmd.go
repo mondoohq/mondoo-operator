@@ -22,6 +22,7 @@ import (
 	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers"
 	"go.mondoo.com/mondoo-operator/controllers/integration"
+	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
@@ -75,9 +76,9 @@ func init() {
 
 		if err = (&controllers.MondooAuditConfigReconciler{
 			Client:                 mgr.GetClient(),
-			Scheme:                 mgr.GetScheme(),
 			MondooClientBuilder:    controllers.MondooClientBuilder,
 			ContainerImageResolver: mondoo.NewContainerImageResolver(),
+			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "MondooAuditConfig")
 			return err
