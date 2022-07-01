@@ -132,6 +132,36 @@ And create/modify/delete a Pod in another window:
 kubectl delete pod -n mondoo-operator --selector control-plane=controller-manager
 ```
 
+### Different modes of operation
+
+You can run the admission controller in two modes: permissive and enforcing.
+You configure the mode via the `MondooAuditConfig`:
+```yaml
+    apiVersion: k8s.mondoo.com/v1alpha2
+    kind: MondooAuditConfig
+    ...
+    spec:
+      ...
+      admission:
+        enable: true
+        mode: permissive
+```
+When admission is enabled, the default mode is `permissive`.
+In permissive mode, the webhook checks objects like Deployments or Pods against policies and reports problems to the Mondoo Backend.
+Mondoo shows the results in the CI/CD view.
+For more details, have a look at the [docs](https://mondoo.com/docs/supplychain/overview/).
+In enforcing the mode, the webhook will deny objects not passing the policy.
+The details are reported to the Mondoo Backend.
+With kubectl, this looks similar to this example:
+```bash
+$ kubectl apply -f ubuntu-privileged.yaml
+Error from server (FAILED MONDOO SCAN): error when creating "ubuntu-privileged.yaml": admission webhook "policy.k8s.mondoo.com" denied the request: FAILED MONDOO SCAN
+```
+
+With enforcing mode, the operator automatically sets the `failurePolicy` of the `ValidatingWebhookConfiguration` to `Fail`.
+The operator automatically creates two replicas for the `webhook` and `scan-api` Pods to prevent outages because of single Pod or Node failures.
+Kubernetes tries to spread the Pods across your cluster, but in the case of a single-node cluster, they will end up on the same node.
+
 ### Deploying the admission controller using cert-manager
 [cert-manager](https://cert-manager.io/) is the easiest way to bootstrap the admission controller TLS certificate: 
 
