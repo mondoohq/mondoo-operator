@@ -205,6 +205,20 @@ func (n *DeploymentHandler) syncWebhookService(ctx context.Context) error {
 }
 
 func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
+	if n.Mondoo.Spec.Admission.CertificateProvisioning.Mode == mondoov1alpha2.CertManagerProvisioning {
+		cm := &CertManagerHandler{
+			KubeClient:      n.KubeClient,
+			TargetNamespace: n.TargetNamespace,
+			Mondoo:          n.Mondoo,
+			Scheme:          n.KubeClient.Scheme(),
+		}
+
+		err := cm.Setup(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-system",
@@ -300,7 +314,7 @@ func (n *DeploymentHandler) prepareValidatingWebhook(ctx context.Context, vwc *w
 		}
 
 		var err error
-		annotationKey, annotationValue, err = cm.Setup(ctx)
+		annotationKey, annotationValue = cm.GetAnnotations()
 		if err != nil {
 			return err
 		}
@@ -354,7 +368,7 @@ func (n *DeploymentHandler) applyWebhooks(ctx context.Context) (ctrl.Result, err
 	// The ValidatingWebhook must be created after Scan API and Webhook are running. Otherwise it will reject their creation.
 	if n.Mondoo.Spec.Admission.Mode == mondoov1alpha2.Enforcing && n.isWebhookDegraded(deployment) {
 		webhookLog.Info("Waiting for Webhook and Scan API deployment before creating the ValidationWebhook.")
-		//return reconcile.Result{Requeue: true}, nil
+		// return reconcile.Result{Requeue: true}, nil
 		return ctrl.Result{}, nil
 	}
 
