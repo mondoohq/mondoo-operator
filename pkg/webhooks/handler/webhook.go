@@ -1,21 +1,24 @@
 package webhookhandler
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/yaml"
 
+	serializerYaml "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
+
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
-	customobject "go.mondoo.com/mondoo-operator/pkg/utils/genericobjectdecoder"
 	"go.mondoo.com/mondoo-operator/pkg/webhooks/utils"
 )
 
@@ -55,6 +58,7 @@ type webhookValidator struct {
 	scanner        mondooclient.Client
 	integrationMRN string
 	clusterID      string
+	uniDecoder     runtime.Decoder
 }
 
 // NewWebhookValidator will initialize a CoreValidator with the provided k8s Client and
@@ -74,6 +78,7 @@ func NewWebhookValidator(client client.Client, mode, scanURL, token, integration
 		}),
 		integrationMRN: integrationMRN,
 		clusterID:      clusterID,
+		uniDecoder:     serializer.NewCodecFactory(client.Scheme()).UniversalDeserializer(),
 	}, nil
 }
 
@@ -93,7 +98,16 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		return
 	}
 
-	k8sLabels, err := a.generateLabels(req)
+	obj, err := a.objFromRaw(req.Object)
+	handlerlog.Info("admission obj", "obj", obj)
+	if err == nil {
+		if !shouldScanObject(obj) {
+			handlerlog.Info("skipping because the resource has a parent", "resource", resource)
+			return
+		}
+	}
+
+	k8sLabels, err := a.generateLabels(req, obj)
 	if err != nil {
 		handlerlog.Error(err, "failed to set labels for incoming request")
 		return
@@ -148,8 +162,8 @@ func (a *webhookValidator) InjectDecoder(d *admission.Decoder) error {
 	return nil
 }
 
-func (a *webhookValidator) generateLabels(req admission.Request) (map[string]string, error) {
-	labels, err := generateLabelsFromAdmissionRequest(req)
+func (a *webhookValidator) generateLabels(req admission.Request, obj runtime.Object) (map[string]string, error) {
+	labels, err := generateLabelsFromAdmissionRequest(req, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -162,29 +176,29 @@ func (a *webhookValidator) generateLabels(req admission.Request) (map[string]str
 	return labels, nil
 }
 
-func generateLabelsFromAdmissionRequest(req admission.Request) (map[string]string, error) {
-
-	k8sObjectData, err := yaml.Marshal(req.Object)
+func (a *webhookValidator) objFromRaw(rawObj runtime.RawExtension) (runtime.Object, error) {
+	obj, _, err := a.uniDecoder.Decode(rawObj.Raw, nil, nil)
 	if err != nil {
-		handlerlog.Error(err, "failed to marshal incoming request")
-		return nil, err
+		obj, _, err = serializerYaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme).Decode(rawObj.Raw, nil, nil)
+		if err != nil {
+			return obj, err
+		}
 	}
+	return obj, err
+}
 
-	r := bytes.NewReader(k8sObjectData)
-	objMeta := &customobject.CustomObjectMeta{}
-
-	yamlDecoder := yamlutil.NewYAMLOrJSONDecoder(r, 4096)
-
-	if err := yamlDecoder.Decode(objMeta); err != nil {
+func generateLabelsFromAdmissionRequest(req admission.Request, obj runtime.Object) (map[string]string, error) {
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
 		return nil, err
 	}
 
 	labels := map[string]string{
-		mondooNamespaceLabel:       objMeta.Namespace,
-		mondooUIDLabel:             string(objMeta.UID),
-		mondooResourceVersionLabel: objMeta.ResourceVersion,
-		mondooNameLabel:            objMeta.Name,
-		mondooKindLabel:            objMeta.Kind,
+		mondooNamespaceLabel:       objMeta.GetNamespace(),
+		mondooUIDLabel:             string(objMeta.GetUID()),
+		mondooResourceVersionLabel: objMeta.GetResourceVersion(),
+		mondooNameLabel:            objMeta.GetName(),
+		mondooKindLabel:            obj.GetObjectKind().GroupVersionKind().Kind,
 		mondooAuthorLabel:          req.UserInfo.Username,
 		mondooOperationLabel:       string(req.Operation),
 	}
@@ -197,4 +211,24 @@ func generateLabelsFromAdmissionRequest(req admission.Request) (map[string]strin
 	}
 
 	return labels, nil
+}
+
+// shouldScanObject determines whether an object should be scanned by Mondoo client.
+func shouldScanObject(obj runtime.Object) bool {
+	objMeta, err := meta.Accessor(obj)
+	if err == nil {
+		controller := metav1.GetControllerOf(objMeta)
+		if controller != nil {
+			// Don't scan objects which parent we have already scanned
+			return controller.Kind != "Deployment" &&
+				controller.Kind != "ReplicaSet" &&
+				controller.Kind != "DaemonSet" &&
+				controller.Kind != "StatefulSet" &&
+				controller.Kind != "CronJob" &&
+				controller.Kind != "Job"
+		}
+	}
+
+	// In case we couldn't access the meta object or there was no controller owner, then scan
+	return true
 }
