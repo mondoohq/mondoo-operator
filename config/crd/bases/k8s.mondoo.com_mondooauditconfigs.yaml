@@ -78,6 +78,7 @@ spec:
                       problems during Pod failures, e.g. node failure, node scaling,
                       etc.
                     format: int32
+                    minimum: 1
                     type: integer
                 type: object
               consoleIntegration:
@@ -168,6 +169,7 @@ spec:
                       to prevent problems during Pod failures, e.g. node failure,
                       node scaling, etc.
                     format: int32
+                    minimum: 1
                     type: integer
                   resources:
                     description: ResourceRequirements describes the compute resource

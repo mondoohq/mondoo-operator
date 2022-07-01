@@ -113,7 +113,7 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	}
 
 	if *deployment.Spec.Replicas < 2 && n.Mondoo.Spec.Admission.Mode == v1alpha2.Enforcing {
-		logger.Info("WARNING: Scan API deployment is only scaled to 1 replica, but the admission mode is set to 'enforcing'. This might be problematic if the API server is not able to connect to the admission webhook. Please consider increasing the replicas.")
+		logger.V(3).Info("Scan API deployment is only scaled to 1 replica, but the admission mode is set to 'enforcing'. This might be problematic if the API server is not able to connect to the admission webhook. Please consider increasing the replicas.")
 	}
 
 	existingDeployment := appsv1.Deployment{}

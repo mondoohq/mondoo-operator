@@ -249,7 +249,7 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 	}
 
 	if *desiredDeployment.Spec.Replicas < 2 && n.Mondoo.Spec.Admission.Mode == mondoov1alpha2.Enforcing {
-		webhookLog.Info("WARNING: Webhook deployment is only scaled to 1 replica, but the webhook mode is set to 'enforcing'. This might be problematic if the API server is not able to connect to the webhook. Please consider increasing the replicas.")
+		webhookLog.V(3).Info("Webhook deployment is only scaled to 1 replica, but the webhook mode is set to 'enforcing'. This might be problematic if the API server is not able to connect to the webhook. Please consider increasing the replicas.")
 	}
 
 	deployment := &appsv1.Deployment{}
@@ -286,11 +286,9 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 
 func (n *DeploymentHandler) isWebhookDegraded(deployment *appsv1.Deployment) bool {
 	for _, condition := range n.Mondoo.Status.Conditions {
-		if condition.Type == mondoov1alpha2.ScanAPIDegraded {
-			if condition.Status == corev1.ConditionTrue {
-				webhookLog.Info("Webhook is degraded, becasue ScanAPI is degraded. Please check the ScanAPI status.")
-				return true
-			}
+		if condition.Type == mondoov1alpha2.ScanAPIDegraded && condition.Status == corev1.ConditionTrue {
+			webhookLog.Info("Webhook is degraded, becasue ScanAPI is degraded. Please check the ScanAPI status.")
+			return true
 		}
 	}
 	if reflect.DeepEqual(deployment.Status, appsv1.DeploymentStatus{}) {
