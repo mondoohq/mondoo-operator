@@ -164,6 +164,23 @@ func (k8sh *K8sHelper) IsPodReady(labelSelector, namespace string) bool {
 	return err == nil
 }
 
+// IsPodInExpectedState waits for a pod to be in a Ready state
+// If the pod is in expected state within the time retry limit true is returned, if not false
+func (k8sh *K8sHelper) EnsureNoPodsPresent(listOpts *client.ListOptions) error {
+	ctx := context.Background()
+	podList := &v1.PodList{}
+
+	return k8sh.ExecuteWithRetries(func() (bool, error) {
+		err := k8sh.Clientset.List(ctx, podList, listOpts)
+		if err == nil {
+			if len(podList.Items) == 0 {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+}
+
 // WaitUntilCronJobsSuccessful waits for the CronJobs with the specified selector to have at least
 // one successful run.
 func (k8sh *K8sHelper) WaitUntilCronJobsSuccessful(labelSelector, namespace string) bool {

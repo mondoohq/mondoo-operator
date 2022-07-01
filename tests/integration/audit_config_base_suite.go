@@ -66,45 +66,16 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		// wait for deployments to be gone
 		// sometimes the operator still terminates ,e.g. the webhook, while the next test already started
 		// the new test then fails because resources vanish during the test
-		// Check for the ScanAPI Deployment to be present.
-		/*
-			listOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(mondooscanapi.DeploymentLabels(s.auditConfig))}
-			zap.S().Info("Searching for ScanAPI Deployment.", "listOpts=", listOpts)
+		scanApiListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(mondooscanapi.DeploymentLabels(s.auditConfig))}
+		err := s.testCluster.K8sHelper.EnsureNoPodsPresent(scanApiListOpts)
+		s.NoErrorf(err, "Failed to wait for ScanAPI Pods to be gone")
 
-			err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
-				deployments := &appsv1.DeploymentList{}
-				err := s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts)
-				if err == nil {
-					if len(deployments.Items) == 0 {
-						return true, nil
-					}
-				} else {
-					return false, err
-				}
-				return false, nil
-			})
-			s.NoErrorf(err, "Failed to wait for ScanAPI Deployment to be gone")
-
-			webhookLabels := map[string]string{mondooadmission.WebhookLabelKey: mondooadmission.WebhookLabelValue}
-			webhookListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(webhookLabels)}
-			zap.S().Info("Searching for Webhook Deployment.", "listOpts=", webhookListOpts)
-			err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
-				deployments := &appsv1.DeploymentList{}
-				err := s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts)
-				if err == nil {
-					if len(deployments.Items) == 0 {
-						return true, nil
-					}
-				} else {
-					return false, err
-				}
-				return false, nil
-			})
-			s.NoErrorf(err, "Failed to wait for ScanAPI Deployment to be gone")
-		*/
+		webhookLabels := map[string]string{mondooadmission.WebhookLabelKey: mondooadmission.WebhookLabelValue}
+		webhookListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(webhookLabels)}
+		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(webhookListOpts)
+		s.NoErrorf(err, "Failed to wait for Webhook Pods to be gone")
 
 		// not sure why the above list does not work. It returns zero deployments. So, first a plain sleep to stabilize the test.
-		time.Sleep(time.Second * 5)
 		zap.S().Info("Cleanup done. Cluster should be good to go for the next test.")
 	}
 }
