@@ -72,3 +72,4 @@ mondoooperatorconfigs
 uninstalling
 RKE
 jsonpath
+supplychain
