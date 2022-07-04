@@ -244,8 +244,17 @@ func TestTokenRegistration(t *testing.T) {
 							Identifier: status.AdmissionControllerIdentifier,
 							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 						},
+						{
+							Message:    "Scan API is disabled",
+							Identifier: status.ScanApiIdentifier,
+							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+						},
 					},
-					LastState: status.OperatorCustomState{KubernetesVersion: k8sVersion.GitVersion, Nodes: make([]string, 0)},
+					LastState: status.OperatorCustomState{
+						KubernetesVersion: k8sVersion.GitVersion,
+						Nodes:             make([]string, 0),
+						MondooAuditConfig: status.MondooAuditConfig{Name: testMondooAuditConfigName, Namespace: testNamespace},
+					},
 				}).Times(1).Return(nil)
 
 				return mClient

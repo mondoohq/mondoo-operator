@@ -29,11 +29,18 @@ const (
 	K8sResourcesScanningIdentifier = "k8s-resources-scanning"
 	NodeScanningIdentifier         = "node-scanning"
 	AdmissionControllerIdentifier  = "admission-controller"
+	ScanApiIdentifier              = "scan-api"
 )
 
 type OperatorCustomState struct {
 	KubernetesVersion string
 	Nodes             []string
+	MondooAuditConfig MondooAuditConfig
+}
+
+type MondooAuditConfig struct {
+	Name      string
+	Namespace string
 }
 
 func ReportStatusRequestFromAuditConfig(
@@ -44,7 +51,7 @@ func ReportStatusRequestFromAuditConfig(
 		nodeNames[i] = nodes[i].Name
 	}
 
-	messages := make([]mondooclient.IntegrationMessage, 3)
+	messages := make([]mondooclient.IntegrationMessage, 4)
 
 	// Kubernetes resources scanning status
 	messages[0].Identifier = K8sResourcesScanningIdentifier
@@ -91,19 +98,38 @@ func ReportStatusRequestFromAuditConfig(
 		messages[2].Message = "Admission controller is disabled"
 	}
 
+	messages[3].Identifier = ScanApiIdentifier
+	if m.Spec.Admission.Enable || m.Spec.KubernetesResources.Enable {
+		scanApi := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.ScanAPIDegraded)
+		if scanApi.Status == v1.ConditionTrue {
+			messages[3].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+		} else {
+			messages[3].Status = mondooclient.MessageStatus_MESSAGE_INFO
+		}
+		messages[3].Message = scanApi.Message
+	} else {
+		messages[3].Status = mondooclient.MessageStatus_MESSAGE_INFO
+		messages[3].Message = "Scan API is disabled"
+	}
+
 	// If there were any error messages, the overall status is error
 	status := mondooclient.Status_ACTIVE
 	for _, m := range messages {
 		if m.Status == mondooclient.MessageStatus_MESSAGE_ERROR {
 			status = mondooclient.Status_ERROR
+			break
 		}
 	}
 
 	return mondooclient.ReportStatusRequest{
-		Mrn:       integrationMrn,
-		Status:    status,
-		LastState: OperatorCustomState{Nodes: nodeNames, KubernetesVersion: k8sVersion.GitVersion},
-		Messages:  messages,
-		Version:   version.Version,
+		Mrn:    integrationMrn,
+		Status: status,
+		LastState: OperatorCustomState{
+			Nodes:             nodeNames,
+			KubernetesVersion: k8sVersion.GitVersion,
+			MondooAuditConfig: MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
+		},
+		Messages: messages,
+		Version:  version.Version,
 	}
 }
