@@ -129,6 +129,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 							},
 							SecurityContext: &corev1.SecurityContext{
 								AllowPrivilegeEscalation: pointer.Bool(false),
+								ReadOnlyRootFilesystem:   pointer.Bool(true),
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
