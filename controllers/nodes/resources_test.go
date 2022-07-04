@@ -10,9 +10,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	testMondooAuditConfigName = "mondoo-config"
 )
 
 func TestCronJobName(t *testing.T) {
@@ -85,6 +91,64 @@ func TestConfigMapName(t *testing.T) {
 	}
 }
 
+func TestResources(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	tests := []struct {
+		name              string
+		mondooauditconfig func() *v1alpha2.MondooAuditConfig
+		expectedResources corev1.ResourceRequirements
+	}{
+		{
+			name: "resources should match default",
+			mondooauditconfig: func() *v1alpha2.MondooAuditConfig {
+				return testMondooAuditConfig()
+			},
+			expectedResources: k8s.DefaultMondooClientResources,
+		},
+		{
+			name: "resources should match spec",
+			mondooauditconfig: func() *v1alpha2.MondooAuditConfig {
+				mac := testMondooAuditConfig()
+				mac.Spec.Nodes.Resources = corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("100m"),
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("100m"),
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+					},
+				}
+				return mac
+			},
+			expectedResources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("100m"),
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+				},
+
+				Requests: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("100m"),
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testNode := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node-name",
+				},
+			}
+			mac := *test.mondooauditconfig()
+			cronJobSepc := CronJob("test123", *testNode, mac)
+			assert.Equal(t, test.expectedResources, cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Resources)
+		})
+	}
+}
+
 func TestInventory(t *testing.T) {
 	randName := utils.RandString(10)
 	auditConfig := v1alpha2.MondooAuditConfig{ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"}}
@@ -100,4 +164,13 @@ func TestInventory(t *testing.T) {
 	assert.Contains(t, inventory, randName)
 	assert.Contains(t, inventory, constants.MondooAssetsIntegrationLabel)
 	assert.Contains(t, inventory, integrationMRN)
+}
+
+func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {
+	return &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testMondooAuditConfigName,
+			Namespace: testNamespace,
+		},
+	}
 }

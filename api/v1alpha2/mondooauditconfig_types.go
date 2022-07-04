@@ -67,7 +67,8 @@ type KubernetesResources struct {
 }
 
 type Nodes struct {
-	Enable bool `json:"enable,omitempty"`
+	Enable    bool                        `json:"enable,omitempty"`
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type Admission struct {
