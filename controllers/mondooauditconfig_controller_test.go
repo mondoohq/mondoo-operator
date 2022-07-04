@@ -29,6 +29,7 @@ import (
 	mockmondoo "go.mondoo.com/mondoo-operator/pkg/mondooclient/mock"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/credentials"
+	k8sversion "k8s.io/apimachinery/pkg/version"
 )
 
 const (
@@ -54,6 +55,8 @@ var (
 		ApiEndpoint: "http://127.0.0.2:8989",
 	}
 	testMondooServiceAccountDataBytes []byte
+
+	k8sVersion = &k8sversion.Info{GitVersion: "v1.24.0"}
 )
 
 func init() {
@@ -244,7 +247,7 @@ func TestTokenRegistration(t *testing.T) {
 							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 						},
 					},
-					LastState: status.OperatorCustomState{KubernetesVersion: "TODO", Nodes: make([]string, 0)},
+					LastState: status.OperatorCustomState{KubernetesVersion: k8sVersion.GitVersion, Nodes: make([]string, 0)},
 				}).Times(1).Return(nil)
 
 				return mClient
@@ -297,7 +300,7 @@ func TestTokenRegistration(t *testing.T) {
 			reconciler := &MondooAuditConfigReconciler{
 				MondooClientBuilder: testMondooClientBuilder,
 				Client:              fakeClient,
-				StatusReporter:      status.NewStatusReporter(fakeClient, testMondooClientBuilder),
+				StatusReporter:      status.NewStatusReporter(fakeClient, testMondooClientBuilder, k8sVersion),
 			}
 
 			// Act

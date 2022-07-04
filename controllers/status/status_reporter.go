@@ -25,6 +25,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/version"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -33,13 +34,15 @@ var logger = ctrl.Log.WithName("status-reporter")
 
 type StatusReporter struct {
 	kubeClient          client.Client
+	k8sVersion          *version.Info
 	mondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
 	lastReportedStatus  mondooclient.ReportStatusRequest
 }
 
-func NewStatusReporter(kubeClient client.Client, mondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client) *StatusReporter {
+func NewStatusReporter(kubeClient client.Client, mondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client, k8sVersion *version.Info) *StatusReporter {
 	return &StatusReporter{
 		kubeClient:          kubeClient,
+		k8sVersion:          k8sVersion,
 		mondooClientBuilder: mondooClientBuilder,
 	}
 }
@@ -63,7 +66,7 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 		return err
 	}
 
-	operatorStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes.Items)
+	operatorStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes.Items, r.k8sVersion)
 	if reflect.DeepEqual(operatorStatus, r.lastReportedStatus) {
 		return nil // If the status hasn't change, don't report
 	}

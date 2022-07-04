@@ -22,6 +22,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	v1 "k8s.io/api/core/v1"
+	k8sversion "k8s.io/apimachinery/pkg/version"
 )
 
 type OperatorCustomState struct {
@@ -29,7 +30,8 @@ type OperatorCustomState struct {
 	Nodes             []string
 }
 
-func ReportStatusRequestFromAuditConfig(integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node) mondooclient.ReportStatusRequest {
+func ReportStatusRequestFromAuditConfig(
+	integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node, k8sVersion *k8sversion.Info) mondooclient.ReportStatusRequest {
 	nodeNames := make([]string, len(nodes))
 	for i := range nodes {
 		nodeNames[i] = nodes[i].Name
@@ -93,7 +95,7 @@ func ReportStatusRequestFromAuditConfig(integrationMrn string, m v1alpha2.Mondoo
 	return mondooclient.ReportStatusRequest{
 		Mrn:       integrationMrn,
 		Status:    status,
-		LastState: OperatorCustomState{Nodes: nodeNames, KubernetesVersion: "TODO"},
+		LastState: OperatorCustomState{Nodes: nodeNames, KubernetesVersion: k8sVersion.GitVersion},
 		Messages:  messages,
 		Version:   version.Version,
 	}
