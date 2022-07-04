@@ -83,6 +83,10 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 											corev1.ResourceMemory: resource.MustParse("20Mi"),
 										},
 									},
+									SecurityContext: &corev1.SecurityContext{
+										AllowPrivilegeEscalation: pointer.Bool(false),
+										ReadOnlyRootFilesystem:   pointer.Bool(true),
+									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
 											Name:      "token",

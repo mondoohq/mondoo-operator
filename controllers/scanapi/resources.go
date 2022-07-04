@@ -99,6 +99,10 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 							PeriodSeconds:       5,
 							FailureThreshold:    5,
 						},
+						SecurityContext: &corev1.SecurityContext{
+							AllowPrivilegeEscalation: pointer.Bool(false),
+							ReadOnlyRootFilesystem:   pointer.Bool(true),
+						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "config",
@@ -109,6 +113,10 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 								Name:      "token",
 								ReadOnly:  true,
 								MountPath: "/etc/opt/mondoo/token",
+							},
+							{
+								Name:      "temp",
+								MountPath: "/tmp",
 							},
 						},
 						Ports: []corev1.ContainerPort{
@@ -165,6 +173,12 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 									},
 									DefaultMode: pointer.Int32(0444),
 								},
+							},
+						},
+						{
+							Name: "temp",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},
 						},
 					},
