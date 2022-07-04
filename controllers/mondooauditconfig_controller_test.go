@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	mockmondoo "go.mondoo.com/mondoo-operator/pkg/mondooclient/mock"
 	"go.mondoo.com/mondoo-operator/pkg/version"
@@ -222,6 +223,30 @@ func TestTokenRegistration(t *testing.T) {
 					Mrn: testIntegrationMRN,
 				}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{}, nil)
 
+				mClient.EXPECT().IntegrationReportStatus(gomock.Any(), &mondooclient.ReportStatusRequest{
+					Mrn:     testIntegrationMRN,
+					Status:  mondooclient.Status_ACTIVE,
+					Version: "latest",
+					Messages: []mondooclient.IntegrationMessage{
+						{
+							Message:    "Kubernetes resources scanning is disabled",
+							Identifier: "k8s-resources-scanning",
+							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+						},
+						{
+							Message:    "Node scanning is disabled",
+							Identifier: "node-scanning",
+							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+						},
+						{
+							Message:    "Admission controller is disabled",
+							Identifier: "admission-controller",
+							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+						},
+					},
+					LastState: status.OperatorCustomState{KubernetesVersion: "TODO", Nodes: make([]string, 0)},
+				}).Times(1).Return(nil)
+
 				return mClient
 			},
 			verify: func(t *testing.T, kubeClient client.Client) {
@@ -237,7 +262,7 @@ func TestTokenRegistration(t *testing.T) {
 				assert.NoError(t, err, "error getting secret that should exist")
 
 				// Check StringData because we're using the fake client
-				assert.Equal(t, string(testMondooServiceAccountDataBytes), credsSecret.StringData["config"])
+				assert.Equal(t, testMondooServiceAccountDataBytes, credsSecret.Data["config"])
 			},
 		},
 		{
@@ -272,6 +297,7 @@ func TestTokenRegistration(t *testing.T) {
 			reconciler := &MondooAuditConfigReconciler{
 				MondooClientBuilder: testMondooClientBuilder,
 				Client:              fakeClient,
+				StatusReporter:      status.NewStatusReporter(fakeClient, testMondooClientBuilder),
 			}
 
 			// Act

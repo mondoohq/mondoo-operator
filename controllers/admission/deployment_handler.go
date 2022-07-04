@@ -218,7 +218,7 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 	}
 	clusterID := string(namespace.UID)
 
-	integrationMRN, _, err := k8s.GetIntegrationSecretForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
+	integrationMRN, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
 	if err != nil {
 		webhookLog.Error(err,
 			"failed to retrieve integration-mrn for MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)

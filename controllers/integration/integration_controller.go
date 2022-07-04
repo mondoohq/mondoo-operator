@@ -97,19 +97,34 @@ func (r *IntegrationReconciler) integrationLoop() {
 }
 
 func (r *IntegrationReconciler) processMondooAuditConfig(m v1alpha2.MondooAuditConfig) error {
+	var err error
+	defer func() {
+		msg := ""
+		if err != nil {
+			msg = err.Error()
+		}
+		_ = r.setIntegrationCondition(&m, err != nil, msg)
+	}()
 
-	integrationMrn, serviceAccount, err := k8s.GetIntegrationSecretForAuditConfig(r.ctx, r.Client, m)
+	secret, err := k8s.GetIntegrationSecretForAuditConfig(r.ctx, r.Client, m)
 	if err != nil {
 		return err
 	}
 
-	if err := r.IntegrationCheckIn(integrationMrn, *serviceAccount); err != nil {
-		r.Log.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
-		_ = r.setIntegrationCondition(&m, true, err.Error())
+	integrationMrn, err := k8s.GetIntegrationMrnFromSecret(*secret, m)
+	if err != nil {
 		return err
 	}
 
-	_ = r.setIntegrationCondition(&m, false, "")
+	serviceAccount, err := k8s.GetServiceAccountFromSecret(*secret)
+	if err != nil {
+		return err
+	}
+
+	if err = r.IntegrationCheckIn(integrationMrn, *serviceAccount); err != nil {
+		r.Log.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
+		return err
+	}
 
 	return nil
 }

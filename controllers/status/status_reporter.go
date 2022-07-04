@@ -54,7 +54,11 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 		return err
 	}
 
-	integrationMrn, serviceAccount, err := k8s.GetIntegrationSecretForAuditConfig(ctx, r.kubeClient, m)
+	secret, err := k8s.GetIntegrationSecretForAuditConfig(ctx, r.kubeClient, m)
+	if err != nil {
+		return err
+	}
+	integrationMrn, err := k8s.GetIntegrationMrnFromSecret(*secret, m)
 	if err != nil {
 		return err
 	}
@@ -62,6 +66,11 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 	operatorStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes.Items)
 	if reflect.DeepEqual(operatorStatus, r.lastReportedStatus) {
 		return nil // If the status hasn't change, don't report
+	}
+
+	serviceAccount, err := k8s.GetServiceAccountFromSecret(*secret)
+	if err != nil {
+		return err
 	}
 
 	token, err := mondoo.GenerateTokenFromServiceAccount(*serviceAccount, logger)

@@ -413,9 +413,9 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 			log.Error(err, "failed to marshal service account creds from IntegrationRegister()")
 			return err
 		}
-		tokenSecret.StringData = map[string]string{
-			constants.MondooCredsSecretServiceAccountKey: string(credsBytes),
-			constants.MondooCredsSecretIntegrationMRNKey: integrationMrn,
+		tokenSecret.Data = map[string][]byte{
+			constants.MondooCredsSecretServiceAccountKey: credsBytes,
+			constants.MondooCredsSecretIntegrationMRNKey: []byte(integrationMrn),
 		}
 		_, err = k8s.CreateIfNotExist(ctx, r.Client, tokenSecret, tokenSecret)
 		if err != nil {

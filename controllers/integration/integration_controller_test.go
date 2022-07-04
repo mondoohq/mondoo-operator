@@ -88,6 +88,7 @@ func (s *IntegrationCheckInSuite) SetupSuite() {
 func (s *IntegrationCheckInSuite) TestCheckIn() {
 	// Arrange
 	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
 
 	existingObjects := []runtime.Object{
 		testMondooCredsSecret(),
@@ -128,6 +129,7 @@ func (s *IntegrationCheckInSuite) TestCheckIn() {
 func (s *IntegrationCheckInSuite) TestClearPreviousCondition() {
 	// Arrange
 	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
 	mondooAuditConfig.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{
 		{
 			Type:   v1alpha2.MondooIntegrationDegraded,
@@ -174,6 +176,7 @@ func (s *IntegrationCheckInSuite) TestClearPreviousCondition() {
 func (s *IntegrationCheckInSuite) TestMissingIntegrationMRN() {
 	// Arrange
 	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
 
 	credsSecret := testMondooCredsSecret()
 	delete(credsSecret.Data, constants.MondooCredsSecretIntegrationMRNKey)
@@ -206,7 +209,7 @@ func (s *IntegrationCheckInSuite) TestMissingIntegrationMRN() {
 	// Assert
 	// this controller doesn't make changes to k8s resources...the only side effect here are the mondooclient API calls
 	s.Error(err, "expected error when missing integration MRN")
-	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "data missing from Mondoo creds secret")
+	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "key with integration MRN data")
 	mockCtrl.Finish()
 
 }
@@ -214,7 +217,7 @@ func (s *IntegrationCheckInSuite) TestMissingIntegrationMRN() {
 func (s *IntegrationCheckInSuite) TestBadServiceAccountData() {
 	// Arrange
 	mondooAuditConfig := testMondooAuditConfig()
-
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
 	credsSecret := testMondooCredsSecret()
 	credsSecret.Data[constants.MondooCredsSecretServiceAccountKey] = []byte("NOT VALID JWT")
 
@@ -254,6 +257,7 @@ func (s *IntegrationCheckInSuite) TestBadServiceAccountData() {
 func (s *IntegrationCheckInSuite) TestFailedCheckIn() {
 	// Arrange
 	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
 
 	existingObjects := []runtime.Object{
 		testMondooCredsSecret(),

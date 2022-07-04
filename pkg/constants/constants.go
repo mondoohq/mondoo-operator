@@ -6,7 +6,7 @@ const (
 	MondooCredsSecretServiceAccountKey = "config"
 	// MondooCredsSecretIntegrationMRNKey is the name of the key in the Secret that holds the
 	// Mondoo integration MRN (used to CheckIn() via the Mondoo API)
-	MondooCredsSecretIntegrationMRNKey = "integraionmrn"
+	MondooCredsSecretIntegrationMRNKey = "integrationmrn"
 	// MondooTokenSecretKey is the name of the key in the Secret that holds the JWT data
 	// used for creating a Mondoo service account
 	MondooTokenSecretKey = "token"

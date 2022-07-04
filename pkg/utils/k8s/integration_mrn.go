@@ -29,15 +29,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// GetIntegrationSecretForAuditConfig retrieves the integration-mrn and service account for a MondooAuditConfig. This is only relevant if ConsoleIntegration
-// is enabled. When ConsoleIntegration is disabled an empty string is returned.
-func GetIntegrationSecretForAuditConfig(ctx context.Context, kubeClient client.Client, auditConfig v1alpha2.MondooAuditConfig) (string, *mondooclient.ServiceAccountCredentials, error) {
+// TryGetIntegrationMrnForAuditConfig tries to get the integration-mrn for a MondooAuditConfig. If ConsoleIntegration is disabled, no
+// integration-mrn is returned but also no error.
+func TryGetIntegrationMrnForAuditConfig(ctx context.Context, kubeClient client.Client, auditConfig v1alpha2.MondooAuditConfig) (string, error) {
 	if !auditConfig.Spec.ConsoleIntegration.Enable {
-		// sending an empty integrationMRN means the webhook or k8s resources scan will run w/o setting integration
-		// labels (which is exactly what we want when console integration is not enabled)
-		return "", nil, nil
+		return "", nil
 	}
 
+	secret, err := GetIntegrationSecretForAuditConfig(ctx, kubeClient, auditConfig)
+	if err != nil {
+		return "", err
+	}
+
+	return GetIntegrationMrnFromSecret(*secret, auditConfig)
+}
+
+// GetIntegrationSecretForAuditConfig retrieves the MondooCredsSecretRef for the give MondooAuditConfig.
+func GetIntegrationSecretForAuditConfig(ctx context.Context, kubeClient client.Client, auditConfig v1alpha2.MondooAuditConfig) (*corev1.Secret, error) {
 	serviceAccountSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      auditConfig.Spec.MondooCredsSecretRef.Name,
@@ -45,20 +53,27 @@ func GetIntegrationSecretForAuditConfig(ctx context.Context, kubeClient client.C
 		},
 	}
 	if err := kubeClient.Get(ctx, client.ObjectKeyFromObject(serviceAccountSecret), serviceAccountSecret); err != nil {
-		return "", nil, err
+		return nil, err
 	}
-	integrationMrn, ok := serviceAccountSecret.Data[constants.MondooCredsSecretIntegrationMRNKey]
+
+	return serviceAccountSecret, nil
+}
+
+func GetIntegrationMrnFromSecret(secret corev1.Secret, auditConfig v1alpha2.MondooAuditConfig) (string, error) {
+	integrationMrn, ok := secret.Data[constants.MondooCredsSecretIntegrationMRNKey]
 	if !ok {
 		err := fmt.Errorf("creds Secret %s/%s missing %s key with integration MRN data",
-			serviceAccountSecret.Namespace, serviceAccountSecret.Name, constants.MondooCredsSecretIntegrationMRNKey)
-		return "", nil, err
+			secret.Namespace, secret.Name, constants.MondooCredsSecretIntegrationMRNKey)
+		return "", err
 	}
+	return string(integrationMrn), nil
+}
 
+func GetServiceAccountFromSecret(secret corev1.Secret) (*mondooclient.ServiceAccountCredentials, error) {
 	serviceAccount := &mondooclient.ServiceAccountCredentials{}
-	if err := json.Unmarshal(serviceAccountSecret.Data[constants.MondooCredsSecretServiceAccountKey], serviceAccount); err != nil {
+	if err := json.Unmarshal(secret.Data[constants.MondooCredsSecretServiceAccountKey], serviceAccount); err != nil {
 		msg := "failed to unmarshal creds Secret"
-		return "", nil, fmt.Errorf("%s: %s", msg, err)
+		return nil, fmt.Errorf("%s: %s", msg, err)
 	}
-
-	return string(integrationMrn), serviceAccount, nil
+	return serviceAccount, nil
 }

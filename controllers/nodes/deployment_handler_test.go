@@ -18,6 +18,7 @@ package nodes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
@@ -99,6 +101,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN
 
 	s.seedNodes()
 
+	sa, err := json.Marshal(mondooclient.ServiceAccountCredentials{Mrn: "test-mrn"})
+	s.NoError(err)
+
 	s.auditConfig.Spec.ConsoleIntegration.Enable = true
 	credsWithIntegration := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -107,6 +112,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN
 		},
 		Data: map[string][]byte{
 			constants.MondooCredsSecretIntegrationMRNKey: []byte(testIntegrationMRN),
+			constants.MondooCredsSecretServiceAccountKey: sa,
 		},
 	}
 	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(credsWithIntegration)
