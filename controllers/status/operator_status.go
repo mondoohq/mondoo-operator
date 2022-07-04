@@ -25,6 +25,12 @@ import (
 	k8sversion "k8s.io/apimachinery/pkg/version"
 )
 
+const (
+	K8sResourcesScanningIdentifier = "k8s-resources-scanning"
+	NodeScanningIdentifier         = "node-scanning"
+	AdmissionControllerIdentifier  = "admission-controller"
+)
+
 type OperatorCustomState struct {
 	KubernetesVersion string
 	Nodes             []string
@@ -41,7 +47,7 @@ func ReportStatusRequestFromAuditConfig(
 	messages := make([]mondooclient.IntegrationMessage, 3)
 
 	// Kubernetes resources scanning status
-	messages[0].Identifier = "k8s-resources-scanning"
+	messages[0].Identifier = K8sResourcesScanningIdentifier
 	if m.Spec.KubernetesResources.Enable {
 		k8sResourcesScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.K8sResourcesScanningDegraded)
 		if k8sResourcesScanning.Status == v1.ConditionTrue {
@@ -56,7 +62,7 @@ func ReportStatusRequestFromAuditConfig(
 	}
 
 	// Node scanning status
-	messages[1].Identifier = "node-scanning"
+	messages[1].Identifier = NodeScanningIdentifier
 	if m.Spec.Nodes.Enable {
 		nodeScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.NodeScanningDegraded)
 		if nodeScanning.Status == v1.ConditionTrue {
@@ -71,7 +77,7 @@ func ReportStatusRequestFromAuditConfig(
 	}
 
 	// Admission controller status
-	messages[2].Identifier = "admission-controller"
+	messages[2].Identifier = AdmissionControllerIdentifier
 	if m.Spec.Admission.Enable {
 		admissionControllerScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.AdmissionDegraded)
 		if admissionControllerScanning.Status == v1.ConditionTrue {

@@ -231,17 +231,17 @@ func TestTokenRegistration(t *testing.T) {
 					Messages: []mondooclient.IntegrationMessage{
 						{
 							Message:    "Kubernetes resources scanning is disabled",
-							Identifier: "k8s-resources-scanning",
+							Identifier: status.K8sResourcesScanningIdentifier,
 							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 						},
 						{
 							Message:    "Node scanning is disabled",
-							Identifier: "node-scanning",
+							Identifier: status.NodeScanningIdentifier,
 							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 						},
 						{
 							Message:    "Admission controller is disabled",
-							Identifier: "admission-controller",
+							Identifier: status.AdmissionControllerIdentifier,
 							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 						},
 					},
