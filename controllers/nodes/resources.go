@@ -66,7 +66,7 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 										"--inventory-file", "/etc/opt/mondoo/inventory.yml",
 										"--score-threshold", "0",
 									},
-									Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources),
+									Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources),
 									SecurityContext: &corev1.SecurityContext{
 										AllowPrivilegeEscalation: pointer.Bool(false),
 										ReadOnlyRootFilesystem:   pointer.Bool(true),
