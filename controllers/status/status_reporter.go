@@ -61,6 +61,7 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 	if err != nil {
 		return err
 	}
+
 	integrationMrn, err := k8s.GetIntegrationMrnFromSecret(*secret, m)
 	if err != nil {
 		return err

@@ -355,11 +355,9 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 	token := strings.TrimSpace(string(mondooTokenSecret.Data[constants.MondooTokenSecretKey]))
 
 	return r.createServiceAccountFromToken(ctx, mondoo, token, log)
-
 }
 
 func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.Context, mondoo *v1alpha2.MondooAuditConfig, jwtString string, log logr.Logger) error {
-
 	parser := &jwt.Parser{}
 	token, _, err := parser.ParseUnverified(jwtString, jwt.MapClaims{})
 	if err != nil {
@@ -453,7 +451,6 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 }
 
 func (r *MondooAuditConfigReconciler) performInitialCheckIn(integrationMrn string, sa mondooclient.ServiceAccountCredentials, logger logr.Logger) error {
-
 	// build a minimal IntegrationReconciler to be able to attempt a CheckIn()
 	integrationReconciler := &integration.IntegrationReconciler{
 		Log:                 logger,
