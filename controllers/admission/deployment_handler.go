@@ -264,12 +264,7 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 		return nil
 	}
 
-	mondooAuditConfigCopy := n.Mondoo.DeepCopy()
 	updateAdmissionConditions(n.Mondoo, n.isWebhookDegraded(deployment))
-	webhookLog.Info("Updated status for MondooAuditConfig")
-	if err := mondoo.UpdateMondooAuditStatus(ctx, n.KubeClient, mondooAuditConfigCopy, n.Mondoo, webhookLog); err != nil {
-		return err
-	}
 
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.
@@ -285,11 +280,10 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 }
 
 func (n *DeploymentHandler) isWebhookDegraded(deployment *appsv1.Deployment) bool {
-	for _, condition := range n.Mondoo.Status.Conditions {
-		if condition.Type == mondoov1alpha2.ScanAPIDegraded && condition.Status == corev1.ConditionTrue {
-			webhookLog.Info("Webhook is degraded, becasue ScanAPI is degraded. Please check the ScanAPI status.")
-			return true
-		}
+	condition := mondoo.FindMondooAuditConditions(n.Mondoo.Status.Conditions, mondoov1alpha2.ScanAPIDegraded)
+	if condition != nil && condition.Status == corev1.ConditionTrue {
+		webhookLog.Info("Webhook is degraded, becasue ScanAPI is degraded. Please check the ScanAPI status.")
+		return true
 	}
 	if reflect.DeepEqual(deployment.Status, appsv1.DeploymentStatus{}) {
 		webhookLog.Info("No status present for webhook deployment. Assuming it is starting.")

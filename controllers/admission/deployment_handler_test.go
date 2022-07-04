@@ -145,7 +145,7 @@ func TestReconcile(t *testing.T) {
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Admission Deployment to exist")
 
-				assert.Equal(t, deployment.Spec.Replicas, pointer.Int32(2))
+				assert.Equal(t, deployment.Spec.Replicas, pointer.Int32(1))
 				assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, string(mondoov1alpha2.Enforcing), "expected Webhook mode to be set to 'enforcing'")
 
 				vwcName, err := validatingWebhookName(&mondoov1alpha2.MondooAuditConfig{
@@ -172,7 +172,7 @@ func TestReconcile(t *testing.T) {
 			mondooAuditConfigSpec: func() mondoov1alpha2.MondooAuditConfigSpec {
 				mac := testMondooAuditConfigSpec(true, false)
 				mac.Admission.Mode = mondoov1alpha2.Enforcing
-				mac.Admission.Replicas = pointer.Int32(1)
+				mac.Admission.Replicas = pointer.Int32(2)
 				return mac
 			}(),
 			validate: func(t *testing.T, kubeClient client.Client) {
@@ -182,7 +182,7 @@ func TestReconcile(t *testing.T) {
 				require.NoError(t, err, "expected Admission Deployment to exist")
 
 				// when replicas is set, the deployment should have a replicas count of 1, although it is enforcing
-				assert.Equal(t, deployment.Spec.Replicas, pointer.Int32(1))
+				assert.Equal(t, deployment.Spec.Replicas, pointer.Int32(2))
 			},
 		},
 		{
@@ -543,7 +543,8 @@ func defaultResourcesWhenEnabled() []client.Object {
 func testMondooAuditConfigSpec(admissionEnabled, integrationEnabled bool) mondoov1alpha2.MondooAuditConfigSpec {
 	return mondoov1alpha2.MondooAuditConfigSpec{
 		Admission: mondoov1alpha2.Admission{
-			Enable: admissionEnabled,
+			Enable:   admissionEnabled,
+			Replicas: pointer.Int32(1),
 		},
 		ConsoleIntegration: mondoov1alpha2.ConsoleIntegration{
 			Enable: integrationEnabled,

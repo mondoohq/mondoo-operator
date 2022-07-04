@@ -4,6 +4,7 @@ import (
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 const MondooClientSecret = "mondoo-client"
@@ -41,7 +42,8 @@ func DefaultAuditConfig(ns string, workloads, nodes, admission bool) mondoov2.Mo
 			Nodes:                mondoov2.Nodes{Enable: nodes},
 			Admission:            mondoov2.Admission{Enable: admission},
 			Scanner: mondoov2.Scanner{
-				Image: mondoov2.Image{Name: "test", Tag: "latest"},
+				Image:    mondoov2.Image{Name: "test", Tag: "latest"},
+				Replicas: pointer.Int32(1),
 			},
 		},
 	}

@@ -56,16 +56,6 @@ func ScanApiSecret(mondoo v1alpha2.MondooAuditConfig) *corev1.Secret {
 func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.Deployment {
 	labels := DeploymentLabels(m)
 
-	replicas := pointer.Int32(1)
-	if m.Spec.Admission.Enable {
-		if m.Spec.Admission.Mode == v1alpha2.Enforcing {
-			replicas = pointer.Int32(2)
-		}
-	}
-	if m.Spec.Scanner.Replicas != nil {
-		replicas = m.Spec.Scanner.Replicas
-	}
-
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DeploymentName(m.Name),
@@ -76,7 +66,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
-			Replicas: replicas,
+			Replicas: m.Spec.Scanner.Replicas,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
@@ -194,16 +184,12 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 					},
 					Affinity: &corev1.Affinity{
 						PodAntiAffinity: &corev1.PodAntiAffinity{
-							// RequiredDuringSchedulingIgnoredDuringExecution would require at least two nodes
-							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+							RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
 								{
-									PodAffinityTerm: corev1.PodAffinityTerm{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: labels,
-										},
-										TopologyKey: "kubernetes.io/hostname",
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: labels,
 									},
-									Weight: 100,
+									TopologyKey: "kubernetes.io/hostname",
 								},
 							},
 						},

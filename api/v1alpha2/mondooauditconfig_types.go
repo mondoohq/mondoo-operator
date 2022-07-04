@@ -65,6 +65,7 @@ type Scanner struct {
 	// For enforcing mode, the minimum should be two to prevent problems during Pod failures,
 	// e.g. node failure, node scaling, etc.
 	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
 	Replicas *int32 `json:"replicas,omitempty"`
 }
 
@@ -95,6 +96,7 @@ type Admission struct {
 	// For enforcing mode, the minimum should be two to prevent problems during Pod failures,
 	// e.g. node failure, node scaling, etc.
 	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
 	Replicas                *int32                  `json:"replicas,omitempty"`
 	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
 }

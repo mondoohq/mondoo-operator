@@ -124,6 +124,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		log.Error(err, "Failed to get mondoo")
 		return ctrl.Result{}, err
 	}
+
 	config := &v1alpha2.MondooOperatorConfig{}
 	if err = r.Get(ctx, types.NamespacedName{Name: v1alpha2.MondooOperatorConfigName}, config); err != nil {
 		if errors.IsNotFound(err) {
@@ -184,6 +185,41 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	mondooAuditConfigCopy := mondooAuditConfig.DeepCopy()
+
+	// Conditions might be updated before this reconciler reaches the end
+	// MondooAuditConfig has to include these updates in any case.
+	defer func() {
+		ctx := context.Background()
+		// Update the mondoo status with the pod names only after all pod creation actions are done
+		// List the pods for this mondoo's cronjobs and deployment
+		podList := &corev1.PodList{}
+		listOpts := []client.ListOption{
+			client.InNamespace(mondooAuditConfig.Namespace),
+			client.MatchingLabels(labelsForMondoo(mondooAuditConfig.Name)),
+		}
+		if funcErr := r.List(ctx, podList, listOpts...); funcErr != nil {
+			log.Error(funcErr, "Failed to list pods", "Mondoo.Namespace", mondooAuditConfig.Namespace, "Mondoo.Name", mondooAuditConfig.Name)
+		}
+		podListNames := getPodNames(podList.Items)
+
+		// Update status.Pods list if needed
+		statusPodNames := sets.NewString(mondooAuditConfig.Status.Pods...)
+
+		if !statusPodNames.Equal(podListNames) {
+			r.MondooAuditConfig.Status.Pods = podListNames.List()
+		}
+
+		// Update status.ReconciledByOperatorVersion to the running operator version
+		if r.MondooAuditConfig.Status.ReconciledByOperatorVersion != version.Version {
+			r.MondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
+		}
+
+		funcErr := mondoo.UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, r.MondooAuditConfig, log)
+		// do not overwrite errors which happened before the defered function is called
+		if err == nil {
+			err = funcErr
+		}
+	}()
 
 	// If spec.MondooTokenSecretRef != "" and the Secret referenced in spec.MondooCredsSecretRef
 	// does not exist, then attempt to trade the token for a Mondoo service account and save it
@@ -253,39 +289,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return result, err
 	}
 
-	// Update the mondoo status with the pod names only after all pod creation actions are done
-	// List the pods for this mondoo's cronjobs and deployment
-	podList := &corev1.PodList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(mondooAuditConfig.Namespace),
-		client.MatchingLabels(labelsForMondoo(mondooAuditConfig.Name)),
-	}
-	if err = r.List(ctx, podList, listOpts...); err != nil {
-		log.Error(err, "Failed to list pods", "Mondoo.Namespace", mondooAuditConfig.Namespace, "Mondoo.Name", mondooAuditConfig.Name)
-		return ctrl.Result{}, err
-	}
-	podListNames := getPodNames(podList.Items)
-
-	// Update status.Pods list if needed
-	statusPodNames := sets.NewString(mondooAuditConfig.Status.Pods...)
-
-	if !statusPodNames.Equal(podListNames) {
-		mondooAuditConfig.Status.Pods = podListNames.List()
-		err = r.Status().Update(ctx, mondooAuditConfig)
-		if err != nil {
-			log.Error(err, "Failed to update mondoo status")
-			return ctrl.Result{}, err
-		}
-	}
-
 	// Update status.ReconciledByOperatorVersion to the running operator version
-	if mondooAuditConfig.Status.ReconciledByOperatorVersion != version.Version {
-		mondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
-	}
+	// This should only happen, after all objects have been reconciled
+	r.MondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
 
-	if err = mondoo.UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log); err != nil {
-		return ctrl.Result{}, err
-	}
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
 }
 

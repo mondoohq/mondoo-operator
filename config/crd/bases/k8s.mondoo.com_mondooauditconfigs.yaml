@@ -71,6 +71,7 @@ spec:
                     - enforcing
                     type: string
                   replicas:
+                    default: 1
                     description: Number of replicas for the admission webhook. When
                       not set and mode is "enforcing", it will automtically be set
                       to two. When not set and mode is "permissive, it will be set
@@ -162,6 +163,7 @@ spec:
                         type: string
                     type: object
                   replicas:
+                    default: 1
                     description: Number of replicas for the scanner. When not set
                       and admission mode is "enforcing", it will automtically be set
                       to two. When not set and admission mode is "permissive, it will

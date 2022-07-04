@@ -197,17 +197,21 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
+	// Disable imageResolution for the webhook image to be runnable.
+	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
+	// image, and fail because we haven't pushed this image publicly.
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
+	s.verifyAdmissionWorking(auditConfig)
+}
+
+func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.MondooAuditConfig) {
 	s.auditConfig = auditConfig
 	// Generate certificates manually
 	caCert, err := s.manuallyCreateCertificates()
 
 	// Don't bother with further webhook tests if we couldnt' save the certificates
 	s.Require().NoErrorf(err, "Error while generating/saving certificates for webhook service")
-	// Disable imageResolution for the webhook image to be runnable.
-	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
-	// image, and fail because we haven't pushed this image publicly.
-	cleanup := s.disableContainerImageResolution()
-	defer cleanup()
 
 	// Enable webhook
 	zap.S().Info("Create an audit config that enables only admission control.")
@@ -255,8 +259,14 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoo
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionScaleDownScanApi(auditConfig mondoov2.MondooAuditConfig) {
+	// Disable imageResolution for the webhook image to be runnable.
+	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
+	// image, and fail because we haven't pushed this image publicly.
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
+
 	// first verify admission is working
-	s.testMondooAuditConfigAdmission(auditConfig)
+	s.verifyAdmissionWorking(auditConfig)
 
 	// now check what happens when it is degraded
 	var scanApiLabels []string
@@ -280,7 +290,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionScaleDownScanApi(au
 
 	zap.S().Info("MondooAuditConfig condition should be updated to degraded.")
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionTrue)
-	s.NoErrorf(err, "Scan API should be in degraded state")
+	s.NoErrorf(err, "Admission should be in degraded state")
 
 	// try to change deployment => should fail
 	deployments := &appsv1.DeploymentList{}
@@ -334,7 +344,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 	listOpts.Namespace = auditConfig.Namespace
 	podList := &corev1.PodList{}
 
-	zap.S().Info(listOpts)
 	err = s.testCluster.K8sHelper.Clientset.List(s.ctx, podList, listOpts)
 	s.NoErrorf(err, "Couldn't list scan API pod.")
 	s.Equalf(0, len(podList.Items), "No ScanAPI Pod should be present")

@@ -66,14 +66,6 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 		containerArgs = append(containerArgs, []string{"--integration-mrn", integrationMRN}...)
 	}
 
-	replicas := pointer.Int32(1)
-	if m.Spec.Admission.Mode == mondoov1alpha2.Enforcing {
-		replicas = pointer.Int32(2)
-	}
-	if m.Spec.Admission.Replicas != nil {
-		replicas = m.Spec.Admission.Replicas
-	}
-
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      webhookDeploymentName(m.Name),
@@ -83,7 +75,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: replicas,
+			Replicas: m.Spec.Admission.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					WebhookLabelKey: WebhookLabelValue,
@@ -182,18 +174,14 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 					},
 					Affinity: &corev1.Affinity{
 						PodAntiAffinity: &corev1.PodAntiAffinity{
-							// RequiredDuringSchedulingIgnoredDuringExecution would require at least two nodes
-							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+							RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
 								{
-									PodAffinityTerm: corev1.PodAffinityTerm{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												WebhookLabelKey: WebhookLabelValue,
-											},
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											WebhookLabelKey: WebhookLabelValue,
 										},
-										TopologyKey: "kubernetes.io/hostname",
 									},
-									Weight: 100,
+									TopologyKey: "kubernetes.io/hostname",
 								},
 							},
 						},
