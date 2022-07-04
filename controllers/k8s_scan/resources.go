@@ -101,7 +101,7 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 									Name: "token",
 									VolumeSource: corev1.VolumeSource{
 										Secret: &corev1.SecretVolumeSource{
-											DefaultMode: pointer.Int32(0444),
+											DefaultMode: pointer.Int32(0o444),
 											SecretName:  scanapi.SecretName(m.Name),
 										},
 									},

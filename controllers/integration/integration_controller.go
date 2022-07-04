@@ -78,7 +78,6 @@ func (r *IntegrationReconciler) Start(ctx context.Context) error {
 }
 
 func (r *IntegrationReconciler) integrationLoop() {
-
 	r.Log.Info("Listing all MondooAuditConfigs")
 
 	mondooAuditConfigs := &v1alpha2.MondooAuditConfigList{}
@@ -154,7 +153,6 @@ func (r *IntegrationReconciler) IntegrationCheckIn(integrationMrn string, sa mon
 }
 
 func (r *IntegrationReconciler) setIntegrationCondition(config *v1alpha2.MondooAuditConfig, degradedStatus bool, customMessage string) error {
-
 	originalConfig := config.DeepCopy()
 
 	updateIntegrationCondition(config, degradedStatus, customMessage)

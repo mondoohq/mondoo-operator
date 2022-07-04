@@ -123,7 +123,6 @@ func (s *IntegrationCheckInSuite) TestCheckIn() {
 	s.NoError(err, "should not error while processing valid MondooAuditConfig")
 	s.Zero(len(mondooAuditConfig.Status.Conditions), "expected no condtion set on happy path")
 	mockCtrl.Finish()
-
 }
 
 func (s *IntegrationCheckInSuite) TestClearPreviousCondition() {
@@ -170,7 +169,6 @@ func (s *IntegrationCheckInSuite) TestClearPreviousCondition() {
 	s.NoError(err, "should not error while processing valid MondooAuditConfig")
 	assertConditionExists(s.T(), fakeClient, corev1.ConditionFalse, "Mondoo integration is working")
 	mockCtrl.Finish()
-
 }
 
 func (s *IntegrationCheckInSuite) TestMissingIntegrationMRN() {
@@ -211,7 +209,6 @@ func (s *IntegrationCheckInSuite) TestMissingIntegrationMRN() {
 	s.Error(err, "expected error when missing integration MRN")
 	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "key with integration MRN data")
 	mockCtrl.Finish()
-
 }
 
 func (s *IntegrationCheckInSuite) TestBadServiceAccountData() {
@@ -251,7 +248,6 @@ func (s *IntegrationCheckInSuite) TestBadServiceAccountData() {
 	s.Error(err, "expected error when Mondoo service account data broken")
 	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "failed to unmarshal creds")
 	mockCtrl.Finish()
-
 }
 
 func (s *IntegrationCheckInSuite) TestFailedCheckIn() {
@@ -291,7 +287,6 @@ func (s *IntegrationCheckInSuite) TestFailedCheckIn() {
 	s.Error(err, "expected error when CheckIn() return error")
 	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "failed to CheckIn")
 	mockCtrl.Finish()
-
 }
 
 func testMondooCredsSecret() *corev1.Secret {
@@ -322,7 +317,6 @@ func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {
 }
 
 func assertConditionExists(t *testing.T, kubeClient client.Client, status corev1.ConditionStatus, message string) {
-
 	mondoo := testMondooAuditConfig()
 	require.NoError(t, kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(mondoo), mondoo), "error fetching current MondooAuditConfig from fake client")
 

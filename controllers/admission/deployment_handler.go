@@ -58,8 +58,8 @@ type DeploymentHandler struct {
 // syncValidatingWebhookConfiguration will create/update the ValidatingWebhookConfiguration
 func (n *DeploymentHandler) syncValidatingWebhookConfiguration(ctx context.Context,
 	vwc *webhooksv1.ValidatingWebhookConfiguration,
-	annotationKey, annotationValue string) error {
-
+	annotationKey, annotationValue string,
+) error {
 	// Override the default/generic name to allow for multiple MondooAudicConfig resources
 	// to each have their own Webhook
 	vwcName, err := validatingWebhookName(n.Mondoo)
@@ -120,7 +120,6 @@ func (n *DeploymentHandler) syncValidatingWebhookConfiguration(ctx context.Conte
 // just check the fields that we would care about. For the many auto-populated fields, we'll just ignore the difference between
 // our desired configuration and the actual Webhook fields.
 func deepEqualsValidatingWebhookConfiguration(existing, desired *webhooksv1.ValidatingWebhookConfiguration, annotationKey string) bool {
-
 	// We always set an annotation, so if there is none set, we need to update the existing webhook
 	if existing.Annotations == nil {
 		return false
@@ -206,7 +205,6 @@ func (n *DeploymentHandler) syncWebhookService(ctx context.Context) error {
 }
 
 func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
-
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-system",
@@ -263,7 +261,6 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 }
 
 func (n *DeploymentHandler) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1.ValidatingWebhookConfiguration) error {
-
 	var annotationKey, annotationValue string
 
 	switch n.Mondoo.Spec.Admission.CertificateProvisioning.Mode {

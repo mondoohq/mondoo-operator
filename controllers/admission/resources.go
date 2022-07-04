@@ -166,7 +166,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 							Name: "token",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									DefaultMode: pointer.Int32(0444),
+									DefaultMode: pointer.Int32(0o444),
 									SecretName:  scanapi.SecretName(m.Name),
 								},
 							},

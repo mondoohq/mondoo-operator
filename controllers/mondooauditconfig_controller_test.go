@@ -66,7 +66,6 @@ func init() {
 }
 
 func TestTokenRegistration(t *testing.T) {
-
 	utilruntime.Must(v1alpha2.AddToScheme(scheme.Scheme))
 
 	testTokenData = credentials.MondooToken(t, "")
@@ -100,7 +99,6 @@ func TestTokenRegistration(t *testing.T) {
 				return mClient
 			},
 			verify: func(t *testing.T, kubeClient client.Client) {
-
 				credsSecret := &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      testMondooCredsSecretName,
@@ -253,7 +251,6 @@ func TestTokenRegistration(t *testing.T) {
 				return mClient
 			},
 			verify: func(t *testing.T, kubeClient client.Client) {
-
 				credsSecret := &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      testMondooCredsSecretName,

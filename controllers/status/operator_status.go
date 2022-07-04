@@ -31,7 +31,8 @@ type OperatorCustomState struct {
 }
 
 func ReportStatusRequestFromAuditConfig(
-	integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node, k8sVersion *k8sversion.Info) mondooclient.ReportStatusRequest {
+	integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node, k8sVersion *k8sversion.Info,
+) mondooclient.ReportStatusRequest {
 	nodeNames := make([]string, len(nodes))
 	for i := range nodes {
 		nodeNames[i] = nodes[i].Name

@@ -16,7 +16,6 @@ const (
 )
 
 func TestCache(t *testing.T) {
-
 	tests := []struct {
 		name            string
 		imagesMap       map[string]imageData
@@ -90,7 +89,6 @@ func TestCache(t *testing.T) {
 					test.extraValidation(t, testCache)
 				}
 			}
-
 		})
 	}
 }

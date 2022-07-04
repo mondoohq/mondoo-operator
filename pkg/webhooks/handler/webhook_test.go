@@ -34,7 +34,6 @@ const (
 )
 
 func TestWebhookValidate(t *testing.T) {
-
 	decoder := setupDecoder(t)
 	tests := []struct {
 		name          string
@@ -172,7 +171,6 @@ func TestWebhookValidate(t *testing.T) {
 			if test.expectReason != "" {
 				assert.Equal(t, test.expectReason, string(response.AdmissionResponse.Result.Reason))
 			}
-
 		})
 	}
 }

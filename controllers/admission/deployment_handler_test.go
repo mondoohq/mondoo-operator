@@ -107,7 +107,6 @@ func TestReconcile(t *testing.T) {
 				certKey := types.NamespacedName{Name: certManagerCertificateName, Namespace: testNamespace}
 				err = kubeClient.Get(context.TODO(), certKey, cert)
 				assert.NoError(t, err, "error retrieving cert-manager Certificate that should exist")
-
 			},
 		},
 		{
