@@ -18,5 +18,5 @@ func updateImageScanningConditions(config *v1alpha2.MondooAuditConfig, degradedS
 	}
 
 	config.Status.Conditions = mondoo.SetMondooAuditCondition(
-		config.Status.Conditions, v1alpha2.K8sResourcesScanningDegraded, status, reason, msg, updateCheck)
+		config.Status.Conditions, v1alpha2.K8sContainerImageScanningDegraded, status, reason, msg, updateCheck)
 }

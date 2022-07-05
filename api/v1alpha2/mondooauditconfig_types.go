@@ -150,6 +150,8 @@ const (
 	NodeScanningDegraded MondooAuditConfigConditionType = "NodeScanningDegraded"
 	// Indicates weather Kubernetes resources scanning is Degraded
 	K8sResourcesScanningDegraded MondooAuditConfigConditionType = "K8sResourcesScanningDegraded"
+	// Indicates weather Kubernetes container image scanning is Degraded
+	K8sContainerImageScanningDegraded MondooAuditConfigConditionType = "K8sContainerImageScanningDegraded"
 	// Indicates weather Admission controller is Degraded
 	AdmissionDegraded MondooAuditConfigConditionType = "AdmissionDegraded"
 	// Indicates weather Admission controller is Degraded because of the ScanAPI

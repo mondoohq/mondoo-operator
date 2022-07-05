@@ -39,7 +39,7 @@ type DeploymentHandler struct {
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
-	if !n.Mondoo.Spec.KubernetesResources.Enable {
+	if !n.Mondoo.Spec.KubernetesResources.ContainerImageScanning {
 		return ctrl.Result{}, n.down(ctx)
 	}
 
