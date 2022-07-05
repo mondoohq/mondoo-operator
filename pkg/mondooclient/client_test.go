@@ -87,7 +87,7 @@ func TestScanner_ScanKubernetesResources(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, healthResp.Status == "SERVING")
 
-	result, err := mClient.ScanKubernetesResources(context.Background(), "")
+	result, err := mClient.ScanKubernetesResources(context.Background(), "", false)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 

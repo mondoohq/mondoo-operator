@@ -29,7 +29,7 @@ type Client interface {
 
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	RunKubernetesManifest(context.Context, *KubernetesManifestJob) (*ScanResult, error)
-	ScanKubernetesResources(ctx context.Context, integrationMrn string) (*ScanResult, error)
+	ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool) (*ScanResult, error)
 
 	IntegrationRegister(context.Context, *IntegrationRegisterInput) (*IntegrationRegisterOutput, error)
 	IntegrationCheckIn(context.Context, *IntegrationCheckInInput) (*IntegrationCheckInOutput, error)
@@ -227,7 +227,7 @@ type Score struct {
 
 const ScanKubernetesResourcesEndpoint = "/Scan/Run"
 
-func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationMrn string) (*ScanResult, error) {
+func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool) (*ScanResult, error) {
 	url := s.ApiEndpoint + ScanKubernetesResourcesEndpoint
 	scanJob := ScanJob{
 		Inventory: inventory.MondooInventory{
@@ -250,6 +250,12 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationM
 			scanJob.Inventory.Spec.Assets[0].Labels = make(map[string]string)
 		}
 		scanJob.Inventory.Spec.Assets[0].Labels[constants.MondooAssetsIntegrationLabel] = integrationMrn
+	}
+
+	if scanContainerImages {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = []string{"container-images"}
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Options = make(map[string]string)
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Options["all-namespaces"] = "true"
 	}
 
 	reqBodyBytes, err := json.Marshal(scanJob)

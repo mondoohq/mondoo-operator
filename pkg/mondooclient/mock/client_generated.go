@@ -111,16 +111,16 @@ func (mr *MockClientMockRecorder) RunKubernetesManifest(arg0, arg1 interface{}) 
 }
 
 // ScanKubernetesResources mocks base method.
-func (m *MockClient) ScanKubernetesResources(ctx context.Context, integrationMrn string) (*mondooclient.ScanResult, error) {
+func (m *MockClient) ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool) (*mondooclient.ScanResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ScanKubernetesResources", ctx, integrationMrn)
+	ret := m.ctrl.Call(m, "ScanKubernetesResources", ctx, integrationMrn, scanContainerImages)
 	ret0, _ := ret[0].(*mondooclient.ScanResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ScanKubernetesResources indicates an expected call of ScanKubernetesResources.
-func (mr *MockClientMockRecorder) ScanKubernetesResources(ctx, integrationMrn interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) ScanKubernetesResources(ctx, integrationMrn, scanContainerImages interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScanKubernetesResources", reflect.TypeOf((*MockClient)(nil).ScanKubernetesResources), ctx, integrationMrn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScanKubernetesResources", reflect.TypeOf((*MockClient)(nil).ScanKubernetesResources), ctx, integrationMrn, scanContainerImages)
 }

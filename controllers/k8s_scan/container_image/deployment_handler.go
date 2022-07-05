@@ -14,32 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package k8s_scan
+package container_image
 
 import (
 	"context"
-	"fmt"
 
-	appsv1 "k8s.io/api/apps/v1"
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/controllers/k8s_scan/container_image"
-	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
-	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
-var logger = ctrl.Log.WithName("k8s-resources-scanning")
-
-const (
-	workloadDeploymentConfigMapNameTemplate = `%s-deploy`
-	WorkloadDeploymentNameTemplate          = `%s-workload`
-)
+var logger = ctrl.Log.WithName("k8s-images-scanning")
 
 type DeploymentHandler struct {
 	KubeClient             client.Client
@@ -56,18 +46,10 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 	if err := n.syncCronJob(ctx); err != nil {
 		return ctrl.Result{}, err
 	}
-
-	cImageScan := container_image.DeploymentHandler{
-		KubeClient:             n.KubeClient,
-		Mondoo:                 n.Mondoo,
-		ContainerImageResolver: n.ContainerImageResolver,
-		MondooOperatorConfig:   n.MondooOperatorConfig,
-	}
-	return cImageScan.Reconcile(ctx)
+	return ctrl.Result{}, nil
 }
 
 func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
-	// TODO: think about overriding these images
 	mondooClientImage, err := n.ContainerImageResolver.MondooOperatorImage(
 		"", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
@@ -112,8 +94,8 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
-	updateWorkloadsConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs))
-	return n.cleanupWorkloadDeployment(ctx)
+	updateImageScanningConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs))
+	return nil
 }
 
 func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]batchv1.CronJob, error) {
@@ -137,41 +119,8 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		return err
 	}
 
-	if err := n.cleanupWorkloadDeployment(ctx); err != nil {
-		return err
-	}
-
 	// Clear any remnant status
-	updateWorkloadsConditions(n.Mondoo, false)
+	updateImageScanningConditions(n.Mondoo, false)
 
-	return nil
-}
-
-// TODO: remove with 0.5.0 release
-// This can be removed once we believe enough time has passed where the old-style named
-// Deployment for workloads has been replaced and removed to keep us from orphaning the old-style Deployment.
-func (n *DeploymentHandler) cleanupWorkloadDeployment(ctx context.Context) error {
-	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: n.Mondoo.Namespace,
-			Name:      fmt.Sprintf(WorkloadDeploymentNameTemplate, n.Mondoo.Name),
-		},
-	}
-
-	if err := k8s.DeleteIfExists(ctx, n.KubeClient, dep); err != nil {
-		logger.Error(err, "failed to clean up old Deployment for workloads", "namespace", dep.Namespace, "name", dep.Name)
-		return err
-	}
-
-	cfgMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf(workloadDeploymentConfigMapNameTemplate, n.Mondoo.Name),
-			Namespace: n.Mondoo.Namespace,
-		},
-	}
-	if err := k8s.DeleteIfExists(ctx, n.KubeClient, cfgMap); err != nil {
-		logger.Error(err, "failed to cleanup configmap", "namespace", cfgMap.Namespace, "name", cfgMap.Name)
-		return err
-	}
 	return nil
 }

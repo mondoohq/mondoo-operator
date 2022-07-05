@@ -64,6 +64,10 @@ type Scanner struct {
 
 type KubernetesResources struct {
 	Enable bool `json:"enable,omitempty"`
+
+	// ContainerImageScanning determines whether container images are being scanned. The current implementation
+	// runs a separate job once every 24h that scans the container images running in the cluster.
+	ContainerImageScanning bool `json:"containerImageScanning,omitempty"`
 }
 
 type Nodes struct {
