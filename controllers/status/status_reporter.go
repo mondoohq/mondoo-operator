@@ -49,7 +49,7 @@ func NewStatusReporter(kubeClient client.Client, mondooClientBuilder func(mondoo
 
 func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfig) error {
 	if !m.Spec.ConsoleIntegration.Enable {
-		return nil // If ConsoleIntegration is not disabled, we cannot report status
+		return nil // If ConsoleIntegration is not enabled, we cannot report status
 	}
 
 	nodes := v1.NodeList{}
