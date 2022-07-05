@@ -68,6 +68,7 @@ spec:
           }}
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
       securityContext:
         runAsNonRoot: true
       serviceAccountName: {{ include "mondoo-operator.fullname" . }}-controller-manager
