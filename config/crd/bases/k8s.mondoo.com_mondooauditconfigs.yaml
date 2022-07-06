@@ -72,12 +72,9 @@ spec:
                     type: string
                   replicas:
                     default: 1
-                    description: Number of replicas for the admission webhook. When
-                      not set and mode is "enforcing", it will automtically be set
-                      to two. When not set and mode is "permissive, it will be set
-                      to one. For enforcing mode, the minimum should be two to prevent
-                      problems during Pod failures, e.g. node failure, node scaling,
-                      etc.
+                    description: Number of replicas for the admission webhook. For
+                      enforcing mode, the minimum should be two to prevent problems
+                      during Pod failures, e.g. node failure, node scaling, etc.
                     format: int32
                     minimum: 1
                     type: integer
@@ -164,12 +161,9 @@ spec:
                     type: object
                   replicas:
                     default: 1
-                    description: Number of replicas for the scanner. When not set
-                      and admission mode is "enforcing", it will automtically be set
-                      to two. When not set and admission mode is "permissive, it will
-                      be set to one. For enforcing mode, the minimum should be two
-                      to prevent problems during Pod failures, e.g. node failure,
-                      node scaling, etc.
+                    description: Number of replicas for the scanner. For enforcing
+                      mode, the minimum should be two to prevent problems during Pod
+                      failures, e.g. node failure, node scaling, etc.
                     format: int32
                     minimum: 1
                     type: integer
