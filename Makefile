@@ -169,7 +169,7 @@ generate-manifests: manifests kustomize ## Generates manifests and pipes into a 
 .PHONY: deploy-olm
 deploy-olm: manifests kustomize ## Deploy using operator-sdk OLM 
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | operator-sdk run bundle ${BUNDLE_IMG}
+	$(KUSTOMIZE) build config/default | operator-sdk run bundle --index-image=quay.io/operator-framework/opm:v1.23.0 ${BUNDLE_IMG}
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
