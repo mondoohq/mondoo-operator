@@ -24,7 +24,6 @@ import (
 
 	api "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
-	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -46,6 +45,8 @@ const (
 var (
 	CreateArgs                        = []string{"create", "-f"}
 	CreateFromStdinArgs               = append(CreateArgs, "-")
+	ApplyArgs                         = []string{"apply", "-f"}
+	ApplyFromStdinArgs                = append(ApplyArgs, "-")
 	DeleteArgs                        = []string{"delete", "-f"}
 	DeleteArgsIgnoreNotFound          = []string{"delete", "--ignore-not-found=true", "-f"}
 	DeleteFromStdinArgs               = append(DeleteArgs, "-")
@@ -528,7 +529,7 @@ func (k8sh *K8sHelper) CheckForPodInStatus(auditConfig *api.MondooAuditConfig, p
 }
 
 // CheckForReconciledOperatorVersion Check whether the MondooAuditConfig Status contains the current operator Version after Reconcile.
-func (k8sh *K8sHelper) CheckForReconciledOperatorVersion(auditConfig *api.MondooAuditConfig) error {
+func (k8sh *K8sHelper) CheckForReconciledOperatorVersion(auditConfig *api.MondooAuditConfig, version string) error {
 	err := k8sh.ExecuteWithRetries(func() (bool, error) {
 		// Condition of MondooAuditConfig should be updated
 		foundMondooAuditConfig, err := k8sh.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
@@ -536,7 +537,7 @@ func (k8sh *K8sHelper) CheckForReconciledOperatorVersion(auditConfig *api.Mondoo
 			return false, err
 		}
 		reconciledVersion := foundMondooAuditConfig.Status.ReconciledByOperatorVersion
-		if reconciledVersion == version.Version {
+		if reconciledVersion == version {
 			return true, nil
 		}
 		return false, nil

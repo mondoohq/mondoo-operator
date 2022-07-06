@@ -27,6 +27,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	mondooscanapi "go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,14 +35,19 @@ import (
 
 type AuditConfigBaseSuite struct {
 	suite.Suite
-	ctx         context.Context
-	testCluster *TestCluster
-	auditConfig mondoov2.MondooAuditConfig
+	ctx            context.Context
+	testCluster    *TestCluster
+	auditConfig    mondoov2.MondooAuditConfig
+	installRelease bool
 }
 
 func (s *AuditConfigBaseSuite) SetupSuite() {
 	s.ctx = context.Background()
-	s.testCluster = StartTestCluster(installer.NewDefaultSettings(), s.T)
+	if s.installRelease {
+		s.testCluster = StartTestCluster(installer.NewReleaseSettings(), s.T)
+	} else {
+		s.testCluster = StartTestCluster(installer.NewDefaultSettings(), s.T)
+	}
 }
 
 func (s *AuditConfigBaseSuite) TearDownSuite() {
@@ -137,7 +143,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	err = s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-k8s-images-scan")
 	s.NoErrorf(err, "Couldn't find container image scan pod in Podlist of the MondooAuditConfig Status")
 
-	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig)
+	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 }
 
@@ -192,7 +198,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 		s.NoErrorf(err, "Couldn't find NodeScan Pod for node "+node.Name+" in Podlist of the MondooAuditConfig Status")
 	}
 
-	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig)
+	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 }
 
@@ -252,7 +258,7 @@ func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.Mondo
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionFalse)
 	s.NoErrorf(err, "Admission shouldn't be in degraded state")
 
-	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig)
+	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 
 	s.checkPods(&auditConfig)
@@ -373,7 +379,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 	s.NoErrorf(err, "Couldn't find condition message about missing service account")
 
 	// The SA is missing, but the actual reconcile loop gets finished. The SA is outside of the operators scope.
-	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig)
+	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 }
 
@@ -399,8 +405,60 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAllDisabled(auditConfig mond
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &s.auditConfig),
 		"Failed to create Mondoo audit config.")
 
-	err := s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&s.auditConfig)
+	err := s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&s.auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+}
+
+func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mondoov2.MondooAuditConfig) {
+	s.auditConfig = auditConfig
+
+	serviceDNSNames := []string{
+		// DNS names will take the form of ServiceName.ServiceNamespace.svc and .svc.cluster.local
+		fmt.Sprintf("%s-webhook-service.%s.svc", auditConfig.Name, auditConfig.Namespace),
+		fmt.Sprintf("%s-webhook-service.%s.svc.cluster.local", auditConfig.Name, auditConfig.Namespace),
+	}
+	secretName := mondooadmission.GetTLSCertificatesSecretName(auditConfig.Name)
+	_, err := s.testCluster.MondooInstaller.GenerateServiceCerts(&auditConfig, secretName, serviceDNSNames)
+
+	// Don't bother with further webhook tests if we couldnt' save the certificates
+	s.Require().NoErrorf(err, "Error while generating/saving certificates for webhook service")
+
+	// Disable imageResolution for the webhook image to be runnable.
+	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
+	// image, and fail because we haven't pushed this image publicly.
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
+
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
+		"Failed to create Mondoo audit config.")
+
+	// Verify scan API deployment and service
+	s.validateScanApiDeployment(auditConfig)
+
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionFalse)
+	s.Require().NoErrorf(err, "Admission shouldn't be in degraded state")
+
+	// TODO: should be checked after this is fixed: https://github.com/mondoohq/mondoo-operator/issues/436
+	/*
+		err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.NodeScanningDegraded)
+		s.Require().NoErrorf(err, "Node scanning shouldn't be in degraded state")
+
+		err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.K8sResourcesScanningDegraded)
+		s.Require().NoErrorf(err, "k8s resource scanning shouldn't be in degraded state")
+	*/
+
+	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, s.testCluster.MondooInstaller.PreviousVersion)
+	s.Require().NoErrorf(err, "Couldn't find release version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+
+	// everything is fine, now install current branch/release
+	branchInstaller := installer.NewMondooInstaller(installer.NewDefaultSettings(), s.T)
+	branchInstaller.InstallOperator()
+
+	s.validateScanApiDeployment(auditConfig)
+
+	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
+	s.NoErrorf(err, "Couldn't find release version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 }
 
 func (s *AuditConfigBaseSuite) validateScanApiDeployment(auditConfig mondoov2.MondooAuditConfig) {
