@@ -23,7 +23,7 @@ import (
 )
 
 // Have kubebuilder generate a ValidatingWebhookConfiguration under the path /validate-k8s-mondoo-com that watches Pod/Deployment creation/updates
-//+kubebuilder:webhook:path=/validate-k8s-mondoo-com,mutating=false,failurePolicy=ignore,sideEffects=None,groups="";apps,resources=pods;deployments,verbs=create;update,versions=v1,name=policy.k8s.mondoo.com,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-k8s-mondoo-com,mutating=false,failurePolicy=ignore,sideEffects=None,groups="";apps;batch,resources=pods;deployments;daemonsets;statefulsets;jobs;cronjobs,verbs=create;update,versions=v1,name=policy.k8s.mondoo.com,admissionReviewVersions=v1
 
 var handlerlog = logf.Log.WithName("webhook-validator")
 

@@ -1,4 +1,3 @@
-
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -19,6 +18,7 @@ webhooks:
   - apiGroups:
     - ""
     - apps
+    - batch
     apiVersions:
     - v1
     operations:
@@ -27,4 +27,8 @@ webhooks:
     resources:
     - pods
     - deployments
+    - daemonsets
+    - statefulsets
+    - jobs
+    - cronjobs
   sideEffects: None
