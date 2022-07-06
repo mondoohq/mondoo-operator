@@ -12,7 +12,7 @@ func updateImageScanningConditions(config *v1alpha2.MondooAuditConfig, degradedS
 	status := corev1.ConditionFalse
 	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
 	if degradedStatus {
-		msg = "Kubernetes ContainerImage Scanning is Unavailable"
+		msg = "Kubernetes Container Image Scanning is Unavailable"
 		reason = "KubernetesContainerImageScanningUnavailable"
 		status = corev1.ConditionTrue
 	}
