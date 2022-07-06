@@ -510,7 +510,6 @@ func (s *AuditConfigBaseSuite) getPassingPod() *corev1.Pod {
 				},
 			},
 			AutomountServiceAccountToken: pointer.Bool(false),
-			ServiceAccountName:           "mondoo-operator-controller-manager",
 		},
 	}
 }

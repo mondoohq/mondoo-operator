@@ -154,7 +154,7 @@ func TestReconcile(t *testing.T) {
 						Namespace: testNamespace,
 					},
 				})
-				assert.NoError(t, err, "unexpected failure while generating Webhook name")
+				require.NoError(t, err, "unexpected failure while generating Webhook name")
 
 				vwc := &webhooksv1.ValidatingWebhookConfiguration{
 					ObjectMeta: metav1.ObjectMeta{
@@ -181,7 +181,6 @@ func TestReconcile(t *testing.T) {
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Admission Deployment to exist")
 
-				// when replicas is set, the deployment should have a replicas count of 1, although it is enforcing
 				assert.Equal(t, deployment.Spec.Replicas, pointer.Int32(2))
 			},
 		},

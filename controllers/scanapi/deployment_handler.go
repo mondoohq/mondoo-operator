@@ -105,8 +105,8 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	logger.Info("Mondoo client image: ", "image", mondooClientImage)
-	logger.Info("Mondoo skip resolve: ", "SkipContainerResolution", n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	logger.V(7).Info("Mondoo client image: ", "image", mondooClientImage)
+	logger.V(7).Info("Mondoo skip resolve: ", "SkipContainerResolution", n.MondooOperatorConfig.Spec.SkipContainerResolution)
 
 	deployment := ScanApiDeployment(n.Mondoo.Namespace, mondooClientImage, *n.Mondoo)
 	if err := ctrl.SetControllerReference(n.Mondoo, deployment, n.KubeClient.Scheme()); err != nil {
@@ -133,8 +133,6 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	updateScanAPIConditions(n.Mondoo, existingDeployment.Status.UnavailableReplicas != 0, existingDeployment.Status.Conditions)
 
 	if !k8s.AreDeploymentsEqual(*deployment, existingDeployment) {
-		logger.Info("expected Deployment.Spec", "Deployment.Spec", deployment.Spec)
-		logger.Info("actual Deployment.Spec", "Deployment.Spec", existingDeployment.Spec)
 		logger.Info("Update needed for scan API Deployment")
 		// If the deployment exists but it is different from what we actually want it to be, then update.
 		k8s.UpdateDeployment(&existingDeployment, *deployment)
