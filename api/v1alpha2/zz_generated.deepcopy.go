@@ -212,16 +212,8 @@ func (in *MondooAuditConfigSpec) DeepCopyInto(out *MondooAuditConfigSpec) {
 	out.MondooTokenSecretRef = in.MondooTokenSecretRef
 	in.Scanner.DeepCopyInto(&out.Scanner)
 	out.KubernetesResources = in.KubernetesResources
-<<<<<<< HEAD
 	in.Nodes.DeepCopyInto(&out.Nodes)
-	out.Admission = in.Admission
-||||||| parent of 8633cc5 (Fix nil pointer dereference)
-	out.Nodes = in.Nodes
-	out.Admission = in.Admission
-=======
-	out.Nodes = in.Nodes
 	in.Admission.DeepCopyInto(&out.Admission)
->>>>>>> 8633cc5 (Fix nil pointer dereference)
 	out.ConsoleIntegration = in.ConsoleIntegration
 }
 
