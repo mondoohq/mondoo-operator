@@ -49,21 +49,22 @@ type DeploymentHandler struct {
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
-	if !n.Mondoo.Spec.KubernetesResources.Enable {
-		return ctrl.Result{}, n.down(ctx)
-	}
-
-	if err := n.syncCronJob(ctx); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	cImageScan := container_image.DeploymentHandler{
 		KubeClient:             n.KubeClient,
 		Mondoo:                 n.Mondoo,
 		ContainerImageResolver: n.ContainerImageResolver,
 		MondooOperatorConfig:   n.MondooOperatorConfig,
 	}
-	return cImageScan.Reconcile(ctx)
+
+	if res, err := cImageScan.Reconcile(ctx); err != nil {
+		return res, err
+	}
+
+	if !n.Mondoo.Spec.KubernetesResources.Enable {
+		return ctrl.Result{}, n.down(ctx)
+	}
+
+	return ctrl.Result{}, n.syncCronJob(ctx)
 }
 
 func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {

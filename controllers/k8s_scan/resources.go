@@ -51,7 +51,7 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CronJobName(m.Name),
 			Namespace: m.Namespace,
-			Labels:    CronJobLabels(m),
+			Labels:    ls,
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:          cronTab,
