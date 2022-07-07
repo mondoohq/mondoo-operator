@@ -59,7 +59,7 @@ type TransportConfig struct {
 	Record  bool              `protobuf:"varint,22,opt,name=record,proto3" json:"record,omitempty"`
 	Options map[string]string `protobuf:"bytes,23,rep,name=options,proto3" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// flags for additional asset discovery
-	// Discover *Discovery `protobuf:"bytes,27,opt,name=discover,proto3" json:"discover,omitempty"`
+	Discover Discovery `protobuf:"bytes,27,opt,name=discover,proto3" json:"discover,omitempty"`
 	// additional platform information, passed-through
 	// Kind    Kind   `protobuf:"varint,24,opt,name=kind,proto3,enum=mondoo.motor.transports.v1.Kind" json:"kind,omitempty"`
 	Runtime string `protobuf:"bytes,25,opt,name=runtime,proto3" json:"runtime,omitempty"`
@@ -98,3 +98,8 @@ const (
 	TransportBackend_CONNECTION_TERRAFORM               TransportBackend = 26
 	TransportBackend_CONNECTION_HOST                    TransportBackend = 27
 )
+
+type Discovery struct {
+	Targets []string          `protobuf:"bytes,1,rep,name=targets,proto3" json:"targets,omitempty"`
+	Filter  map[string]string `protobuf:"bytes,2,rep,name=filter,proto3" json:"filter,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+}

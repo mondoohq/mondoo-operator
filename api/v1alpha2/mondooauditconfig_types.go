@@ -64,6 +64,10 @@ type Scanner struct {
 
 type KubernetesResources struct {
 	Enable bool `json:"enable,omitempty"`
+
+	// ContainerImageScanning determines whether container images are being scanned. The current implementation
+	// runs a separate job once every 24h that scans the container images running in the cluster.
+	ContainerImageScanning bool `json:"containerImageScanning,omitempty"`
 }
 
 type Nodes struct {
@@ -146,6 +150,8 @@ const (
 	NodeScanningDegraded MondooAuditConfigConditionType = "NodeScanningDegraded"
 	// Indicates weather Kubernetes resources scanning is Degraded
 	K8sResourcesScanningDegraded MondooAuditConfigConditionType = "K8sResourcesScanningDegraded"
+	// Indicates weather Kubernetes container image scanning is Degraded
+	K8sContainerImageScanningDegraded MondooAuditConfigConditionType = "K8sContainerImageScanningDegraded"
 	// Indicates weather Admission controller is Degraded
 	AdmissionDegraded MondooAuditConfigConditionType = "AdmissionDegraded"
 	// Indicates weather Admission controller is Degraded because of the ScanAPI

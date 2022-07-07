@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package k8s_scan
+package container_image
 
 import (
 	"context"
@@ -58,6 +58,7 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 
 func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
 	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", true, false, false)
+	s.auditConfig.Spec.KubernetesResources.ContainerImageScanning = true
 	s.fakeClientBuilder = fake.NewClientBuilder()
 }
 
@@ -167,7 +168,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.Equal(expected, created)
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
+func (s *DeploymentHandlerSuite) TestReconcile_K8sContainerImageScanningStatus() {
 	d := s.createDeploymentHandler()
 
 	// Reconcile to create all resources
@@ -196,8 +197,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 
 	// Verify the node scanning status is set to unavailable
 	condition := d.Mondoo.Status.Conditions[0]
-	s.Equal("Kubernetes Resources Scanning is Unavailable", condition.Message)
-	s.Equal("KubernetesResourcesScanningUnavailable", condition.Reason)
+	s.Equal("Kubernetes Container Image Scanning is Unavailable", condition.Message)
+	s.Equal("KubernetesContainerImageScanningUnavailable", condition.Reason)
 	s.Equal(corev1.ConditionTrue, condition.Status)
 
 	// Make the jobs successful again
@@ -212,12 +213,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 
 	// Verify the node scanning status is set to available
 	condition = d.Mondoo.Status.Conditions[0]
-	s.Equal("Kubernetes Resources Scanning is Available", condition.Message)
-	s.Equal("KubernetesResourcesScanningAvailable", condition.Reason)
+	s.Equal("Kubernetes Container Image Scanning is Available", condition.Message)
+	s.Equal("KubernetesContainerImageScanningAvailable", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
+func (s *DeploymentHandlerSuite) TestReconcile_DisableKubernetesResources() {
 	d := s.createDeploymentHandler()
 
 	// Reconcile to create all resources
@@ -227,6 +228,25 @@ func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
 
 	// Reconcile again to delete the resources
 	d.Mondoo.Spec.KubernetesResources.Enable = false
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	cronJobs := &batchv1.CronJobList{}
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs))
+	s.Equal(0, len(cronJobs.Items))
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_DisableContainerImageScanning() {
+	d := s.createDeploymentHandler()
+
+	// Reconcile to create all resources
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Reconcile again to delete the resources
+	d.Mondoo.Spec.KubernetesResources.ContainerImageScanning = false
 	result, err = d.Reconcile(s.ctx)
 	s.NoError(err)
 	s.True(result.IsZero())

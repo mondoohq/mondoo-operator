@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package k8s_scan
+package container_image
 
 import (
 	"fmt"
@@ -29,18 +29,21 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-const CronJobNameSuffix = "-k8s-scan"
+const CronJobNameSuffix = "-k8s-images-scan"
 
 func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
-	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
+	// We want to start the cron job one minute after it was enabled.
+	cronStart := time.Now().Add(1 * time.Minute)
+	cronTab := fmt.Sprintf("%d %d * * *", cronStart.Minute(), cronStart.Hour())
 	scanApiUrl := scanapi.ScanApiServiceUrl(m)
 
 	containerArgs := []string{
 		"k8s-scan",
 		"--scan-api-url", scanApiUrl,
 		"--token-file-path", "/etc/scanapi/token",
+		"--scan-container-images",
 	}
 
 	if integrationMrn != "" {
@@ -101,7 +104,7 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 									Name: "token",
 									VolumeSource: corev1.VolumeSource{
 										Secret: &corev1.SecretVolumeSource{
-											DefaultMode: pointer.Int32(0444),
+											DefaultMode: pointer.Int32(0o444),
 											SecretName:  scanapi.SecretName(m.Name),
 										},
 									},
@@ -119,7 +122,7 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 
 func CronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 	return map[string]string{
-		"app":       "mondoo-k8s-scan",
+		"app":       "mondoo-k8s-images-scan",
 		"scan":      "k8s",
 		"mondoo_cr": m.Name,
 	}

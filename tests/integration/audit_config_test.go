@@ -20,6 +20,7 @@ func (s *AuditConfigSuite) TestReconcile_AllDisabled() {
 
 func (s *AuditConfigSuite) TestReconcile_KubernetesResources() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false)
+	auditConfig.Spec.KubernetesResources.ContainerImageScanning = true
 	s.testMondooAuditConfigKubernetesResources(auditConfig)
 }
 
