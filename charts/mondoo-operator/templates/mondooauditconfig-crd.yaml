@@ -89,6 +89,12 @@ spec:
                 type: object
               kubernetesResources:
                 properties:
+                  containerImageScanning:
+                    description: ContainerImageScanning determines whether container
+                      images are being scanned. The current implementation runs a separate
+                      job once every 24h that scans the container images running in
+                      the cluster.
+                    type: boolean
                   enable:
                     type: boolean
                 type: object

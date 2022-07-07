@@ -311,7 +311,7 @@ func (k8sh *K8sHelper) PrintPodDescribe(namespace string, args ...string) {
 }
 
 func (k8sh *K8sHelper) getPodDescribe(namespace string, args ...string) string {
-	args = append([]string{"describe", "pod", "-n", namespace}, args...)
+	args = append([]string{"get", "pod", "-o", "yaml", "-n", namespace}, args...)
 	description, err := k8sh.Kubectl(args...)
 	if err != nil {
 		zap.S().Errorf("failed to describe pod. %v %+v", args, err)
