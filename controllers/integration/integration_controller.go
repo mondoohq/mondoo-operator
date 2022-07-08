@@ -110,7 +110,7 @@ func (r *IntegrationReconciler) processMondooAuditConfig(m v1alpha2.MondooAuditC
 		return err
 	}
 
-	integrationMrn, err := k8s.GetIntegrationMrnFromSecret(*secret, m)
+	integrationMrn, err := k8s.GetIntegrationMrnFromSecret(*secret)
 	if err != nil {
 		return err
 	}

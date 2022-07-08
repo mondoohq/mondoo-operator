@@ -61,10 +61,16 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
-	integrationMrn, err := k8s.GetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
+	secret, err := k8s.GetIntegrationSecretForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
+	if err != nil {
+		logger.Error(err, "failed to get integration secret for MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
+		return err
+	}
+
+	integrationMrn, err := k8s.GetIntegrationMrnFromSecret(*secret)
 	if err != nil {
 		logger.Error(err,
-			"failed to retrieve integration-mrn for MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
+			"failed to retrieve integration-mrn from secret", "namespace", secret.Namespace, "name", secret.Name)
 		return err
 	}
 

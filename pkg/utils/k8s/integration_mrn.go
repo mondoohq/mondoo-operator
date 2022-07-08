@@ -41,7 +41,7 @@ func TryGetIntegrationMrnForAuditConfig(ctx context.Context, kubeClient client.C
 		return "", err
 	}
 
-	return GetIntegrationMrnFromSecret(*secret, auditConfig)
+	return GetIntegrationMrnFromSecret(*secret)
 }
 
 // GetIntegrationSecretForAuditConfig retrieves the MondooCredsSecretRef for the give MondooAuditConfig.
@@ -59,7 +59,7 @@ func GetIntegrationSecretForAuditConfig(ctx context.Context, kubeClient client.C
 	return serviceAccountSecret, nil
 }
 
-func GetIntegrationMrnFromSecret(secret corev1.Secret, auditConfig v1alpha2.MondooAuditConfig) (string, error) {
+func GetIntegrationMrnFromSecret(secret corev1.Secret) (string, error) {
 	integrationMrn, ok := secret.Data[constants.MondooCredsSecretIntegrationMRNKey]
 	if !ok {
 		err := fmt.Errorf("creds Secret %s/%s missing %s key with integration MRN data",
