@@ -270,7 +270,6 @@ func TestTokenRegistration(t *testing.T) {
 
 				assert.NoError(t, err, "error getting secret that should exist")
 
-				// Check StringData because we're using the fake client
 				assert.Equal(t, testMondooServiceAccountDataBytes, credsSecret.Data["config"])
 			},
 		},

@@ -209,7 +209,10 @@ func TestReconcile(t *testing.T) {
 			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, true),
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
 				sa := mondooclient.ServiceAccountCredentials{Mrn: "test-mrn"}
-				saData, _ := json.Marshal(sa)
+				saData, err := json.Marshal(sa)
+				if err != nil {
+					panic(err)
+				}
 
 				return []client.Object{
 					&corev1.Secret{
