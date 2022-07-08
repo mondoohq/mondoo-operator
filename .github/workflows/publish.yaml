@@ -278,6 +278,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # fetch is nneded for "git tag --list"
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
       - name: extract tag/version
@@ -311,12 +313,12 @@ jobs:
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
       # before the test execution starts.
       - name: Wait a bit for the runner to become more stable
-        run: sleep 60
+        run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
       - name: Install Mondoo operator using OLM
         run: |
           operator-sdk olm install
-          sleep 30
+          kubectl -n olm wait --for=condition=Ready pods --all --timeout=30s
           kubectl create ns mondoo-operator
           operator-sdk run bundle --index-image=quay.io/operator-framework/opm:v1.23.0 ghcr.io/${{ github.repository }}-bundle:${{ github.ref_name }} --namespace mondoo-operator --timeout 3m0s
 
@@ -331,10 +333,14 @@ jobs:
       - name: Store creds
         run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
+      - name: Setting PREVIOUS_RELEASE env var
+        run: |
+          echo "PREVIOUS_RELEASE=$(git tag --list 'v*' | tail -1)" >> $GITHUB_ENV
+
       - name: Run integration tests
         run: |
           EXTERNAL_INSTALLATION=1 \
-          PREVIOUS_RELEASE=$(git tag --list 'v*' | tail -1) \
+          PREVIOUS_RELEASE=${{ env.PREVIOUS_RELEASE }} \
           VERSION=${{ steps.get_version.outputs.VERSION }} \
           make test/integration/ci
 
@@ -415,10 +421,14 @@ jobs:
       - name: Wait a bit for the runner to become more stable
         run: sleep 60
 
+      - name: Setting PREVIOUS_RELEASE env var
+        run: |
+          echo "PREVIOUS_RELEASE=$(git tag --list 'v*' | tail -1)" >> $GITHUB_ENV
+
       - name: Run integration tests
         run: |
           EXTERNAL_INSTALLATION=1 \
-          PREVIOUS_RELEASE=$(git tag --list 'v*' | tail -1) \
+          PREVIOUS_RELEASE=${{ env.PREVIOUS_RELEASE }} \
           VERSION=${{ steps.get_version.outputs.VERSION }} \
           make test/integration/ci
 
