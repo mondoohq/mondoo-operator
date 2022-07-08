@@ -83,7 +83,7 @@ jobs:
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
       - name: Setting PREVIOUS_RELEASE env var
-        run: >
+        run: |
           git tag --list 'v*' | tail
           echo "PREVIOUS_RELEASE=$(git tag --list 'v*' | tail -1)" >> $GITHUB_ENV
 
