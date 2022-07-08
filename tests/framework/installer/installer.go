@@ -46,7 +46,10 @@ func NewMondooInstaller(settings Settings, t func() *testing.T) *MondooInstaller
 
 	_, externalInstall := os.LookupEnv(ExternalInstallationEnvVar)
 
-	previousVersion, _ := os.LookupEnv(PreviousVersionEnvVar)
+	previousVersion, found := os.LookupEnv(PreviousVersionEnvVar)
+	if !found {
+		panic("failed to get previous version tag for this repo")
+	}
 
 	return &MondooInstaller{
 		T:                     t,
