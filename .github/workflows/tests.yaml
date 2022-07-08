@@ -82,9 +82,19 @@ jobs:
       - name: Wait a bit for the runner to become more stable
         run: sleep 60
 
-      - run: |
-          PREVIOUS_RELEASE=$(git tag --list 'v*' | tail -1) \
+      - name: Setting PREVIOUS_RELEASE env var
+        run: >
+          git tag --list 'v*' | tail -1
+          echo "PREVIOUS_RELEASE=$(git tag --list 'v*' | tail -1)" >> $GITHUB_ENV
+
+      - name: Debug PREVIOUS_RELEASE
+        run: echo ${{ env.PREVIOUS_RELEASE }}
+      
+      - name: Run integration tests
+        run: |
+          PREVIOUS_RELEASE=${{ env.PREVIOUS_RELEASE }} \
           make test/integration/ci
+
       - uses: actions/download-artifact@v3 # download the unit test results
         if: success() || failure()        # run this step even if previous step failed
         with:
