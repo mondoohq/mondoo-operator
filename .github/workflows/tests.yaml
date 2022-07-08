@@ -80,11 +80,11 @@ jobs:
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
       # before the test execution starts.
       - name: Wait a bit for the runner to become more stable
-        run: sleep 60
+        run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
       - name: Setting PREVIOUS_RELEASE env var
         run: >
-          git tag --list 'v*' | tail -1
+          git tag --list 'v*' | tail
           echo "PREVIOUS_RELEASE=$(git tag --list 'v*' | tail -1)" >> $GITHUB_ENV
 
       - name: Debug PREVIOUS_RELEASE
