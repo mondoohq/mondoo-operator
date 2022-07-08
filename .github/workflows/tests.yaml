@@ -59,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          fetch-depth: 0 # fetch is nneded for "git tag --list"
+          fetch-depth: 0 # fetch is nneded for "git tag --list" in the Makefile
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
       - name: Start minikube
@@ -84,14 +84,8 @@ jobs:
       - name: Wait a bit for the runner to become more stable
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
-      - name: Setting PREVIOUS_RELEASE env var
-        run: |
-          echo "PREVIOUS_RELEASE=$(git tag --list 'v*' | tail -1)" >> $GITHUB_ENV
-
       - name: Run integration tests
-        run: |
-          PREVIOUS_RELEASE=${{ env.PREVIOUS_RELEASE }} \
-          make test/integration/ci
+        run: make test/integration/ci
 
       - uses: actions/download-artifact@v3 # download the unit test results
         if: success() || failure()        # run this step even if previous step failed
