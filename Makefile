@@ -5,7 +5,7 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= sha256-$(shell git rev-parse HEAD).sig
 
-PREVIOUS_RELEASE = $(shell git tag --list 'v*' | tail -1)
+PREVIOUS_RELEASE ?= $(shell git tag --list 'v*' | tail -1)
 export PREVIOUS_RELEASE
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -114,7 +114,6 @@ test/integration: manifests generate generate-manifests load-minikube
 
 test/integration/ci: manifests generate generate-manifests load-minikube gotestsum
 	$(info PREVIOUS_RELEASE="$(PREVIOUS_RELEASE)")
-	$(info $(shell git tag --list 'v*' | tail -1))
 	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -ldflags $(LDFLAGS) -v -timeout 900s -p 1
 
 ##@ Build

@@ -82,7 +82,9 @@ jobs:
       - name: Wait a bit for the runner to become more stable
         run: sleep 60
 
-      - run: make test/integration/ci
+      - run: |
+          PREVIOUS_RELEASE=$(git tag --list 'v*' | tail -1) \
+          make test/integration/ci
       - uses: actions/download-artifact@v3 # download the unit test results
         if: success() || failure()        # run this step even if previous step failed
         with:

@@ -332,7 +332,11 @@ jobs:
         run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
       - name: Run integration tests
-        run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.get_version.outputs.VERSION }} make test/integration/ci
+        run: |
+          EXTERNAL_INSTALLATION=1 \
+          PREVIOUS_RELEASE=$(git tag --list 'v*' | tail -1) \
+          VERSION=${{ steps.get_version.outputs.VERSION }} \
+          make test/integration/ci
 
       - name: Clean up
         run: |
@@ -412,7 +416,11 @@ jobs:
         run: sleep 60
 
       - name: Run integration tests
-        run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.get_version.outputs.VERSION }} make test/integration/ci
+        run: |
+          EXTERNAL_INSTALLATION=1 \
+          PREVIOUS_RELEASE=$(git tag --list 'v*' | tail -1) \
+          VERSION=${{ steps.get_version.outputs.VERSION }} \
+          make test/integration/ci
 
       - name: Upload test logs artifact
         uses: actions/upload-artifact@v3
