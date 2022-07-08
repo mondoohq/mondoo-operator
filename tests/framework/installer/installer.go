@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
@@ -168,10 +169,15 @@ func (i *MondooInstaller) CreateClientSecret(ns string) error {
 	}
 	secret.Name = utils.MondooClientSecret
 	secret.Namespace = ns
-	if err := i.K8sHelper.Clientset.Create(i.ctx, &secret); err != nil {
+	created, err := k8s.CreateIfNotExist(i.ctx, i.K8sHelper.Clientset, &secret, &secret)
+	if err != nil {
 		return fmt.Errorf("failed to create Мondoo secret in namespace %s. %v", ns, err)
 	}
-	zap.S().Infof("Created Мondoo client secret %q.", utils.MondooClientSecret)
+	if created {
+		zap.S().Infof("Created Мondoo client secret %q.", utils.MondooClientSecret)
+	} else {
+		zap.S().Infof("Мondoo client secret %s/%s already exists.", secret.Namespace, secret.Name)
+	}
 	return nil
 }
 

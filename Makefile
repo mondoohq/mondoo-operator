@@ -113,7 +113,8 @@ test/integration: manifests generate generate-manifests load-minikube
 	go test -ldflags $(LDFLAGS) -v -timeout 900s -p 1 ./tests/integration/...
 
 test/integration/ci: manifests generate generate-manifests load-minikube gotestsum
-    $(shell git tag --list 'v*' | tail -1)
+	$(info PREVIOUS_RELEASE="$(PREVIOUS_RELEASE)")
+	$(info $(shell git tag --list 'v*' | tail -1))
 	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -ldflags $(LDFLAGS) -v -timeout 900s -p 1
 
 ##@ Build

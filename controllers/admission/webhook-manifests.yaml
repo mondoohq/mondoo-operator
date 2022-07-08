@@ -17,6 +17,7 @@ webhooks:
   - apiGroups:
     - ""
     - apps
+    - batch
     apiVersions:
     - v1
     operations:
@@ -25,4 +26,8 @@ webhooks:
     resources:
     - pods
     - deployments
+    - daemonsets
+    - statefulsets
+    - jobs
+    - cronjobs
   sideEffects: None
