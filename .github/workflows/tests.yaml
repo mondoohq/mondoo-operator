@@ -84,7 +84,13 @@ jobs:
 
       - name: Setting PREVIOUS_RELEASE env var
         run: |
-          git tag --list 'v*' | tail
+          echo "*******************"
+          git tag --list
+          echo "*******************"
+          git tag --list 'v*'
+          echo "*******************"
+          git for-each-ref --sort=-refname --format '%(refname:strip=2)' refs/tags --count=1
+          echo "*******************"
           echo "PREVIOUS_RELEASE=$(git tag --list 'v*' | tail -1)" >> $GITHUB_ENV
 
       - name: Debug PREVIOUS_RELEASE
