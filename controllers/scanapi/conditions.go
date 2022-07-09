@@ -14,7 +14,11 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 	reason := "ScanAPIAvailable"
 	status := corev1.ConditionFalse
 	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
-	if degradedStatus {
+	if !config.Spec.KubernetesResources.Enable && !config.Spec.Admission.Enable {
+		msg = "ScanAPI is disabled"
+		reason = "ScanAPIDisabled"
+		status = corev1.ConditionFalse
+	} else if degradedStatus {
 		msg = "ScanAPI controller is unavailable"
 
 		// perhaps more general ReplicaFailure?

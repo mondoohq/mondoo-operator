@@ -176,8 +176,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sContainerImageScanningStatus()
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	// Verify no conditions were added
-	s.Equal(0, len(d.Mondoo.Status.Conditions))
+	// Verify the image scanning status is set to unavailable
+	s.Equal(1, len(d.Mondoo.Status.Conditions))
+	condition := d.Mondoo.Status.Conditions[0]
+	s.Equal("Kubernetes Container Image Scanning is Available", condition.Message)
+	s.Equal("KubernetesContainerImageScanningAvailable", condition.Reason)
+	s.Equal(corev1.ConditionFalse, condition.Status)
 
 	cronJobs := &batchv1.CronJobList{}
 	s.NoError(d.KubeClient.List(s.ctx, cronJobs))
@@ -195,8 +199,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sContainerImageScanningStatus()
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	// Verify the node scanning status is set to unavailable
-	condition := d.Mondoo.Status.Conditions[0]
+	// Verify the image scanning status is set to unavailable
+	condition = d.Mondoo.Status.Conditions[0]
 	s.Equal("Kubernetes Container Image Scanning is Unavailable", condition.Message)
 	s.Equal("KubernetesContainerImageScanningUnavailable", condition.Reason)
 	s.Equal(corev1.ConditionTrue, condition.Status)
@@ -211,10 +215,23 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sContainerImageScanningStatus()
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	// Verify the node scanning status is set to available
+	// Verify the image scanning status is set to available
 	condition = d.Mondoo.Status.Conditions[0]
 	s.Equal("Kubernetes Container Image Scanning is Available", condition.Message)
 	s.Equal("KubernetesContainerImageScanningAvailable", condition.Reason)
+	s.Equal(corev1.ConditionFalse, condition.Status)
+
+	d.Mondoo.Spec.KubernetesResources.ContainerImageScanning = false
+
+	// Reconcile to update the audit config status
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Verify the image scanning status is set to disabled
+	condition = d.Mondoo.Status.Conditions[0]
+	s.Equal("Kubernetes Container Image Scanning is disabled", condition.Message)
+	s.Equal("KubernetesContainerImageScanningDisabled", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
 }
 
