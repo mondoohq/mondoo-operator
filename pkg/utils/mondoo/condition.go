@@ -156,19 +156,17 @@ func SetMondooAuditCondition(
 	now := metav1.Now()
 	existingCondition := FindMondooAuditConditions(conditions, conditionType)
 	if existingCondition == nil {
-		if status == corev1.ConditionTrue {
-			conditions = append(
-				conditions,
-				mondoov1alpha2.MondooAuditConfigCondition{
-					Type:               conditionType,
-					Status:             status,
-					Reason:             reason,
-					Message:            message,
-					LastTransitionTime: now,
-					LastUpdateTime:     now,
-				},
-			)
-		}
+		conditions = append(
+			conditions,
+			mondoov1alpha2.MondooAuditConfigCondition{
+				Type:               conditionType,
+				Status:             status,
+				Reason:             reason,
+				Message:            message,
+				LastTransitionTime: now,
+				LastUpdateTime:     now,
+			},
+		)
 	} else {
 		if shouldUpdateCondition(
 			existingCondition.Status, existingCondition.Reason, existingCondition.Message,
