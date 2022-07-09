@@ -51,13 +51,11 @@ func ExecuteCommand(cmdStruct CommandArgs) CommandOut {
 	cmd.Env = append(cmd.Env, cmdStruct.EnvironmentVariable...)
 
 	stdOut, err := cmd.StdoutPipe()
-
 	if err != nil {
 		return CommandOut{StdErr: errBuffer.String(), StdOut: outBuffer.String(), Err: err}
 	}
 
 	stdin, err := cmd.StdinPipe()
-
 	if err != nil {
 		return CommandOut{Err: err}
 	}
@@ -73,7 +71,6 @@ func ExecuteCommand(cmdStruct CommandArgs) CommandOut {
 	}()
 
 	stdErr, err := cmd.StderrPipe()
-
 	if err != nil {
 		return CommandOut{StdErr: errBuffer.String(), StdOut: outBuffer.String(), Err: err}
 	}

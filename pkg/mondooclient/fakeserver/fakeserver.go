@@ -42,7 +42,6 @@ func FakeServer() *httptest.Server {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-
 	})
 
 	mux.HandleFunc(mondooclient.ScanKubernetesResourcesEndpoint, func(w http.ResponseWriter, r *http.Request) {
@@ -62,7 +61,6 @@ func FakeServer() *httptest.Server {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-
 	})
 	return httptest.NewServer(mux)
 }

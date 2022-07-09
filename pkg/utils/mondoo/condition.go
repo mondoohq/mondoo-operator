@@ -144,6 +144,7 @@ func FindMondooAuditConditions(conditions []mondoov1alpha2.MondooAuditConfigCond
 	}
 	return nil
 }
+
 func SetMondooAuditCondition(
 	conditions []mondoov1alpha2.MondooAuditConfigCondition,
 	conditionType mondoov1alpha2.MondooAuditConfigConditionType,

@@ -32,7 +32,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -50,6 +49,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
+	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -62,10 +62,10 @@ const finalizerString = "k8s.mondoo.com/delete"
 // MondooAuditConfigReconciler reconciles a MondooAuditConfig object
 type MondooAuditConfigReconciler struct {
 	client.Client
-	Scheme                 *runtime.Scheme
 	MondooClientBuilder    func(mondooclient.ClientOptions) mondooclient.Client
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooAuditConfig      *v1alpha2.MondooAuditConfig
+	StatusReporter         *status.StatusReporter
 }
 
 // Embed the Default Inventory for CronJob and Deployment Configurations
@@ -103,13 +103,13 @@ var (
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
-func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	log := ctrllog.FromContext(ctx)
 
 	// Fetch the Mondoo instance
 	mondooAuditConfig := &v1alpha2.MondooAuditConfig{}
 
-	err := r.Get(ctx, req.NamespacedName, mondooAuditConfig)
+	err = r.Get(ctx, req.NamespacedName, mondooAuditConfig)
 	r.MondooAuditConfig = mondooAuditConfig
 
 	if err != nil {
@@ -125,7 +125,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 	config := &v1alpha2.MondooOperatorConfig{}
-	if err := r.Get(ctx, types.NamespacedName{Name: v1alpha2.MondooOperatorConfigName}, config); err != nil {
+	if err = r.Get(ctx, types.NamespacedName{Name: v1alpha2.MondooOperatorConfigName}, config); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("MondooOperatorConfig not found, using defaults")
 		} else {
@@ -133,6 +133,16 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			return ctrl.Result{}, err
 		}
 	}
+
+	defer func() {
+		reportErr := r.StatusReporter.Report(ctx, *mondooAuditConfig)
+
+		// If the err from the reconcile func is nil, the all steps were executed it successfully
+		// If there was an error, we do not override the existing error with the status report error
+		if err == nil {
+			err = reportErr
+		}
+	}()
 
 	if !config.DeletionTimestamp.IsZero() {
 		// Going to proceed as if there is no MondooOperatorConfig
@@ -152,7 +162,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			MondooOperatorConfig:   config,
 			ContainerImageResolver: r.ContainerImageResolver,
 		}
-		result, err := webhooks.Reconcile(ctx)
+		result, err = webhooks.Reconcile(ctx)
 		if err != nil {
 			log.Error(err, "failed to cleanup webhooks")
 			return result, err
@@ -166,7 +176,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	} else {
 		if !controllerutil.ContainsFinalizer(mondooAuditConfig, finalizerString) {
 			controllerutil.AddFinalizer(mondooAuditConfig, finalizerString)
-			if err := r.Update(ctx, mondooAuditConfig); err != nil {
+			if err = r.Update(ctx, mondooAuditConfig); err != nil {
 				log.Error(err, "failed to set finalizer")
 			}
 			return ctrl.Result{}, err
@@ -178,7 +188,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// If spec.MondooTokenSecretRef != "" and the Secret referenced in spec.MondooCredsSecretRef
 	// does not exist, then attempt to trade the token for a Mondoo service account and save it
 	// in the Secret referenced in .spec.MondooCredsSecretRef
-	if err := r.exchangeTokenForServiceAccount(ctx, mondooAuditConfig, log); err != nil {
+	if err = r.exchangeTokenForServiceAccount(ctx, mondooAuditConfig, log); err != nil {
 		log.Error(err, "errors while checking if Mondoo service account needs creating")
 		return ctrl.Result{}, err
 	}
@@ -189,7 +199,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: r.ContainerImageResolver,
 	}
-	result, err := scanapi.Reconcile(ctx)
+	result, err = scanapi.Reconcile(ctx)
 	if err != nil {
 		log.Error(err, "Failed to set up scan API")
 	}
@@ -261,7 +271,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	if !statusPodNames.Equal(podListNames) {
 		mondooAuditConfig.Status.Pods = podListNames.List()
-		err := r.Status().Update(ctx, mondooAuditConfig)
+		err = r.Status().Update(ctx, mondooAuditConfig)
 		if err != nil {
 			log.Error(err, "Failed to update mondoo status")
 			return ctrl.Result{}, err
@@ -273,7 +283,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		mondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
 	}
 
-	if err := mondoo.UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log); err != nil {
+	if err = mondoo.UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
@@ -345,11 +355,9 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 	token := strings.TrimSpace(string(mondooTokenSecret.Data[constants.MondooTokenSecretKey]))
 
 	return r.createServiceAccountFromToken(ctx, mondoo, token, log)
-
 }
 
 func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.Context, mondoo *v1alpha2.MondooAuditConfig, jwtString string, log logr.Logger) error {
-
 	parser := &jwt.Parser{}
 	token, _, err := parser.ParseUnverified(jwtString, jwt.MapClaims{})
 	if err != nil {
@@ -403,9 +411,9 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 			log.Error(err, "failed to marshal service account creds from IntegrationRegister()")
 			return err
 		}
-		tokenSecret.StringData = map[string]string{
-			constants.MondooCredsSecretServiceAccountKey: string(credsBytes),
-			constants.MondooCredsSecretIntegrationMRNKey: integrationMrn,
+		tokenSecret.Data = map[string][]byte{
+			constants.MondooCredsSecretServiceAccountKey: credsBytes,
+			constants.MondooCredsSecretIntegrationMRNKey: []byte(integrationMrn),
 		}
 		_, err = k8s.CreateIfNotExist(ctx, r.Client, tokenSecret, tokenSecret)
 		if err != nil {
@@ -415,7 +423,7 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 
 		// No easy way to retry this one-off CheckIn(). An error on initial CheckIn()
 		// means we'll just retry on the regularly scheduled interval via the integration controller
-		_ = r.performInitialCheckIn(integrationMrn, credsBytes, log)
+		_ = r.performInitialCheckIn(integrationMrn, *resp.Creds, log)
 	} else {
 		// Do a vanilla token-for-service-account exchange
 		resp, err := mClient.ExchangeRegistrationToken(ctx, &mondooclient.ExchangeRegistrationTokenInput{
@@ -442,15 +450,14 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 	return nil
 }
 
-func (r *MondooAuditConfigReconciler) performInitialCheckIn(integrationMrn string, serviceAccount []byte, logger logr.Logger) error {
-
+func (r *MondooAuditConfigReconciler) performInitialCheckIn(integrationMrn string, sa mondooclient.ServiceAccountCredentials, logger logr.Logger) error {
 	// build a minimal IntegrationReconciler to be able to attempt a CheckIn()
 	integrationReconciler := &integration.IntegrationReconciler{
 		Log:                 logger,
 		MondooClientBuilder: r.MondooClientBuilder,
 	}
 
-	if err := integrationReconciler.IntegrationCheckIn([]byte(integrationMrn), serviceAccount); err != nil {
+	if err := integrationReconciler.IntegrationCheckIn(integrationMrn, sa); err != nil {
 		logger.Error(err, "initial CheckIn() failed, will CheckIn() periodically", "integrationMRN", integrationMrn)
 		return err
 	}

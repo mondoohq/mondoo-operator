@@ -39,7 +39,6 @@ const (
 )
 
 func ScanApiSecret(mondoo v1alpha2.MondooAuditConfig) *corev1.Secret {
-
 	// Generate a token. It will only be saved on initial Secret creation.
 	token := uuid.New()
 
@@ -148,7 +147,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 											},
 										},
 									},
-									DefaultMode: pointer.Int32(0444),
+									DefaultMode: pointer.Int32(0o444),
 								},
 							},
 						},
@@ -171,7 +170,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 											},
 										},
 									},
-									DefaultMode: pointer.Int32(0444),
+									DefaultMode: pointer.Int32(0o444),
 								},
 							},
 						},

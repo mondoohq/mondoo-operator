@@ -78,5 +78,4 @@ func GenerateTLSCerts(dnsNames []string) (*bytes.Buffer, *bytes.Buffer, *bytes.B
 	}
 
 	return pemEncodedCA, pemEncodedServerCert, pemEncodedServerPrivKey, nil
-
 }

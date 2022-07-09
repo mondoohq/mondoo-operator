@@ -76,7 +76,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
-	integrationMrn, err := k8s.GetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
+	integrationMrn, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
 	if err != nil {
 		logger.Error(err,
 			"failed to retrieve integration-mrn for MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)

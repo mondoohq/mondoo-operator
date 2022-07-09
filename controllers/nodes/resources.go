@@ -22,10 +22,6 @@ const (
 	CronJobNameBase        = "-node-"
 	InventoryConfigMapBase = "-node-inventory-"
 
-	// TODO: remove in a follow-up version
-	OldCronJobNameBase          = "-node-scanning-"
-	OldInventoryConfigMapSuffix = "-node-scanning-inventory"
-
 	// Execute hourly
 	CronTab = "0 * * * *"
 )
@@ -163,17 +159,9 @@ func CronJobName(prefix, suffix string) string {
 	return fmt.Sprintf("%s%s", base, NodeNameOrHash(52-len(base), suffix))
 }
 
-func OldCronJobName(prefix, suffix string) string {
-	return fmt.Sprintf("%s%s%s", prefix, OldCronJobNameBase, suffix)
-}
-
 func ConfigMapName(prefix, nodeName string) string {
 	base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
 	return fmt.Sprintf("%s%s", base, NodeNameOrHash(52-len(base), nodeName))
-}
-
-func OldConfigMapName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, OldInventoryConfigMapSuffix)
 }
 
 func Inventory(node corev1.Node, integrationMRN string, m v1alpha2.MondooAuditConfig) (string, error) {

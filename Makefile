@@ -98,7 +98,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 lint: golangci-lint
-	$(GOLANGCI_LINT) run
+	$(GOLANGCI_LINT) run --enable gofumpt
 
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) --arch=amd64 use $(ENVTEST_K8S_VERSION) -p path)" go test $(UNIT_TEST_PACKAGES) -coverprofile cover.out

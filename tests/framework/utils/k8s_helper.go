@@ -101,7 +101,6 @@ func (k8sh *K8sHelper) Kubectl(args ...string) (string, error) {
 
 // KubectlWithStdin is wrapper for executing kubectl commands in stdin
 func (k8sh *K8sHelper) KubectlWithStdin(stdin string, args ...string) (string, error) {
-
 	cmdStruct := CommandArgs{Command: cmd, PipeToStdIn: stdin, CmdArgs: args}
 	cmdOut := ExecuteCommand(cmdStruct)
 
@@ -334,7 +333,7 @@ func (k8sh *K8sHelper) createTestLogFile(name, namespace, testName, suffix strin
 	dir, _ := os.Getwd()
 	logDir := path.Join(dir, "_output/tests/")
 	if _, err := os.Stat(logDir); os.IsNotExist(err) {
-		err := os.MkdirAll(logDir, 0777)
+		err := os.MkdirAll(logDir, 0o777)
 		if err != nil {
 			zap.S().Errorf("Cannot get logs files dir for app : %v in namespace %v, err: %v", name, namespace, err)
 			return nil, err

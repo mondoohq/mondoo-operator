@@ -2,6 +2,7 @@ package admission
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -23,6 +24,7 @@ import (
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -105,7 +107,6 @@ func TestReconcile(t *testing.T) {
 				certKey := types.NamespacedName{Name: certManagerCertificateName, Namespace: testNamespace}
 				err = kubeClient.Get(context.TODO(), certKey, cert)
 				assert.NoError(t, err, "error retrieving cert-manager Certificate that should exist")
-
 			},
 		},
 		{
@@ -207,6 +208,12 @@ func TestReconcile(t *testing.T) {
 			name:                  "pass Integration MRN down to Deployment",
 			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, true),
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
+				sa := mondooclient.ServiceAccountCredentials{Mrn: "test-mrn"}
+				saData, err := json.Marshal(sa)
+				if err != nil {
+					panic(err)
+				}
+
 				return []client.Object{
 					&corev1.Secret{
 						ObjectMeta: metav1.ObjectMeta{
@@ -215,6 +222,7 @@ func TestReconcile(t *testing.T) {
 						},
 						Data: map[string][]byte{
 							constants.MondooCredsSecretIntegrationMRNKey: []byte("exampleIntegrationMRN"),
+							constants.MondooCredsSecretServiceAccountKey: saData,
 						},
 					},
 				}

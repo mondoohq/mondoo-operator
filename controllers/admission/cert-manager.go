@@ -142,7 +142,6 @@ func (c *CertManagerHandler) syncCertManagerIssuer(ctx context.Context) error {
 
 // syncCertManagerCertificate will create/update the cert-manager Certificate resource
 func (c *CertManagerHandler) syncCertManagerCertificate(ctx context.Context) error {
-
 	certificate := &certmanagerv1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certManagerCertificateName,

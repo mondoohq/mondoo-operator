@@ -22,6 +22,8 @@ import (
 	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers"
 	"go.mondoo.com/mondoo-operator/controllers/integration"
+	"go.mondoo.com/mondoo-operator/controllers/status"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
@@ -73,11 +75,17 @@ func init() {
 			return err
 		}
 
+		v, err := k8s.GetServerVersion(mgr.GetConfig())
+		if err != nil {
+			setupLog.Error(err, "failed to retrieve server version")
+			return err
+		}
+
 		if err = (&controllers.MondooAuditConfigReconciler{
 			Client:                 mgr.GetClient(),
-			Scheme:                 mgr.GetScheme(),
 			MondooClientBuilder:    controllers.MondooClientBuilder,
 			ContainerImageResolver: mondoo.NewContainerImageResolver(),
+			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder, v),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "MondooAuditConfig")
 			return err
@@ -105,7 +113,7 @@ func init() {
 			return err
 		}
 
-		setupLog.Info("starting manager", "version", version.Version)
+		setupLog.Info("starting manager", "operator-version", version.Version, "k8s-version", v.GitVersion)
 		if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 			setupLog.Error(err, "problem running manager")
 			return err

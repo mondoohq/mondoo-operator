@@ -24,10 +24,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	mockmondoo "go.mondoo.com/mondoo-operator/pkg/mondooclient/mock"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/credentials"
+	k8sversion "k8s.io/apimachinery/pkg/version"
 )
 
 const (
@@ -53,6 +55,8 @@ var (
 		ApiEndpoint: "http://127.0.0.2:8989",
 	}
 	testMondooServiceAccountDataBytes []byte
+
+	k8sVersion = &k8sversion.Info{GitVersion: "v1.24.0"}
 )
 
 func init() {
@@ -62,7 +66,6 @@ func init() {
 }
 
 func TestTokenRegistration(t *testing.T) {
-
 	utilruntime.Must(v1alpha2.AddToScheme(scheme.Scheme))
 
 	testTokenData = credentials.MondooToken(t, "")
@@ -96,7 +99,6 @@ func TestTokenRegistration(t *testing.T) {
 				return mClient
 			},
 			verify: func(t *testing.T, kubeClient client.Client) {
-
 				credsSecret := &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      testMondooCredsSecretName,
@@ -222,10 +224,42 @@ func TestTokenRegistration(t *testing.T) {
 					Mrn: testIntegrationMRN,
 				}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{}, nil)
 
+				mClient.EXPECT().IntegrationReportStatus(gomock.Any(), &mondooclient.ReportStatusRequest{
+					Mrn:     testIntegrationMRN,
+					Status:  mondooclient.Status_ACTIVE,
+					Version: "latest",
+					Messages: []mondooclient.IntegrationMessage{
+						{
+							Message:    "Kubernetes resources scanning is disabled",
+							Identifier: status.K8sResourcesScanningIdentifier,
+							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+						},
+						{
+							Message:    "Node scanning is disabled",
+							Identifier: status.NodeScanningIdentifier,
+							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+						},
+						{
+							Message:    "Admission controller is disabled",
+							Identifier: status.AdmissionControllerIdentifier,
+							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+						},
+						{
+							Message:    "Scan API is disabled",
+							Identifier: status.ScanApiIdentifier,
+							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+						},
+					},
+					LastState: status.OperatorCustomState{
+						KubernetesVersion: k8sVersion.GitVersion,
+						Nodes:             make([]string, 0),
+						MondooAuditConfig: status.MondooAuditConfig{Name: testMondooAuditConfigName, Namespace: testNamespace},
+					},
+				}).Times(1).Return(nil)
+
 				return mClient
 			},
 			verify: func(t *testing.T, kubeClient client.Client) {
-
 				credsSecret := &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      testMondooCredsSecretName,
@@ -236,8 +270,7 @@ func TestTokenRegistration(t *testing.T) {
 
 				assert.NoError(t, err, "error getting secret that should exist")
 
-				// Check StringData because we're using the fake client
-				assert.Equal(t, string(testMondooServiceAccountDataBytes), credsSecret.StringData["config"])
+				assert.Equal(t, testMondooServiceAccountDataBytes, credsSecret.Data["config"])
 			},
 		},
 		{
@@ -272,6 +305,7 @@ func TestTokenRegistration(t *testing.T) {
 			reconciler := &MondooAuditConfigReconciler{
 				MondooClientBuilder: testMondooClientBuilder,
 				Client:              fakeClient,
+				StatusReporter:      status.NewStatusReporter(fakeClient, testMondooClientBuilder, k8sVersion),
 			}
 
 			// Act

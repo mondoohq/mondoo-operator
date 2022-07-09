@@ -46,8 +46,8 @@ type ServiceMonitor struct {
 
 func (s *ServiceMonitor) serviceMonitorName() string {
 	return "mondoo-operator-metrics-monitor"
-
 }
+
 func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.Client, scheme *runtime.Scheme) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
@@ -122,10 +122,10 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *mondoov1alpha2.MondooOperato
 	}
 	return dep
 }
+
 func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 	found, err := verifyAPI(monitoringv1.SchemeGroupVersion.Group, monitoringv1.SchemeGroupVersion.Version, ctx)
-
 	if err != nil {
 		return ctrl.Result{}, err
 	}

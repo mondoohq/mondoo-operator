@@ -131,13 +131,13 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 func (n *DeploymentHandler) syncConfigMap(ctx context.Context, node corev1.Node) (bool, error) {
 	existing := &corev1.ConfigMap{}
 
-	integrationMRN, err := k8s.GetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
+	integrationMrn, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
 	if err != nil {
 		logger.Error(err, "failed to retrieve IntegrationMRN")
 		return false, err
 	}
 
-	desired, err := ConfigMap(node, integrationMRN, *n.Mondoo)
+	desired, err := ConfigMap(node, integrationMrn, *n.Mondoo)
 	if err != nil {
 		logger.Error(err, "failed to generate desired ConfigMap with inventory")
 		return false, err

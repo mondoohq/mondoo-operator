@@ -1,3 +1,19 @@
+/*
+Copyright 2022 Mondoo, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package mondooclient
 
 import (
@@ -33,6 +49,7 @@ type Client interface {
 
 	IntegrationRegister(context.Context, *IntegrationRegisterInput) (*IntegrationRegisterOutput, error)
 	IntegrationCheckIn(context.Context, *IntegrationCheckInInput) (*IntegrationCheckInOutput, error)
+	IntegrationReportStatus(context.Context, *ReportStatusRequest) error
 }
 
 func DefaultHttpClient() *http.Client {
@@ -369,4 +386,66 @@ func (s *mondooClient) IntegrationCheckIn(ctx context.Context, in *IntegrationCh
 	}
 
 	return out, nil
+}
+
+type ReportStatusRequest struct {
+	Mrn string `protobuf:"bytes,1,opt,name=mrn,proto3" json:"mrn,omitempty"`
+	// this is the status of the integration itself (is it active/checking in, errored, etc)
+	Status Status `protobuf:"varint,2,opt,name=status,proto3,enum=mondoo.integrations.v1.Status" json:"status,omitempty"`
+	// this can be any information about the current state of the integration. it will be displayed to the user as-is where supported
+	LastState interface{} `protobuf:"bytes,4,opt,name=last_state,json=lastState,proto3" json:"last_state,omitempty"`
+	// Allows the agent to report its current version
+	Version string `protobuf:"bytes,5,opt,name=version,proto3" json:"version,omitempty"`
+	// messages that convey extra information about the integration - these messages can be informational, warnings or errors. Can be used
+	// to report non-critical errors/warnings without neccesarily changing the whole integration status.
+	Messages []IntegrationMessage `protobuf:"bytes,7,opt,name=messages,proto3" json:"messages,omitempty"`
+}
+
+type Status int32
+
+const (
+	Status_NOT_READY         Status = 0
+	Status_WAITING_FOR_SETUP Status = 1
+	Status_ACTIVE            Status = 2
+	Status_ERROR             Status = 3
+	Status_DELETED           Status = 4
+	Status_MISSING           Status = 5
+	Status_WARNING           Status = 6
+)
+
+type IntegrationMessage struct {
+	Message         string        `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	Timestamp       string        `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Status          MessageStatus `protobuf:"varint,3,opt,name=status,proto3,enum=mondoo.integrations.v1.MessageStatus" json:"status,omitempty"`
+	ReportedByAgent bool          `protobuf:"varint,4,opt,name=reported_by_agent,json=reportedByAgent,proto3" json:"reported_by_agent,omitempty"`
+	Identifier      string        `protobuf:"bytes,5,opt,name=identifier,proto3" json:"identifier,omitempty"`
+	// Anything extra that the message might contain.
+	Extra interface{} `protobuf:"bytes,6,opt,name=extra,proto3" json:"extra,omitempty"`
+}
+
+type MessageStatus int32
+
+const (
+	MessageStatus_MESSAGE_UNKNOWN MessageStatus = 0
+	MessageStatus_MESSAGE_WARNING MessageStatus = 1
+	MessageStatus_MESSAGE_ERROR   MessageStatus = 2
+	MessageStatus_MESSAGE_INFO    MessageStatus = 3
+)
+
+const IntegrationReportStatusEndpoint = "/IntegrationsManager/ReportStatus"
+
+func (s *mondooClient) IntegrationReportStatus(ctx context.Context, in *ReportStatusRequest) error {
+	url := s.ApiEndpoint + IntegrationReportStatusEndpoint
+
+	reqBodyBytes, err := json.Marshal(in)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	_, err = s.request(ctx, url, reqBodyBytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	return nil
 }

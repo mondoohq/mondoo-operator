@@ -29,8 +29,7 @@ import (
 )
 
 // CommandExecutor is the type of the Executor
-type CommandExecutor struct {
-}
+type CommandExecutor struct{}
 
 // ExecuteCommand starts a process and wait for its completion
 func (c *CommandExecutor) ExecuteCommand(command string, arg ...string) error {
@@ -125,8 +124,8 @@ func (*CommandExecutor) ExecuteCommandWithCombinedOutput(command string, arg ...
 // ExecuteCommandWithOutputFileTimeout Same as ExecuteCommandWithOutputFile but with a timeout limit.
 // #nosec G307 Calling defer to close the file without checking the error return is not a risk for a simple file open and close
 func (*CommandExecutor) ExecuteCommandWithOutputFileTimeout(timeout time.Duration,
-	command, outfileArg string, arg ...string) (string, error) {
-
+	command, outfileArg string, arg ...string,
+) (string, error) {
 	outFile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return "", fmt.Errorf("failed to open output file: %+v", err)
@@ -168,7 +167,6 @@ func (*CommandExecutor) ExecuteCommandWithOutputFileTimeout(timeout time.Duratio
 // ExecuteCommandWithOutputFile executes a command with output on a file
 // #nosec G307 Calling defer to close the file without checking the error return is not a risk for a simple file open and close
 func (*CommandExecutor) ExecuteCommandWithOutputFile(command, outfileArg string, arg ...string) (string, error) {
-
 	// create a temporary file to serve as the output file for the command to be run and ensure
 	// it is cleaned up after this function is done
 	outFile, err := ioutil.TempFile("", "")

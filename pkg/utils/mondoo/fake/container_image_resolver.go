@@ -22,8 +22,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
-type noOpContainerImageResolver struct {
-}
+type noOpContainerImageResolver struct{}
 
 func NewNoOpContainerImageResolver() mondoo.ContainerImageResolver {
 	return &noOpContainerImageResolver{}

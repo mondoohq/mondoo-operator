@@ -88,6 +88,7 @@ func (s *IntegrationCheckInSuite) SetupSuite() {
 func (s *IntegrationCheckInSuite) TestCheckIn() {
 	// Arrange
 	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
 
 	existingObjects := []runtime.Object{
 		testMondooCredsSecret(),
@@ -122,12 +123,12 @@ func (s *IntegrationCheckInSuite) TestCheckIn() {
 	s.NoError(err, "should not error while processing valid MondooAuditConfig")
 	s.Zero(len(mondooAuditConfig.Status.Conditions), "expected no condtion set on happy path")
 	mockCtrl.Finish()
-
 }
 
 func (s *IntegrationCheckInSuite) TestClearPreviousCondition() {
 	// Arrange
 	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
 	mondooAuditConfig.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{
 		{
 			Type:   v1alpha2.MondooIntegrationDegraded,
@@ -168,12 +169,12 @@ func (s *IntegrationCheckInSuite) TestClearPreviousCondition() {
 	s.NoError(err, "should not error while processing valid MondooAuditConfig")
 	assertConditionExists(s.T(), fakeClient, corev1.ConditionFalse, "Mondoo integration is working")
 	mockCtrl.Finish()
-
 }
 
 func (s *IntegrationCheckInSuite) TestMissingIntegrationMRN() {
 	// Arrange
 	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
 
 	credsSecret := testMondooCredsSecret()
 	delete(credsSecret.Data, constants.MondooCredsSecretIntegrationMRNKey)
@@ -206,15 +207,14 @@ func (s *IntegrationCheckInSuite) TestMissingIntegrationMRN() {
 	// Assert
 	// this controller doesn't make changes to k8s resources...the only side effect here are the mondooclient API calls
 	s.Error(err, "expected error when missing integration MRN")
-	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "data missing from Mondoo creds secret")
+	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "key with integration MRN data")
 	mockCtrl.Finish()
-
 }
 
 func (s *IntegrationCheckInSuite) TestBadServiceAccountData() {
 	// Arrange
 	mondooAuditConfig := testMondooAuditConfig()
-
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
 	credsSecret := testMondooCredsSecret()
 	credsSecret.Data[constants.MondooCredsSecretServiceAccountKey] = []byte("NOT VALID JWT")
 
@@ -248,12 +248,12 @@ func (s *IntegrationCheckInSuite) TestBadServiceAccountData() {
 	s.Error(err, "expected error when Mondoo service account data broken")
 	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "failed to unmarshal creds")
 	mockCtrl.Finish()
-
 }
 
 func (s *IntegrationCheckInSuite) TestFailedCheckIn() {
 	// Arrange
 	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
 
 	existingObjects := []runtime.Object{
 		testMondooCredsSecret(),
@@ -287,7 +287,6 @@ func (s *IntegrationCheckInSuite) TestFailedCheckIn() {
 	s.Error(err, "expected error when CheckIn() return error")
 	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "failed to CheckIn")
 	mockCtrl.Finish()
-
 }
 
 func testMondooCredsSecret() *corev1.Secret {
@@ -318,7 +317,6 @@ func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {
 }
 
 func assertConditionExists(t *testing.T, kubeClient client.Client, status corev1.ConditionStatus, message string) {
-
 	mondoo := testMondooAuditConfig()
 	require.NoError(t, kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(mondoo), mondoo), "error fetching current MondooAuditConfig from fake client")
 

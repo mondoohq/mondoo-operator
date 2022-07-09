@@ -463,8 +463,7 @@ func TestAreCronJobsEqual(t *testing.T) {
 			name: "should not be equal when tolerations differ",
 			createB: func(a batchv1.CronJob) batchv1.CronJob {
 				b := *a.DeepCopy()
-				b.Spec.JobTemplate.Spec.Template.Spec.Tolerations =
-					append(b.Spec.JobTemplate.Spec.Template.Spec.Tolerations, b.Spec.JobTemplate.Spec.Template.Spec.Tolerations[0])
+				b.Spec.JobTemplate.Spec.Template.Spec.Tolerations = append(b.Spec.JobTemplate.Spec.Template.Spec.Tolerations, b.Spec.JobTemplate.Spec.Template.Spec.Tolerations[0])
 				return b
 			},
 			shouldBeEqual: false,
