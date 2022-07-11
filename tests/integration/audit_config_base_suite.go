@@ -439,14 +439,11 @@ func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mo
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionFalse)
 	s.Require().NoErrorf(err, "Admission shouldn't be in degraded state")
 
-	// TODO: should be checked after this is fixed: https://github.com/mondoohq/mondoo-operator/issues/436
-	/*
-		err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.NodeScanningDegraded)
-		s.Require().NoErrorf(err, "Node scanning shouldn't be in degraded state")
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.NodeScanningDegraded)
+	s.Require().NoErrorf(err, "Node scanning shouldn't be in degraded state")
 
-		err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.K8sResourcesScanningDegraded)
-		s.Require().NoErrorf(err, "k8s resource scanning shouldn't be in degraded state")
-	*/
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.K8sResourcesScanningDegraded)
+	s.Require().NoErrorf(err, "k8s resource scanning shouldn't be in degraded state")
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, s.testCluster.MondooInstaller.PreviousVersion)
 	s.Require().NoErrorf(err, "Couldn't find release version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
