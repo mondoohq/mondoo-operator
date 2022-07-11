@@ -11,7 +11,11 @@ func updateWorkloadsConditions(config *v1alpha2.MondooAuditConfig, degradedStatu
 	reason := "KubernetesResourcesScanningAvailable"
 	status := corev1.ConditionFalse
 	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
-	if degradedStatus {
+	if !config.Spec.KubernetesResources.Enable {
+		msg = "Kubernetes Resources Scanning is disabled"
+		reason = "KubernetesResourcesScanningDisabled"
+		status = corev1.ConditionFalse
+	} else if degradedStatus {
 		msg = "Kubernetes Resources Scanning is Unavailable"
 		reason = "KubernetesResourcesScanningUnavailable"
 		status = corev1.ConditionTrue

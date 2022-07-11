@@ -11,7 +11,11 @@ func updateAdmissionConditions(config *mondoov1alpha2.MondooAuditConfig, degrade
 	reason := "AdmissionAvailable"
 	status := corev1.ConditionFalse
 	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
-	if degradedStatus {
+	if !config.Spec.Admission.Enable {
+		msg = "Admission controller is disabled"
+		reason = "AdmissionDisabled"
+		status = corev1.ConditionFalse
+	} else if degradedStatus {
 		msg = "Admission controller is unavailable"
 		reason = "AdmissionUnvailable"
 		status = corev1.ConditionTrue
