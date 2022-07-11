@@ -79,6 +79,7 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes() {
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigNodes(auditConfig)
 }
+
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Admission() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true)
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
