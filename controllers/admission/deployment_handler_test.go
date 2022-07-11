@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -74,6 +75,113 @@ func TestReconcile(t *testing.T) {
 					err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(obj), obj)
 					assert.NoError(t, err, "error retrieving k8s resource that should exist: %s", client.ObjectKeyFromObject(obj))
 				}
+			},
+		},
+		{
+			name: "admission enabled with mode enforcing",
+			mondooAuditConfigSpec: func() mondoov1alpha2.MondooAuditConfigSpec {
+				mac := testMondooAuditConfigSpec(true, false)
+				mac.Admission.Mode = mondoov1alpha2.Enforcing
+				return mac
+			}(),
+			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
+				deployment := &appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      webhookDeploymentName(testMondooAuditConfigName),
+						Namespace: testNamespace,
+					},
+					Spec: appsv1.DeploymentSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Args: []string{
+											"--enforcement-mode",
+											string(mondoov1alpha2.Enforcing),
+										},
+									},
+								},
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
+						ReadyReplicas:     1,
+						Replicas:          1,
+					},
+				}
+
+				deploymentScanApi := &appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mondoo-client-scan-api",
+						Namespace: testNamespace,
+					},
+					Spec: appsv1.DeploymentSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Args: []string{
+											"--enforcement-mode",
+											string(mondoov1alpha2.Enforcing),
+										},
+									},
+								},
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
+						ReadyReplicas:     1,
+						Replicas:          1,
+					},
+				}
+
+				return []client.Object{deployment, deploymentScanApi}
+			},
+			validate: func(t *testing.T, kubeClient client.Client) {
+				deployment := &appsv1.Deployment{}
+				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
+				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
+				require.NoError(t, err, "expected Admission Deployment to exist")
+
+				assert.Equal(t, deployment.Spec.Replicas, pointer.Int32(1))
+				assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, string(mondoov1alpha2.Enforcing), "expected Webhook mode to be set to 'enforcing'")
+
+				vwcName, err := validatingWebhookName(&mondoov1alpha2.MondooAuditConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testMondooAuditConfigName,
+						Namespace: testNamespace,
+					},
+				})
+				require.NoError(t, err, "unexpected failure while generating Webhook name")
+
+				vwc := &webhooksv1.ValidatingWebhookConfiguration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: vwcName,
+					},
+				}
+				err = kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(vwc), vwc)
+				assert.NoError(t, err, "error retrieving k8s resource that should exist: %s", client.ObjectKeyFromObject(vwc))
+
+				assert.Equalf(t, *vwc.Webhooks[0].FailurePolicy, webhooksv1.Fail, "expected Webhook failure policy to be set to 'Fail'")
+			},
+		},
+		{
+			name: "admission enabled with mode enforcing and set replicas",
+			mondooAuditConfigSpec: func() mondoov1alpha2.MondooAuditConfigSpec {
+				mac := testMondooAuditConfigSpec(true, false)
+				mac.Admission.Mode = mondoov1alpha2.Enforcing
+				mac.Admission.Replicas = pointer.Int32(2)
+				return mac
+			}(),
+			validate: func(t *testing.T, kubeClient client.Client) {
+				deployment := &appsv1.Deployment{}
+				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
+				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
+				require.NoError(t, err, "expected Admission Deployment to exist")
+
+				assert.Equal(t, deployment.Spec.Replicas, pointer.Int32(2))
 			},
 		},
 		{
@@ -189,6 +297,25 @@ func TestReconcile(t *testing.T) {
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Admission Deployment to exist")
 
+				assert.Equal(t, deployment.Spec.Replicas, pointer.Int32(1))
+				assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, string(mondoov1alpha2.Permissive), "expected Webhook mode to be set to 'permissive'")
+			},
+		},
+		{
+			name: "pass admission mode down to Deployment and set replicas",
+			mondooAuditConfigSpec: func() mondoov1alpha2.MondooAuditConfigSpec {
+				mac := testMondooAuditConfigSpec(true, false)
+				mac.Admission.Mode = mondoov1alpha2.Permissive
+				mac.Admission.Replicas = pointer.Int32(3)
+				return mac
+			}(),
+			validate: func(t *testing.T, kubeClient client.Client) {
+				deployment := &appsv1.Deployment{}
+				deploymentKey := types.NamespacedName{Name: webhookDeploymentName(testMondooAuditConfigName), Namespace: testNamespace}
+				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
+				require.NoError(t, err, "expected Admission Deployment to exist")
+
+				assert.Equal(t, deployment.Spec.Replicas, pointer.Int32(3))
 				assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, string(mondoov1alpha2.Permissive), "expected Webhook mode to be set to 'permissive'")
 			},
 		},
@@ -415,7 +542,8 @@ func defaultResourcesWhenEnabled() []client.Object {
 func testMondooAuditConfigSpec(admissionEnabled, integrationEnabled bool) mondoov1alpha2.MondooAuditConfigSpec {
 	return mondoov1alpha2.MondooAuditConfigSpec{
 		Admission: mondoov1alpha2.Admission{
-			Enable: admissionEnabled,
+			Enable:   admissionEnabled,
+			Replicas: pointer.Int32(1),
 		},
 		ConsoleIntegration: mondoov1alpha2.ConsoleIntegration{
 			Enable: integrationEnabled,

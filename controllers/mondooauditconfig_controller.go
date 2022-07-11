@@ -103,17 +103,17 @@ var (
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
-func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
+func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (reconcileResult ctrl.Result, reconcileError error) {
 	log := ctrllog.FromContext(ctx)
 
 	// Fetch the Mondoo instance
 	mondooAuditConfig := &v1alpha2.MondooAuditConfig{}
 
-	err = r.Get(ctx, req.NamespacedName, mondooAuditConfig)
+	reconcileError = r.Get(ctx, req.NamespacedName, mondooAuditConfig)
 	r.MondooAuditConfig = mondooAuditConfig
 
-	if err != nil {
-		if errors.IsNotFound(err) {
+	if reconcileError != nil {
+		if errors.IsNotFound(reconcileError) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
@@ -121,16 +121,17 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		log.Error(err, "Failed to get mondoo")
-		return ctrl.Result{}, err
+		log.Error(reconcileError, "Failed to get mondoo")
+		return ctrl.Result{}, reconcileError
 	}
+
 	config := &v1alpha2.MondooOperatorConfig{}
-	if err = r.Get(ctx, types.NamespacedName{Name: v1alpha2.MondooOperatorConfigName}, config); err != nil {
-		if errors.IsNotFound(err) {
+	if reconcileError = r.Get(ctx, types.NamespacedName{Name: v1alpha2.MondooOperatorConfigName}, config); reconcileError != nil {
+		if errors.IsNotFound(reconcileError) {
 			log.Info("MondooOperatorConfig not found, using defaults")
 		} else {
-			log.Error(err, "Failed to check for MondooOpertorConfig")
-			return ctrl.Result{}, err
+			log.Error(reconcileError, "Failed to check for MondooOpertorConfig")
+			return ctrl.Result{}, reconcileError
 		}
 	}
 
@@ -139,8 +140,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 		// If the err from the reconcile func is nil, the all steps were executed it successfully
 		// If there was an error, we do not override the existing error with the status report error
-		if err == nil {
-			err = reportErr
+		if reconcileError == nil {
+			reconcileError = reportErr
 		}
 	}()
 
@@ -162,35 +163,74 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			MondooOperatorConfig:   config,
 			ContainerImageResolver: r.ContainerImageResolver,
 		}
-		result, err = webhooks.Reconcile(ctx)
-		if err != nil {
-			log.Error(err, "failed to cleanup webhooks")
-			return result, err
+		result, reconcileError := webhooks.Reconcile(ctx)
+		if reconcileError != nil {
+			log.Error(reconcileError, "failed to cleanup webhooks")
+			return result, reconcileError
 		}
 
 		controllerutil.RemoveFinalizer(mondooAuditConfig, finalizerString)
-		if err := r.Update(ctx, mondooAuditConfig); err != nil {
-			log.Error(err, "failed to remove finalizer")
+		if reconcileError = r.Update(ctx, mondooAuditConfig); reconcileError != nil {
+			log.Error(reconcileError, "failed to remove finalizer")
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, reconcileError
 	} else {
 		if !controllerutil.ContainsFinalizer(mondooAuditConfig, finalizerString) {
 			controllerutil.AddFinalizer(mondooAuditConfig, finalizerString)
-			if err = r.Update(ctx, mondooAuditConfig); err != nil {
-				log.Error(err, "failed to set finalizer")
+			if reconcileError = r.Update(ctx, mondooAuditConfig); reconcileError != nil {
+				log.Error(reconcileError, "failed to set finalizer")
 			}
-			return ctrl.Result{}, err
+			return ctrl.Result{}, reconcileError
 		}
 	}
 
 	mondooAuditConfigCopy := mondooAuditConfig.DeepCopy()
 
+	// Conditions might be updated before this reconciler reaches the end
+	// MondooAuditConfig has to include these updates in any case.
+	defer func() {
+		var deferFuncErr error
+		ctx := context.Background()
+		// Update the mondoo status with the pod names only after all pod creation actions are done
+		// List the pods for this mondoo's cronjobs and deployment
+		podList := &corev1.PodList{}
+		listOpts := []client.ListOption{
+			client.InNamespace(mondooAuditConfig.Namespace),
+			client.MatchingLabels(labelsForMondoo(mondooAuditConfig.Name)),
+		}
+		if deferFuncErr = r.List(ctx, podList, listOpts...); deferFuncErr != nil {
+			log.Error(deferFuncErr, "Failed to list pods", "Mondoo.Namespace", mondooAuditConfig.Namespace, "Mondoo.Name", mondooAuditConfig.Name)
+		} else {
+			podListNames := getPodNames(podList.Items)
+
+			// Update status.Pods list if needed
+			statusPodNames := sets.NewString(mondooAuditConfig.Status.Pods...)
+
+			if !statusPodNames.Equal(podListNames) {
+				r.MondooAuditConfig.Status.Pods = podListNames.List()
+			}
+		}
+
+		// Update status.ReconciledByOperatorVersion to the running operator version
+		if r.MondooAuditConfig.Status.ReconciledByOperatorVersion != version.Version {
+			r.MondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
+		}
+
+		deferFuncErr = mondoo.UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, r.MondooAuditConfig, log)
+		// do not overwrite errors which happened before the defered function is called
+		// but in case an error happend in the defered func, also overwrite the reconcileResult
+		if reconcileError == nil && deferFuncErr != nil {
+			reconcileResult = ctrl.Result{}
+			reconcileError = deferFuncErr
+		}
+	}()
+
 	// If spec.MondooTokenSecretRef != "" and the Secret referenced in spec.MondooCredsSecretRef
 	// does not exist, then attempt to trade the token for a Mondoo service account and save it
 	// in the Secret referenced in .spec.MondooCredsSecretRef
-	if err = r.exchangeTokenForServiceAccount(ctx, mondooAuditConfig, log); err != nil {
-		log.Error(err, "errors while checking if Mondoo service account needs creating")
-		return ctrl.Result{}, err
+	if reconcileError = r.exchangeTokenForServiceAccount(ctx, mondooAuditConfig, log); reconcileError != nil {
+		log.Error(reconcileError, "errors while checking if Mondoo service account needs creating")
+		return ctrl.Result{}, reconcileError
 	}
 
 	scanapi := scanapi.DeploymentHandler{
@@ -199,12 +239,12 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: r.ContainerImageResolver,
 	}
-	result, err = scanapi.Reconcile(ctx)
-	if err != nil {
-		log.Error(err, "Failed to set up scan API")
+	result, reconcileError := scanapi.Reconcile(ctx)
+	if reconcileError != nil {
+		log.Error(reconcileError, "Failed to set up scan API")
 	}
-	if err != nil || result.Requeue {
-		return result, err
+	if reconcileError != nil || result.Requeue {
+		return result, reconcileError
 	}
 
 	nodes := nodes.DeploymentHandler{
@@ -214,12 +254,12 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		ContainerImageResolver: r.ContainerImageResolver,
 	}
 
-	result, err = nodes.Reconcile(ctx)
-	if err != nil {
-		log.Error(err, "Failed to set up nodes scanning")
+	result, reconcileError = nodes.Reconcile(ctx)
+	if reconcileError != nil {
+		log.Error(reconcileError, "Failed to set up nodes scanning")
 	}
-	if err != nil || result.Requeue {
-		return result, err
+	if reconcileError != nil || result.Requeue {
+		return result, reconcileError
 	}
 
 	workloads := k8s_scan.DeploymentHandler{
@@ -229,12 +269,12 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		ContainerImageResolver: r.ContainerImageResolver,
 	}
 
-	result, err = workloads.Reconcile(ctx)
-	if err != nil {
-		log.Error(err, "Failed to set up Kubernetes resources scanning")
+	result, reconcileError = workloads.Reconcile(ctx)
+	if reconcileError != nil {
+		log.Error(reconcileError, "Failed to set up Kubernetes resources scanning")
 	}
-	if err != nil || result.Requeue {
-		return result, err
+	if reconcileError != nil || result.Requeue {
+		return result, reconcileError
 	}
 
 	webhooks := admission.DeploymentHandler{
@@ -245,47 +285,18 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		ContainerImageResolver: r.ContainerImageResolver,
 	}
 
-	result, err = webhooks.Reconcile(ctx)
-	if err != nil {
-		log.Error(err, "Failed to set up webhooks")
+	result, reconcileError = webhooks.Reconcile(ctx)
+	if reconcileError != nil {
+		log.Error(reconcileError, "Failed to set up webhooks")
 	}
-	if err != nil || result.Requeue {
-		return result, err
-	}
-
-	// Update the mondoo status with the pod names only after all pod creation actions are done
-	// List the pods for this mondoo's cronjobs and deployment
-	podList := &corev1.PodList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(mondooAuditConfig.Namespace),
-		client.MatchingLabels(labelsForMondoo(mondooAuditConfig.Name)),
-	}
-	if err = r.List(ctx, podList, listOpts...); err != nil {
-		log.Error(err, "Failed to list pods", "Mondoo.Namespace", mondooAuditConfig.Namespace, "Mondoo.Name", mondooAuditConfig.Name)
-		return ctrl.Result{}, err
-	}
-	podListNames := getPodNames(podList.Items)
-
-	// Update status.Pods list if needed
-	statusPodNames := sets.NewString(mondooAuditConfig.Status.Pods...)
-
-	if !statusPodNames.Equal(podListNames) {
-		mondooAuditConfig.Status.Pods = podListNames.List()
-		err = r.Status().Update(ctx, mondooAuditConfig)
-		if err != nil {
-			log.Error(err, "Failed to update mondoo status")
-			return ctrl.Result{}, err
-		}
+	if reconcileError != nil || result.Requeue {
+		return result, reconcileError
 	}
 
 	// Update status.ReconciledByOperatorVersion to the running operator version
-	if mondooAuditConfig.Status.ReconciledByOperatorVersion != version.Version {
-		mondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
-	}
+	// This should only happen, after all objects have been reconciled
+	r.MondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
 
-	if err = mondoo.UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log); err != nil {
-		return ctrl.Result{}, err
-	}
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
 }
 

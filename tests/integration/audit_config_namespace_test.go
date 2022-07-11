@@ -4,11 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"

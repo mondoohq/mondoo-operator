@@ -19,6 +19,10 @@ func updateAdmissionConditions(config *mondoov1alpha2.MondooAuditConfig, degrade
 		msg = "Admission controller is unavailable"
 		reason = "AdmissionUnvailable"
 		status = corev1.ConditionTrue
+		condition := mondoo.FindMondooAuditConditions(config.Status.Conditions, mondoov1alpha2.ScanAPIDegraded)
+		if condition != nil && condition.Status == corev1.ConditionTrue {
+			reason = "Scan API is unavailable"
+		}
 	}
 
 	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha2.AdmissionDegraded, status, reason, msg, updateCheck)

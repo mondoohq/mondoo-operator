@@ -49,20 +49,24 @@ type CertManagerHandler struct {
 	Scheme          *runtime.Scheme
 }
 
-func (c *CertManagerHandler) Setup(ctx context.Context) (string, string, error) {
+func (c *CertManagerHandler) Setup(ctx context.Context) error {
+	if err := c.syncCertManagerIssuer(ctx); err != nil {
+		return err
+	}
+
+	if err := c.syncCertManagerCertificate(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *CertManagerHandler) GetAnnotations() (string, string) {
 	// Modify the webhook annotation so that cert-manager mutates it with the certificate authority data.
 	// The format for cert-manager annotation value is namespace/nameOfCertManagerCertificate
 	annotationValue := c.TargetNamespace + "/" + certManagerCertificateName
 
-	if err := c.syncCertManagerIssuer(ctx); err != nil {
-		return certManagerAnnotationKey, annotationValue, err
-	}
-
-	if err := c.syncCertManagerCertificate(ctx); err != nil {
-		return certManagerAnnotationKey, annotationValue, err
-	}
-
-	return certManagerAnnotationKey, annotationValue, nil
+	return certManagerAnnotationKey, annotationValue
 }
 
 func (c *CertManagerHandler) Cleanup(ctx context.Context) error {

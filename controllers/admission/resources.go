@@ -75,7 +75,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: pointer.Int32(1),
+			Replicas: m.Spec.Admission.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					WebhookLabelKey: WebhookLabelValue,
@@ -168,6 +168,20 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 								Secret: &corev1.SecretVolumeSource{
 									DefaultMode: pointer.Int32(0o444),
 									SecretName:  scanapi.SecretName(m.Name),
+								},
+							},
+						},
+					},
+					Affinity: &corev1.Affinity{
+						PodAntiAffinity: &corev1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											WebhookLabelKey: WebhookLabelValue,
+										},
+									},
+									TopologyKey: "kubernetes.io/hostname",
 								},
 							},
 						},

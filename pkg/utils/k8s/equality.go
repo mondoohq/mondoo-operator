@@ -38,6 +38,7 @@ func AreDeploymentsEqual(a, b appsv1.Deployment) bool {
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Env, b.Spec.Template.Spec.Containers[0].Env) &&
 		AreResouceRequirementsEqual(a.Spec.Template.Spec.Containers[0].Resources, b.Spec.Template.Spec.Containers[0].Resources) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Volumes, b.Spec.Template.Spec.Volumes) &&
+		reflect.DeepEqual(a.Spec.Template.Spec.Affinity, b.Spec.Template.Spec.Affinity) &&
 		reflect.DeepEqual(a.GetOwnerReferences(), b.GetOwnerReferences())
 }
 

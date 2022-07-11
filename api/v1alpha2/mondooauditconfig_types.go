@@ -60,6 +60,12 @@ type Scanner struct {
 	ServiceAccountName string                      `json:"serviceAccountName,omitempty"`
 	Image              Image                       `json:"image,omitempty"`
 	Resources          corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Number of replicas for the scanner.
+	// For enforcing mode, the minimum should be two to prevent problems during Pod failures,
+	// e.g. node failure, node scaling, etc.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	Replicas *int32 `json:"replicas,omitempty"`
 }
 
 type KubernetesResources struct {
@@ -83,7 +89,13 @@ type Admission struct {
 	// on the scan results may reject the k8s resource creation/modification.
 	// +kubebuilder:validation:Enum=permissive;enforcing
 	// +kubebuilder:default=permissive
-	Mode                    AdmissionMode           `json:"mode,omitempty"`
+	Mode AdmissionMode `json:"mode,omitempty"`
+	// Number of replicas for the admission webhook.
+	// For enforcing mode, the minimum should be two to prevent problems during Pod failures,
+	// e.g. node failure, node scaling, etc.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	Replicas                *int32                  `json:"replicas,omitempty"`
 	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
 }
 

@@ -93,7 +93,6 @@ func (n *DeploymentHandler) syncSecret(ctx context.Context) error {
 		logger.Info("Created token Secret for scan API")
 		return nil
 	} else if errors.IsAlreadyExists(err) {
-		logger.Info("Token Secret for scan API already exists")
 		return nil
 	} else {
 		logger.Error(err, "Faled to create/check for existence of token Secret for scan API")
@@ -106,11 +105,18 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	logger.V(7).Info("Mondoo client image: ", "image", mondooClientImage)
+	logger.V(7).Info("Mondoo skip resolve: ", "SkipContainerResolution", n.MondooOperatorConfig.Spec.SkipContainerResolution)
 
 	deployment := ScanApiDeployment(n.Mondoo.Namespace, mondooClientImage, *n.Mondoo)
 	if err := ctrl.SetControllerReference(n.Mondoo, deployment, n.KubeClient.Scheme()); err != nil {
 		return err
 	}
+
+	if *deployment.Spec.Replicas < 2 && n.Mondoo.Spec.Admission.Mode == v1alpha2.Enforcing {
+		logger.V(3).Info("Scan API deployment is only scaled to 1 replica, but the admission mode is set to 'enforcing'. This might be problematic if the API server is not able to connect to the admission webhook. Please consider increasing the replicas.")
+	}
+
 	existingDeployment := appsv1.Deployment{}
 	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, &existingDeployment, deployment)
 	if err != nil {
@@ -122,16 +128,18 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		logger.Info("Created Deployment for scan API")
 		// set conditions on next iteration to not set to unavailable during initialisation
 		return nil
-	} else if !k8s.AreDeploymentsEqual(*deployment, existingDeployment) {
-		logger.Info("Updated needed for scan API Deployment")
+	}
+
+	updateScanAPIConditions(n.Mondoo, existingDeployment.Status.UnavailableReplicas != 0, existingDeployment.Status.Conditions)
+
+	if !k8s.AreDeploymentsEqual(*deployment, existingDeployment) {
+		logger.Info("Update needed for scan API Deployment")
 		// If the deployment exists but it is different from what we actually want it to be, then update.
 		k8s.UpdateDeployment(&existingDeployment, *deployment)
 		if err := n.KubeClient.Update(ctx, &existingDeployment); err != nil {
 			return err
 		}
 	}
-
-	updateScanAPIConditions(n.Mondoo, existingDeployment.Status.UnavailableReplicas != 0, existingDeployment.Status.Conditions)
 
 	return nil
 }

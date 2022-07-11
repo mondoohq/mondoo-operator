@@ -132,6 +132,47 @@ And create/modify/delete a Pod in another window:
 kubectl delete pod -n mondoo-operator --selector control-plane=controller-manager
 ```
 
+### Different modes of operation
+
+You can run the admission controller in two modes: permissive and enforcing.
+You configure the mode via the `MondooAuditConfig`:
+```yaml
+    apiVersion: k8s.mondoo.com/v1alpha2
+    kind: MondooAuditConfig
+    ...
+    spec:
+      ...
+      admission:
+        enable: true
+        mode: permissive
+        replicas: 1
+      scanner:
+        replicas: 1
+```
+When admission is enabled, the default mode is `permissive` with one replica.
+In permissive mode, the webhook checks objects like Deployments or Pods against policies and reports problems to the Mondoo Backend.
+Mondoo shows the results in the CI/CD view.
+For more details, have a look at the [docs](https://mondoo.com/docs/supplychain/overview/).
+In enforcing mode, the operator automatically sets the `failurePolicy` of the `ValidatingWebhookConfiguration` to `Fail`.
+The webhook then will deny objects not passing the policy.
+The details are reported to the Mondoo Backend.
+
+With kubectl, this looks similar to this example:
+```bash
+$ kubectl apply -f ubuntu-privileged.yaml
+Error from server (FAILED MONDOO SCAN): error when creating "ubuntu-privileged.yaml": admission webhook "policy.k8s.mondoo.com" denied the request: FAILED MONDOO SCAN
+```
+
+> :warning: The default replica count of one is not meant for production usage in enforcing mode.
+>
+> Increase replicas for webhook **and** scanner to at least two.
+
+
+The Deployments are configured with [`PodAntiAffinity`](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity).
+This, with a replica count of two, helps to prevent outages because of single Pod or Node failures.
+Please increase the replicas count according to your needs.
+
+
 ### Deploying the admission controller using cert-manager
 [cert-manager](https://cert-manager.io/) is the easiest way to bootstrap the admission controller TLS certificate: 
 
