@@ -176,7 +176,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sContainerImageScanningStatus()
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	// Verify the image scanning status is set to unavailable
+	// Verify the image scanning status is set to available
 	s.Equal(1, len(d.Mondoo.Status.Conditions))
 	condition := d.Mondoo.Status.Conditions[0]
 	s.Equal("Kubernetes Container Image Scanning is Available", condition.Message)

@@ -357,7 +357,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningStatus() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	// Verify the node scanning status is set to unavailable
+	// Verify the node scanning status is set to available
 	s.Equal(1, len(d.Mondoo.Status.Conditions))
 	condition := d.Mondoo.Status.Conditions[0]
 	s.Equal("Node Scanning is available", condition.Message)
