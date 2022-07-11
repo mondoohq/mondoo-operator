@@ -156,6 +156,8 @@ func (k8sh *K8sHelper) IsPodReady(labelSelector, namespace string) bool {
 					}
 				}
 			}
+		} else {
+			zap.S().Errorf("Error listing pods: %v", err)
 		}
 		return false, nil
 	})

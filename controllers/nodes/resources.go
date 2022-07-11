@@ -30,7 +30,7 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 	ls := CronJobLabels(m)
 
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
-
+	unsetHostPath := corev1.HostPathUnset
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CronJobName(m.Name, node.Name),
@@ -95,13 +95,14 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 								{
 									Name: "root",
 									VolumeSource: corev1.VolumeSource{
-										HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+										HostPath: &corev1.HostPathVolumeSource{Path: "/", Type: &unsetHostPath},
 									},
 								},
 								{
 									Name: "config",
 									VolumeSource: corev1.VolumeSource{
 										Projected: &corev1.ProjectedVolumeSource{
+											DefaultMode: pointer.Int32(corev1.ProjectedVolumeSourceDefaultMode),
 											Sources: []corev1.VolumeProjection{
 												{
 													ConfigMap: &corev1.ConfigMapProjection{
