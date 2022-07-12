@@ -58,6 +58,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # fetch is nneded for "git tag --list" in the Makefile
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
       - name: Start minikube
@@ -80,9 +82,11 @@ jobs:
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
       # before the test execution starts.
       - name: Wait a bit for the runner to become more stable
-        run: sleep 60
+        run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
-      - run: make test/integration/ci
+      - name: Run integration tests
+        run: make test/integration/ci
+
       - uses: actions/download-artifact@v3 # download the unit test results
         if: success() || failure()        # run this step even if previous step failed
         with:

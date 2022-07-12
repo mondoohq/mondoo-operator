@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
@@ -25,6 +26,7 @@ const (
 	MondooClientsNodesLabel    = "audit=node"
 	MondooClientsK8sLabel      = "audit=k8s"
 	ExternalInstallationEnvVar = "EXTERNAL_INSTALLATION"
+	PreviousVersionEnvVar      = "PREVIOUS_RELEASE"
 )
 
 type MondooInstaller struct {
@@ -34,6 +36,7 @@ type MondooInstaller struct {
 	isInstalled           bool
 	ctx                   context.Context
 	isInstalledExternally bool
+	PreviousVersion       string
 }
 
 func NewMondooInstaller(settings Settings, t func() *testing.T) *MondooInstaller {
@@ -42,15 +45,21 @@ func NewMondooInstaller(settings Settings, t func() *testing.T) *MondooInstaller
 		panic("failed to get kubectl client :" + err.Error())
 	}
 
-	_, ok := os.LookupEnv(ExternalInstallationEnvVar)
+	_, externalInstall := os.LookupEnv(ExternalInstallationEnvVar)
+
+	previousVersion, found := os.LookupEnv(PreviousVersionEnvVar)
+	if !found {
+		panic("failed to get previous version tag for this repo")
+	}
 
 	return &MondooInstaller{
 		T:                     t,
 		Settings:              settings,
 		K8sHelper:             k8sHelper,
 		ctx:                   context.Background(),
-		isInstalled:           ok,
-		isInstalledExternally: ok,
+		isInstalled:           externalInstall,
+		isInstalledExternally: externalInstall,
+		PreviousVersion:       previousVersion,
 	}
 }
 
@@ -73,8 +82,15 @@ func (i *MondooInstaller) InstallOperator() error {
 		return fmt.Errorf("file %q does not exist. Run %q", OperatorManifest, "make generate-manifests")
 	}
 
-	_, err = i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.CreateFromStdinArgs...)
-	i.isInstalled = true // If the command above has run there is a change things have been partially created.
+	if i.Settings.installRelease {
+		zap.S().Info("Installing Mondoo operator release. ", "version=", i.PreviousVersion)
+		releaseManifestUrl := fmt.Sprintf("https://github.com/mondoohq/mondoo-operator/releases/download/%s/mondoo-operator-manifests.yaml", i.PreviousVersion)
+		_, err = i.K8sHelper.Kubectl(append(utils.ApplyArgs, releaseManifestUrl)...)
+	} else {
+		zap.S().Info("Installing Mondoo operator with local manifest")
+		_, err = i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.ApplyFromStdinArgs...)
+	}
+	i.isInstalled = true // If the command above has run there is a chance things have been partially created.
 	if err != nil {
 		return fmt.Errorf("failed to create mondoo-operator manifest(s): %v ", err)
 	}
@@ -153,10 +169,15 @@ func (i *MondooInstaller) CreateClientSecret(ns string) error {
 	}
 	secret.Name = utils.MondooClientSecret
 	secret.Namespace = ns
-	if err := i.K8sHelper.Clientset.Create(i.ctx, &secret); err != nil {
+	created, err := k8s.CreateIfNotExist(i.ctx, i.K8sHelper.Clientset, &secret, &secret)
+	if err != nil {
 		return fmt.Errorf("failed to create Мondoo secret in namespace %s. %v", ns, err)
 	}
-	zap.S().Infof("Created Мondoo client secret %q.", utils.MondooClientSecret)
+	if created {
+		zap.S().Infof("Created Мondoo client secret %q.", utils.MondooClientSecret)
+	} else {
+		zap.S().Infof("Мondoo client secret %s/%s already exists.", secret.Namespace, secret.Name)
+	}
 	return nil
 }
 
