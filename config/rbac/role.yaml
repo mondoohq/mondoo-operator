@@ -88,6 +88,7 @@ rules:
   resourceNames:
   - mondoo-client
   - mondoo-token
+  - mondoo-private-registries-secrets
   resources:
   - secrets
   verbs:

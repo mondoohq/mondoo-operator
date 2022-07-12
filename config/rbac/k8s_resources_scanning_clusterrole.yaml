@@ -11,3 +11,11 @@ rules:
   - get
   - watch
   - list
+- apiGroups:
+  - ""
+  resourceNames:
+  - mondoo-private-registries-secrets
+  resources:
+  - secrets
+  verbs:
+  - get

@@ -236,7 +236,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 
 		scanApiDeployment.Spec.Template.Spec.Containers[0].Env = append(scanApiDeployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
 			Name:  "DOCKER_CONFIG",
-			Value: "/etc/opt/mondoo/docker/config.json",
+			Value: "/etc/opt/mondoo/docker",
 		})
 	}
 
