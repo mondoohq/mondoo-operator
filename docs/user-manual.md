@@ -142,8 +142,8 @@ Currently, the admission controller scans workloads of these types:
 - Jobs
 - CronJobs
 
-In the case of workloads that have parent workloads, e.g., a Pod belonging to a Deployment, Mondoo only scans the parent workload.
-The parent workload is the definition where you can fix issues permanently.
+In the case of workloads being dependent on other workloads, e.g., a Pod being dependent on a Deployment, the admission controller only scans the owner workload.
+The owner workload is the definition where you can fix issues permanently.
 
 For more information on how you can configure this, have a look at [this tutorial](https://mondoo.com/docs/tutorials/kubernetes/scan-kubernetes-with-operator/).
 
