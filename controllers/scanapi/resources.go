@@ -53,10 +53,10 @@ func ScanApiSecret(mondoo v1alpha2.MondooAuditConfig) *corev1.Secret {
 	}
 }
 
-func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.Deployment {
+func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateImageScanning bool) *appsv1.Deployment {
 	labels := DeploymentLabels(m)
 
-	return &appsv1.Deployment{
+	scanApiDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DeploymentName(m.Name),
 			Namespace: ns,
@@ -201,6 +201,44 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 			},
 		},
 	}
+
+	if privateImageScanning {
+		// mount secret needed to pull images from private registries
+		scanApiDeployment.Spec.Template.Spec.Volumes = append(scanApiDeployment.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: "pull-secrets",
+			VolumeSource: corev1.VolumeSource{
+				Projected: &corev1.ProjectedVolumeSource{
+					Sources: []corev1.VolumeProjection{
+						{
+							Secret: &corev1.SecretProjection{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: PullSecretName(),
+								},
+								Items: []corev1.KeyToPath{
+									{
+										Key:  ".dockerconfigjson",
+										Path: ".docker.json",
+									},
+								},
+							},
+						},
+					},
+					DefaultMode: pointer.Int32(0o444),
+				},
+			},
+		})
+
+		scanApiDeployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(scanApiDeployment.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      "pull-secrets",
+			ReadOnly:  true,
+			MountPath: "/etc/opt/mondoo/config",
+		})
+
+		scanApiDeployment.Spec.Template.Spec.Containers[0].Command = append(scanApiDeployment.Spec.Template.Spec.Containers[0].Command,
+			"--pull-secret-path", "/etc/opt/mondoo/config/.docker.json")
+	}
+
+	return scanApiDeployment
 }
 
 func ScanApiService(ns string, m v1alpha2.MondooAuditConfig) *corev1.Service {
@@ -245,4 +283,8 @@ func DeploymentName(prefix string) string {
 
 func SecretName(prefix string) string {
 	return prefix + SecretSuffix
+}
+
+func PullSecretName() string {
+	return "mondoo-private-registries-secrets"
 }

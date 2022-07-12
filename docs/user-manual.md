@@ -286,6 +286,15 @@ The end result should resemble this:
             port: 443
 ```
 
+## Creating a secret for private image scanning
+
+To allow the Mondoo operator to scan private images, it needs access to image pull secrets to these private registries.
+Please create a secret with the name `mondoo-private-registries-secrets` within the same namespace as your `MondooAuditConfig` is created.
+The Mondoo operator will only read a secret with this exact name so that we can limit required RBAC permissions.
+Please ensure the secret contains access data to all the registries you want to scan.
+
+You can find examples how to create such a secret [here](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
+
 ## Uninstalling the Mondoo operator
 Before uninstalling the Mondoo operator, be sure to delete all `MondooAuditConfig` and `MondooOperatorConfig` objects. You can find any in your cluster by running:
 ```bash

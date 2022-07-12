@@ -87,8 +87,8 @@ var (
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // Just neeed to be able to create a Secret to hold the generated ScanAPI token
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=create;delete
-// Need to be able to check for the existence of Secrets with tokens and Mondoo service accounts without asking for permission to read all Secrets
-//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get,resourceNames=mondoo-client;mondoo-token
+// Need to be able to check for the existence of Secrets with tokens, Mondoo service accounts, and private image pull secrets without asking for permission to read all Secrets
+//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get,resourceNames=mondoo-client;mondoo-token;mondoo-private-registries-secrets
 //+kubebuilder:rbac:groups=cert-manager.io,resources=certificates;issuers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete

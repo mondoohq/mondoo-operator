@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -62,7 +63,7 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		logger.Error(err, "failed to clean up scan API token Secret resource")
 		return err
 	}
-	scanApiDeployment := ScanApiDeployment(n.Mondoo.Namespace, "", *n.Mondoo) // Image is not relevant when deleting.
+	scanApiDeployment := ScanApiDeployment(n.Mondoo.Namespace, "", *n.Mondoo, false) // Image is not relevant when deleting.
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, scanApiDeployment); err != nil {
 		logger.Error(err, "failed to clean up scan API Deployment resource")
 		return err
@@ -108,7 +109,24 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	logger.V(7).Info("Mondoo client image: ", "image", mondooClientImage)
 	logger.V(7).Info("Mondoo skip resolve: ", "SkipContainerResolution", n.MondooOperatorConfig.Spec.SkipContainerResolution)
 
-	deployment := ScanApiDeployment(n.Mondoo.Namespace, mondooClientImage, *n.Mondoo)
+	// check whether we have private registry pull secrets
+	privateRegistriesSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      PullSecretName(),
+			Namespace: n.Mondoo.Namespace,
+		},
+	}
+	privateRegistriesSecretPresent := false
+	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(privateRegistriesSecret), privateRegistriesSecret); err != nil {
+		if errors.IsNotFound(err) {
+			logger.Info("private registries pull secret not found, mondoo will not scan private registriy images ", "secretname=", PullSecretName())
+		}
+		logger.Error(err, "problems getting secret", "name=", PullSecretName())
+	} else {
+		privateRegistriesSecretPresent = true
+	}
+
+	deployment := ScanApiDeployment(n.Mondoo.Namespace, mondooClientImage, *n.Mondoo, privateRegistriesSecretPresent)
 	if err := ctrl.SetControllerReference(n.Mondoo, deployment, n.KubeClient.Scheme()); err != nil {
 		return err
 	}
