@@ -217,13 +217,13 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 								Items: []corev1.KeyToPath{
 									{
 										Key:  ".dockerconfigjson",
-										Path: ".docker.json",
+										Path: "config.json",
 									},
 								},
 							},
 						},
 					},
-					DefaultMode: pointer.Int32(0o444),
+					DefaultMode: pointer.Int32(0o440),
 				},
 			},
 		})
@@ -231,12 +231,13 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 		scanApiDeployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(scanApiDeployment.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
 			Name:      "pull-secrets",
 			ReadOnly:  true,
-			MountPath: "/etc/opt/mondoo/config",
+			MountPath: "/etc/opt/mondoo/docker",
 		})
 
-		// perhaps we already have something similar in the client?
-		scanApiDeployment.Spec.Template.Spec.Containers[0].Command = append(scanApiDeployment.Spec.Template.Spec.Containers[0].Command,
-			"--pull-secret-path", "/etc/opt/mondoo/config/.docker.json")
+		scanApiDeployment.Spec.Template.Spec.Containers[0].Env = append(scanApiDeployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+			Name:  "DOCKER_CONFIG",
+			Value: "/etc/opt/mondoo/docker/config.json",
+		})
 	}
 
 	return scanApiDeployment
