@@ -174,14 +174,17 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 					},
 					Affinity: &corev1.Affinity{
 						PodAntiAffinity: &corev1.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
 								{
-									LabelSelector: &metav1.LabelSelector{
-										MatchLabels: map[string]string{
-											WebhookLabelKey: WebhookLabelValue,
+									PodAffinityTerm: corev1.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: map[string]string{
+												WebhookLabelKey: WebhookLabelValue,
+											},
 										},
+										TopologyKey: "kubernetes.io/hostname",
 									},
-									TopologyKey: "kubernetes.io/hostname",
+									Weight: int32(100),
 								},
 							},
 						},
