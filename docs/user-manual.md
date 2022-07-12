@@ -132,6 +132,13 @@ And create/modify/delete a Pod in another window:
 kubectl delete pod -n mondoo-operator --selector control-plane=controller-manager
 ```
 
+### Scanned workload types
+
+Currently the admission controller scans workloads of these type:
+- Pods
+- Deployments
+- DaemonSets
+
 ### Different modes of operation
 
 You can run the admission controller in two modes: permissive and enforcing.
