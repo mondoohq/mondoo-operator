@@ -234,6 +234,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 			MountPath: "/etc/opt/mondoo/config",
 		})
 
+		// perhaps we already have something similar in the client?
 		scanApiDeployment.Spec.Template.Spec.Containers[0].Command = append(scanApiDeployment.Spec.Template.Spec.Containers[0].Command,
 			"--pull-secret-path", "/etc/opt/mondoo/config/.docker.json")
 	}

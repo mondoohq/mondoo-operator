@@ -85,6 +85,70 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_KubernetesResources() {
 	s.Equal(*service, ss.Items[0])
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() {
+	d := s.createDeploymentHandler()
+
+	privateRegistriesSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      PullSecretName(),
+		},
+		StringData: map[string]string{
+			".dockerconfigjson": "{	\"auths\": { \"https://registry.example.com/v1/\": { \"auth\": \"c3R...zE2\" } } }",
+		},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, privateRegistriesSecret), "Error creating the private registries secret")
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, ds))
+	s.Equal(1, len(ds.Items))
+
+	image, err := s.containerImageResolver.MondooClientImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, true)
+	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
+	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
+	s.Equal(*deployment, ds.Items[0])
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretTypo() {
+	d := s.createDeploymentHandler()
+
+	privateRegistriesSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      "mondoo-private-pull-secrets",
+		},
+		StringData: map[string]string{
+			".dockerconfigjson": "{	\"auths\": { \"https://registry.example.com/v1/\": { \"auth\": \"c3R...zE2\" } } }",
+		},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, privateRegistriesSecret), "Error creating the private registries secret")
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, ds))
+	s.Equal(1, len(ds.Items))
+
+	image, err := s.containerImageResolver.MondooClientImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, false)
+	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
+	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
+	s.Equal(*deployment, ds.Items[0])
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
 	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", false, false, true)
 
