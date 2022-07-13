@@ -333,9 +333,6 @@ jobs:
       - name: Store creds
         run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
-      - name: Install awk (needed in Makefile)
-        run: sudo apt-get install -y gawk
-
       - name: Run integration tests
         run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.get_version.outputs.VERSION }} make test/integration/ci
 
@@ -415,9 +412,6 @@ jobs:
       # before the test execution starts.
       - name: Wait a bit for the runner to become more stable
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
-
-      - name: Install awk (needed in Makefile)
-        run: sudo apt-get install -y gawk
 
       - name: Run integration tests
         run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.get_version.outputs.VERSION }} make test/integration/ci

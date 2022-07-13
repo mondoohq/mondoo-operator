@@ -447,9 +447,6 @@ func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mo
 		err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.K8sResourcesScanningDegraded, corev1.ConditionFalse)
 		s.Require().NoErrorf(err, "k8s resource scanning shouldn't be in degraded state")
 	*/
-	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, s.testCluster.MondooInstaller.PreviousVersion)
-	s.Require().NoErrorf(err, "Couldn't find release version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
-
 	// everything is fine, now install current branch/release
 	branchInstaller := installer.NewMondooInstaller(installer.NewDefaultSettings(), s.T)
 	err = branchInstaller.InstallOperator()
