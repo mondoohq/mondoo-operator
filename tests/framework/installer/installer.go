@@ -26,7 +26,6 @@ const (
 	MondooClientsNodesLabel    = "audit=node"
 	MondooClientsK8sLabel      = "audit=k8s"
 	ExternalInstallationEnvVar = "EXTERNAL_INSTALLATION"
-	PreviousVersionEnvVar      = "PREVIOUS_RELEASE"
 )
 
 type MondooInstaller struct {
@@ -36,7 +35,6 @@ type MondooInstaller struct {
 	isInstalled           bool
 	ctx                   context.Context
 	isInstalledExternally bool
-	PreviousVersion       string
 }
 
 func NewMondooInstaller(settings Settings, t func() *testing.T) *MondooInstaller {
@@ -47,11 +45,6 @@ func NewMondooInstaller(settings Settings, t func() *testing.T) *MondooInstaller
 
 	_, externalInstall := os.LookupEnv(ExternalInstallationEnvVar)
 
-	previousVersion, found := os.LookupEnv(PreviousVersionEnvVar)
-	if !found {
-		panic("failed to get previous version tag for this repo")
-	}
-
 	return &MondooInstaller{
 		T:                     t,
 		Settings:              settings,
@@ -59,7 +52,6 @@ func NewMondooInstaller(settings Settings, t func() *testing.T) *MondooInstaller
 		ctx:                   context.Background(),
 		isInstalled:           externalInstall,
 		isInstalledExternally: externalInstall,
-		PreviousVersion:       previousVersion,
 	}
 }
 
@@ -83,8 +75,8 @@ func (i *MondooInstaller) InstallOperator() error {
 	}
 
 	if i.Settings.installRelease {
-		zap.S().Info("Installing Mondoo operator release. ", "version=", i.PreviousVersion)
-		releaseManifestUrl := fmt.Sprintf("https://github.com/mondoohq/mondoo-operator/releases/download/%s/mondoo-operator-manifests.yaml", i.PreviousVersion)
+		zap.S().Info("Installing Mondoo operator latest release.")
+		releaseManifestUrl := "https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml"
 		_, err = i.K8sHelper.Kubectl(append(utils.ApplyArgs, releaseManifestUrl)...)
 	} else {
 		zap.S().Info("Installing Mondoo operator with local manifest")

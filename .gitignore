@@ -38,3 +38,5 @@ integration-tests.xml
 
 # Integration tests output
 tests/integration/_output
+
+.vscode/*.log
