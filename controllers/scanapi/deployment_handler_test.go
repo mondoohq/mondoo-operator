@@ -54,7 +54,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_KubernetesResources() {
 	tokenSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: s.auditConfig.Namespace,
-			Name:      SecretName(s.auditConfig.Name),
+			Name:      TokenSecretName(s.auditConfig.Name),
 		},
 	}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret), "Error checking for token secret")
@@ -117,7 +117,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() 
 	s.Equal(*deployment, ds.Items[0])
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretTypo() {
+func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretWrongName() {
 	d := s.createDeploymentHandler()
 
 	privateRegistriesSecret := &corev1.Secret{
@@ -160,7 +160,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
 	tokenSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: s.auditConfig.Namespace,
-			Name:      SecretName(s.auditConfig.Name),
+			Name:      TokenSecretName(s.auditConfig.Name),
 		},
 	}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret), "Error checking for token secret")

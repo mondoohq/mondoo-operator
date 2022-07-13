@@ -44,7 +44,7 @@ func ScanApiSecret(mondoo v1alpha2.MondooAuditConfig) *corev1.Secret {
 
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      SecretName(mondoo.Name),
+			Name:      TokenSecretName(mondoo.Name),
 			Namespace: mondoo.Namespace,
 		},
 		StringData: map[string]string{
@@ -160,7 +160,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 										{
 											Secret: &corev1.SecretProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: SecretName(m.Name),
+													Name: TokenSecretName(m.Name),
 												},
 												Items: []corev1.KeyToPath{
 													{
@@ -236,7 +236,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 
 		scanApiDeployment.Spec.Template.Spec.Containers[0].Env = append(scanApiDeployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
 			Name:  "DOCKER_CONFIG",
-			Value: "/etc/opt/mondoo/docker",
+			Value: "/etc/opt/mondoo/docker", // the docker client automatically adds '/config.json' to the path
 		})
 	}
 
@@ -283,7 +283,7 @@ func DeploymentName(prefix string) string {
 	return prefix + DeploymentSuffix
 }
 
-func SecretName(prefix string) string {
+func TokenSecretName(prefix string) string {
 	return prefix + SecretSuffix
 }
 

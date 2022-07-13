@@ -63,7 +63,7 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		logger.Error(err, "failed to clean up scan API token Secret resource")
 		return err
 	}
-	scanApiDeployment := ScanApiDeployment(n.Mondoo.Namespace, "", *n.Mondoo, false) // Image is not relevant when deleting.
+	scanApiDeployment := ScanApiDeployment(n.Mondoo.Namespace, "", *n.Mondoo, false) // Image and private image scanning secret are not relevant when deleting.
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, scanApiDeployment); err != nil {
 		logger.Error(err, "failed to clean up scan API Deployment resource")
 		return err
@@ -119,7 +119,7 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	privateRegistriesSecretPresent := false
 	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(privateRegistriesSecret), privateRegistriesSecret); err != nil {
 		if errors.IsNotFound(err) {
-			logger.Info("private registries pull secret not found, mondoo will not scan private registriy images ", "secretname=", PullSecretName())
+			logger.Info("private registries pull secret not found, mondoo will not scan private registry images ", "secretname=", PullSecretName())
 		}
 		logger.Error(err, "problems getting secret", "name=", PullSecretName())
 	} else {
