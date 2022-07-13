@@ -41,7 +41,7 @@ jobs:
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
       - name: Install awk (needed in Makefile)
-        run: sudo apt-get install -y awk
+        run: sudo apt-get install -y gawk
 
       - run: make test/ci
       - uses: actions/upload-artifact@v3  # upload test results
@@ -88,7 +88,7 @@ jobs:
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
       - name: Install awk (needed in Makefile)
-        run: sudo apt-get install -y awk
+        run: sudo apt-get install -y gawk
 
       - name: Run integration tests
         run: make test/integration/ci
