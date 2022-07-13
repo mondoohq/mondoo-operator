@@ -8,7 +8,7 @@ VERSION ?= sha256-$(shell git rev-parse HEAD).sig
 # The latest url is just a HTTP redirect to an actual tag.
 # The actual tag is the last part of the location header
 # i.e.: location: https://github.com/mondoohq/mondoo-operator/releases/tag/v0.5.1
-PREVIOUS_RELEASE ?= $(shell curl -sI https://github.com/mondoohq/mondoo-operator/releases/latest/ | grep "location:" | awk -F"/" '{ print $NF }')
+PREVIOUS_RELEASE ?= $(shell curl -sI https://github.com/mondoohq/mondoo-operator/releases/latest/ | grep "location:" | sed 's#^.*/##'
 export PREVIOUS_RELEASE
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
