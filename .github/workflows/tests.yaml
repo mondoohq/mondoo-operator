@@ -40,6 +40,9 @@ jobs:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
+      - name: Install awk (needed in Makefile)
+        run: sudo apt-get install -y awk
+
       - run: make test/ci
       - uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
@@ -83,6 +86,9 @@ jobs:
       # before the test execution starts.
       - name: Wait a bit for the runner to become more stable
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
+
+      - name: Install awk (needed in Makefile)
+        run: sudo apt-get install -y awk
 
       - name: Run integration tests
         run: make test/integration/ci
