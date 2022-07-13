@@ -9,7 +9,7 @@ VERSION ?= sha256-$(shell git rev-parse HEAD).sig
 # The actual tag is the last part of the location header
 # i.e.: location: https://github.com/mondoohq/mondoo-operator/releases/tag/v0.5.1
 # sed and awk aren't present in the GitHub ubuntu image
-PREVIOUS_RELEASE ?= $(shell $(curl -sI https://github.com/mondoohq/mondoo-operator/releases/latest/ | grep "location:" | rev | cut -d'/' -f1 | rev)
+PREVIOUS_RELEASE ?= $(shell $(curl -sI https://github.com/mondoohq/mondoo-operator/releases/latest/ | grep "location:" | rev | cut -d'/' -f1 | rev))
 export PREVIOUS_RELEASE
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
