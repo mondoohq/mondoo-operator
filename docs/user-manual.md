@@ -134,7 +134,7 @@ kubectl delete pod -n mondoo-operator --selector control-plane=controller-manage
 
 ### Scanned workload types
 
-Currently, the admission controller scans workloads of these types:
+Currently, the admission controller can scan these workload types:
 - Pods
 - Deployments
 - DaemonSets
@@ -142,7 +142,8 @@ Currently, the admission controller scans workloads of these types:
 - Jobs
 - CronJobs
 
-In the case of workloads being dependent on other workloads, e.g., a Pod being dependent on a Deployment, the admission controller only scans the owner workload.
+If a workload is dependent on another workload, the admission controller only scans the owner workload.
+For example, if a Deployment creates a Pod, the admission controller skips the Pod and scans the Deployment.
 The owner workload is the definition where you can fix issues permanently.
 
 For more information on how you can configure this, have a look at [this tutorial](https://mondoo.com/docs/tutorials/kubernetes/scan-kubernetes-with-operator/).
