@@ -74,6 +74,10 @@ type KubernetesResources struct {
 	// ContainerImageScanning determines whether container images are being scanned. The current implementation
 	// runs a separate job once every 24h that scans the container images running in the cluster.
 	ContainerImageScanning bool `json:"containerImageScanning,omitempty"`
+
+	// PrivateRegistryScanning defines the name of a secret that contains the credentials for the private
+	// registries we have to pull images from.
+	PrivateRegistriesPullSecretRef corev1.LocalObjectReference `json:"privateRegistriesPullSecretRef,omitempty"`
 }
 
 type Nodes struct {

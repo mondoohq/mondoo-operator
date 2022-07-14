@@ -88,10 +88,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_KubernetesResources() {
 func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() {
 	d := s.createDeploymentHandler()
 
+	s.auditConfig.Spec.KubernetesResources.PrivateRegistriesPullSecretRef.Name = "my-pull-secrets"
+
 	privateRegistriesSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: s.auditConfig.Namespace,
-			Name:      PullSecretName(),
+			Name:      s.auditConfig.Spec.KubernetesResources.PrivateRegistriesPullSecretRef.Name,
 		},
 		StringData: map[string]string{
 			".dockerconfigjson": "{	\"auths\": { \"https://registry.example.com/v1/\": { \"auth\": \"c3R...zE2\" } } }",
@@ -115,6 +117,19 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() 
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.Equal(*deployment, ds.Items[0])
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretSpecifiedButMissing() {
+	d := s.createDeploymentHandler()
+
+	s.auditConfig.Spec.KubernetesResources.PrivateRegistriesPullSecretRef.Name = "my-pull-secrets"
+
+	_, err := d.Reconcile(s.ctx)
+	s.Errorf(err, "Should not have reconciled becasuse of missing private registries secret")
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, ds))
+	s.Equal(0, len(ds.Items))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretWrongName() {

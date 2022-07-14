@@ -212,7 +212,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 						{
 							Secret: &corev1.SecretProjection{
 								LocalObjectReference: corev1.LocalObjectReference{
-									Name: PullSecretName(),
+									Name: m.Spec.KubernetesResources.PrivateRegistriesPullSecretRef.Name,
 								},
 								Items: []corev1.KeyToPath{
 									{
@@ -285,8 +285,4 @@ func DeploymentName(prefix string) string {
 
 func TokenSecretName(prefix string) string {
 	return prefix + SecretSuffix
-}
-
-func PullSecretName() string {
-	return "mondoo-private-registries-secrets"
 }

@@ -112,18 +112,22 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	// check whether we have private registry pull secrets
 	privateRegistriesSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      PullSecretName(),
+			Name:      n.Mondoo.Spec.KubernetesResources.PrivateRegistriesPullSecretRef.Name,
 			Namespace: n.Mondoo.Namespace,
 		},
 	}
 	privateRegistriesSecretPresent := false
-	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(privateRegistriesSecret), privateRegistriesSecret); err != nil {
-		if errors.IsNotFound(err) {
-			logger.Info("private registries pull secret not found, mondoo will not scan private registry images ", "secretname=", PullSecretName())
+	if n.Mondoo.Spec.KubernetesResources.PrivateRegistriesPullSecretRef.Name != "" {
+		if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(privateRegistriesSecret), privateRegistriesSecret); err != nil {
+			if errors.IsNotFound(err) {
+				logger.Info("private registries pull secret not found, but specified. please make sure this secret is present",
+					" namespace=", n.Mondoo.Namespace,
+					" secretname=", n.Mondoo.Spec.KubernetesResources.PrivateRegistriesPullSecretRef.Name)
+			}
+			return err
+		} else {
+			privateRegistriesSecretPresent = true
 		}
-		logger.Error(err, "problems getting secret", "name=", PullSecretName())
-	} else {
-		privateRegistriesSecretPresent = true
 	}
 
 	deployment := ScanApiDeployment(n.Mondoo.Namespace, mondooClientImage, *n.Mondoo, privateRegistriesSecretPresent)
