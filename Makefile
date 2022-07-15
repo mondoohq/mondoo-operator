@@ -121,7 +121,7 @@ build: generate fmt vet ## Build manager binary.
 	CGO_ENABLED=0 GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build -o bin/mondoo-operator -ldflags $(LDFLAGS) cmd/mondoo-operator/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
-	MONDOO_OPERATOR_NAMESPACE=mondoo-operator go run ./cmd/mondoo-operator/main.go
+	MONDOO_OPERATOR_NAMESPACE=mondoo-operator go run ./cmd/mondoo-operator/main.go operator
 
 docker-build: TARGET_OS=linux
 docker-build: build ## Build docker image with the manager.
