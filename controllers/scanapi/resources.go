@@ -53,7 +53,7 @@ func ScanApiSecret(mondoo v1alpha2.MondooAuditConfig) *corev1.Secret {
 	}
 }
 
-func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateImageScanning bool) *appsv1.Deployment {
+func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateImageScanningSecretName string) *appsv1.Deployment {
 	labels := DeploymentLabels(m)
 
 	scanApiDeployment := &appsv1.Deployment{
@@ -202,7 +202,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 		},
 	}
 
-	if privateImageScanning {
+	if privateImageScanningSecretName != "" {
 		// mount secret needed to pull images from private registries
 		scanApiDeployment.Spec.Template.Spec.Volumes = append(scanApiDeployment.Spec.Template.Spec.Volumes, corev1.Volume{
 			Name: "pull-secrets",
@@ -212,7 +212,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 						{
 							Secret: &corev1.SecretProjection{
 								LocalObjectReference: corev1.LocalObjectReference{
-									Name: m.Spec.KubernetesResources.PrivateRegistriesPullSecretRef.Name,
+									Name: privateImageScanningSecretName,
 								},
 								Items: []corev1.KeyToPath{
 									{
