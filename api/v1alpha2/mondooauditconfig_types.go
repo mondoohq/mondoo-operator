@@ -66,6 +66,10 @@ type Scanner struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=1
 	Replicas *int32 `json:"replicas,omitempty"`
+
+	// PrivateRegistryScanning defines the name of a secret that contains the credentials for the private
+	// registries we have to pull images from.
+	PrivateRegistriesPullSecretRef corev1.LocalObjectReference `json:"privateRegistriesPullSecretRef,omitempty"`
 }
 
 type KubernetesResources struct {

@@ -44,7 +44,7 @@ func ScanApiSecret(mondoo v1alpha2.MondooAuditConfig) *corev1.Secret {
 
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      SecretName(mondoo.Name),
+			Name:      TokenSecretName(mondoo.Name),
 			Namespace: mondoo.Namespace,
 		},
 		StringData: map[string]string{
@@ -53,10 +53,10 @@ func ScanApiSecret(mondoo v1alpha2.MondooAuditConfig) *corev1.Secret {
 	}
 }
 
-func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.Deployment {
+func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateImageScanningSecretName string) *appsv1.Deployment {
 	labels := DeploymentLabels(m)
 
-	return &appsv1.Deployment{
+	scanApiDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DeploymentName(m.Name),
 			Namespace: ns,
@@ -160,7 +160,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 										{
 											Secret: &corev1.SecretProjection{
 												LocalObjectReference: corev1.LocalObjectReference{
-													Name: SecretName(m.Name),
+													Name: TokenSecretName(m.Name),
 												},
 												Items: []corev1.KeyToPath{
 													{
@@ -201,6 +201,46 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig) *appsv1.D
 			},
 		},
 	}
+
+	if privateImageScanningSecretName != "" {
+		// mount secret needed to pull images from private registries
+		scanApiDeployment.Spec.Template.Spec.Volumes = append(scanApiDeployment.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: "pull-secrets",
+			VolumeSource: corev1.VolumeSource{
+				Projected: &corev1.ProjectedVolumeSource{
+					Sources: []corev1.VolumeProjection{
+						{
+							Secret: &corev1.SecretProjection{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: privateImageScanningSecretName,
+								},
+								Items: []corev1.KeyToPath{
+									{
+										Key:  ".dockerconfigjson",
+										Path: "config.json",
+									},
+								},
+							},
+						},
+					},
+					DefaultMode: pointer.Int32(0o440),
+				},
+			},
+		})
+
+		scanApiDeployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(scanApiDeployment.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      "pull-secrets",
+			ReadOnly:  true,
+			MountPath: "/etc/opt/mondoo/docker",
+		})
+
+		scanApiDeployment.Spec.Template.Spec.Containers[0].Env = append(scanApiDeployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+			Name:  "DOCKER_CONFIG",
+			Value: "/etc/opt/mondoo/docker", // the client automatically adds '/config.json' to the path
+		})
+	}
+
+	return scanApiDeployment
 }
 
 func ScanApiService(ns string, m v1alpha2.MondooAuditConfig) *corev1.Service {
@@ -243,6 +283,6 @@ func DeploymentName(prefix string) string {
 	return prefix + DeploymentSuffix
 }
 
-func SecretName(prefix string) string {
+func TokenSecretName(prefix string) string {
 	return prefix + SecretSuffix
 }

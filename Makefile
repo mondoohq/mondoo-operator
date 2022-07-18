@@ -85,7 +85,9 @@ help: ## Display this help.
 ##@ Development
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./api/..." paths="./pkg/webhooks/..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./controllers/..."
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd paths="./api/..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role webhook paths="./pkg/webhooks/..."
 
 generate: controller-gen gomockgen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -119,7 +121,7 @@ build: generate fmt vet ## Build manager binary.
 	CGO_ENABLED=0 GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build -o bin/mondoo-operator -ldflags $(LDFLAGS) cmd/mondoo-operator/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
-	MONDOO_OPERATOR_NAMESPACE=mondoo-operator go run ./cmd/mondoo-operator/main.go
+	MONDOO_OPERATOR_NAMESPACE=mondoo-operator go run ./cmd/mondoo-operator/main.go operator
 
 docker-build: TARGET_OS=linux
 docker-build: build ## Build docker image with the manager.

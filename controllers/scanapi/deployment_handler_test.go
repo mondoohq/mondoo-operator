@@ -54,7 +54,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_KubernetesResources() {
 	tokenSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: s.auditConfig.Namespace,
-			Name:      SecretName(s.auditConfig.Name),
+			Name:      TokenSecretName(s.auditConfig.Name),
 		},
 	}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret), "Error checking for token secret")
@@ -70,7 +70,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_KubernetesResources() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.Equal(*deployment, ds.Items[0])
@@ -85,6 +85,104 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_KubernetesResources() {
 	s.Equal(*service, ss.Items[0])
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() {
+	d := s.createDeploymentHandler()
+
+	s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRef.Name = "my-pull-secrets"
+
+	privateRegistriesSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRef.Name,
+		},
+		StringData: map[string]string{
+			".dockerconfigjson": "{	\"auths\": { \"https://registry.example.com/v1/\": { \"auth\": \"c3R...zE2\" } } }",
+		},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, privateRegistriesSecret), "Error creating the private registries secret")
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, ds))
+	s.Equal(1, len(ds.Items))
+
+	image, err := s.containerImageResolver.MondooClientImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "my-pull-secrets")
+	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
+	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
+	s.Equal(*deployment, ds.Items[0])
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretNotSpecifiedButPresent() {
+	d := s.createDeploymentHandler()
+
+	privateRegistriesSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      "mondoo-private-registries-secrets",
+		},
+		StringData: map[string]string{
+			".dockerconfigjson": "{	\"auths\": { \"https://registry.example.com/v1/\": { \"auth\": \"c3R...zE2\" } } }",
+		},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, privateRegistriesSecret), "Error creating the private registries secret")
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, ds))
+	s.Equal(1, len(ds.Items))
+
+	image, err := s.containerImageResolver.MondooClientImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "mondoo-private-registries-secrets")
+	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
+	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
+	s.Equal(*deployment, ds.Items[0])
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretWrongName() {
+	d := s.createDeploymentHandler()
+
+	privateRegistriesSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      "mondoo-private-pull-secrets",
+		},
+		StringData: map[string]string{
+			".dockerconfigjson": "{	\"auths\": { \"https://registry.example.com/v1/\": { \"auth\": \"c3R...zE2\" } } }",
+		},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, privateRegistriesSecret), "Error creating the private registries secret")
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, ds))
+	s.Equal(1, len(ds.Items))
+
+	image, err := s.containerImageResolver.MondooClientImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
+	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
+	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
+	s.Equal(*deployment, ds.Items[0])
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
 	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", false, false, true)
 
@@ -96,7 +194,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
 	tokenSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: s.auditConfig.Namespace,
-			Name:      SecretName(s.auditConfig.Name),
+			Name:      TokenSecretName(s.auditConfig.Name),
 		},
 	}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret), "Error checking for token secret")
@@ -112,7 +210,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.Equal(*deployment, ds.Items[0])
@@ -136,7 +234,7 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
 	deployment.Status.UnavailableReplicas = 1
 	deployment.Status.Conditions = []appsv1.DeploymentCondition{
 		{
@@ -174,7 +272,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
 	deployment.Spec.Replicas = pointer.Int32(3)
 
 	service := ScanApiService(s.auditConfig.Namespace, s.auditConfig)
@@ -191,7 +289,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.NoError(d.KubeClient.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
-	deployment = ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig)
+	deployment = ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	deployment.ResourceVersion = "1000" // Needed because the fake client sets it.
 
@@ -216,7 +314,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Cleanup_NoScanning() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
 	service := ScanApiService(s.auditConfig.Namespace, s.auditConfig)
 	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(deployment, service)
 
@@ -247,7 +345,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Cleanup_AuditConfigDeletion() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
 	service := ScanApiService(s.auditConfig.Namespace, s.auditConfig)
 	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(deployment, service)
 
