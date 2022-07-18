@@ -439,14 +439,12 @@ func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mo
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionFalse)
 	s.Require().NoErrorf(err, "Admission shouldn't be in degraded state")
 
-	// TODO: should be checked after this is fixed: https://github.com/mondoohq/mondoo-operator/issues/436
-	/*
-		err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.NodeScanningDegraded, corev1.ConditionFalse)
-		s.Require().NoErrorf(err, "Node scanning shouldn't be in degraded state")
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.NodeScanningDegraded, corev1.ConditionFalse)
+	s.Require().NoErrorf(err, "Node scanning shouldn't be in degraded state")
 
-		err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.K8sResourcesScanningDegraded, corev1.ConditionFalse)
-		s.Require().NoErrorf(err, "k8s resource scanning shouldn't be in degraded state")
-	*/
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.K8sResourcesScanningDegraded, corev1.ConditionFalse)
+	s.Require().NoErrorf(err, "k8s resource scanning shouldn't be in degraded state")
+
 	// everything is fine, now install current branch/release
 	branchInstaller := installer.NewMondooInstaller(installer.NewDefaultSettings(), s.T)
 	err = branchInstaller.InstallOperator()
