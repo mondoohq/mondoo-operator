@@ -102,6 +102,10 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 						SecurityContext: &corev1.SecurityContext{
 							AllowPrivilegeEscalation: pointer.Bool(false),
 							ReadOnlyRootFilesystem:   pointer.Bool(true),
+							RunAsNonRoot:             pointer.Bool(true),
+							// This is needed to prevent:
+							// Error: container has runAsNonRoot and image has non-numeric user (mondoo), cannot verify user is non-root ...
+							RunAsUser: pointer.Int64(101),
 						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
