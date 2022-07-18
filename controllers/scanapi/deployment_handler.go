@@ -111,8 +111,8 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 
 	// check whether we have private registry pull secrets
 	privateRegistriesSecretName := "mondoo-private-registries-secrets"
-	if n.Mondoo.Spec.KubernetesResources.PrivateRegistriesPullSecretRef.Name != "" {
-		privateRegistriesSecretName = n.Mondoo.Spec.KubernetesResources.PrivateRegistriesPullSecretRef.Name
+	if n.Mondoo.Spec.Scanner.PrivateRegistriesPullSecretRef.Name != "" {
+		privateRegistriesSecretName = n.Mondoo.Spec.Scanner.PrivateRegistriesPullSecretRef.Name
 	}
 	privateRegistriesSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

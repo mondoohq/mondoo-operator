@@ -94,16 +94,6 @@ spec:
                     type: boolean
                   enable:
                     type: boolean
-                  privateRegistriesPullSecretRef:
-                    description: PrivateRegistryScanning defines the name of a secret
-                      that contains the credentials for the private registries we
-                      have to pull images from.
-                    properties:
-                      name:
-                        description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                          TODO: Add other useful fields. apiVersion, kind, uid?'
-                        type: string
-                    type: object
                 type: object
               mondooCredsSecretRef:
                 description: Config is an example field of MondooAuditConfig. Edit
@@ -167,6 +157,16 @@ spec:
                       name:
                         type: string
                       tag:
+                        type: string
+                    type: object
+                  privateRegistriesPullSecretRef:
+                    description: PrivateRegistryScanning defines the name of a secret
+                      that contains the credentials for the private registries we
+                      have to pull images from.
+                    properties:
+                      name:
+                        description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
                     type: object
                   replicas:

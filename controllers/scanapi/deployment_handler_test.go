@@ -88,12 +88,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_KubernetesResources() {
 func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() {
 	d := s.createDeploymentHandler()
 
-	s.auditConfig.Spec.KubernetesResources.PrivateRegistriesPullSecretRef.Name = "my-pull-secrets"
+	s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRef.Name = "my-pull-secrets"
 
 	privateRegistriesSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: s.auditConfig.Namespace,
-			Name:      s.auditConfig.Spec.KubernetesResources.PrivateRegistriesPullSecretRef.Name,
+			Name:      s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRef.Name,
 		},
 		StringData: map[string]string{
 			".dockerconfigjson": "{	\"auths\": { \"https://registry.example.com/v1/\": { \"auth\": \"c3R...zE2\" } } }",
