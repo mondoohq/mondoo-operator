@@ -18,14 +18,9 @@ package controllers
 
 import (
 	"context"
-	_ "embed"
-	"encoding/json"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
-	jwt "github.com/golang-jwt/jwt/v4"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -53,6 +48,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
+	"go.mondoo.com/mondoo-operator/pkg/utils/tokenexchange"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 )
 
@@ -67,11 +63,8 @@ type MondooAuditConfigReconciler struct {
 	StatusReporter         *status.StatusReporter
 }
 
-// Embed the Default Inventory for CronJob and Deployment Configurations
-var (
-	// so we can mock out the mondoo client for testing
-	MondooClientBuilder = mondooclient.NewClient
-)
+// so we can mock out the mondoo client for testing
+var MondooClientBuilder = mondooclient.NewClient
 
 // The update permissions for MondooAuditConfigs are required because having update permissions just for finalizers is insufficient
 // to add finalizers. There is a github issue describing the problem https://github.com/kubernetes-sigs/kubebuilder/issues/2264
@@ -362,107 +355,8 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 	}
 
 	log.Info("Creating Mondoo service account from token")
-	token := strings.TrimSpace(string(mondooTokenSecret.Data[constants.MondooTokenSecretKey]))
-
-	return r.createServiceAccountFromToken(ctx, mondoo, token, log)
-}
-
-func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.Context, auditConfig *v1alpha2.MondooAuditConfig, jwtString string, log logr.Logger) error {
-	parser := &jwt.Parser{}
-	token, _, err := parser.ParseUnverified(jwtString, jwt.MapClaims{})
-	if err != nil {
-		log.Error(err, "failed to parse token")
-		return err
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		err := fmt.Errorf("failed to type asesrt claims from token")
-		log.Error(err, "failed to extract claim")
-		return err
-	}
-	apiEndpoint := claims["api_endpoint"]
-
-	opts := mondooclient.ClientOptions{
-		ApiEndpoint: fmt.Sprintf("%v", apiEndpoint),
-		Token:       jwtString,
-	}
-
-	mClient := r.MondooClientBuilder(opts)
-
-	tokenSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      auditConfig.Spec.MondooCredsSecretRef.Name,
-			Namespace: auditConfig.Namespace,
-		},
-	}
-	if auditConfig.Spec.ConsoleIntegration.Enable {
-		// owner is the MRN of the integration
-		tokenOwner, ok := claims["owner"]
-		if !ok {
-			err := fmt.Errorf("'owner' claim missing from token which is expected for Mondoo integration registration")
-			log.Error(err, "missing data in token Secret")
-			return err
-		}
-		// Do an integration-style registration to associate the generated
-		// service account with the Mondoo console Integration
-		resp, err := mClient.IntegrationRegister(ctx, &mondooclient.IntegrationRegisterInput{
-			Mrn:   fmt.Sprintf("%v", tokenOwner),
-			Token: jwtString,
-		})
-		if err != nil {
-			log.Error(err, "failed to exchange token for a service account")
-			return err
-		}
-
-		integrationMrn := resp.Mrn
-		credsBytes, err := json.Marshal(*resp.Creds)
-		if err != nil {
-			log.Error(err, "failed to marshal service account creds from IntegrationRegister()")
-			return err
-		}
-		tokenSecret.Data = map[string][]byte{
-			constants.MondooCredsSecretServiceAccountKey: credsBytes,
-			constants.MondooCredsSecretIntegrationMRNKey: []byte(integrationMrn),
-		}
-		_, err = k8s.CreateIfNotExist(ctx, r.Client, tokenSecret, tokenSecret)
-		if err != nil {
-			log.Error(err, "error while trying to save Mondoo service account into secret")
-			return err
-		}
-
-		// No easy way to retry this one-off CheckIn(). An error on initial CheckIn()
-		// means we'll just retry on the regularly scheduled interval via the integration controller
-		if err := mondoo.IntegrationCheckIn(ctx, integrationMrn, *resp.Creds, r.MondooClientBuilder, log); err != nil {
-			log.Error(err, "initial CheckIn() failed, will CheckIn() periodically", "integrationMRN", integrationMrn)
-		}
-	} else {
-		// Do a vanilla token-for-service-account exchange
-		resp, err := mClient.ExchangeRegistrationToken(ctx, &mondooclient.ExchangeRegistrationTokenInput{
-			Token: jwtString,
-		})
-		if err != nil {
-			log.Error(err, "failed to exchange token for a service account")
-			return err
-		}
-
-		// Save the service account
-		tokenSecret.StringData = map[string]string{
-			constants.MondooCredsSecretServiceAccountKey: resp.ServiceAccount,
-		}
-		_, err = k8s.CreateIfNotExist(ctx, r.Client, tokenSecret, tokenSecret)
-		if err != nil {
-			log.Error(err, "error while trying to save Mondoo service account into secret")
-			return err
-		}
-	}
-
-	log.Info(
-		"saved Mondoo service account",
-		"secret",
-		fmt.Sprintf("%s/%s", auditConfig.Namespace, auditConfig.Spec.MondooCredsSecretRef.Name))
-
-	return nil
+	tokenData := string(mondooTokenSecret.Data[constants.MondooTokenSecretKey])
+	return tokenexchange.CreateServiceAccountFromToken(ctx, r.Client, r.MondooClientBuilder, mondoo.Spec.ConsoleIntegration.Enable, client.ObjectKeyFromObject(mondooCredsSecret), tokenData, log)
 }
 
 // SetupWithManager sets up the controller with the Manager.
