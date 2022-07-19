@@ -30,6 +30,7 @@ const (
 	NodeScanningIdentifier         = "node-scanning"
 	AdmissionControllerIdentifier  = "admission-controller"
 	ScanApiIdentifier              = "scan-api"
+	noStatusMessage                = "No status yet reported'"
 )
 
 type OperatorCustomState struct {
@@ -57,12 +58,17 @@ func ReportStatusRequestFromAuditConfig(
 	messages[0].Identifier = K8sResourcesScanningIdentifier
 	if m.Spec.KubernetesResources.Enable {
 		k8sResourcesScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.K8sResourcesScanningDegraded)
-		if k8sResourcesScanning != nil && k8sResourcesScanning.Status == v1.ConditionTrue {
-			messages[0].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+		if k8sResourcesScanning != nil {
+			if k8sResourcesScanning.Status == v1.ConditionTrue {
+				messages[0].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+			} else {
+				messages[0].Status = mondooclient.MessageStatus_MESSAGE_INFO
+			}
+			messages[0].Message = k8sResourcesScanning.Message
 		} else {
-			messages[0].Status = mondooclient.MessageStatus_MESSAGE_INFO
+			messages[0].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
+			messages[0].Message = noStatusMessage
 		}
-		messages[0].Message = k8sResourcesScanning.Message
 	} else {
 		messages[0].Status = mondooclient.MessageStatus_MESSAGE_INFO
 		messages[0].Message = "Kubernetes resources scanning is disabled"
@@ -72,12 +78,17 @@ func ReportStatusRequestFromAuditConfig(
 	messages[1].Identifier = NodeScanningIdentifier
 	if m.Spec.Nodes.Enable {
 		nodeScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.NodeScanningDegraded)
-		if nodeScanning != nil && nodeScanning.Status == v1.ConditionTrue {
-			messages[1].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+		if nodeScanning != nil {
+			if nodeScanning.Status == v1.ConditionTrue {
+				messages[1].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+			} else {
+				messages[1].Status = mondooclient.MessageStatus_MESSAGE_INFO
+			}
+			messages[1].Message = nodeScanning.Message
 		} else {
-			messages[1].Status = mondooclient.MessageStatus_MESSAGE_INFO
+			messages[1].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
+			messages[1].Message = noStatusMessage
 		}
-		messages[1].Message = nodeScanning.Message
 	} else {
 		messages[1].Status = mondooclient.MessageStatus_MESSAGE_INFO
 		messages[1].Message = "Node scanning is disabled"
@@ -87,12 +98,17 @@ func ReportStatusRequestFromAuditConfig(
 	messages[2].Identifier = AdmissionControllerIdentifier
 	if m.Spec.Admission.Enable {
 		admissionControllerScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.AdmissionDegraded)
-		if admissionControllerScanning != nil && admissionControllerScanning.Status == v1.ConditionTrue {
-			messages[2].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+		if admissionControllerScanning != nil {
+			if admissionControllerScanning.Status == v1.ConditionTrue {
+				messages[2].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+			} else {
+				messages[2].Status = mondooclient.MessageStatus_MESSAGE_INFO
+			}
+			messages[2].Message = admissionControllerScanning.Message
 		} else {
-			messages[2].Status = mondooclient.MessageStatus_MESSAGE_INFO
+			messages[2].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
+			messages[2].Message = noStatusMessage
 		}
-		messages[2].Message = admissionControllerScanning.Message
 	} else {
 		messages[2].Status = mondooclient.MessageStatus_MESSAGE_INFO
 		messages[2].Message = "Admission controller is disabled"
@@ -101,12 +117,17 @@ func ReportStatusRequestFromAuditConfig(
 	messages[3].Identifier = ScanApiIdentifier
 	if m.Spec.Admission.Enable || m.Spec.KubernetesResources.Enable {
 		scanApi := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.ScanAPIDegraded)
-		if scanApi.Status == v1.ConditionTrue {
-			messages[3].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+		if scanApi != nil {
+			if scanApi.Status == v1.ConditionTrue {
+				messages[3].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+			} else {
+				messages[3].Status = mondooclient.MessageStatus_MESSAGE_INFO
+			}
+			messages[3].Message = scanApi.Message
 		} else {
-			messages[3].Status = mondooclient.MessageStatus_MESSAGE_INFO
+			messages[3].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
+			messages[3].Message = noStatusMessage
 		}
-		messages[3].Message = scanApi.Message
 	} else {
 		messages[3].Status = mondooclient.MessageStatus_MESSAGE_INFO
 		messages[3].Message = "Scan API is disabled"
