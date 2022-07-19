@@ -80,26 +80,28 @@ func (s *StatusReporterSuite) TestReport() {
 		Mrn:     testIntegrationMrn,
 		Status:  mondooclient.Status_ACTIVE,
 		Version: "latest",
-		Messages: []mondooclient.IntegrationMessage{
-			{
-				Message:    "Kubernetes resources scanning is disabled",
-				Identifier: K8sResourcesScanningIdentifier,
-				Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-			},
-			{
-				Message:    "Node scanning is disabled",
-				Identifier: NodeScanningIdentifier,
-				Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-			},
-			{
-				Message:    "Admission controller is disabled",
-				Identifier: AdmissionControllerIdentifier,
-				Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-			},
-			{
-				Message:    "Scan API is disabled",
-				Identifier: ScanApiIdentifier,
-				Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+		Messages: mondooclient.Messages{
+			Messages: []mondooclient.IntegrationMessage{
+				{
+					Message:    "Kubernetes resources scanning is disabled",
+					Identifier: K8sResourcesScanningIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+				},
+				{
+					Message:    "Node scanning is disabled",
+					Identifier: NodeScanningIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+				},
+				{
+					Message:    "Admission controller is disabled",
+					Identifier: AdmissionControllerIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+				},
+				{
+					Message:    "Scan API is disabled",
+					Identifier: ScanApiIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+				},
 			},
 		},
 		LastState: OperatorCustomState{
@@ -128,26 +130,28 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 		Mrn:     testIntegrationMrn,
 		Status:  mondooclient.Status_ACTIVE,
 		Version: "latest",
-		Messages: []mondooclient.IntegrationMessage{
-			{
-				Message:    "Kubernetes resources scanning is disabled",
-				Identifier: K8sResourcesScanningIdentifier,
-				Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-			},
-			{
-				Message:    "Node scanning is disabled",
-				Identifier: NodeScanningIdentifier,
-				Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-			},
-			{
-				Message:    "Admission controller is disabled",
-				Identifier: AdmissionControllerIdentifier,
-				Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-			},
-			{
-				Message:    "Scan API is disabled",
-				Identifier: ScanApiIdentifier,
-				Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+		Messages: mondooclient.Messages{
+			Messages: []mondooclient.IntegrationMessage{
+				{
+					Message:    "Kubernetes resources scanning is disabled",
+					Identifier: K8sResourcesScanningIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+				},
+				{
+					Message:    "Node scanning is disabled",
+					Identifier: NodeScanningIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+				},
+				{
+					Message:    "Admission controller is disabled",
+					Identifier: AdmissionControllerIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+				},
+				{
+					Message:    "Scan API is disabled",
+					Identifier: ScanApiIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+				},
 			},
 		},
 		LastState: OperatorCustomState{
@@ -166,8 +170,8 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 	}
 
 	expected.Status = mondooclient.Status_ERROR
-	expected.Messages[1].Message = s.auditConfig.Status.Conditions[0].Message
-	expected.Messages[1].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+	expected.Messages.Messages[1].Message = s.auditConfig.Status.Conditions[0].Message
+	expected.Messages.Messages[1].Status = mondooclient.MessageStatus_MESSAGE_ERROR
 	s.mockMondooClient.EXPECT().IntegrationReportStatus(gomock.Any(), expected).Times(1).Return(nil)
 
 	// We call Report another time to make sure IntegrationReportStatus is only called whenever the status actually changes.
