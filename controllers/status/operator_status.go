@@ -129,7 +129,7 @@ func ReportStatusRequestFromAuditConfig(
 			KubernetesVersion: k8sVersion.GitVersion,
 			MondooAuditConfig: MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
 		},
-		Messages: messages,
+		Messages: mondooclient.Messages{Messages: messages},
 		Version:  version.Version,
 	}
 }

@@ -228,26 +228,28 @@ func TestTokenRegistration(t *testing.T) {
 					Mrn:     testIntegrationMRN,
 					Status:  mondooclient.Status_ACTIVE,
 					Version: "latest",
-					Messages: []mondooclient.IntegrationMessage{
-						{
-							Message:    "Kubernetes resources scanning is disabled",
-							Identifier: status.K8sResourcesScanningIdentifier,
-							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-						},
-						{
-							Message:    "Node scanning is disabled",
-							Identifier: status.NodeScanningIdentifier,
-							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-						},
-						{
-							Message:    "Admission controller is disabled",
-							Identifier: status.AdmissionControllerIdentifier,
-							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-						},
-						{
-							Message:    "Scan API is disabled",
-							Identifier: status.ScanApiIdentifier,
-							Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+					Messages: mondooclient.Messages{
+						Messages: []mondooclient.IntegrationMessage{
+							{
+								Message:    "Kubernetes resources scanning is disabled",
+								Identifier: status.K8sResourcesScanningIdentifier,
+								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+							},
+							{
+								Message:    "Node scanning is disabled",
+								Identifier: status.NodeScanningIdentifier,
+								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+							},
+							{
+								Message:    "Admission controller is disabled",
+								Identifier: status.AdmissionControllerIdentifier,
+								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+							},
+							{
+								Message:    "Scan API is disabled",
+								Identifier: status.ScanApiIdentifier,
+								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+							},
 						},
 					},
 					LastState: status.OperatorCustomState{

@@ -37,7 +37,7 @@ func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
 		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Admission controller is disabled"},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Scan API is disabled"},
 	}
-	assert.ElementsMatch(t, messages, reportStatus.Messages)
+	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 	assert.Equal(t, version.Version, reportStatus.Version)
 }
 
@@ -75,7 +75,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[2].Message},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[3].Message},
 	}
-	assert.ElementsMatch(t, messages, reportStatus.Messages)
+	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 	assert.Equal(t, version.Version, reportStatus.Version)
 }
 
@@ -113,7 +113,7 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[2].Message},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[3].Message},
 	}
-	assert.ElementsMatch(t, messages, reportStatus.Messages)
+	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 	assert.Equal(t, version.Version, reportStatus.Version)
 }
 
