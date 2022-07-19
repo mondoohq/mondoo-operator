@@ -120,33 +120,9 @@ func (r *IntegrationReconciler) processMondooAuditConfig(m v1alpha2.MondooAuditC
 		return err
 	}
 
-	if err = r.IntegrationCheckIn(integrationMrn, *serviceAccount); err != nil {
+	if err = mondoo.IntegrationCheckIn(r.ctx, integrationMrn, *serviceAccount, r.MondooClientBuilder, r.Log); err != nil {
 		r.Log.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
 		return err
-	}
-
-	return nil
-}
-
-func (r *IntegrationReconciler) IntegrationCheckIn(integrationMrn string, sa mondooclient.ServiceAccountCredentials) error {
-	token, err := mondoo.GenerateTokenFromServiceAccount(sa, r.Log)
-	if err != nil {
-		msg := "unable to generate token from service account"
-		r.Log.Error(err, msg)
-		return fmt.Errorf("%s: %s", msg, err)
-	}
-	mondooClient := r.MondooClientBuilder(mondooclient.ClientOptions{
-		ApiEndpoint: sa.ApiEndpoint,
-		Token:       token,
-	})
-
-	// Do the actual check-in
-	if _, err := mondooClient.IntegrationCheckIn(r.ctx, &mondooclient.IntegrationCheckInInput{
-		Mrn: integrationMrn,
-	}); err != nil {
-		msg := "failed to CheckIn() to Mondoo API"
-		r.Log.Error(err, msg)
-		return fmt.Errorf("%s: %s", msg, err)
 	}
 
 	return nil

@@ -57,7 +57,7 @@ func ReportStatusRequestFromAuditConfig(
 	messages[0].Identifier = K8sResourcesScanningIdentifier
 	if m.Spec.KubernetesResources.Enable {
 		k8sResourcesScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.K8sResourcesScanningDegraded)
-		if k8sResourcesScanning.Status == v1.ConditionTrue {
+		if k8sResourcesScanning != nil && k8sResourcesScanning.Status == v1.ConditionTrue {
 			messages[0].Status = mondooclient.MessageStatus_MESSAGE_ERROR
 		} else {
 			messages[0].Status = mondooclient.MessageStatus_MESSAGE_INFO
@@ -72,7 +72,7 @@ func ReportStatusRequestFromAuditConfig(
 	messages[1].Identifier = NodeScanningIdentifier
 	if m.Spec.Nodes.Enable {
 		nodeScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.NodeScanningDegraded)
-		if nodeScanning.Status == v1.ConditionTrue {
+		if nodeScanning != nil && nodeScanning.Status == v1.ConditionTrue {
 			messages[1].Status = mondooclient.MessageStatus_MESSAGE_ERROR
 		} else {
 			messages[1].Status = mondooclient.MessageStatus_MESSAGE_INFO
@@ -87,7 +87,7 @@ func ReportStatusRequestFromAuditConfig(
 	messages[2].Identifier = AdmissionControllerIdentifier
 	if m.Spec.Admission.Enable {
 		admissionControllerScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.AdmissionDegraded)
-		if admissionControllerScanning.Status == v1.ConditionTrue {
+		if admissionControllerScanning != nil && admissionControllerScanning.Status == v1.ConditionTrue {
 			messages[2].Status = mondooclient.MessageStatus_MESSAGE_ERROR
 		} else {
 			messages[2].Status = mondooclient.MessageStatus_MESSAGE_INFO
