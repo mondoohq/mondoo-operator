@@ -45,7 +45,6 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/admission"
-	"go.mondoo.com/mondoo-operator/controllers/integration"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
@@ -368,7 +367,7 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 	return r.createServiceAccountFromToken(ctx, mondoo, token, log)
 }
 
-func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.Context, mondoo *v1alpha2.MondooAuditConfig, jwtString string, log logr.Logger) error {
+func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.Context, auditConfig *v1alpha2.MondooAuditConfig, jwtString string, log logr.Logger) error {
 	parser := &jwt.Parser{}
 	token, _, err := parser.ParseUnverified(jwtString, jwt.MapClaims{})
 	if err != nil {
@@ -393,11 +392,11 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 
 	tokenSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mondoo.Spec.MondooCredsSecretRef.Name,
-			Namespace: mondoo.Namespace,
+			Name:      auditConfig.Spec.MondooCredsSecretRef.Name,
+			Namespace: auditConfig.Namespace,
 		},
 	}
-	if mondoo.Spec.ConsoleIntegration.Enable {
+	if auditConfig.Spec.ConsoleIntegration.Enable {
 		// owner is the MRN of the integration
 		tokenOwner, ok := claims["owner"]
 		if !ok {
@@ -434,7 +433,9 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 
 		// No easy way to retry this one-off CheckIn(). An error on initial CheckIn()
 		// means we'll just retry on the regularly scheduled interval via the integration controller
-		_ = r.performInitialCheckIn(integrationMrn, *resp.Creds, log)
+		if err := mondoo.IntegrationCheckIn(ctx, integrationMrn, *resp.Creds, r.MondooClientBuilder, log); err != nil {
+			log.Error(err, "initial CheckIn() failed, will CheckIn() periodically", "integrationMRN", integrationMrn)
+		}
 	} else {
 		// Do a vanilla token-for-service-account exchange
 		resp, err := mClient.ExchangeRegistrationToken(ctx, &mondooclient.ExchangeRegistrationTokenInput{
@@ -456,22 +457,11 @@ func (r *MondooAuditConfigReconciler) createServiceAccountFromToken(ctx context.
 		}
 	}
 
-	log.Info("saved Mondoo service account", "secret", fmt.Sprintf("%s/%s", mondoo.Namespace, mondoo.Spec.MondooCredsSecretRef.Name))
+	log.Info(
+		"saved Mondoo service account",
+		"secret",
+		fmt.Sprintf("%s/%s", auditConfig.Namespace, auditConfig.Spec.MondooCredsSecretRef.Name))
 
-	return nil
-}
-
-func (r *MondooAuditConfigReconciler) performInitialCheckIn(integrationMrn string, sa mondooclient.ServiceAccountCredentials, logger logr.Logger) error {
-	// build a minimal IntegrationReconciler to be able to attempt a CheckIn()
-	integrationReconciler := &integration.IntegrationReconciler{
-		Log:                 logger,
-		MondooClientBuilder: r.MondooClientBuilder,
-	}
-
-	if err := integrationReconciler.IntegrationCheckIn(integrationMrn, sa); err != nil {
-		logger.Error(err, "initial CheckIn() failed, will CheckIn() periodically", "integrationMRN", integrationMrn)
-		return err
-	}
 	return nil
 }
 
