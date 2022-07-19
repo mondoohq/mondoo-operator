@@ -398,7 +398,11 @@ type ReportStatusRequest struct {
 	Version string `protobuf:"bytes,5,opt,name=version,proto3" json:"version,omitempty"`
 	// messages that convey extra information about the integration - these messages can be informational, warnings or errors. Can be used
 	// to report non-critical errors/warnings without neccesarily changing the whole integration status.
-	Messages []IntegrationMessage `protobuf:"bytes,7,opt,name=messages,proto3" json:"messages,omitempty"`
+	Messages Messages `protobuf:"bytes,7,opt,name=messages,proto3" json:"messages,omitempty"`
+}
+
+type Messages struct {
+	Messages []IntegrationMessage `protobuf:"bytes,1,opt,name=messages,proto3" json:"messages,omitempty"`
 }
 
 type Status int32
