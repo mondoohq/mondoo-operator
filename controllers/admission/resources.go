@@ -120,11 +120,11 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 							Resources: corev1.ResourceRequirements{
 								Limits: corev1.ResourceList{
 									corev1.ResourceCPU:    resource.MustParse("200m"),
-									corev1.ResourceMemory: resource.MustParse("100Mi"),
+									corev1.ResourceMemory: resource.MustParse("50Mi"),
 								},
 								Requests: corev1.ResourceList{
 									corev1.ResourceCPU:    resource.MustParse("100m"),
-									corev1.ResourceMemory: resource.MustParse("20Mi"),
+									corev1.ResourceMemory: resource.MustParse("30Mi"),
 								},
 							},
 							SecurityContext: &corev1.SecurityContext{
