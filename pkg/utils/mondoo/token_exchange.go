@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tokenexchange
+package mondoo
 
 import (
 	"context"
@@ -33,7 +33,6 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
-	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
 type MondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
@@ -136,7 +135,7 @@ func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client
 }
 
 func performInitialCheckIn(ctx context.Context, mondooClientBuilder MondooClientBuilder, integrationMrn string, sa mondooclient.ServiceAccountCredentials, logger logr.Logger) error {
-	if err := mondoo.IntegrationCheckIn(ctx, integrationMrn, sa, mondooClientBuilder, logger); err != nil {
+	if err := IntegrationCheckIn(ctx, integrationMrn, sa, mondooClientBuilder, logger); err != nil {
 		logger.Error(err, "initial CheckIn() failed, will CheckIn() periodically", "integrationMRN", integrationMrn)
 		return err
 	}

@@ -48,7 +48,6 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
-	"go.mondoo.com/mondoo-operator/pkg/utils/tokenexchange"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 )
 
@@ -313,16 +312,16 @@ func (r *MondooAuditConfigReconciler) nodeEventsRequestMapper(o client.Object) [
 	return requests
 }
 
-func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context.Context, mondoo *v1alpha2.MondooAuditConfig, log logr.Logger) error {
-	if mondoo.Spec.MondooCredsSecretRef.Name == "" {
+func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context.Context, auditConfig *v1alpha2.MondooAuditConfig, log logr.Logger) error {
+	if auditConfig.Spec.MondooCredsSecretRef.Name == "" {
 		log.Info("MondooAuditConfig without .spec.mondooCredsSecretRef defined")
 		return nil
 	}
 
 	mondooCredsSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mondoo.Spec.MondooCredsSecretRef.Name,
-			Namespace: mondoo.Namespace,
+			Name:      auditConfig.Spec.MondooCredsSecretRef.Name,
+			Namespace: auditConfig.Namespace,
 		},
 	}
 	mondooCredsExists, err := k8s.CheckIfExists(ctx, r.Client, mondooCredsSecret, mondooCredsSecret)
@@ -338,8 +337,8 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 
 	mondooTokenSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mondoo.Spec.MondooTokenSecretRef.Name,
-			Namespace: mondoo.Namespace,
+			Name:      auditConfig.Spec.MondooTokenSecretRef.Name,
+			Namespace: auditConfig.Namespace,
 		},
 	}
 	mondooTokenExists, err := k8s.CheckIfExists(ctx, r.Client, mondooTokenSecret, mondooTokenSecret)
@@ -356,7 +355,7 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 
 	log.Info("Creating Mondoo service account from token")
 	tokenData := string(mondooTokenSecret.Data[constants.MondooTokenSecretKey])
-	return tokenexchange.CreateServiceAccountFromToken(ctx, r.Client, r.MondooClientBuilder, mondoo.Spec.ConsoleIntegration.Enable, client.ObjectKeyFromObject(mondooCredsSecret), tokenData, log)
+	return mondoo.CreateServiceAccountFromToken(ctx, r.Client, r.MondooClientBuilder, auditConfig.Spec.ConsoleIntegration.Enable, client.ObjectKeyFromObject(mondooCredsSecret), tokenData, log)
 }
 
 // SetupWithManager sets up the controller with the Manager.
