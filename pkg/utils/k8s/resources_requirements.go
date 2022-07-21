@@ -48,12 +48,12 @@ func ResourcesRequirementsWithDefaults(m corev1.ResourceRequirements) corev1.Res
 // DefaultNodeScanningResources for Mondoo Client container when scanning nodes
 var DefaultNodeScanningResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("400M"),
+		corev1.ResourceMemory: resource.MustParse("100M"),
 		corev1.ResourceCPU:    resource.MustParse("200m"),
 	},
 
 	Requests: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("180M"),
+		corev1.ResourceMemory: resource.MustParse("60M"),
 		corev1.ResourceCPU:    resource.MustParse("50m"),
 	},
 }
