@@ -103,7 +103,7 @@ func TestResources(t *testing.T) {
 			mondooauditconfig: func() *v1alpha2.MondooAuditConfig {
 				return testMondooAuditConfig()
 			},
-			expectedResources: k8s.DefaultMondooClientResources,
+			expectedResources: k8s.DefaultNodeScanningResources,
 		},
 		{
 			name: "resources should match spec",
