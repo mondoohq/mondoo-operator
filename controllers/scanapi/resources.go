@@ -99,6 +99,17 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 							PeriodSeconds:       5,
 							FailureThreshold:    5,
 						},
+						LivenessProbe: &corev1.Probe{
+							ProbeHandler: corev1.ProbeHandler{
+								HTTPGet: &corev1.HTTPGetAction{
+									Path: "/Health/Check",
+									Port: intstr.FromInt(Port),
+								},
+							},
+							InitialDelaySeconds: 10,
+							PeriodSeconds:       10,
+							TimeoutSeconds:      5,
+						},
 						SecurityContext: &corev1.SecurityContext{
 							AllowPrivilegeEscalation: pointer.Bool(false),
 							ReadOnlyRootFilesystem:   pointer.Bool(true),
