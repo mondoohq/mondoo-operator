@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	WebhookLabelKey   = "control-plane"
+	WebhookLabelKey   = "app"
 	WebhookLabelValue = "webhook-manager"
 
 	// openShiftServiceAnnotationKey is how we annotate a Service so that OpenShift

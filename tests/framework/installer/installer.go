@@ -91,7 +91,12 @@ func (i *MondooInstaller) InstallOperator() error {
 		return err
 	}
 
-	if !i.K8sHelper.IsPodReady("control-plane=controller-manager", i.Settings.Namespace) {
+	watchLabel := "app=mondoo-operator"
+	// FIXME: remove this once we have migrated away from the old labeling scheme
+	if i.Settings.installRelease {
+		watchLabel = "control-plane=controller-manager"
+	}
+	if !i.K8sHelper.IsPodReady(watchLabel, i.Settings.Namespace) {
 		return fmt.Errorf("mondoo operator is not in a ready state")
 	}
 	zap.S().Info("Mondoo operator is ready.")
