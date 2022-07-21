@@ -50,6 +50,7 @@ func init() {
 		res, err := client.ScanKubernetesResources(context.Background(), *integrationMrn, *scanContainerImages)
 		if err != nil {
 			logger.Error(err, "failed to trigger a Kubernetes resources scan")
+			return err
 		}
 
 		// TODO: print some more useful info
