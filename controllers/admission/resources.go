@@ -17,7 +17,7 @@ import (
 
 const (
 	WebhookLabelKey   = "app"
-	WebhookLabelValue = "webhook-manager"
+	WebhookLabelValue = "mondoo-operator"
 
 	// openShiftServiceAnnotationKey is how we annotate a Service so that OpenShift
 	// will create TLS certificates for the webhook Service.
