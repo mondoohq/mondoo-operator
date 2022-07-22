@@ -76,7 +76,7 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		err := s.testCluster.K8sHelper.EnsureNoPodsPresent(scanApiListOpts)
 		s.NoErrorf(err, "Failed to wait for ScanAPI Pods to be gone")
 
-		webhookLabels := map[string]string{mondooadmission.WebhookLabelKey: mondooadmission.WebhookLabelValue}
+		webhookLabels := mondooadmission.WebhookDeploymentLabels()
 		webhookListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(webhookLabels)}
 		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(webhookListOpts)
 		s.NoErrorf(err, "Failed to wait for Webhook Pods to be gone")
@@ -618,8 +618,13 @@ func (s *AuditConfigBaseSuite) checkPods(auditConfig *mondoov2.MondooAuditConfig
 }
 
 func (s *AuditConfigBaseSuite) getWebhookLabelsString() string {
-	webhookLabels := []string{mondooadmission.WebhookLabelKey + "=" + mondooadmission.WebhookLabelValue}
-	webhookLabelsString := strings.Join(webhookLabels, ",")
+	webhookDeploymentLabels := mondooadmission.WebhookDeploymentLabels()
+
+	keyValuesWithEquals := []string{}
+	for key, val := range webhookDeploymentLabels {
+		keyValuesWithEquals = append(keyValuesWithEquals, key+"="+val)
+	}
+	webhookLabelsString := strings.Join(keyValuesWithEquals, ",")
 	return webhookLabelsString
 }
 

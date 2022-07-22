@@ -129,7 +129,7 @@ kubectl logs -f deployment/mondoo-client-webhook-manager -n mondoo-operator
 
 And delete a Pod in another window (which will cause a new one to be created):
 ```bash
-kubectl delete pod -n mondoo-operator --selector app=mondoo-operator
+kubectl delete pod -n mondoo-operator --selector app.kubernetes.io/name=mondoo-operator
 ```
 
 ### Scanned workload types

@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	WebhookLabelKey   = "app"
-	WebhookLabelValue = "mondoo-operator"
+	webhookDeploymentLabelKey   = "app.kubernetes.io/name"
+	webhookDeploymentLabelValue = "mondoo-operator-webhook"
 
 	// openShiftServiceAnnotationKey is how we annotate a Service so that OpenShift
 	// will create TLS certificates for the webhook Service.
@@ -70,22 +70,16 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      webhookDeploymentName(m.Name),
 			Namespace: ns,
-			Labels: map[string]string{
-				WebhookLabelKey: WebhookLabelValue,
-			},
+			Labels:    WebhookDeploymentLabels(),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: m.Spec.Admission.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					WebhookLabelKey: WebhookLabelValue,
-				},
+				MatchLabels: WebhookDeploymentLabels(),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						WebhookLabelKey: WebhookLabelValue,
-					},
+					Labels: WebhookDeploymentLabels(),
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -178,9 +172,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 								{
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												WebhookLabelKey: WebhookLabelValue,
-											},
+											MatchLabels: WebhookDeploymentLabels(),
 										},
 										TopologyKey: "kubernetes.io/hostname",
 									},
@@ -197,6 +189,12 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 	return deployment
 }
 
+func WebhookDeploymentLabels() map[string]string {
+	return map[string]string{
+		webhookDeploymentLabelKey: webhookDeploymentLabelValue,
+	}
+}
+
 func WebhookService(ns string, m mondoov1alpha2.MondooAuditConfig) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -211,10 +209,8 @@ func WebhookService(ns string, m mondoov1alpha2.MondooAuditConfig) *corev1.Servi
 					TargetPort: intstr.FromInt(webhook.DefaultPort),
 				},
 			},
-			Type: corev1.ServiceTypeClusterIP,
-			Selector: map[string]string{
-				WebhookLabelKey: WebhookLabelValue,
-			},
+			Type:     corev1.ServiceTypeClusterIP,
+			Selector: WebhookDeploymentLabels(),
 		},
 	}
 }
