@@ -120,16 +120,16 @@ You can choose one of three approaches:
 - Use the OpenShift certificate creation/rotation features
 - Create (and rotate) your own TLS certificates manually
 
-A working setup shows the webhook Pod processing the created/modified/deleted Pods.
+A working setup shows the webhook Pod processing the created/modified Pods.
 
 Display the logs in one window:
 ```bash
 kubectl logs -f deployment/mondoo-client-webhook-manager -n mondoo-operator
 ```
 
-And create/modify/delete a Pod in another window:
+And delete a Pod in another window (which will cause a new one to be created):
 ```bash
-kubectl delete pod -n mondoo-operator --selector control-plane=controller-manager
+kubectl delete pod -n mondoo-operator --selector app.kubernetes.io/name=mondoo-operator
 ```
 
 ### Scanned workload types
