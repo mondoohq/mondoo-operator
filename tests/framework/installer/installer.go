@@ -91,7 +91,7 @@ func (i *MondooInstaller) InstallOperator() error {
 		return err
 	}
 
-	watchLabel := "app=mondoo-operator"
+	watchLabel := "app.kubernetes.io/name=mondoo-operator"
 	// FIXME: remove this once we have migrated away from the old labeling scheme
 	if i.Settings.installRelease {
 		watchLabel = "control-plane=controller-manager"
