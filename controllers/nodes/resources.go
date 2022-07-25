@@ -178,11 +178,9 @@ func Inventory(node corev1.Node, integrationMRN string, m v1alpha2.MondooAuditCo
 		Spec: inventory.MondooInventorySpec{
 			Assets: []inventory.Asset{
 				{
-					Id:   "host",
-					Name: node.Name,
-					IdDetector: []string{
-						"machine-id",
-					},
+					Id:          "host",
+					Name:        node.Name,
+					PlatformIds: []string{node.Name},
 					Connections: []inventory.TransportConfig{
 						{
 							Host:    "/mnt/host",
