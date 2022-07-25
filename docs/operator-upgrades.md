@@ -54,3 +54,21 @@ For Helm and kubectl installations before applying the `v1.0.0` manifests run:
 ```bash
 kubectl delete -n mondoo-operator deployments.apps mondoo-operator-controller-manager
 ```
+
+### OLM installations
+For OLM installations first list the subscriptions:
+```bash
+kubectl get subscription -n mondoo-operator
+```
+
+Delete the Mondoo Operator subscription:
+```bash
+kubectl delete sub -n mondoo-operator mondoo-operator-v0-7-1-sub  
+```
+
+Delete the Mondoo Operator cluster service version:
+```bash
+kubectl delete csv -n mondoo-operator mondoo-operator.v0.7.1
+```
+
+After that you can install the latest Mondoo Operator version using the standard OLM installation command.
