@@ -95,6 +95,16 @@ func (s *ContainerImageResolverSuite) TestMondooClientImage_SkipImageResolution(
 	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
 }
 
+func (s *ContainerImageResolverSuite) TestMondooClientImage_OpenShift() {
+	s.resolver.resolveForOpenShift = true
+
+	res, err := s.resolver.MondooClientImage("", "", true)
+	s.NoError(err)
+
+	s.Equal(fmt.Sprintf("%s:%s", MondooClientImage, OpenShiftMondooClientTag), res)
+	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
+}
+
 func (s *ContainerImageResolverSuite) TestMondooOperatorImage() {
 	image := "ghcr.io/mondoo/testimage"
 	res, err := s.resolver.MondooOperatorImage(image, "testtag", false)

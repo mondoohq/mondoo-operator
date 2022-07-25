@@ -386,6 +386,21 @@ func (s *DeploymentHandlerSuite) TestCleanup_AlreadyClean() {
 	s.Equal(0, len(ss.Items))
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_Create_KubernetesResources_OpenShift() {
+	d := s.createDeploymentHandler()
+	d.DeployOnOpenShift = true
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, ds))
+	s.Require().Equal(1, len(ds.Items))
+
+	s.Nil(ds.Items[0].Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser, "expecting unset RunAsUser on OpenShift to allow OpenShift to select a UID from the allowed range (for the Namespace)")
+}
+
 func TestDeploymentHandlerSuite(t *testing.T) {
 	suite.Run(t, new(DeploymentHandlerSuite))
 }
