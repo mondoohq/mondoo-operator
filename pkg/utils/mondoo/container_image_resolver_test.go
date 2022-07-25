@@ -47,7 +47,7 @@ func (s *ContainerImageResolverSuite) BeforeTest(suiteName, testName string) {
 }
 
 func (s *ContainerImageResolverSuite) TestNewContainerImageResolver() {
-	resolver := NewContainerImageResolver()
+	resolver := NewContainerImageResolver(false)
 
 	ref, err := name.ParseReference(fmt.Sprintf("%s:%s", MondooClientImage, MondooClientTag))
 	s.NoError(err)
@@ -92,6 +92,16 @@ func (s *ContainerImageResolverSuite) TestMondooClientImage_SkipImageResolution(
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s:%s", image, tag), res)
+	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
+}
+
+func (s *ContainerImageResolverSuite) TestMondooClientImage_OpenShift() {
+	s.resolver.resolveForOpenShift = true
+
+	res, err := s.resolver.MondooClientImage("", "", true)
+	s.NoError(err)
+
+	s.Equal(fmt.Sprintf("%s:%s", MondooClientImage, OpenShiftMondooClientTag), res)
 	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
 }
 

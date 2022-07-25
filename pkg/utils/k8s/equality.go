@@ -39,7 +39,27 @@ func AreDeploymentsEqual(a, b appsv1.Deployment) bool {
 		AreResouceRequirementsEqual(a.Spec.Template.Spec.Containers[0].Resources, b.Spec.Template.Spec.Containers[0].Resources) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Volumes, b.Spec.Template.Spec.Volumes) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Affinity, b.Spec.Template.Spec.Affinity) &&
+		AreSecurityContextsEqual(a.Spec.Template.Spec.Containers[0].SecurityContext, b.Spec.Template.Spec.Containers[0].SecurityContext) &&
 		reflect.DeepEqual(a.GetOwnerReferences(), b.GetOwnerReferences())
+}
+
+// AreSecurityContextsEqual checks whether the provided Pod SecurityContexts are equal
+// for the fields we are interested in.
+func AreSecurityContextsEqual(a, b *corev1.SecurityContext) bool {
+	// If both left undefined, then they're equal to us
+	if a == nil && b == nil {
+		return true
+	}
+	// If not both are undefined, but one is, then unequal
+	if a == nil || b == nil {
+		return false
+	}
+
+	// Finally do the field comparisons for the filds we care about
+	return reflect.DeepEqual(a.AllowPrivilegeEscalation, b.AllowPrivilegeEscalation) &&
+		reflect.DeepEqual(a.ReadOnlyRootFilesystem, b.ReadOnlyRootFilesystem) &&
+		reflect.DeepEqual(a.RunAsNonRoot, b.RunAsNonRoot) &&
+		reflect.DeepEqual(a.RunAsUser, b.RunAsUser)
 }
 
 // AreServicesEqual return a value indicating whether 2 services are equal. Note that it

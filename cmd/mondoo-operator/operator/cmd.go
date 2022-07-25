@@ -81,11 +81,17 @@ func init() {
 			return err
 		}
 
+		isOpenShift, err := k8s.IsOpenShift(mgr.GetConfig())
+		if err != nil {
+			setupLog.Error(err, "error while checking if running on OpenShift")
+		}
+
 		if err = (&controllers.MondooAuditConfigReconciler{
 			Client:                 mgr.GetClient(),
 			MondooClientBuilder:    controllers.MondooClientBuilder,
-			ContainerImageResolver: mondoo.NewContainerImageResolver(),
+			ContainerImageResolver: mondoo.NewContainerImageResolver(isOpenShift),
 			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder, v),
+			RunningOnOpenShift:     isOpenShift,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "MondooAuditConfig")
 			return err

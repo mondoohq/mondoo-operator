@@ -28,9 +28,10 @@ import (
 )
 
 const (
-	MondooClientImage   = "docker.io/mondoo/client"
-	MondooClientTag     = "6-rootless"
-	MondooOperatorImage = "ghcr.io/mondoohq/mondoo-operator"
+	MondooClientImage        = "docker.io/mondoo/client"
+	MondooClientTag          = "6-rootless"
+	OpenShiftMondooClientTag = "6-ubi-rootless"
+	MondooOperatorImage      = "ghcr.io/mondoohq/mondoo-operator"
 )
 
 // On a normal mondoo-operator build, the Version variable will be set at build time to match
@@ -50,20 +51,25 @@ type ContainerImageResolver interface {
 }
 
 type containerImageResolver struct {
-	logger logr.Logger
-
-	imageCacher imagecache.ImageCacher
+	logger              logr.Logger
+	resolveForOpenShift bool
+	imageCacher         imagecache.ImageCacher
 }
 
-func NewContainerImageResolver() ContainerImageResolver {
+func NewContainerImageResolver(isOpenShift bool) ContainerImageResolver {
 	return &containerImageResolver{
-		logger:      ctrl.Log.WithName("container-image-resolver"),
-		imageCacher: imagecache.NewImageCacher(),
+		logger:              ctrl.Log.WithName("container-image-resolver"),
+		imageCacher:         imagecache.NewImageCacher(),
+		resolveForOpenShift: isOpenShift,
 	}
 }
 
 func (c *containerImageResolver) MondooClientImage(userImage, userTag string, skipImageResolution bool) (string, error) {
-	image := userImageOrDefault(MondooClientImage, MondooClientTag, userImage, userTag)
+	defaultTag := MondooClientTag
+	if c.resolveForOpenShift {
+		defaultTag = OpenShiftMondooClientTag
+	}
+	image := userImageOrDefault(MondooClientImage, defaultTag, userImage, userTag)
 	return c.resolveImage(image, skipImageResolution)
 }
 
