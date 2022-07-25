@@ -19,15 +19,16 @@ package scanapi
 import (
 	"context"
 
-	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
-	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
 var logger = ctrl.Log.WithName("scan-api")
@@ -37,6 +38,7 @@ type DeploymentHandler struct {
 	Mondoo                 *v1alpha2.MondooAuditConfig
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
+	DeployOnOpenShift      bool
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
@@ -63,7 +65,7 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		logger.Error(err, "failed to clean up scan API token Secret resource")
 		return err
 	}
-	scanApiDeployment := ScanApiDeployment(n.Mondoo.Namespace, "", *n.Mondoo, "") // Image and private image scanning secret are not relevant when deleting.
+	scanApiDeployment := ScanApiDeployment(n.Mondoo.Namespace, "", *n.Mondoo, "", n.DeployOnOpenShift) // Image and private image scanning secret are not relevant when deleting.
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, scanApiDeployment); err != nil {
 		logger.Error(err, "failed to clean up scan API Deployment resource")
 		return err
@@ -102,7 +104,7 @@ func (n *DeploymentHandler) syncSecret(ctx context.Context) error {
 }
 
 func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
-	mondooClientImage, err := n.ContainerImageResolver.MondooClientImage("", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	mondooClientImage, err := n.ContainerImageResolver.MondooClientImage(n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		return err
 	}
@@ -131,7 +133,7 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		privateRegistriesSecretName = ""
 	}
 
-	deployment := ScanApiDeployment(n.Mondoo.Namespace, mondooClientImage, *n.Mondoo, privateRegistriesSecretName)
+	deployment := ScanApiDeployment(n.Mondoo.Namespace, mondooClientImage, *n.Mondoo, privateRegistriesSecretName, n.DeployOnOpenShift)
 	if err := ctrl.SetControllerReference(n.Mondoo, deployment, n.KubeClient.Scheme()); err != nil {
 		return err
 	}

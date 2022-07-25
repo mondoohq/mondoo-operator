@@ -70,7 +70,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_KubernetesResources() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "", false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.Equal(*deployment, ds.Items[0])
@@ -113,7 +113,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() 
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "my-pull-secrets")
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "my-pull-secrets", false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.Equal(*deployment, ds.Items[0])
@@ -145,7 +145,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretNot
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "mondoo-private-registries-secrets")
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "mondoo-private-registries-secrets", false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.Equal(*deployment, ds.Items[0])
@@ -177,7 +177,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretWro
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "", false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.Equal(*deployment, ds.Items[0])
@@ -210,7 +210,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "", false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.Equal(*deployment, ds.Items[0])
@@ -234,7 +234,7 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "", false)
 	deployment.Status.UnavailableReplicas = 1
 	deployment.Status.Conditions = []appsv1.DeploymentCondition{
 		{
@@ -272,7 +272,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "", false)
 	deployment.Spec.Replicas = pointer.Int32(3)
 
 	service := ScanApiService(s.auditConfig.Namespace, s.auditConfig)
@@ -289,7 +289,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.NoError(d.KubeClient.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
-	deployment = ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
+	deployment = ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "", false)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	deployment.ResourceVersion = "1000" // Needed because the fake client sets it.
 
@@ -314,7 +314,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Cleanup_NoScanning() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "", false)
 	service := ScanApiService(s.auditConfig.Namespace, s.auditConfig)
 	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(deployment, service)
 
@@ -345,7 +345,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Cleanup_AuditConfigDeletion() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "")
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "", false)
 	service := ScanApiService(s.auditConfig.Namespace, s.auditConfig)
 	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(deployment, service)
 

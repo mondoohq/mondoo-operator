@@ -60,6 +60,7 @@ type MondooAuditConfigReconciler struct {
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooAuditConfig      *v1alpha2.MondooAuditConfig
 	StatusReporter         *status.StatusReporter
+	RunningOnOpenShift     bool
 }
 
 // so we can mock out the mondoo client for testing
@@ -229,6 +230,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: r.ContainerImageResolver,
+		DeployOnOpenShift:      r.RunningOnOpenShift,
 	}
 	result, reconcileError := scanapi.Reconcile(ctx)
 	if reconcileError != nil {

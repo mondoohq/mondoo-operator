@@ -47,7 +47,7 @@ func (s *ContainerImageResolverSuite) BeforeTest(suiteName, testName string) {
 }
 
 func (s *ContainerImageResolverSuite) TestNewContainerImageResolver() {
-	resolver := NewContainerImageResolver()
+	resolver := NewContainerImageResolver(false)
 
 	ref, err := name.ParseReference(fmt.Sprintf("%s:%s", MondooClientImage, MondooClientTag))
 	s.NoError(err)

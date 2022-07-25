@@ -53,7 +53,7 @@ func ScanApiSecret(mondoo v1alpha2.MondooAuditConfig) *corev1.Secret {
 	}
 }
 
-func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateImageScanningSecretName string) *appsv1.Deployment {
+func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateImageScanningSecretName string, deployOnOpenShift bool) *appsv1.Deployment {
 	labels := DeploymentLabels(m)
 
 	scanApiDeployment := &appsv1.Deployment{
@@ -253,6 +253,13 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 			Name:  "DOCKER_CONFIG",
 			Value: "/etc/opt/mondoo/docker", // the client automatically adds '/config.json' to the path
 		})
+	}
+
+	if deployOnOpenShift {
+		// OpenShift will set its own UID in the range assinged to the Namespace the Pod is running
+		// in; so clear out our 101 UID otherwise OpenShift SCCs will fail the Pod do to it not using
+		// a UID in the assigned range.
+		scanApiDeployment.Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser = nil
 	}
 
 	return scanApiDeployment
