@@ -19,6 +19,7 @@ import (
 
 const (
 	testMondooAuditConfigName = "mondoo-config"
+	testClusterUID            = "abcdefg"
 )
 
 func TestCronJobName(t *testing.T) {
@@ -153,13 +154,13 @@ func TestInventory(t *testing.T) {
 	randName := utils.RandString(10)
 	auditConfig := v1alpha2.MondooAuditConfig{ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"}}
 
-	inventory, err := Inventory(corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: randName}}, "", auditConfig)
+	inventory, err := Inventory(corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: randName}}, "", testClusterUID, auditConfig)
 	assert.NoError(t, err, "unexpected error generating inventory")
 	assert.Contains(t, inventory, randName)
 	assert.NotContains(t, inventory, constants.MondooAssetsIntegrationLabel)
 
 	const integrationMRN = "//test-MRN"
-	inventory, err = Inventory(corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: randName}}, integrationMRN, auditConfig)
+	inventory, err = Inventory(corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: randName}}, integrationMRN, testClusterUID, auditConfig)
 	assert.NoError(t, err, "unexpected error generating inventory")
 	assert.Contains(t, inventory, randName)
 	assert.Contains(t, inventory, constants.MondooAssetsIntegrationLabel)

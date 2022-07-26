@@ -63,6 +63,7 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
 	s.auditConfig = utils.DefaultAuditConfig(testNamespace, false, true, false)
 	s.fakeClientBuilder = fake.NewClientBuilder()
+	s.seedKubeSystemNamespace()
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMap() {
@@ -77,7 +78,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMap() {
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	for _, node := range nodes.Items {
-		expected, err := ConfigMap(node, "", s.auditConfig)
+		expected, err := ConfigMap(node, "", testClusterUID, s.auditConfig)
 		s.Require().NoError(err, "unexpected error while generating ConfigMap")
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
@@ -127,7 +128,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	for _, node := range nodes.Items {
-		expected, err := ConfigMap(node, testIntegrationMRN, s.auditConfig)
+		expected, err := ConfigMap(node, testIntegrationMRN, testClusterUID, s.auditConfig)
 		s.Require().NoError(err, "unexpected error while generating ConfigMap")
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
@@ -154,7 +155,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	for _, node := range nodes.Items {
-		existing, err := ConfigMap(node, "", s.auditConfig)
+		existing, err := ConfigMap(node, "", testClusterUID, s.auditConfig)
 		s.Require().NoError(err, "unexpected error while generating ConfigMap")
 		existing.Data["inventory"] = ""
 		s.NoError(d.KubeClient.Create(s.ctx, existing))
@@ -165,7 +166,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
 	s.True(result.IsZero())
 
 	for _, node := range nodes.Items {
-		expected, err := ConfigMap(node, "", s.auditConfig)
+		expected, err := ConfigMap(node, "", testClusterUID, s.auditConfig)
 		s.Require().NoError(err, "unexpected error while generating ConfigMap")
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
@@ -209,7 +210,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanConfigMapsForDeletedNodes() 
 
 	s.Equal(1, len(configMaps.Items))
 
-	expected, err := ConfigMap(nodes.Items[0], "", s.auditConfig)
+	expected, err := ConfigMap(nodes.Items[0], "", testClusterUID, s.auditConfig)
 	s.Require().NoError(err, "unexpected error while generating ConfigMap")
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
@@ -460,6 +461,16 @@ func (s *DeploymentHandlerSuite) seedNodes() {
 	}
 	worker := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node02"}}
 	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(master, worker)
+}
+
+func (s *DeploymentHandlerSuite) seedKubeSystemNamespace() {
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-system",
+			UID:  testClusterUID,
+		},
+	}
+	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(namespace)
 }
 
 func TestDeploymentHandlerSuite(t *testing.T) {
