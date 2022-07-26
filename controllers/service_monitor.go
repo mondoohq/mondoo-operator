@@ -17,25 +17,21 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
@@ -126,7 +122,7 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *mondoov1alpha2.MondooOperato
 
 func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	found, err := verifyAPI(monitoringv1.SchemeGroupVersion.Group, monitoringv1.SchemeGroupVersion.Version, ctx)
+	found, err := k8s.VerifyAPI(monitoringv1.SchemeGroupVersion.Group, monitoringv1.SchemeGroupVersion.Version, log)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -192,33 +188,4 @@ func (s *ServiceMonitor) down(ctx context.Context, clt client.Client) (ctrl.Resu
 		}
 	}
 	return ctrl.Result{Requeue: true}, err
-}
-
-// Verify if Prometheus API exists
-func verifyAPI(group string, version string, ctx context.Context) (bool, error) {
-	log := ctrllog.FromContext(ctx)
-	cfg, err := config.GetConfig()
-	if err != nil {
-		log.Error(err, "unable to get k8s config")
-		return false, err
-	}
-
-	k8s, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		log.Error(err, "unable to create k8s client")
-		return false, err
-	}
-
-	gv := schema.GroupVersion{
-		Group:   group,
-		Version: version,
-	}
-
-	if err = discovery.ServerSupportsVersion(k8s, gv); err != nil {
-		// error, API not available
-		return false, nil
-	}
-
-	log.Info(fmt.Sprintf("%s/%s API verified", group, version))
-	return true, nil
 }

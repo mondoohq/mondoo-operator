@@ -130,8 +130,8 @@ docker-build: build ## Build docker image with the manager.
 load-minikube: docker-build ## Build docker image with the manager and load it into minikube.
 	minikube image load ${IMG}
 
-buildah-build: test ## Build container image
-	buildah build -t ${IMG} .
+buildah-build: build ## Build container image
+	buildah build --platform=${TARGET_OS}/${TARGET_ARCH} -t ${IMG} .
 
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
