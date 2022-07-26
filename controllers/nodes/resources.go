@@ -180,7 +180,7 @@ func Inventory(node corev1.Node, integrationMRN string, m v1alpha2.MondooAuditCo
 				{
 					Id:          "host",
 					Name:        node.Name,
-					PlatformIds: []string{node.Name},
+					PlatformIds: []string{fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/%s", node.UID, node.Name)},
 					Connections: []inventory.TransportConfig{
 						{
 							Host:    "/mnt/host",
