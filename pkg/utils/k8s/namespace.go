@@ -17,8 +17,15 @@ limitations under the License.
 package k8s
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
+
+	"github.com/go-logr/logr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // GetRunningNamespace will return the namespace the Pod is running under
@@ -37,4 +44,19 @@ func GetRunningNamespace() (string, error) {
 	}
 
 	return string(namespaceBytes), nil
+}
+
+// GetClusterUID will just attempt to get the 'kube-system' Namespace and return the UID of the resource
+func GetClusterUID(ctx context.Context, kubeClient client.Client, log logr.Logger) (string, error) {
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-system",
+		},
+	}
+	if err := kubeClient.Get(ctx, client.ObjectKeyFromObject(namespace), namespace); err != nil {
+		log.Error(err, "Failed to get cluster ID from kube-system Namespace")
+		return "", err
+	}
+	clusterID := string(namespace.UID)
+	return clusterID, nil
 }

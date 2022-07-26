@@ -224,16 +224,10 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 		}
 	}
 
-	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "kube-system",
-		},
-	}
-	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(namespace), namespace); err != nil {
-		webhookLog.Error(err, "Failed to get cluster ID from kube-system Namespace")
+	clusterID, err := k8s.GetClusterUID(ctx, n.KubeClient, webhookLog)
+	if err != nil {
 		return err
 	}
-	clusterID := string(namespace.UID)
 
 	integrationMRN, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
 	if err != nil {
