@@ -2,14 +2,14 @@ controllerManager:
   manager:
     image:
       repository: ghcr.io/mondoohq/mondoo-operator
-      tag: v0.7.1
+      tag: v0.7.2
     resources:
       limits:
         cpu: 200m
-        memory: 100Mi
+        memory: 60Mi
       requests:
         cpu: 100m
-        memory: 20Mi
+        memory: 35Mi
   replicas: 1
 kubernetesClusterDomain: cluster.local
 managerConfig:
