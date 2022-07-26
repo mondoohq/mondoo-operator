@@ -46,11 +46,11 @@ If there **is** more than one minor version difference between the installed Mon
     ```
 Adjust the steps above to fit your current situation. There may be multiple minor release versions between your installed version and the latest release. You must install each minor version independently, wait between each update to verify that the version installed properly and the log is error-free.
 
-## Upgrading to Mondoo Operator v1
-In case you are running a Mondoo Operator with a version older than v1 in your cluster, it is required to perform extra steps before upgrading.
+## Upgrading to Mondoo Operator v0.8.0
+In case you are running a Mondoo Operator with a version older than v0.8.0 in your cluster, it is required to perform extra steps before upgrading.
 
 ### Helm and kubectl installations
-For Helm and kubectl installations before applying the `v1.0.0` manifests run:
+For Helm and kubectl installations before applying the `v0.8.0` manifests run:
 ```bash
 kubectl delete -n mondoo-operator deployments.apps mondoo-operator-controller-manager
 ```
