@@ -81,9 +81,11 @@ func init() {
 			return err
 		}
 
-		isOpenShift, err := k8s.IsOpenShift(mgr.GetConfig())
+		// The API group "config.openshift.io" should be unique to an OpenShift cluster
+		isOpenShift, err := k8s.VerifyAPI("config.openshift.io", "v1", setupLog)
 		if err != nil {
 			setupLog.Error(err, "error while checking if running on OpenShift")
+			return err
 		}
 
 		if err = (&controllers.MondooAuditConfigReconciler{
