@@ -139,8 +139,8 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 	}
 }
 
-func ConfigMap(node corev1.Node, integrationMRN string, m v1alpha2.MondooAuditConfig) (*corev1.ConfigMap, error) {
-	inv, err := Inventory(node, integrationMRN, m)
+func ConfigMap(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (*corev1.ConfigMap, error) {
+	inv, err := Inventory(node, integrationMRN, clusterUID, m)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func ConfigMapName(prefix, nodeName string) string {
 	return fmt.Sprintf("%s%s", base, NodeNameOrHash(52-len(base), nodeName))
 }
 
-func Inventory(node corev1.Node, integrationMRN string, m v1alpha2.MondooAuditConfig) (string, error) {
+func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
 	inv := inventory.MondooInventory{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "mondoo-node-inventory",
@@ -180,7 +180,7 @@ func Inventory(node corev1.Node, integrationMRN string, m v1alpha2.MondooAuditCo
 				{
 					Id:          "host",
 					Name:        node.Name,
-					PlatformIds: []string{fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/%s", node.UID, node.Name)},
+					PlatformIds: []string{fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/%s", clusterUID, node.UID)},
 					Connections: []inventory.TransportConfig{
 						{
 							Host:    "/mnt/host",
