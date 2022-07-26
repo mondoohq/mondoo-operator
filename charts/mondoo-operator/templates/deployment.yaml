@@ -17,18 +17,17 @@ kind: Deployment
 metadata:
   name: {{ include "mondoo-operator.fullname" . }}-controller-manager
   labels:
-    control-plane: controller-manager
   {{- include "mondoo-operator.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.controllerManager.replicas }}
   selector:
     matchLabels:
-      control-plane: controller-manager
+      app.kubernetes.io/name: mondoo-operator
     {{- include "mondoo-operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        control-plane: controller-manager
+        app.kubernetes.io/name: mondoo-operator
       {{- include "mondoo-operator.selectorLabels" . | nindent 8 }}
       annotations:
         kubectl.kubernetes.io/default-container: manager
