@@ -76,7 +76,7 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		err := s.testCluster.K8sHelper.EnsureNoPodsPresent(scanApiListOpts)
 		s.NoErrorf(err, "Failed to wait for ScanAPI Pods to be gone")
 
-		webhookLabels := map[string]string{mondooadmission.WebhookLabelKey: mondooadmission.WebhookLabelValue}
+		webhookLabels := mondooadmission.WebhookDeploymentLabels()
 		webhookListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(webhookLabels)}
 		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(webhookListOpts)
 		s.NoErrorf(err, "Failed to wait for Webhook Pods to be gone")
@@ -445,7 +445,20 @@ func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mo
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.K8sResourcesScanningDegraded, corev1.ConditionFalse)
 	s.Require().NoErrorf(err, "k8s resource scanning shouldn't be in degraded state")
 
-	// everything is fine, now install current branch/release
+	// everything is fine, now upgrade to current branch/release
+
+	// FIXME: remove once label-change flag day is over
+	// Manual step to deal with the change of labels
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mondoo-operator-controller-manager",
+			Namespace: "mondoo-operator",
+		},
+	}
+	err = s.testCluster.K8sHelper.DeleteResourceIfExists(dep)
+	s.Require().NoError(err, "Failed to delete mondoo-operator Deployment")
+	// FIXME: remove up to here
+
 	branchInstaller := installer.NewMondooInstaller(installer.NewDefaultSettings(), s.T)
 	err = branchInstaller.InstallOperator()
 	s.NoErrorf(err, "Failed updating the latest operator release to this branch")
@@ -605,8 +618,13 @@ func (s *AuditConfigBaseSuite) checkPods(auditConfig *mondoov2.MondooAuditConfig
 }
 
 func (s *AuditConfigBaseSuite) getWebhookLabelsString() string {
-	webhookLabels := []string{mondooadmission.WebhookLabelKey + "=" + mondooadmission.WebhookLabelValue}
-	webhookLabelsString := strings.Join(webhookLabels, ",")
+	webhookDeploymentLabels := mondooadmission.WebhookDeploymentLabels()
+
+	keyValuesWithEquals := []string{}
+	for key, val := range webhookDeploymentLabels {
+		keyValuesWithEquals = append(keyValuesWithEquals, key+"="+val)
+	}
+	webhookLabelsString := strings.Join(keyValuesWithEquals, ",")
 	return webhookLabelsString
 }
 

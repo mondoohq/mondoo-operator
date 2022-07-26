@@ -44,4 +44,31 @@ If there **is** more than one minor version difference between the installed Mon
     ```bash
     kubectl apply -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml
     ```
-Adjust the steps above to fit your current situation. There may be multiple minor release versions between your installed version and the latest release. You must install each minor version independently, wait between each update to verify that the version installed properly and the log is error-free.      
+Adjust the steps above to fit your current situation. There may be multiple minor release versions between your installed version and the latest release. You must install each minor version independently, wait between each update to verify that the version installed properly and the log is error-free.
+
+## Upgrading to Mondoo Operator v1
+In case you are running a Mondoo Operator with a version older than v1 in your cluster, it is required to perform extra steps before upgrading.
+
+### Helm and kubectl installations
+For Helm and kubectl installations before applying the `v1.0.0` manifests run:
+```bash
+kubectl delete -n mondoo-operator deployments.apps mondoo-operator-controller-manager
+```
+
+### OLM installations
+For OLM installations first list the subscriptions:
+```bash
+kubectl get subscription -n mondoo-operator
+```
+
+Delete the Mondoo Operator subscription:
+```bash
+kubectl delete sub -n mondoo-operator mondoo-operator-v0-7-1-sub  
+```
+
+Delete the Mondoo Operator cluster service version:
+```bash
+kubectl delete csv -n mondoo-operator mondoo-operator.v0.7.1
+```
+
+After that you can install the latest Mondoo Operator version using the standard OLM installation command.

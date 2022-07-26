@@ -96,6 +96,7 @@ func (n *DeploymentHandler) syncValidatingWebhookConfiguration(ctx context.Conte
 
 	if !deepEqualsValidatingWebhookConfiguration(existingVWC, vwc, annotationKey) {
 		existingVWC.Webhooks = vwc.Webhooks
+		existingVWC.Labels = vwc.Labels
 
 		if existingVWC.Annotations == nil {
 			existingVWC.Annotations = map[string]string{}
@@ -130,6 +131,10 @@ func deepEqualsValidatingWebhookConfiguration(existing, desired *webhooksv1.Vali
 	}
 
 	if len(existing.Webhooks) != len(desired.Webhooks) {
+		return false
+	}
+
+	if !reflect.DeepEqual(existing.Labels, desired.Labels) {
 		return false
 	}
 
@@ -269,9 +274,14 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.
 	if !k8s.AreDeploymentsEqual(*deployment, *desiredDeployment) {
-		k8s.UpdateDeployment(deployment, *desiredDeployment)
-		if err := n.KubeClient.Update(ctx, deployment); err != nil {
-			webhookLog.Error(err, "failed to update existing webhook Deployment")
+		// Note: changes to the labels/selector labels means we can't Update() the
+		// Deployment, so we'll do a delete/create instead.
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, deployment); err != nil {
+			webhookLog.Error(err, "failed to delete exising webhook Deployment")
+			return err
+		}
+		if _, err := k8s.CreateIfNotExist(ctx, n.KubeClient, deployment, desiredDeployment); err != nil {
+			webhookLog.Error(err, "failed to replace exising webhook Deployment")
 			return err
 		}
 	}
@@ -333,6 +343,14 @@ func (n *DeploymentHandler) prepareValidatingWebhook(ctx context.Context, vwc *w
 			*vwc.Webhooks[i].FailurePolicy = webhooksv1.Ignore
 		}
 	}
+
+	// For AKS the ValidatingWebhookConfiguration would normally not be notified about resources
+	// in Namespaces with the label key 'control-plane'. Adding the label "admissions.enforcer/disabled": "true"
+	// allows the Mondoo Operator webhook to be notified about these resources.
+	if vwc.Labels == nil {
+		vwc.Labels = map[string]string{}
+	}
+	vwc.Labels["admissions.enforcer/disabled"] = "true"
 
 	return n.syncValidatingWebhookConfiguration(ctx, vwc, annotationKey, annotationValue)
 }

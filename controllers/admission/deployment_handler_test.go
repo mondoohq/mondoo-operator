@@ -85,30 +85,28 @@ func TestReconcile(t *testing.T) {
 				return mac
 			}(),
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
-				deployment := &appsv1.Deployment{
+				mac := &mondoov1alpha2.MondooAuditConfig{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      webhookDeploymentName(testMondooAuditConfigName),
+						Name:      testMondooAuditConfigName,
 						Namespace: testNamespace,
 					},
-					Spec: appsv1.DeploymentSpec{
-						Template: corev1.PodTemplateSpec{
-							Spec: corev1.PodSpec{
-								Containers: []corev1.Container{
-									{
-										Args: []string{
-											"--enforcement-mode",
-											string(mondoov1alpha2.Enforcing),
-										},
-									},
-								},
-							},
+					Spec: mondoov1alpha2.MondooAuditConfigSpec{
+						Admission: mondoov1alpha2.Admission{
+							Mode:     mondoov1alpha2.Enforcing,
+							Replicas: pointer.Int32(1),
 						},
 					},
-					Status: appsv1.DeploymentStatus{
-						AvailableReplicas: 1,
-						ReadyReplicas:     1,
-						Replicas:          1,
-					},
+				}
+
+				deployment := WebhookDeployment(testNamespace, "ghcr.io/mondoohq/mondoo-operator:latest", *mac, "", testClusterID)
+				err := ctrl.SetControllerReference(mac, deployment, scheme.Scheme)
+				if err != nil {
+					panic("failed to set controller ref for sample object")
+				}
+				deployment.Status = appsv1.DeploymentStatus{
+					AvailableReplicas: 1,
+					ReadyReplicas:     1,
+					Replicas:          1,
 				}
 
 				deploymentScanApi := &appsv1.Deployment{
@@ -162,7 +160,7 @@ func TestReconcile(t *testing.T) {
 					},
 				}
 				err = kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(vwc), vwc)
-				assert.NoError(t, err, "error retrieving k8s resource that should exist: %s", client.ObjectKeyFromObject(vwc))
+				require.NoError(t, err, "error retrieving k8s resource that should exist: %s", client.ObjectKeyFromObject(vwc))
 
 				assert.Equalf(t, *vwc.Webhooks[0].FailurePolicy, webhooksv1.Fail, "expected Webhook failure policy to be set to 'Fail'")
 			},

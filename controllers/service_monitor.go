@@ -112,7 +112,8 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *mondoov1alpha2.MondooOperato
 			},
 			Selector: metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"control-plane": "controller-manager",
+					// The key/value set for the mondoo-operator Deployment
+					"app.kubernetes.io/name": "mondoo-operator",
 				},
 			},
 			NamespaceSelector: monitoringv1.NamespaceSelector{
