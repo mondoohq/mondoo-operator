@@ -11,7 +11,6 @@ metadata:
   name: controller-manager
   namespace: system
   labels:
-    app: mondoo-operator
     app.kubernetes.io/name: mondoo-operator
 spec:
   selector:
