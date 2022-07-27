@@ -76,7 +76,7 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 									Resources: corev1.ResourceRequirements{
 										Limits: corev1.ResourceList{
 											corev1.ResourceCPU:    resource.MustParse("100m"),
-											corev1.ResourceMemory: resource.MustParse("100Mi"),
+											corev1.ResourceMemory: resource.MustParse("30Mi"),
 										},
 										Requests: corev1.ResourceList{
 											corev1.ResourceCPU:    resource.MustParse("50m"),
