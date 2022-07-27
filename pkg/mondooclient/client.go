@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -37,6 +38,13 @@ const (
 	defaultTLSHandshakeTimeout = 10 * time.Second
 	maxIdleConnections         = 100
 )
+
+var enablePodDiscovery bool
+
+func init() {
+	_, ok := os.LookupEnv("SCAN_DISCOVER_PODS")
+	enablePodDiscovery = ok
+}
 
 //go:generate ./../../bin/mockgen -source=./client.go -destination=./mock/client_generated.go -package=mock
 
@@ -269,10 +277,18 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationM
 		scanJob.Inventory.Spec.Assets[0].Labels[constants.MondooAssetsIntegrationLabel] = integrationMrn
 	}
 
-	if scanContainerImages {
-		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = []string{"container-images"}
+	if scanContainerImages || enablePodDiscovery {
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Options = make(map[string]string)
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Options["all-namespaces"] = "true"
+
+	}
+
+	if scanContainerImages {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets, "container-images")
+	}
+
+	if enablePodDiscovery {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets, "pods")
 	}
 
 	reqBodyBytes, err := json.Marshal(scanJob)
