@@ -10,6 +10,8 @@ jobs:
   integration-tests:
     runs-on: ubuntu-latest
     name: Integration tests
+    env:
+      MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.client_version }}
 
     strategy:
       matrix:
@@ -33,9 +35,6 @@ jobs:
       - name: Store creds
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
-
-      - name: Pre-pull container images
-        run: minikube image load docker.io/mondoo/client:latest
 
       # Now that dependencies are cached the tests start almost immediately after minikube has started
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
