@@ -31,7 +31,7 @@ func AllFeatureFlags() map[string]string {
 }
 
 func AllFeatureFlagsAsEnv() []corev1.EnvVar {
-	env := []corev1.EnvVar{}
+	var env []corev1.EnvVar
 	for k, v := range allFeatureFlags {
 		env = append(env, corev1.EnvVar{Name: k, Value: v})
 	}
