@@ -5,6 +5,9 @@ on:
       mondooClientImageTag:
         required: true
         type: string
+    secrets:
+      MONDOO_CLIENT:
+        required: true
 
 jobs:
   integration-tests:

@@ -19,4 +19,5 @@ jobs:
 
       - uses: ./.github/workflows/integration-tests.yaml
         with:
-          mondooClientImageTag: ${{ github.event.inputs.mondooClientImageTag }} 
+          mondooClientImageTag: ${{ github.event.inputs.mondooClientImageTag }}
+          secrets: inherit
