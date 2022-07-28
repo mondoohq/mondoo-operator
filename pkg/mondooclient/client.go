@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/inventory"
 )
 
@@ -270,10 +271,18 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationM
 		scanJob.Inventory.Spec.Assets[0].Labels[constants.MondooAssetsIntegrationLabel] = integrationMrn
 	}
 
-	if scanContainerImages {
-		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = []string{"container-images"}
+	if scanContainerImages || feature_flags.GetEnablePodDiscovery() {
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Options = make(map[string]string)
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Options["all-namespaces"] = "true"
+
+	}
+
+	if scanContainerImages {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets, "container-images")
+	}
+
+	if feature_flags.GetEnablePodDiscovery() {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets, "pods")
 	}
 
 	reqBodyBytes, err := json.Marshal(scanJob)
