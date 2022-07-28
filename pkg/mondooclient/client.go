@@ -247,6 +247,7 @@ const ScanKubernetesResourcesEndpoint = "/Scan/Run"
 func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool) (*ScanResult, error) {
 	url := s.ApiEndpoint + ScanKubernetesResourcesEndpoint
 	scanJob := ScanJob{
+		ReportType: ReportType_ERROR,
 		Inventory: inventory.MondooInventory{
 			Spec: inventory.MondooInventorySpec{
 				Assets: []inventory.Asset{
@@ -293,8 +294,17 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationM
 	return out, nil
 }
 
+type ReportType int
+
+const (
+	ReportType_NONE  ReportType = 0
+	ReportType_ERROR ReportType = 1
+	ReportType_FULL  ReportType = 2
+)
+
 type ScanJob struct {
-	Inventory inventory.MondooInventory `json:"inventory"`
+	Inventory  inventory.MondooInventory `json:"inventory"`
+	ReportType ReportType                `protobuf:"varint,22,opt,name=report_type,json=reportType,proto3,enum=mondoo.policy.scan.ReportType" json:"report_type,omitempty"`
 }
 
 func NewClient(opts ClientOptions) Client {
