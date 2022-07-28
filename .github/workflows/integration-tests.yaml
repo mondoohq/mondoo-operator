@@ -2,7 +2,7 @@ name: Integration tests
 on:
   workflow_call:
     inputs:
-      client_version:
+      mondooClientImageTag:
         required: true
         type: string
 
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Integration tests
     env:
-      MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.client_version }}
+      MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag }}
 
     strategy:
       matrix:

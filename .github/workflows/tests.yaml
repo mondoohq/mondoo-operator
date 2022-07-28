@@ -52,6 +52,6 @@ jobs:
     if: needs.unit-tests.result == 'success' # run only if unit-tests are successful
     name: Integration tests
     with:
-      client_version: ""
+      mondooClientImageTag: ""
 
    

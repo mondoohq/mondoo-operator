@@ -1,0 +1,22 @@
+name: Edge integration tests
+on:
+  workflow_dispatch:
+    inputs:
+      mondooClientImageTag:
+        description: "The Mondoo client image tag to be used for the integration tests"
+        required: true
+        type: string
+
+jobs:
+  integration_tests:
+    runs-on: ubuntu-latest
+    name: Start edge integration tests
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/workflows/integration-tests.yaml
+        with:
+          mondooClientImageTag: ${{ github.event.inputs.mondooClientImageTag }} 
