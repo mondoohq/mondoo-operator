@@ -1,7 +1,7 @@
 name: 'Test Report'
 on:
   workflow_run:
-    workflows: ['Tests']              # runs after Tests workflow
+    workflows: ['Tests', 'Edge integration tests'] # runs after tests
     types:
       - completed
 jobs:

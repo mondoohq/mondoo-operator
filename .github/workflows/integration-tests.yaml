@@ -52,19 +52,15 @@ jobs:
       - name: Run integration tests
         run: make test/integration/ci
 
-      - uses: actions/download-artifact@v3 # download the unit test results
-        if: success() || failure()        # run this step even if previous step failed
-        with:
-          name: unit-test-results
       - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-version }}.xml
         if: success() || failure()
+
       - uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: test-results
-          path: |
-            unit-tests.xml
-            integration-tests-${{ matrix.k8s-version }}.xml
+          path: integration-tests-${{ matrix.k8s-version }}.xml
+
       - name: Upload test logs artifact
         uses: actions/upload-artifact@v3
         if: failure()

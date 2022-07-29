@@ -44,7 +44,7 @@ jobs:
       - uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:
-          name: unit-test-results
+          name: test-results
           path: unit-tests.xml
   integration-tests:
     needs: [unit-tests]
@@ -54,5 +54,4 @@ jobs:
     with:
       mondooClientImageTag: ""
     secrets: inherit
-
    
