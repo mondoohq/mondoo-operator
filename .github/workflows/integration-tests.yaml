@@ -1,0 +1,69 @@
+name: Integration tests
+on:
+  workflow_call:
+    inputs:
+      mondooClientImageTag:
+        required: true
+        type: string
+    secrets:
+      MONDOO_CLIENT:
+        required: true
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    name: Integration tests
+    env:
+      MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag }}
+
+    strategy:
+      matrix:
+        k8s-version: [v1.22.12, v1.23.9, v1.24.3]
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # fetch is nneded for "git tag --list" in the Makefile
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+      - name: Start minikube
+        uses: medyagh/setup-minikube@master
+        with:
+          memory: 4000m
+          kubernetes-version: ${{ matrix.k8s-version }}
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "${{ env.golang-version }}"
+
+      - name: Store creds
+        run: |
+          echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+
+      # Now that dependencies are cached the tests start almost immediately after minikube has started
+      # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
+      # before the test execution starts.
+      - name: Wait a bit for the runner to become more stable
+        run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=90s
+
+      - name: Run integration tests
+        run: make test/integration/ci
+
+      - uses: actions/download-artifact@v3 # download the unit test results
+        if: success() || failure()        # run this step even if previous step failed
+        with:
+          name: unit-test-results
+      - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-version }}.xml
+        if: success() || failure()
+      - uses: actions/upload-artifact@v3  # upload test results
+        if: success() || failure()        # run this step even if previous step failed
+        with:                             # upload a combined archive with unit and integration test results
+          name: test-results
+          path: |
+            unit-tests.xml
+            integration-tests-${{ matrix.k8s-version }}.xml
+      - name: Upload test logs artifact
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: test-logs-${{ matrix.k8s-version }}
+          path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
