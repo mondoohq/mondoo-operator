@@ -44,7 +44,6 @@ func DefaultAuditConfigMinimal(ns string, workloads, nodes, admission bool) mond
 	}
 
 	if mondooClientImageTag != "" {
-		auditConfig.Spec.Scanner.Image.Name = mondoo.MondooClientImage
 		auditConfig.Spec.Scanner.Image.Tag = mondooClientImageTag
 		zap.S().Infof("Using image %s:%s for mondoo-client", mondoo.MondooClientImage, mondooClientImageTag)
 	}

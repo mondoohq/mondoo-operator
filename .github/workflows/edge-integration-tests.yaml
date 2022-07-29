@@ -9,15 +9,7 @@ on:
 
 jobs:
   integration_tests:
-    runs-on: ubuntu-latest
-    name: Start edge integration tests
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
-      - uses: ./.github/workflows/integration-tests.yaml
-        with:
-          mondooClientImageTag: ${{ github.event.inputs.mondooClientImageTag }}
-          secrets: inherit
+    uses: ./.github/workflows/integration-tests.yaml
+    with:
+      mondooClientImageTag: ${{ github.event.inputs.mondooClientImageTag }}
+      secrets: inherit
