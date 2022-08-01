@@ -61,6 +61,14 @@ jobs:
       - name: Wait a bit for the runner to become more stable
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=90s
 
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+        with:
+          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
+          limit-access-to-actor: true
+          ## limits ssh access and adds the ssh public keys of the listed GitHub users
+          limit-access-to-users: imilchev
+
       - name: Run integration tests
         run: make test/integration/ci
 
