@@ -7,12 +7,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	webhookhandler "go.mondoo.com/mondoo-operator/pkg/webhooks/handler"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -31,7 +31,7 @@ func init() {
 	clusterID := Cmd.Flags().String("cluster-id", "", "A cluster-unique ID for associating the webhook payloads with the underlying cluster.")
 
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		log.SetLogger(zap.New())
+		log.SetLogger(logger.NewLogger())
 		webhookLog := log.Log.WithName("webhook")
 
 		if *scanApiUrl == "" {

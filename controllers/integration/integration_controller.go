@@ -6,9 +6,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/go-logr/logr"
-	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -26,30 +25,23 @@ const (
 	interval = time.Minute * 10
 )
 
+var logger = log.Log.WithName("integration")
+
 // Add creates a new Integrations controller adds it to the Manager.
 func Add(mgr manager.Manager) error {
-	var log logr.Logger
-
 	cfg := zap.NewDevelopmentConfig()
 
 	cfg.InitialFields = map[string]interface{}{
 		"controller": "integration",
 	}
 
-	zapLog, err := cfg.Build()
-	if err != nil {
-		return fmt.Errorf("failed to set up logging for integration controller: %s", err)
-	}
-	log = zapr.NewLogger(zapLog)
-
 	mc := &IntegrationReconciler{
 		Client:              mgr.GetClient(),
 		Interval:            interval,
-		Log:                 log,
 		MondooClientBuilder: mondooclient.NewClient,
 	}
 	if err := mgr.Add(mc); err != nil {
-		log.Error(err, "failed to add integration controller to manager")
+		logger.Error(err, "failed to add integration controller to manager")
 		return err
 	}
 	return nil
@@ -60,14 +52,13 @@ type IntegrationReconciler struct {
 
 	// Interval is the length of time we sleep between runs
 	Interval            time.Duration
-	Log                 logr.Logger
 	MondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
 	ctx                 context.Context
 }
 
 // Start begins the integration status loop.
 func (r *IntegrationReconciler) Start(ctx context.Context) error {
-	r.Log.Info("started Mondoo console integration goroutine")
+	logger.Info("started Mondoo console integration goroutine")
 
 	r.ctx = ctx
 
@@ -78,18 +69,18 @@ func (r *IntegrationReconciler) Start(ctx context.Context) error {
 }
 
 func (r *IntegrationReconciler) integrationLoop() {
-	r.Log.Info("Listing all MondooAuditConfigs")
+	logger.Info("Listing all MondooAuditConfigs")
 
 	mondooAuditConfigs := &v1alpha2.MondooAuditConfigList{}
 	if err := r.Client.List(r.ctx, mondooAuditConfigs); err != nil {
-		r.Log.Error(err, "error listing MondooAuditConfigs")
+		logger.Error(err, "error listing MondooAuditConfigs")
 		return
 	}
 
 	for _, mac := range mondooAuditConfigs.Items {
 		if mac.Spec.ConsoleIntegration.Enable {
 			if err := r.processMondooAuditConfig(mac); err != nil {
-				r.Log.Error(err, "failed to process MondooAuditconfig", "mondooAuditConfig", fmt.Sprintf("%s/%s", mac.Namespace, mac.Name))
+				logger.Error(err, "failed to process MondooAuditconfig", "mondooAuditConfig", fmt.Sprintf("%s/%s", mac.Namespace, mac.Name))
 			}
 		}
 	}
@@ -120,8 +111,8 @@ func (r *IntegrationReconciler) processMondooAuditConfig(m v1alpha2.MondooAuditC
 		return err
 	}
 
-	if err = mondoo.IntegrationCheckIn(r.ctx, integrationMrn, *serviceAccount, r.MondooClientBuilder, r.Log); err != nil {
-		r.Log.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
+	if err = mondoo.IntegrationCheckIn(r.ctx, integrationMrn, *serviceAccount, r.MondooClientBuilder, logger); err != nil {
+		logger.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
 		return err
 	}
 
@@ -134,9 +125,9 @@ func (r *IntegrationReconciler) setIntegrationCondition(config *v1alpha2.MondooA
 	updateIntegrationCondition(config, degradedStatus, customMessage)
 
 	if !reflect.DeepEqual(originalConfig.Status.Conditions, config.Status.Conditions) {
-		r.Log.Info("status has changed, updating")
+		logger.Info("status has changed, updating")
 		if err := r.Client.Status().Update(r.ctx, config); err != nil {
-			r.Log.Error(err, "failed to update status")
+			logger.Error(err, "failed to update status")
 			return err
 		}
 	}
