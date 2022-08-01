@@ -9,16 +9,19 @@ on:
       MONDOO_CLIENT:
         required: true
 
+env:
+  MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag }}
+
+
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
     name: Integration tests
-    env:
-      MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag }}
-
+    
     strategy:
       matrix:
         k8s-version: [v1.22.12, v1.23.9, v1.24.3]
+        k8s-distro: [minikube,k3s]
 
     steps:
       - uses: actions/checkout@v2
@@ -26,11 +29,20 @@ jobs:
           fetch-depth: 0 # fetch is nneded for "git tag --list" in the Makefile
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
+
       - name: Start minikube
         uses: medyagh/setup-minikube@master
+        if: ${{ matrix.k8s-distro }} == 'minikube'
         with:
           memory: 4000m
           kubernetes-version: ${{ matrix.k8s-version }}
+
+      - name: Start k3s
+        uses: nolar/setup-k3d-k3s@v1
+        if: ${{ matrix.k8s-distro }} == 'k3s'
+        with:
+          version: ${{ matrix.k8s-version }}
+
       - uses: actions/setup-go@v2
         with:
           go-version: "${{ env.golang-version }}"
