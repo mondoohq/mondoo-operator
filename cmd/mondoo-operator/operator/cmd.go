@@ -14,7 +14,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -24,6 +23,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/integration"
 	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
@@ -43,10 +43,7 @@ func init() {
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		// TODO: opts.BindFlags(flag.CommandLine) is not supported with cobra. If we want to support that we should manually
 		// implement reading the flags.
-		opts := zap.Options{
-			Development: true,
-		}
-		ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+		ctrl.SetLogger(logger.NewLogger())
 		setupLog := ctrl.Log.WithName("setup")
 
 		scheme := runtime.NewScheme()

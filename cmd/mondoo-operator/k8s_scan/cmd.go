@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 var Cmd = &cobra.Command{
@@ -24,7 +24,7 @@ func init() {
 	scanContainerImages := Cmd.Flags().Bool("scan-container-images", false, "A value indicating whether to scan container images.")
 
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		log.SetLogger(zap.New())
+		log.SetLogger(logger.NewLogger())
 		logger := log.Log.WithName("k8s-scan")
 
 		if *scanApiUrl == "" {
