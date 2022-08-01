@@ -62,7 +62,7 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:          cronTab,
-			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			ConcurrencyPolicy: batchv1.ForbidConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: ls},
 				Spec: batchv1.JobSpec{
