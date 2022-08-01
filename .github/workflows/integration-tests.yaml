@@ -20,8 +20,10 @@ jobs:
     
     strategy:
       matrix:
-        k8s-version: [v1.22.12, v1.23.9, v1.24.3]
-        k8s-distro: [minikube,k3s]
+        # k8s-version: [v1.22.12, v1.23.9, v1.24.3]
+        # k8s-distro: [minikube,k3s]
+        k8s-version: [v1.24.3]
+        k8s-distro: [k3s]
 
     steps:
       - uses: actions/checkout@v2
