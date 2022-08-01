@@ -42,6 +42,9 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 		"k8s-scan",
 		"--scan-api-url", scanApiUrl,
 		"--token-file-path", "/etc/scanapi/token",
+
+		// The job runs hourly and we need to make sure that the previous one is killed before the new one is started so we don't stack them.
+		"--timeout", "55",
 	}
 
 	if integrationMrn != "" {
