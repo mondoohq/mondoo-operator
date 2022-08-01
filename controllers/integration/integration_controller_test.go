@@ -112,7 +112,6 @@ func (s *IntegrationCheckInSuite) TestCheckIn() {
 
 	r := &IntegrationReconciler{
 		Client:              fakeClient,
-		Log:                 testLogger,
 		MondooClientBuilder: testMondooClientBuilder,
 	}
 
@@ -158,7 +157,6 @@ func (s *IntegrationCheckInSuite) TestClearPreviousCondition() {
 
 	r := &IntegrationReconciler{
 		Client:              fakeClient,
-		Log:                 testLogger,
 		MondooClientBuilder: testMondooClientBuilder,
 	}
 
@@ -197,7 +195,6 @@ func (s *IntegrationCheckInSuite) TestMissingIntegrationMRN() {
 
 	r := &IntegrationReconciler{
 		Client:              fakeClient,
-		Log:                 testLogger,
 		MondooClientBuilder: testMondooClientBuilder,
 	}
 
@@ -236,7 +233,6 @@ func (s *IntegrationCheckInSuite) TestBadServiceAccountData() {
 
 	r := &IntegrationReconciler{
 		Client:              fakeClient,
-		Log:                 testLogger,
 		MondooClientBuilder: testMondooClientBuilder,
 	}
 
@@ -275,7 +271,6 @@ func (s *IntegrationCheckInSuite) TestFailedCheckIn() {
 
 	r := &IntegrationReconciler{
 		Client:              fakeClient,
-		Log:                 testLogger,
 		MondooClientBuilder: testMondooClientBuilder,
 	}
 
