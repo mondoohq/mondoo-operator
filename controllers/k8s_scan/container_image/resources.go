@@ -45,6 +45,9 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 		"--scan-api-url", scanApiUrl,
 		"--token-file-path", "/etc/scanapi/token",
 		"--scan-container-images",
+
+		// The job runs daily and we need to make sure that the previous one is killed before the new one is started so we don't stack them.
+		"--timeout", "1430",
 	}
 
 	if integrationMrn != "" {
@@ -59,7 +62,7 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:          cronTab,
-			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			ConcurrencyPolicy: batchv1.ForbidConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: ls},
 				Spec: batchv1.JobSpec{
