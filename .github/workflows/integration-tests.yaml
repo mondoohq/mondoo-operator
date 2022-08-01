@@ -32,14 +32,14 @@ jobs:
 
       - name: Start minikube
         uses: medyagh/setup-minikube@master
-        if: ${{ matrix.k8s-distro }} == 'minikube'
+        if: matrix.k8s-distro == 'minikube'
         with:
           memory: 4000m
           kubernetes-version: ${{ matrix.k8s-version }}
 
       - name: Start k3s
         uses: nolar/setup-k3d-k3s@v1
-        if: ${{ matrix.k8s-distro }} == 'k3s'
+        if: matrix.k8s-distro == 'k3s'
         with:
           version: ${{ matrix.k8s-version }}
 
