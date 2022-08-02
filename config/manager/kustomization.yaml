@@ -14,4 +14,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: ghcr.io/mondoohq/mondoo-operator
-  newTag: v0.8.2
+  newTag: v1.0.0
