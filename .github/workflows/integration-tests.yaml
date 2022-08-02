@@ -21,9 +21,9 @@ jobs:
     strategy:
       matrix:
         # k8s-version: [v1.22.12, v1.23.9, v1.24.3]
-        # k8s-distro: [minikube,k3s]
+        # k8s-distro: [minikube,k3d]
         k8s-version: [v1.24.3]
-        k8s-distro: [k3s]
+        k8s-distro: [k3d]
 
     steps:
       - uses: actions/checkout@v2
@@ -39,9 +39,9 @@ jobs:
           memory: 4000m
           kubernetes-version: ${{ matrix.k8s-version }}
 
-      - name: Start k3s
+      - name: Start k3d
         uses: nolar/setup-k3d-k3s@v1
-        if: matrix.k8s-distro == 'k3s'
+        if: matrix.k8s-distro == 'k3d'
         with:
           version: ${{ matrix.k8s-version }}
           k3d-args: --k3s-arg=--disable=traefik@server:*
