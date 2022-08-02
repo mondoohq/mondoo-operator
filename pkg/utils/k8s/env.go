@@ -21,17 +21,17 @@ import corev1 "k8s.io/api/core/v1"
 // MergeEnv merges 2 slices of env vars. If the same key is present in
 // both slices, the value from the second slice will be used.
 func MergeEnv(a, b []corev1.EnvVar) []corev1.EnvVar {
-	envSet := make(map[string]string)
+	envSet := make(map[string]corev1.EnvVar)
 	for _, e := range a {
-		envSet[e.Name] = e.Value
+		envSet[e.Name] = e
 	}
 	for _, e := range b {
-		envSet[e.Name] = e.Value
+		envSet[e.Name] = e
 	}
 
 	mergedEnv := make([]corev1.EnvVar, 0, len(envSet))
-	for k, v := range envSet {
-		mergedEnv = append(mergedEnv, corev1.EnvVar{Name: k, Value: v})
+	for _, v := range envSet {
+		mergedEnv = append(mergedEnv, v)
 	}
 	return mergedEnv
 }

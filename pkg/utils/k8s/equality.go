@@ -19,6 +19,8 @@ package k8s
 import (
 	"reflect"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -35,7 +37,7 @@ func AreDeploymentsEqual(a, b appsv1.Deployment) bool {
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Command, b.Spec.Template.Spec.Containers[0].Command) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Args, b.Spec.Template.Spec.Containers[0].Args) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].VolumeMounts, b.Spec.Template.Spec.Containers[0].VolumeMounts) &&
-		reflect.DeepEqual(a.Spec.Template.Spec.Containers[0].Env, b.Spec.Template.Spec.Containers[0].Env) &&
+		AreEnvVarsEqual(a.Spec.Template.Spec.Containers[0].Env, b.Spec.Template.Spec.Containers[0].Env) &&
 		AreResouceRequirementsEqual(a.Spec.Template.Spec.Containers[0].Resources, b.Spec.Template.Spec.Containers[0].Resources) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Volumes, b.Spec.Template.Spec.Volumes) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Affinity, b.Spec.Template.Spec.Affinity) &&
@@ -85,7 +87,7 @@ func AreCronJobsEqual(a, b batchv1.CronJob) bool {
 		reflect.DeepEqual(aPodSpec.Containers[0].Command, bPodSpec.Containers[0].Command) &&
 		reflect.DeepEqual(aPodSpec.Containers[0].Args, bPodSpec.Containers[0].Args) &&
 		reflect.DeepEqual(aPodSpec.Containers[0].VolumeMounts, bPodSpec.Containers[0].VolumeMounts) &&
-		reflect.DeepEqual(aPodSpec.Containers[0].Env, bPodSpec.Containers[0].Env) &&
+		AreEnvVarsEqual(aPodSpec.Containers[0].Env, bPodSpec.Containers[0].Env) &&
 		AreResouceRequirementsEqual(aPodSpec.Containers[0].Resources, bPodSpec.Containers[0].Resources) &&
 		reflect.DeepEqual(aPodSpec.Volumes, bPodSpec.Volumes) &&
 		reflect.DeepEqual(a.Spec.SuccessfulJobsHistoryLimit, b.Spec.SuccessfulJobsHistoryLimit) &&
@@ -102,4 +104,10 @@ func AreResouceRequirementsEqual(x corev1.ResourceRequirements, y corev1.Resourc
 		return true
 	}
 	return false
+}
+
+// AreEnvVarsEqual returns a value indicating whether 2 slices of environment variables are equal. Ordering
+// is ignored.
+func AreEnvVarsEqual(a, b []corev1.EnvVar) bool {
+	return cmp.Equal(a, b, cmpopts.SortSlices(func(a, b corev1.EnvVar) bool { return a.Name < b.Name }))
 }

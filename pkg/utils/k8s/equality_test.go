@@ -605,3 +605,29 @@ func TestAreResouceRequirementsEqual(t *testing.T) {
 		},
 	}))
 }
+
+func TestAreEnvVarsEqual(t *testing.T) {
+	a := []corev1.EnvVar{
+		{Name: "a", Value: "2"},
+		{Name: "a1", Value: "3"},
+	}
+
+	b := []corev1.EnvVar{
+		{Name: "a", Value: "2"},
+		{Name: "a1", Value: "3"},
+	}
+	assert.True(t, AreEnvVarsEqual(a, b))
+}
+
+func TestAreEnvVarsEqual_DifferentOrder(t *testing.T) {
+	a := []corev1.EnvVar{
+		{Name: "a", Value: "2"},
+		{Name: "a1", Value: "3"},
+	}
+
+	b := []corev1.EnvVar{
+		{Name: "a1", Value: "3"},
+		{Name: "a", Value: "2"},
+	}
+	assert.True(t, AreEnvVarsEqual(a, b))
+}

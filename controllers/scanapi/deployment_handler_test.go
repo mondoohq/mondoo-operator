@@ -74,7 +74,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_CustomEnvVars() {
 	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "", false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
-	s.Equal(*deployment, ds.Items[0])
+	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
 
 	ss := &corev1.ServiceList{}
 	s.NoError(d.KubeClient.List(s.ctx, ss))
@@ -114,7 +114,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_KubernetesResources() {
 	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "", false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
-	s.Equal(*deployment, ds.Items[0])
+	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
 
 	ss := &corev1.ServiceList{}
 	s.NoError(d.KubeClient.List(s.ctx, ss))
@@ -157,7 +157,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() 
 	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "my-pull-secrets", false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
-	s.Equal(*deployment, ds.Items[0])
+	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretNotSpecifiedButPresent() {
@@ -189,7 +189,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretNot
 	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "mondoo-private-registries-secrets", false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
-	s.Equal(*deployment, ds.Items[0])
+	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretWrongName() {
@@ -221,7 +221,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretWro
 	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "", false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
-	s.Equal(*deployment, ds.Items[0])
+	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
