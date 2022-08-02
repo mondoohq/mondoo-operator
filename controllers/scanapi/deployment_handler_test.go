@@ -254,7 +254,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
 	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "", false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
-	s.Equal(*deployment, ds.Items[0])
+	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
 
 	ss := &corev1.ServiceList{}
 	s.NoError(d.KubeClient.List(s.ctx, ss))
