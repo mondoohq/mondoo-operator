@@ -20,10 +20,8 @@ jobs:
     
     strategy:
       matrix:
-        # k8s-version: [v1.22.12, v1.23.9, v1.24.3]
-        # k8s-distro: [minikube,k3d]
-        k8s-version: [v1.24.3]
-        k8s-distro: [k3d]
+        k8s-version: [v1.22.12, v1.23.9, v1.24.3]
+        k8s-distro: [minikube, k3d]
 
     steps:
       - uses: actions/checkout@v2
@@ -64,14 +62,6 @@ jobs:
       - name: Wait a bit for the runner to become more stable
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=90s
 
-      - name: Setup upterm session
-        uses: lhotari/action-upterm@v1
-        with:
-          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-          limit-access-to-actor: true
-          ## limits ssh access and adds the ssh public keys of the listed GitHub users
-          limit-access-to-users: imilchev
-
       - name: Run integration tests
         run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration/ci
 
@@ -82,11 +72,11 @@ jobs:
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: test-results
-          path: integration-tests-${{ matrix.k8s-version }}.xml
+          path: ${{ matrix.k8s-distro }}-integration-tests-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
         uses: actions/upload-artifact@v3
         if: failure()
         with:
-          name: test-logs-${{ matrix.k8s-version }}
+          name: ${{ matrix.k8s-distro }}test-logs-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
