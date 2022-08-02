@@ -255,6 +255,9 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 		})
 	}
 
+	// Merge the operator env for the scanner with the one provided in the MondooAuditConfig
+	scanApiDeployment.Spec.Template.Spec.Containers[0].Env = k8s.MergeEnv(scanApiDeployment.Spec.Template.Spec.Containers[0].Env, m.Spec.Scanner.Env)
+
 	if deployOnOpenShift {
 		// OpenShift will set its own UID in the range assinged to the Namespace the Pod is running
 		// in; so clear out our 101 UID otherwise OpenShift SCCs will fail the Pod do to it not using

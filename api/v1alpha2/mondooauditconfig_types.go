@@ -70,6 +70,10 @@ type Scanner struct {
 	// PrivateRegistryScanning defines the name of a secret that contains the credentials for the private
 	// registries we have to pull images from.
 	PrivateRegistriesPullSecretRef corev1.LocalObjectReference `json:"privateRegistriesPullSecretRef,omitempty"`
+
+	// Env allows setting extra environment variables for the scanner. If the operator sets already an env
+	// variable with the same name, the value specified here will override it.
+	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
 type KubernetesResources struct {
