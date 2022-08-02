@@ -65,18 +65,18 @@ jobs:
       - name: Run integration tests
         run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration/ci
 
-      - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-version }}.xml
+      - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
         if: success() || failure()
 
       - uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: test-results
-          path: ${{ matrix.k8s-distro }}-integration-tests-${{ matrix.k8s-version }}.xml
+          path: integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
         uses: actions/upload-artifact@v3
         if: failure()
         with:
-          name: ${{ matrix.k8s-distro }}test-logs-${{ matrix.k8s-version }}
+          name: test-logs-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
