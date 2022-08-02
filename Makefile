@@ -109,10 +109,18 @@ test/ci: manifests generate fmt vet envtest gotestsum
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) --arch=amd64 use $(ENVTEST_K8S_VERSION) -p path)" $(GOTESTSUM) --junitfile unit-tests.xml -- $(UNIT_TEST_PACKAGES) -coverprofile cover.out
 
 # Integration tests are run synchronously to avoid race conditions
+ifeq ($(K8S_DISTRO),k3s)
+test/integration: manifests generate generate-manifests load-k3s
+else
 test/integration: manifests generate generate-manifests load-minikube
+endif
 	go test -ldflags $(LDFLAGS) -v -timeout 900s -p 1 ./tests/integration/...
 
-test/integration/ci: manifests generate generate-manifests load-minikube gotestsum
+ifeq ($(K8S_DISTRO),k3s)
+test/integration/ci: manifests generate generate-manifests gotestsum load-k3s
+else
+test/integration/ci: manifests generate generate-manifests gotestsum load-minikube
+endif
 	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -ldflags $(LDFLAGS) -v -timeout 900s -p 1
 
 ##@ Build
@@ -129,6 +137,12 @@ docker-build: build ## Build docker image with the manager.
 
 load-minikube: docker-build ## Build docker image with the manager and load it into minikube.
 	minikube image load ${IMG}
+
+load-k3s: docker-build
+	docker save -o operator.tar ${IMG}
+	docker cp operator.tar k3d-k3s-default-server-0:/tmp/operator.tar
+	docker exec k3d-k3s-default-server-0 ctr -a /run/k3s/containerd/containerd.sock images import -n k8s.io operator.tar
+	rm operator.tar
 
 buildah-build: build ## Build container image
 	buildah build --platform=${TARGET_OS}/${TARGET_ARCH} -t ${IMG} .

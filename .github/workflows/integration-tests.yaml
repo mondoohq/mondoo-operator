@@ -72,7 +72,7 @@ jobs:
           limit-access-to-users: imilchev
 
       - name: Run integration tests
-        run: make test/integration/ci
+        run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration/ci
 
       - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-version }}.xml
         if: success() || failure()
