@@ -25,7 +25,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan/container_image"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
-	mondooscanapi "go.mondoo.com/mondoo-operator/controllers/scanapi"
+	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
@@ -72,7 +72,7 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		// wait for deployments to be gone
 		// sometimes the operator still terminates ,e.g. the webhook, while the next test already started
 		// the new test then fails because resources vanish during the test
-		scanApiListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(mondooscanapi.DeploymentLabels(s.auditConfig))}
+		scanApiListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(scanapi.DeploymentLabels(s.auditConfig))}
 		err := s.testCluster.K8sHelper.EnsureNoPodsPresent(scanApiListOpts)
 		s.NoErrorf(err, "Failed to wait for ScanAPI Pods to be gone")
 
@@ -276,12 +276,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionScaleDownScanApi(au
 	s.verifyAdmissionWorking(auditConfig)
 
 	// now check what happens when it is degraded
-	var scanApiLabels []string
-	for k, v := range mondooscanapi.DeploymentLabels(auditConfig) {
-		scanApiLabels = append(scanApiLabels, fmt.Sprintf("%s=%s", k, v))
-	}
-	scanApiLabelsString := strings.Join(scanApiLabels, ",")
-	listOpts, err := utils.LabelSelectorListOptions(scanApiLabelsString)
+	listOpts, err := utils.LabelSelectorListOptions(utils.LabelsToLabelSelector(scanapi.DeploymentLabels(auditConfig)))
 	s.NoError(err)
 	listOpts.Namespace = auditConfig.Namespace
 
@@ -337,16 +332,12 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 		"Failed to create Mondoo audit config.")
 
 	// Pod should not start, because of missing service account
-	var scanApiLabels []string
-	for k, v := range mondooscanapi.DeploymentLabels(auditConfig) {
-		scanApiLabels = append(scanApiLabels, fmt.Sprintf("%s=%s", k, v))
-	}
-	scanApiLabelsString := strings.Join(scanApiLabels, ",")
+
 	// do not wait until IsPodReady timeout, pod will not be present
 	// something like eventually from ginko would be nice, first iteration just with a sleep.
 	// just a grace period
 	time.Sleep(10 * time.Second)
-	listOpts, err := utils.LabelSelectorListOptions(scanApiLabelsString)
+	listOpts, err := utils.LabelSelectorListOptions(utils.LabelsToLabelSelector(scanapi.DeploymentLabels(auditConfig)))
 	s.NoError(err)
 	listOpts.Namespace = auditConfig.Namespace
 	podList := &corev1.PodList{}
@@ -459,14 +450,14 @@ func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mo
 }
 
 func (s *AuditConfigBaseSuite) validateScanApiDeployment(auditConfig mondoov2.MondooAuditConfig) {
-	scanApiLabelsString := utils.LabelsToLabelSelector(mondooscanapi.DeploymentLabels(auditConfig))
+	scanApiLabelsString := utils.LabelsToLabelSelector(scanapi.DeploymentLabels(auditConfig))
 	zap.S().Info("Waiting for scan API Pod to become ready.")
 	s.Truef(
 		s.testCluster.K8sHelper.IsPodReady(scanApiLabelsString, auditConfig.Namespace),
 		"Mondoo scan API Pod is not in a Ready state.")
 	zap.S().Info("Scan API Pod is ready.")
 
-	scanApiService := mondooscanapi.ScanApiService(auditConfig.Namespace, auditConfig)
+	scanApiService := scanapi.ScanApiService(auditConfig.Namespace, auditConfig)
 	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
 		err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(scanApiService), scanApiService)
 		if err == nil {
@@ -476,7 +467,7 @@ func (s *AuditConfigBaseSuite) validateScanApiDeployment(auditConfig mondoov2.Mo
 	})
 	s.NoErrorf(err, "Failed to get scan API service.")
 
-	expectedService := mondooscanapi.ScanApiService(auditConfig.Namespace, auditConfig)
+	expectedService := scanapi.ScanApiService(auditConfig.Namespace, auditConfig)
 	s.NoError(ctrl.SetControllerReference(&auditConfig, expectedService, s.testCluster.K8sHelper.Clientset.Scheme()))
 	s.Truef(k8s.AreServicesEqual(*expectedService, *scanApiService), "Scan API service is not as expected.")
 
@@ -677,6 +668,20 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 		s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
 		"Failed to add CA data to Webhook")
 
+	// Restart the scan API pods to ensure the cert secret is reloaded.
+	webhookLabels := mondooadmission.WebhookDeploymentLabels()
+
+	webhookPods := &corev1.PodList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, webhookPods, webhookListOpts), "Failed to list webhook pods")
+
+	for _, p := range webhookPods.Items {
+		s.NoError(s.testCluster.K8sHelper.Clientset.Delete(s.ctx, &p), "Failed to delete webhook pod")
+	}
+
+	s.Truef(
+		s.testCluster.K8sHelper.IsPodReady(utils.LabelsToLabelSelector(webhookLabels), s.auditConfig.Namespace),
+		"Mondoo webhook Pod is not in a Ready state.")
+	zap.S().Info("Webhook Pod is ready.")
+
 	zap.S().Info("Wait for webhook to start working.")
-	time.Sleep(10 * time.Second)
 }
