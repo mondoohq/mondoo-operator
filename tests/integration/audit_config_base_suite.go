@@ -663,10 +663,15 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 		vwc.Webhooks[i].ClientConfig.CABundle = caCert.Bytes()
 	}
 
+	// Set the failure policy to ignore always so we can ensure that we can restart the webhook. After the webhook has restarted,
+	// we can rollback to the original value. This workaround is needed to enforce that the webhook has successfully reloaded the
+	// CA secret which we set after it is created. If we do not force it to restart, there is no reliable way of knowing when it
+	// has the correct CA data mounted and the tests become flaky.
+	currentFailurePolicy := *vwc.Webhooks[0].FailurePolicy
+	*vwc.Webhooks[0].FailurePolicy = webhooksv1.Ignore
+
 	zap.S().Info("Update the webhook with the CA data.")
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc),
-		"Failed to add CA data to Webhook")
+	s.NoErrorf(s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc), "Failed to add CA data to Webhook")
 
 	// Restart the scan API pods to ensure the cert secret is reloaded.
 	webhookLabels := mondooadmission.WebhookDeploymentLabels()
@@ -674,14 +679,23 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 	webhookPods := &corev1.PodList{}
 	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, webhookPods, webhookListOpts), "Failed to list webhook pods")
 
+	zap.S().Info("Restart the webhook pods such that it is certain the CA secret has been reloaded.")
 	for _, p := range webhookPods.Items {
 		s.NoError(s.testCluster.K8sHelper.Clientset.Delete(s.ctx, &p), "Failed to delete webhook pod")
 	}
+
+	time.Sleep(2 * time.Second)
 
 	s.Truef(
 		s.testCluster.K8sHelper.IsPodReady(utils.LabelsToLabelSelector(webhookLabels), s.auditConfig.Namespace),
 		"Mondoo webhook Pod is not in a Ready state.")
 	zap.S().Info("Webhook Pod is ready.")
+
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(vwc), vwc),
+		"Failed to retrieve ValidatingWebhookConfiguration")
+	*vwc.Webhooks[0].FailurePolicy = currentFailurePolicy
+	s.NoErrorf(s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc), "Failed to add CA data to Webhook")
 
 	zap.S().Info("Wait for webhook to start working.")
 }
