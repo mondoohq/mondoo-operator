@@ -9,16 +9,19 @@ on:
       MONDOO_CLIENT:
         required: true
 
+env:
+  MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag }}
+
+
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
     name: Integration tests
-    env:
-      MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag }}
-
+    
     strategy:
       matrix:
         k8s-version: [v1.22.12, v1.23.9, v1.24.3]
+        k8s-distro: [minikube, k3d]
 
     steps:
       - uses: actions/checkout@v2
@@ -26,11 +29,21 @@ jobs:
           fetch-depth: 0 # fetch is nneded for "git tag --list" in the Makefile
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
+
       - name: Start minikube
         uses: medyagh/setup-minikube@master
+        if: matrix.k8s-distro == 'minikube'
         with:
           memory: 4000m
           kubernetes-version: ${{ matrix.k8s-version }}
+
+      - name: Start k3d
+        uses: nolar/setup-k3d-k3s@v1
+        if: matrix.k8s-distro == 'k3d'
+        with:
+          version: ${{ matrix.k8s-version }}
+          k3d-args: --k3s-arg=--disable=traefik@server:*
+
       - uses: actions/setup-go@v2
         with:
           go-version: "${{ env.golang-version }}"
@@ -50,20 +63,20 @@ jobs:
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=90s
 
       - name: Run integration tests
-        run: make test/integration/ci
+        run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration/ci
 
-      - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-version }}.xml
+      - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
         if: success() || failure()
 
       - uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: test-results
-          path: integration-tests-${{ matrix.k8s-version }}.xml
+          path: integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
         uses: actions/upload-artifact@v3
         if: failure()
         with:
-          name: test-logs-${{ matrix.k8s-version }}
+          name: test-logs-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/

@@ -1,6 +1,7 @@
 # Mondoo Operator for Kubernetes
 
 ![CI](https://github.com/mondoohq/mondoo-operator/actions/workflows/tests.yaml/badge.svg)
+![Edge CI](https://github.com/mondoohq/mondoo-operator/actions/workflows/edge-integration-tests.yaml/badge.svg)
 ![License](https://img.shields.io/github/license/mondoohq/mondoo-operator)
 
 > **Project Status**: This project is stable. Any API and CRD changes will be handled in way where previous versions are kept working or migrated.
@@ -37,7 +38,7 @@ The following Kubernetes environments are tested:
 - GCP GKE 1.22 and 1.23
 - Minikube with Kubernetes versions 1.22, 1.23 and 1.24
 - Rancher RKE1 1.22 and 1.23
-- K3S
+- K3S 1.22, 1.23 and 1.24
 
 ## Documentation
 
