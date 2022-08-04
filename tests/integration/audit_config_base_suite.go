@@ -634,9 +634,12 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 			Name: fmt.Sprintf("%s-%s-mondoo", s.auditConfig.Namespace, s.auditConfig.Name),
 		},
 	}
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(vwc), vwc),
-		"Failed to retrieve ValidatingWebhookConfiguration")
+	s.NoErrorf(s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		if err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(vwc), vwc); err == nil {
+			return true, nil
+		}
+		return false, nil
+	}), "Failed to retrieve ValidatingWebhookConfiguration")
 
 	if s.auditConfig.Spec.Admission.Mode == mondoov2.Enforcing {
 		s.Equalf(*vwc.Webhooks[0].FailurePolicy, webhooksv1.Fail, "Webhook failurePolicy should be 'Fail' because of enforcing mode")
