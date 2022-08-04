@@ -178,13 +178,13 @@ func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.M
 		Spec: inventory.MondooInventorySpec{
 			Assets: []inventory.Asset{
 				{
-					Id:          "host",
-					Name:        node.Name,
-					PlatformIds: []string{fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/%s", clusterUID, node.UID)},
+					Id:   "host",
+					Name: node.Name,
 					Connections: []inventory.TransportConfig{
 						{
-							Host:    "/mnt/host",
-							Backend: inventory.TransportBackend_CONNECTION_FS,
+							Host:       "/mnt/host",
+							Backend:    inventory.TransportBackend_CONNECTION_FS,
+							PlatformId: fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/%s", clusterUID, node.UID),
 						},
 					},
 					Labels: map[string]string{},
