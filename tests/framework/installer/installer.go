@@ -178,7 +178,7 @@ func (i *MondooInstaller) GatherAllMondooLogs(testName string, namespaces ...str
 	zap.S().Infof("gathering all logs from the test")
 	for _, namespace := range namespaces {
 		i.K8sHelper.GetLogsFromNamespace(namespace, testName)
-		i.K8sHelper.GetPodDescribeFromNamespace(namespace, testName)
+		i.K8sHelper.GetDescribeFromNamespace(namespace, testName)
 		i.K8sHelper.GetEventsFromNamespace(namespace, testName)
 	}
 }
