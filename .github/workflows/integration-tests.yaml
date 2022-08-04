@@ -60,7 +60,7 @@ jobs:
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
       # before the test execution starts.
       - name: Wait a bit for the runner to become more stable
-        run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=180s
+        run: for i in 1 2 3 4 5; do kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=180s && break || sleep 10; done
 
       - name: Run integration tests
         run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration/ci
