@@ -235,7 +235,7 @@ func (k8sh *K8sHelper) GetLogsFromNamespace(namespace, testName string) {
 	k8sh.getPodsLogs(pods, namespace, testName)
 }
 
-func (k8sh *K8sHelper) GetPodDescribeFromNamespace(namespace, testName string) {
+func (k8sh *K8sHelper) GetDescribeFromNamespace(namespace, testName string) {
 	ctx := context.TODO()
 	zap.S().Infof("Gathering pod describe for all pods in namespace %s", namespace)
 	pods, err := k8sh.kubeClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
@@ -244,7 +244,7 @@ func (k8sh *K8sHelper) GetPodDescribeFromNamespace(namespace, testName string) {
 		return
 	}
 
-	file, err := k8sh.createTestLogFile("", "podDescribe", namespace, testName)
+	file, err := k8sh.createTestLogFile("", "describe", namespace, testName)
 	if err != nil {
 		return
 	}
@@ -252,6 +252,16 @@ func (k8sh *K8sHelper) GetPodDescribeFromNamespace(namespace, testName string) {
 
 	for _, p := range pods.Items {
 		k8sh.appendPodDescribe(file, namespace, p.Name)
+	}
+
+	deployments, err := k8sh.kubeClient.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		zap.S().Errorf("failed to list pods in namespace %s. %+v", namespace, err)
+		return
+	}
+
+	for _, p := range deployments.Items {
+		k8sh.appendDeploymentDescribe(file, namespace, p.Name)
 	}
 }
 
@@ -311,6 +321,16 @@ func (k8sh *K8sHelper) ExecuteWithRetries(f func() (bool, error)) error {
 	return fmt.Errorf("test did not succeed after %d retries", RetryLoop)
 }
 
+func (k8sh *K8sHelper) appendDeploymentDescribe(file *os.File, namespace, name string) {
+	description := k8sh.getDeploymentDescribe(namespace, name)
+	if description == "" {
+		return
+	}
+	writeHeader(file, fmt.Sprintf("Pod: %s\n", name)) //nolint // ok to ignore this test logging
+	file.WriteString(description)                     //nolint // ok to ignore this test logging
+	file.WriteString("\n")                            //nolint // ok to ignore this test logging
+}
+
 func (k8sh *K8sHelper) appendPodDescribe(file *os.File, namespace, name string) {
 	description := k8sh.getPodDescribe(namespace, name)
 	if description == "" {
@@ -327,6 +347,16 @@ func (k8sh *K8sHelper) PrintPodDescribe(namespace string, args ...string) {
 		return
 	}
 	zap.S().Infof("POD Description:\n%s", description)
+}
+
+func (k8sh *K8sHelper) getDeploymentDescribe(namespace string, args ...string) string {
+	args = append([]string{"get", "deployment", "-o", "yaml", "-n", namespace}, args...)
+	description, err := k8sh.Kubectl(args...)
+	if err != nil {
+		zap.S().Errorf("failed to describe pod. %v %+v", args, err)
+		return ""
+	}
+	return description
 }
 
 func (k8sh *K8sHelper) getPodDescribe(namespace string, args ...string) string {

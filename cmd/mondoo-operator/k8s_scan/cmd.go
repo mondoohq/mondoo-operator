@@ -69,7 +69,7 @@ func init() {
 		if res.Ok {
 			logger.Info("Kubernetes resources scan successful", "worst score", res.WorstScore.Value)
 		} else {
-			err := fmt.Errorf("scan API returned not OK. %v", res.WorstScore)
+			err := fmt.Errorf("scan API returned not OK. %+v", res)
 			logger.Error(err, "Kubernetes resources scan was not successful")
 			return err
 		}
