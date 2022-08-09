@@ -10,8 +10,9 @@ import (
 const FeatureFlagPrefix = "FEATURE_"
 
 var (
-	enablePodDiscovery bool
-	allFeatureFlags    = make(map[string]string)
+	enablePodDiscovery      bool
+	enableWorkloadDiscovery bool
+	allFeatureFlags         = make(map[string]string)
 )
 
 func init() {
@@ -42,9 +43,15 @@ func GetEnablePodDiscovery() bool {
 	return enablePodDiscovery
 }
 
+func GetEnableWorkloadDiscovery() bool {
+	return enableWorkloadDiscovery
+}
+
 func setGlobalFlags(k, v string) {
 	switch k {
 	case "FEATURE_DISCOVER_PODS":
 		enablePodDiscovery = true
+	case "FEATURE_DISCOVER_WORKLOADS":
+		enableWorkloadDiscovery = true
 	}
 }

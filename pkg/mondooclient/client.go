@@ -281,8 +281,15 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationM
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets, "container-images")
 	}
 
-	if feature_flags.GetEnablePodDiscovery() {
+	// Only enter this branch if workload discovery is disabled since workload discovery will add pods as well.
+	if feature_flags.GetEnablePodDiscovery() && !feature_flags.GetEnableWorkloadDiscovery() {
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets, "pods")
+	}
+
+	if feature_flags.GetEnableWorkloadDiscovery() {
+		// We cannot discover "all" because that includes container images.
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets,
+			"pods", "deployments", "daemonsets", "statefulsets", "replicasets", "jobs", "cronjobs")
 	}
 
 	reqBodyBytes, err := json.Marshal(scanJob)
