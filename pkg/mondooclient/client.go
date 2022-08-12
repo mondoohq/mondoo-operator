@@ -21,7 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"time"
@@ -112,7 +112,7 @@ func (s *mondooClient) request(ctx context.Context, url string, reqBodyBytes []b
 		resp.Body.Close()
 	}()
 
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read http response body: %s", err)
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
@@ -40,7 +40,7 @@ func init() {
 			return fmt.Errorf("--timeout must be greater than 0")
 		}
 
-		tokenBytes, err := ioutil.ReadFile(*tokenFilePath)
+		tokenBytes, err := os.ReadFile(*tokenFilePath)
 		if err != nil {
 			logger.Error(err, "failed to read in file with token content")
 			return err
