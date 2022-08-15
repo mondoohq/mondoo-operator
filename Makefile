@@ -223,7 +223,7 @@ gotestsum: $(LOCALBIN) ## Download gotestsum locally if necessary.
 
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 golangci-lint: $(LOCALBIN) ## Download golangci-lint locally if necessary.
-	GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45
+	GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.48
 
 GOMOCKGEN = $(LOCALBIN)/mockgen
 .PHONY: gomockgen

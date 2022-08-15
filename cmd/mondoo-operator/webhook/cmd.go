@@ -2,7 +2,7 @@ package webhook
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -44,7 +44,7 @@ func init() {
 			return fmt.Errorf("--cluster-id must be provided")
 		}
 
-		tokenBytes, err := ioutil.ReadFile(*tokenFilePath)
+		tokenBytes, err := os.ReadFile(*tokenFilePath)
 		if err != nil {
 			webhookLog.Error(err, "Failed to read in file with token content")
 			return err

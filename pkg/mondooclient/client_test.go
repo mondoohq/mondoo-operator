@@ -2,7 +2,7 @@ package mondooclient_test
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -99,7 +99,7 @@ func TestScanner_ScanKubernetesResources(t *testing.T) {
 }
 
 func mustRead(file string) []byte {
-	bytes, err := ioutil.ReadFile(file)
+	bytes, err := os.ReadFile(file)
 	if err != nil {
 		panic("couldn't read in file")
 	}

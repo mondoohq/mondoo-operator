@@ -3,7 +3,7 @@ package webhookhandler
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -335,7 +335,7 @@ func setupDecoder(t *testing.T) *admission.Decoder {
 }
 
 func mustRead(filePath string) []byte {
-	bytes, err := ioutil.ReadFile(filePath)
+	bytes, err := os.ReadFile(filePath)
 	if err != nil {
 		panic("failed to read in file")
 	}

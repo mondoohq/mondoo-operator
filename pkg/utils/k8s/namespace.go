@@ -18,7 +18,6 @@ package k8s
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 
 	"github.com/go-logr/logr"
@@ -38,7 +37,7 @@ func GetRunningNamespace() (string, error) {
 		return env, nil
 	}
 	// Else, check the namespace of the ServiceAccount the Pod is running in.
-	namespaceBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	namespaceBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		return "", err
 	}
