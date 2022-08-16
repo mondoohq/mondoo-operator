@@ -271,7 +271,7 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationM
 		scanJob.Inventory.Spec.Assets[0].Labels[constants.MondooAssetsIntegrationLabel] = integrationMrn
 	}
 
-	if scanContainerImages || feature_flags.GetEnablePodDiscovery() {
+	if scanContainerImages || feature_flags.GetEnablePodDiscovery() || feature_flags.GetEnableWorkloadDiscovery() {
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Options = make(map[string]string)
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Options["all-namespaces"] = "true"
 
