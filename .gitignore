@@ -40,3 +40,7 @@ integration-tests.xml
 tests/integration/_output
 
 .vscode/*.log
+
+terraform/**/.terraform*
+terraform/**/terraform.tfstate*
+terraform/aws/eks-config
