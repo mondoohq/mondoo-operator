@@ -84,9 +84,9 @@ Outputs:
 
 cluster_arn = "arn:aws:eks:eu-central-1:735798807192:cluster/3d5f6a67b-int-tests-bpke-cluster"
 cluster_certificate_authority_data = "..."
-cluster_endpoint = "https://FA7565E235EBFB08D1D68D90B420C086.gr7.eu-central-1.eks.amazonaws.com"
-cluster_id = "3d5f6a67b-int-tests-bpke-cluster"
-cluster_name = "3d5f6a67b-int-tests-bpke-cluster"
+cluster_endpoint = "https://...eks.amazonaws.com"
+cluster_id = "..."
+cluster_name = "..."
 cluster_status = "ACTIVE"
 region = "eu-central-1"
 
