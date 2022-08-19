@@ -10,7 +10,7 @@ This folder contains Terraform automation code to provision the following:
 <!-- code_chunk_output -->
 
 - [Integration Tests EKS Provisioning](#integration-tests-eks-provisioning)
-    - [Prerequsites](#prerequsites)
+    - [Prerequisites](#prerequisites)
   - [Configuration](#configuration)
     - [Example configuration](#example-configuration)
   - [Provision the cluster](#provision-the-cluster)
@@ -21,7 +21,7 @@ This folder contains Terraform automation code to provision the following:
 
 <!-- /code_chunk_output -->
 
-### Prerequsites
+### Prerequisites
 
 - [AWS Account](https://aws.amazon.com/free/)
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html) - `~> aws-cli/2.4.28`
@@ -111,13 +111,13 @@ ip-10-0-6-242.us-east-2.compute.internal   Ready    <none>   6m6s    v1.21.5-eks
 ## Running integration tests
 
 After setting up the cluster via terraform, set your kube config as described above.
-Install mondoo-oprator via an Integration command.
+Install mondoo-operator via an Integration command.
 Now you can run the integration tests of the current branch against EKS by executing:
 ```bash
 EXTERNAL_INSTALLATION=1 K8S_DISTRO=eks VERSION=<latest-tag> make test/integration
 ```
 
-## Knwon issues
+## Known issues
 
 A refresh of the cluster state might error for the aws_auth config map.
 This helps: https://github.com/terraform-aws-modules/terraform-aws-eks/issues/911#issuecomment-726328484
