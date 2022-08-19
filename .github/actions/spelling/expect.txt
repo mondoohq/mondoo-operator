@@ -94,3 +94,5 @@ KUBECONFIG
 issuecomment
 psp
 dataloss
+DISTRO
+
