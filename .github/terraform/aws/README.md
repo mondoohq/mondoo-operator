@@ -54,7 +54,7 @@ git clone git@github.com:mondoohq/mondoo-operator.git
 
 2. cd into the terraform folder
 ```
-cd terraform/aws
+cd .github/terraform/aws
 ```
 
 3. Initialize the project (download modules)
