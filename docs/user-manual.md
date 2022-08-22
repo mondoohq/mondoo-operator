@@ -302,6 +302,12 @@ The end result should resemble this:
             port: 443
 ```
 
+### Firewall rules for the webhook
+
+Make sure your Kubernetes API servers can connect to the webhook.
+Otherwise, you would see connection timeout errors in your API server logs.
+An example for an EKS basic firewall rule can be found [here](../terraform/aws/main.tf#L110)
+
 ## Creating a secret for private image scanning
 
 To allow the Mondoo operator to scan private images, it needs access to image pull secrets for these private registries.
