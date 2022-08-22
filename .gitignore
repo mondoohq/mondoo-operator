@@ -41,6 +41,6 @@ tests/integration/_output
 
 .vscode/*.log
 
-terraform/**/.terraform*
-terraform/**/terraform.tfstate*
-terraform/aws/eks-config
+.github/terraform/**/.terraform*
+.github/terraform/**/terraform.tfstate*
+.github/terraform/aws/eks-config
