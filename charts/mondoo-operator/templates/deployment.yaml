@@ -41,6 +41,8 @@ spec:
         command:
         - /mondoo-operator
         env:
+        - name: FEATURE_DISCOVER_WORKLOADS
+          value: "1"
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ .Values.kubernetesClusterDomain }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
