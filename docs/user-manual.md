@@ -306,7 +306,7 @@ The end result should resemble this:
 
 Make sure your Kubernetes API servers can connect to the webhook.
 Otherwise, you would see connection timeout errors in your API server logs.
-An example for an EKS basic firewall rule can be found [here](../terraform/aws/main.tf#L110)
+An example for an EKS basic firewall rule can be found [here](../.github/terraform/aws/main.tf#L110)
 
 ## Creating a secret for private image scanning
 
