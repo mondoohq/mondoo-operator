@@ -32,6 +32,9 @@ spec:
         args:
         - operator
         - --leader-elect
+        env:
+        - name: FEATURE_DISCOVER_WORKLOADS
+          value: "1"
         image: controller:latest
         imagePullPolicy: IfNotPresent
         name: manager
