@@ -56,6 +56,13 @@ jobs:
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
+      - name: Debug mondoo space
+        run: |
+          wget https://releases.mondoo.com/mondoo/6.12.0/mondoo_6.12.0_linux_amd64.tar.gz
+          tar -xvf mondoo_6.12.0_linux_amd64.tar.gz
+          export MONDOO_CONFIG_PATH=./creds.json
+          ./mondoo status
+
       # Now that dependencies are cached the tests start almost immediately after minikube has started
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
       # before the test execution starts.
