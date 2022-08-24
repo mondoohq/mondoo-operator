@@ -80,6 +80,10 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 											ReadOnly:  true,
 											MountPath: "/etc/opt/",
 										},
+										{
+											Name:      "temp",
+											MountPath: "/tmp",
+										},
 									},
 									Env: []corev1.EnvVar{
 										{
@@ -126,6 +130,12 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 												},
 											},
 										},
+									},
+								},
+								{
+									Name: "temp",
+									VolumeSource: corev1.VolumeSource{
+										EmptyDir: &corev1.EmptyDirVolumeSource{},
 									},
 								},
 							},
