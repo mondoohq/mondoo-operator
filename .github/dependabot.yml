@@ -4,3 +4,6 @@ updates:
     directory: /
     schedule:
       interval: daily
+    ignore:
+      # This dependency is inherited from our usage of OperatorSDK
+      - dependency-name: sigs.k8s.io/controller-runtime
