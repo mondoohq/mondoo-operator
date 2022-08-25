@@ -60,3 +60,31 @@ func VerifyAPI(group, version string, log logr.Logger) (bool, error) {
 	log.Info(fmt.Sprintf("%s/%s API verified", group, version))
 	return true, nil
 }
+
+func VerifyResourceExists(group, version, resource string, log logr.Logger) (bool, error) {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		log.Error(err, "unable to get k8s config")
+		return false, err
+	}
+
+	k8s, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		log.Error(err, "unable to create k8s client")
+		return false, err
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    group,
+		Version:  version,
+		Resource: resource,
+	}
+
+	exists, err := discovery.IsResourceEnabled(k8s, gvr)
+	if err != nil {
+		log.Error(err, "error while check whether resource exists", "gvr", gvr)
+		return false, err
+	}
+
+	return exists, nil
+}
