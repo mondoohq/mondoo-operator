@@ -5,5 +5,10 @@ updates:
     schedule:
       interval: daily
     ignore:
-      # This dependency is inherited from our usage of OperatorSDK
+      # These dependencies are inherited from our usage of OperatorSDK
+      # and they get updated as we follow OperatorSDK's releases
       - dependency-name: sigs.k8s.io/controller-runtime
+      - dependency-name: k8s.io/apimachinery
+      - dependency-name: k8s.io/client-go
+      - dependency-name: github.com/onsi/ginkgo/v2
+      - dependency-name: github.com/onsi/gomega
