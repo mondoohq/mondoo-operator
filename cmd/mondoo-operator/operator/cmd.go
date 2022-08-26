@@ -1,12 +1,16 @@
 package operator
 
 import (
+	"fmt"
+
+	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -78,6 +82,17 @@ func init() {
 			return err
 		}
 
+		passed, err := preflightApiChecks(setupLog)
+		if err != nil {
+			setupLog.Error(err, "error while performing preflight validation")
+			return err
+		}
+		if !passed {
+			msg := "required API(s) not found"
+			setupLog.Info(msg)
+			return fmt.Errorf(msg)
+		}
+
 		// The API group "config.openshift.io" should be unique to an OpenShift cluster
 		isOpenShift, err := k8s.VerifyAPI("config.openshift.io", "v1", setupLog)
 		if err != nil {
@@ -126,4 +141,32 @@ func init() {
 
 		return nil
 	}
+}
+
+func preflightApiChecks(log logr.Logger) (bool, error) {
+	gvrs := []struct{ g, v, r string }{
+		{
+			g: batchv1.SchemeGroupVersion.Group,
+			v: batchv1.SchemeGroupVersion.Version,
+			r: "jobs",
+		},
+		{
+			g: batchv1.SchemeGroupVersion.Group,
+			v: batchv1.SchemeGroupVersion.Version,
+			r: "cronjobs",
+		},
+	}
+
+	for _, gvr := range gvrs {
+		exists, err := k8s.VerifyResourceExists(gvr.g, gvr.v, gvr.r, log)
+		if err != nil {
+			return false, err
+		}
+		if !exists {
+			log.Error(fmt.Errorf("%s.%s.%s not found", gvr.r, gvr.v, gvr.g), "missing required resource. Mondoo Operator requires features from Kubernetes 1.21 (or later)")
+			return exists, nil
+		}
+	}
+
+	return true, nil
 }
