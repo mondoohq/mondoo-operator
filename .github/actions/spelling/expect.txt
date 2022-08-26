@@ -6,7 +6,6 @@ arttor
 authn
 authz
 AWS
-backend
 CAcreateserial
 certs
 config
@@ -77,16 +76,12 @@ Versioning
 uniq
 ubuntu
 semver
-Cron
-Terraform
-terraform
 VPC
 eks
 toc
 aws
 userguide
 html
-hashicorp
 bpke
 amazonaws
 kube
@@ -95,4 +90,3 @@ issuecomment
 psp
 dataloss
 DISTRO
-
