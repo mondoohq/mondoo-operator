@@ -109,7 +109,7 @@ test/ci: manifests generate fmt vet envtest gotestsum
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) --arch=amd64 use $(ENVTEST_K8S_VERSION) -p path)" $(GOTESTSUM) --junitfile unit-tests.xml -- $(UNIT_TEST_PACKAGES) -coverprofile cover.out
 
 # Integration tests are run synchronously to avoid race conditions
-ifeq ($(K8S_DISTRO),eks)
+ifeq ($(K8S_DISTRO),aws)
 test/integration: manifests generate generate-manifests
 else ifeq ($(K8S_DISTRO),k3d)
 test/integration: manifests generate generate-manifests load-k3d

@@ -90,3 +90,4 @@ issuecomment
 psp
 dataloss
 DISTRO
+kubeconfig

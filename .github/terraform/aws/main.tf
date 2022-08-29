@@ -251,30 +251,6 @@ resource "null_resource" "kubectl_config_update" {
     module.eks
   ]
   provisioner "local-exec" {
-    command = "aws eks --region $(terraform output -raw region) update-kubeconfig --name $(terraform output -raw cluster_name) --kubeconfig ./eks-config"
-  }
-}
-
-################################################################################
-# Install additions
-################################################################################
-
-resource "null_resource" "kubectl_install_cert_manager" {
-  depends_on = [
-    module.eks,
-    null_resource.kubectl_config_update
-  ]
-  provisioner "local-exec" {
-    command = "kubectl --kubeconfig eks-config apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml"
-  }
-}
-
-resource "null_resource" "kubectl_install_psp" {
-  depends_on = [
-    module.eks,
-    null_resource.kubectl_config_update
-  ]
-  provisioner "local-exec" {
-    command = "kubectl --kubeconfig eks-config apply -f ./psp-unprivileged.yaml"
+    command = "aws eks --region $(terraform output -raw region) update-kubeconfig --name $(terraform output -raw cluster_name) --kubeconfig ./kubeconfig"
   }
 }

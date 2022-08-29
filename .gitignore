@@ -43,4 +43,4 @@ tests/integration/_output
 
 .github/terraform/**/.terraform*
 .github/terraform/**/terraform.tfstate*
-.github/terraform/aws/eks-config
+.github/terraform/aws/kubeconfig
