@@ -10,5 +10,3 @@ updates:
       - dependency-name: sigs.k8s.io/controller-runtime
       - dependency-name: k8s.io/apimachinery
       - dependency-name: k8s.io/client-go
-      - dependency-name: github.com/onsi/ginkgo/v2
-      - dependency-name: github.com/onsi/gomega

@@ -6,8 +6,6 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.3.0
 	github.com/golang/mock v1.6.0
 	github.com/jetstack/cert-manager v1.7.1
-	github.com/onsi/ginkgo/v2 v2.1.3
-	github.com/onsi/gomega v1.18.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.55.0
 	github.com/spf13/cobra v1.5.0
 	github.com/stretchr/testify v1.7.0
