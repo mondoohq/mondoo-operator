@@ -96,7 +96,7 @@ region = "eu-central-1"
 
 After Terraform finishes provisioning, set your kube config:
 ```bash
-export KUBECONFIG=./eks-config
+export KUBECONFIG=./kubeconfig
 ```
 
 Then you can connect to your EKS cluster:
