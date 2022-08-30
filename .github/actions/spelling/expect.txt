@@ -35,6 +35,7 @@ mondoo
 mondooauditconfig
 mondoohq
 mondoooperatorconfigs
+mozilla
 MQL
 mrn
 openshift
