@@ -34,6 +34,7 @@ jobs:
             cspell:aws/aws.txt
             cspell:filetypes/filetypes.txt
             cspell:software-terms/softwareTerms.txt
+            cspell:companies/companies.txt
 
   comment:
     name: Report
