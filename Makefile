@@ -109,7 +109,7 @@ test/ci: manifests generate fmt vet envtest gotestsum
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) --arch=amd64 use $(ENVTEST_K8S_VERSION) -p path)" $(GOTESTSUM) --junitfile unit-tests.xml -- $(UNIT_TEST_PACKAGES) -coverprofile cover.out
 
 # Integration tests are run synchronously to avoid race conditions
-ifeq ($(K8S_DISTRO),aws)
+ifeq ($(K8S_DISTRO),aks)
 test/integration: manifests generate generate-manifests
 else ifeq ($(K8S_DISTRO),k3d)
 test/integration: manifests generate generate-manifests load-k3d
@@ -118,7 +118,7 @@ test/integration: manifests generate generate-manifests load-minikube
 endif
 	go test -ldflags $(LDFLAGS) -v -timeout 900s -p 1 ./tests/integration/...
 
-ifeq ($(K8S_DISTRO),eks)
+ifeq ($(K8S_DISTRO),aks)
 test/integration/ci: manifests generate generate-manifests gotestsum
 else ifeq ($(K8S_DISTRO),k3d)
 test/integration/ci: manifests generate generate-manifests gotestsum load-k3d
