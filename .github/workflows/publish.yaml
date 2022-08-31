@@ -82,8 +82,16 @@ jobs:
           flavor: |
             suffix=-${{ matrix.arch }},onlatest=true
 
+      # Extract metadata (tags, labels) for Docker
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker metadata (without suffixes)
+        id: meta_clean
+        uses: docker/metadata-action@v3
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
       - name: Build binaries
-        run: VERSION=${{ steps.meta.outputs.version }} TARGET_OS=${{ matrix.os }} TARGET_ARCH=${{ matrix.arch }} make build
+        run: VERSION=${{ steps.meta_clean.outputs.version }} TARGET_OS=${{ matrix.os }} TARGET_ARCH=${{ matrix.arch }} make build
 
       # Build and push Docker image with Buildx
       # https://github.com/docker/build-push-action
