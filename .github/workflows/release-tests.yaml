@@ -93,7 +93,7 @@ jobs:
       - name: Run integration tests
         run: VERSION=${{ env.MONDOO_OPERATOR_IMAGE_TAG }} K8S_DISTRO=aks make test/integration/ci
         env:
-          KUBECONFIG: ${{ env.GITHUB_WORKSPACE }}/.github/terraform/aks/kubeconfig
+          KUBECONFIG: ${{ format('{0}/{1}', github.workspace, '.github/terraform/aks/kubeconfig') }}
 
       - name: Clean up AKS terraform
         run: terraform destroy -auto-approve
