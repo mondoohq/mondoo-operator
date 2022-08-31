@@ -1,4 +1,4 @@
-name: Release tests EKS
+name: Cloud tests
 on:
   workflow_dispatch:
     inputs:
@@ -10,7 +10,7 @@ on:
       mondooOperatorImageTag:
         required: true
         type: string
-        default: nightly
+        default: main
         description: The image tag to use for the mondoo operator image
       AZURE_CLIENT_ID:
         required: true
@@ -37,9 +37,9 @@ env:
   MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag }}
 
 jobs:
-  release-tests-aks:
+  aks-integration-test:
     runs-on: ubuntu-latest
-    name: Release tests AKS
+    name: AKS integration tests
 
     env:
       ARM_CLIENT_ID: ${{ github.event.inputs.AZURE_CLIENT_ID }}
@@ -49,7 +49,7 @@ jobs:
     
     strategy:
       matrix:
-        k8s-version: ["1.23"]
+        k8s-version: ["1.22", "1.23", "1.24"]
 
     steps:
       - uses: actions/checkout@v3
@@ -83,12 +83,6 @@ jobs:
       - name: Store creds
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
-
-      # - name: Setup upterm session
-      #   uses: lhotari/action-upterm@v1
-      #   with:
-      #     ## limits ssh access and adds the ssh public keys of the listed GitHub users
-      #     limit-access-to-users: imilchev
 
       - name: Run integration tests
         run: VERSION=${{ env.MONDOO_OPERATOR_IMAGE_TAG }} K8S_DISTRO=aks make test/integration/ci
