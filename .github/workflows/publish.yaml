@@ -37,10 +37,6 @@ jobs:
         arch: [amd64, arm64, arm]
 
     steps:
-      - name: extract tag/version
-        id: get_version
-        run: echo ::set-output name=VERSION::$(echo ${GITHUB_REF##refs/tags/})
-
       - name: Checkout repository
         uses: actions/checkout@v2
 
@@ -87,7 +83,7 @@ jobs:
             suffix=-${{ matrix.arch }},onlatest=true
 
       - name: Build binaries
-        run: VERSION=${{ steps.get_version.outputs.VERSION }} TARGET_OS=${{ matrix.os }} TARGET_ARCH=${{ matrix.arch }} make build
+        run: VERSION=${{ steps.meta.outputs.version }} TARGET_OS=${{ matrix.os }} TARGET_ARCH=${{ matrix.arch }} make build
 
       # Build and push Docker image with Buildx
       # https://github.com/docker/build-push-action
@@ -272,9 +268,7 @@ jobs:
           fetch-depth: 0 # fetch is nneded for "git tag --list" in the Makefile
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
-      - name: extract tag/version
-        id: get_version
-        run: echo ::set-output name=VERSION::$(echo ${GITHUB_REF##refs/tags/})
+
       - name: Install Go
         uses: actions/setup-go@v2
         with:
@@ -323,8 +317,14 @@ jobs:
       - name: Store creds
         run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
       - name: Run integration tests
-        run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.get_version.outputs.VERSION }} make test/integration/ci
+        run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.meta.outputs.version }} make test/integration/ci
 
       - name: Clean up
         run: |
@@ -374,10 +374,6 @@ jobs:
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
 
-      - name: extract tag/version
-        id: get_version
-        run: echo ::set-output name=VERSION::$(echo ${GITHUB_REF##refs/tags/})
-
       - name: Install Go
         uses: actions/setup-go@v2
         with:
@@ -398,6 +394,12 @@ jobs:
       - name: Store creds
         run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
       - name: Install Mondoo Operator Helm chart
         run: helm install mondoo-operator charts/mondoo-operator -n mondoo-operator --create-namespace --wait
 
@@ -408,7 +410,7 @@ jobs:
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
       - name: Run integration tests
-        run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.get_version.outputs.VERSION }} make test/integration/ci
+        run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.meta.outputs.version }} make test/integration/ci
 
       - name: Upload test logs artifact
         uses: actions/upload-artifact@v3
