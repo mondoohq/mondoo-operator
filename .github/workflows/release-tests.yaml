@@ -84,6 +84,12 @@ jobs:
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+        with:
+          ## limits ssh access and adds the ssh public keys of the listed GitHub users
+          limit-access-to-users: imilchev
+
       - name: Run integration tests
         run: KUBECONFIG=.github/terraform/aks/kubeconfig VERSION=${{ env.MONDOO_OPERATOR_IMAGE_TAG }} K8S_DISTRO=aks make test/integration/ci
         env:
