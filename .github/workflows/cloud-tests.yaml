@@ -1,0 +1,104 @@
+name: Cloud tests
+on:
+  workflow_dispatch:
+    inputs:
+      mondooClientImageTag:
+        required: true
+        type: string
+        default: edge-latest-rootless
+        description: The image tag to use for the mondoo client image
+      mondooOperatorImageTag:
+        required: true
+        type: string
+        default: main
+        description: The image tag to use for the mondoo operator image
+    secrets:
+      MONDOO_CLIENT:
+        required: true
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_CLIENT_SECRET:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+
+env:
+  MONDOO_OPERATOR_IMAGE_TAG: ${{ github.event.inputs.mondooOperatorImageTag }}
+  MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag }}
+
+jobs:
+  aks-integration-test:
+    runs-on: ubuntu-latest
+    name: AKS integration tests
+
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+    
+    strategy:
+      matrix:
+        k8s-version: ["1.22", "1.23", "1.24"]
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # fetch is nneded for "git tag --list" in the Makefile
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      - name: Terraform init
+        run: terraform init
+        working-directory: .github/terraform/aks
+      
+      - name: Terraform plan
+        run: terraform plan -out aks-${{ matrix.k8s-version }}.json
+        env:
+          TF_VAR_k8s_version: ${{ matrix.k8s-version }}
+        working-directory: .github/terraform/aks
+
+      - name: Terraform apply
+        run: terraform apply -auto-approve aks-${{ matrix.k8s-version }}.json
+        working-directory: .github/terraform/aks
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "${{ env.golang-version }}"
+
+      - name: Store creds
+        run: |
+          echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+
+      - name: Run integration tests
+        run: VERSION=${{ env.MONDOO_OPERATOR_IMAGE_TAG }} K8S_DISTRO=aks make test/integration/ci
+        env:
+          KUBECONFIG: ${{ format('{0}/{1}', github.workspace, '.github/terraform/aks/kubeconfig') }}
+
+      - name: Clean up AKS terraform
+        run: terraform destroy -auto-approve
+        if: success() || failure()
+        working-directory: .github/terraform/aks
+      
+      - run: mv integration-tests.xml integration-tests-aks-${{ matrix.k8s-version }}.xml
+        if: success() || failure()
+
+      - uses: actions/upload-artifact@v3  # upload test results
+        if: success() || failure()        # run this step even if previous step failed
+        with:                             # upload a combined archive with unit and integration test results
+          name: test-results
+          path: |
+            integration-tests-aks-${{ matrix.k8s-version }}.xml
+            .github/terraform/aks/aks-${{ matrix.k8s-version }}.json
+
+      - name: Upload test logs artifact
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: test-logs-aks-${{ matrix.k8s-version }}
+          path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
