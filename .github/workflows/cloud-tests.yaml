@@ -40,6 +40,7 @@ jobs:
       ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
     
     strategy:
+      fail-fast: false
       matrix:
         k8s-version: ["1.22", "1.23", "1.24"]
 
@@ -71,6 +72,15 @@ jobs:
         with:
           go-version: "${{ env.golang-version }}"
 
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-test-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-test-
+
       - name: Store creds
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
@@ -88,7 +98,8 @@ jobs:
       - run: mv integration-tests.xml integration-tests-aks-${{ matrix.k8s-version }}.xml
         if: success() || failure()
 
-      - uses: actions/upload-artifact@v3  # upload test results
+      - name: Upload test results
+        uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: test-results
