@@ -177,12 +177,12 @@ func CronJobName(prefix, suffix string) string {
 	// it such that the full name fits within 52 chars. This is needed because in
 	// manager Kubernetes services such as EKS or GKE the node names can be very long.
 	base := fmt.Sprintf("%s%s", prefix, CronJobNameBase)
-	return fmt.Sprintf("%s%s", base, NodeNameOrHash(52-len(base), suffix))
+	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), suffix))
 }
 
 func ConfigMapName(prefix, nodeName string) string {
 	base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
-	return fmt.Sprintf("%s%s", base, NodeNameOrHash(52-len(base), nodeName))
+	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), nodeName))
 }
 
 func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {

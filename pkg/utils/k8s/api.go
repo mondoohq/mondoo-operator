@@ -20,6 +20,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
+const (
+	ResourceNameMaxLength = 52
+)
+
 // VerifyAPI will query the underlying k8s cluster for the existence
 // of the provided group/version.
 func VerifyAPI(group, version string, log logr.Logger) (bool, error) {

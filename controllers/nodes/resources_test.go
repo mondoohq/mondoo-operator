@@ -41,7 +41,7 @@ func TestCronJobName(t *testing.T) {
 			name: "should be prefix+base+suffix when shorter than 52 chars",
 			data: func() (suffix, expected string) {
 				base := fmt.Sprintf("%s%s", prefix, CronJobNameBase)
-				suffix = utils.RandString(52 - len(base))
+				suffix = utils.RandString(k8s.ResourceNameMaxLength - len(base))
 				return suffix, fmt.Sprintf("%s%s", base, suffix)
 			},
 		},
@@ -52,7 +52,7 @@ func TestCronJobName(t *testing.T) {
 				suffix = utils.RandString(53 - len(base))
 
 				hash := fmt.Sprintf("%x", sha256.Sum256([]byte(suffix)))
-				return suffix, fmt.Sprintf("%s%s", base, hash[:52-len(base)])
+				return suffix, fmt.Sprintf("%s%s", base, hash[:k8s.ResourceNameMaxLength-len(base)])
 			},
 		},
 	}
@@ -76,7 +76,7 @@ func TestConfigMapName(t *testing.T) {
 			name: "should be prefix+base+suffix when shorter than 52 chars",
 			data: func() (suffix, expected string) {
 				base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
-				suffix = utils.RandString(52 - len(base))
+				suffix = utils.RandString(k8s.ResourceNameMaxLength - len(base))
 				return suffix, fmt.Sprintf("%s%s", base, suffix)
 			},
 		},
@@ -87,7 +87,7 @@ func TestConfigMapName(t *testing.T) {
 				suffix = utils.RandString(53 - len(base))
 
 				hash := fmt.Sprintf("%x", sha256.Sum256([]byte(suffix)))
-				return suffix, fmt.Sprintf("%s%s", base, hash[:52-len(base)])
+				return suffix, fmt.Sprintf("%s%s", base, hash[:k8s.ResourceNameMaxLength-len(base)])
 			},
 		},
 	}
