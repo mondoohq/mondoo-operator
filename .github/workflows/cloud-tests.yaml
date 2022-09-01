@@ -122,9 +122,14 @@ jobs:
     needs: [aks-integration-test]
     if: always()
     steps:
-    - uses: dorny/test-reporter@v1
+    - name: Download test results
+      uses: actions/download-artifact@v3
       with:
-        artifact: test-results
+        name: test-results
+
+    - name: Parse test results
+      uses: dorny/test-reporter@v1
+      with:
         name: Report test results
-        path: '*.xml'                     # Path to test results (inside artifact .zip)
+        path: '*.xml'                     # Path to test results
         reporter: java-junit              # Format of test results
