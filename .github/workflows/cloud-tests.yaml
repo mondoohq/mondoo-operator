@@ -100,11 +100,11 @@ jobs:
       - run: mv integration-tests.xml integration-tests-aks-${{ matrix.k8s-version }}.xml
         if: success() || failure()
 
-      - name: Upload test results
+      - name: Upload cloud test results
         uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
-          name: test-results
+          name: cloud-test-results
           path: |
             integration-tests-aks-${{ matrix.k8s-version }}.xml
             .github/terraform/aks/aks-${{ matrix.k8s-version }}.json
@@ -122,14 +122,18 @@ jobs:
     needs: [aks-integration-test]
     if: always()
     steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # fetch is nneded for "git tag --list" in the Makefile
+
     - name: Download test results
       uses: actions/download-artifact@v3
       with:
-        name: test-results
+        name: cloud-test-results
 
     - name: Parse test results
       uses: dorny/test-reporter@v1
       with:
-        name: Report test results
+        name: Report cloud test results
         path: '*.xml'                     # Path to test results
         reporter: java-junit              # Format of test results
