@@ -111,6 +111,8 @@ test/ci: manifests generate fmt vet envtest gotestsum
 # Integration tests are run synchronously to avoid race conditions
 ifeq ($(K8S_DISTRO),aks)
 test/integration: manifests generate generate-manifests
+else ifeq ($(K8S_DISTRO),eks)
+test/integration: manifests generate generate-manifests
 else ifeq ($(K8S_DISTRO),k3d)
 test/integration: manifests generate generate-manifests load-k3d
 else
@@ -119,6 +121,8 @@ endif
 	go test -ldflags $(LDFLAGS) -v -timeout 20m -p 1 ./tests/integration/...
 
 ifeq ($(K8S_DISTRO),aks)
+test/integration/ci: manifests generate generate-manifests gotestsum
+else ifeq ($(K8S_DISTRO),eks)
 test/integration/ci: manifests generate generate-manifests gotestsum
 else ifeq ($(K8S_DISTRO),k3d)
 test/integration/ci: manifests generate generate-manifests gotestsum load-k3d

@@ -1,0 +1,138 @@
+name: Cloud tests EKS
+on:
+  workflow_dispatch:
+    inputs:
+      mondooClientImageTag:
+        required: true
+        type: string
+        default: edge-latest-rootless
+        description: The image tag to use for the mondoo client image
+      mondooOperatorImageTag:
+        required: true
+        type: string
+        default: main
+        description: The image tag to use for the mondoo operator image
+      AWS_REGION:
+        required: true
+        type: string
+        default: us-east-2
+        description: AWS region where we create the EKS cluster
+    secrets:
+      MONDOO_CLIENT:
+        required: true
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_CLIENT_SECRET:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+
+env:
+  MONDOO_OPERATOR_IMAGE_TAG: ${{ github.event.inputs.mondooOperatorImageTag }}
+  MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag }}
+
+
+jobs:
+  release-tests-eks:
+    runs-on: ubuntu-latest
+    name: Release tests
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        k8s-version: ["1.22", "1.23"]
+
+    env:
+      TF_VAR_test_name: ${{ env.MONDOO_OPERATOR_IMAGE_TAG }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ github.event.inputs.AWS_REGION }}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
+
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      - run: terraform init
+        working-directory: .github/terraform/aws
+
+      - name: Plan EKS
+        run: terraform plan -out eks-${{ matrix.k8s-version }}.json
+        env:
+          TF_VAR_kubernetes_version: ${{ matrix.k8s-version }}
+        working-directory: .github/terraform/aws
+      
+      - name: Apply EKS
+        run: terraform apply -auto-approve eks-${{ matrix.k8s-version }}.json
+        env:
+          TF_VAR_kubernetes_version: ${{ matrix.k8s-version }}
+        working-directory: .github/terraform/aws
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "${{ env.golang-version }}"
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-test-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-test-
+
+      - name: Store creds
+        run: |
+          echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+
+      - name: Wait a bit for the cluster to become more stable
+        run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
+
+      - name: Run integration tests
+        run: VERSION=${{ env.MONDOO_OPERATOR_IMAGE_TAG }} K8S_DISTRO=eks make test/integration/ci
+
+      - name: Clean up EKS terraform
+        run: terraform destroy -auto-approve
+        working-directory: .github/terraform/aws
+        if: success() || failure()
+
+      - run: mv integration-tests.xml integration-tests-eks-${{ matrix.k8s-version }}.xml
+        if: success() || failure()
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3  # upload test results
+        if: success() || failure()        # run this step even if previous step failed
+        with:                             # upload a combined archive with unit and integration test results
+          name: test-results
+          path: integration-tests-eks-${{ matrix.k8s-version }}.xml
+
+      - name: Upload test logs artifact
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: test-logs-eks-${{ matrix.k8s-version }}
+          path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
+
+  test-report:
+    name: Report test results
+    runs-on: ubuntu-latest
+    needs: [eks-integration-test]
+    steps:
+    - uses: dorny/test-reporter@v1
+      with:
+        artifact: test-results
+        name: Report test results
+        path: '*.xml'                     # Path to test results (inside artifact .zip)
+        reporter: java-junit              # Format of test results
