@@ -47,6 +47,7 @@ jobs:
       ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      KUBECONFIG: ${{ format('{0}/{1}', github.workspace, '.github/terraform/aks/kubeconfig') }}
     
     strategy:
       fail-fast: false
@@ -100,15 +101,13 @@ jobs:
 
       - name: Run integration tests
         run: VERSION=${{ env.MONDOO_OPERATOR_IMAGE_TAG }} K8S_DISTRO=aks make test/integration/ci
-        env:
-          KUBECONFIG: ${{ format('{0}/{1}', github.workspace, '.github/terraform/aks/kubeconfig') }}
 
       - name: Clean up AKS terraform
         run: terraform destroy -auto-approve
         if: success() || failure()
         working-directory: .github/terraform/aks
       
-      - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
+      - run: mv integration-tests.xml integration-tests-aks-${{ matrix.k8s-version }}.xml
         if: success() || failure()
 
       - name: Upload cloud test results
