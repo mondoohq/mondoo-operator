@@ -101,7 +101,7 @@ jobs:
           echo "mondoo status"
           mondoo status || true
           echo "mondoo status w/ export"
-          export $MONDOO_CONFIG_PATH
+          export MONDOO_CONFIG_PATH
           mondoo status || true
           cat creds.json | jq '.api_endpoint' 
           cat creds.json | jq '.space_mrn'
