@@ -199,7 +199,7 @@ jobs:
         uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
-          name: test-results
+          name: cloud-test-results
           path: integration-tests-eks-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
