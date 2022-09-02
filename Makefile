@@ -116,7 +116,7 @@ test/integration: manifests generate generate-manifests load-k3d
 else
 test/integration: manifests generate generate-manifests load-minikube
 endif
-	go test -ldflags $(LDFLAGS) -v -timeout 900s -p 1 ./tests/integration/...
+	go test -ldflags $(LDFLAGS) -v -timeout 20m -p 1 ./tests/integration/...
 
 ifeq ($(K8S_DISTRO),aks)
 test/integration/ci: manifests generate generate-manifests gotestsum
@@ -125,7 +125,7 @@ test/integration/ci: manifests generate generate-manifests gotestsum load-k3d
 else
 test/integration/ci: manifests generate generate-manifests gotestsum load-minikube
 endif
-	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -ldflags $(LDFLAGS) -v -timeout 900s -p 1
+	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -ldflags $(LDFLAGS) -v -timeout 20m -p 1
 
 ##@ Build
 
