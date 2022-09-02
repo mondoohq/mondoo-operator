@@ -95,7 +95,7 @@ jobs:
           which mondoo
           echo $MONDOO_CONFIG_PATH
           ls -l $MONDOO_CONFIG_PATH
-          alias mondoo="mondoo --config $MONDOO_CONFIG_PATH"
+          alias mondoo="mondoo --config ./creds.json"
           echo "mondoo version"
           mondoo version
           #mondoo --config $MONDOO_CONFIG_PATH status
