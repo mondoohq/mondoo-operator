@@ -7,7 +7,7 @@ data "aws_availability_zones" "available" {}
 data "aws_caller_identity" "current" {}
 
 locals {
-  name            = "${var.test_name}-integration-tests-${random_string.suffix.result}"
+  name            = "integration-tests-${random_string.suffix.result}"
   cluster_version = var.kubernetes_version
   default_tags = {
     Name       = local.name
@@ -134,6 +134,8 @@ module "eks" {
   }
 
   iam_role_use_name_prefix = false
+  create_iam_role = false  
+  iam_role_arn = "arn:aws:iam::735798807192:role/AWSEKSClusterRoleTesting"
 
   eks_managed_node_group_defaults = {
     ami_type       = "AL2_x86_64"
@@ -179,7 +181,7 @@ module "eks" {
         max_unavailable_percentage = 50 # or set `max_unavailable`
       }
 
-      description = "${var.test_name} EKS managed node group"
+      description = "EKS managed node group - ${random_string.suffix.result}"
 
       ebs_optimized           = true
       disable_api_termination = false
@@ -199,19 +201,8 @@ module "eks" {
         }
       }
 
-      create_iam_role          = true
-      iam_role_name            = "${var.test_name}-iam-role"
-      iam_role_use_name_prefix = false
-      iam_role_description     = "${var.test_name} EKS managed node group role"
-      iam_role_tags = {
-        Purpose = "Protector of the kubelet"
-      }
-      iam_role_additional_policies = [
-        "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
-        "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
-        "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
-        "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
-      ]
+      create_iam_role = false
+      iam_role_arn    = "arn:aws:iam::735798807192:role/mondoo-operator-eks-tests"
 
     }
   }
@@ -226,7 +217,7 @@ module "eks" {
 resource "aws_kms_key" "eks" {
   description             = "EKS Secret Encryption Key"
   deletion_window_in_days = 7
-  enable_key_rotation     = true
+  enable_key_rotation     = false
 
   tags = local.default_tags
 }
@@ -251,6 +242,6 @@ resource "null_resource" "kubectl_config_update" {
     module.eks
   ]
   provisioner "local-exec" {
-    command = "aws eks --region $(terraform output -raw region) update-kubeconfig --name $(terraform output -raw cluster_name) --kubeconfig ./kubeconfig"
+    command = "aws eks --region ${var.region} update-kubeconfig --name ${module.eks.cluster_id}"
   }
 }

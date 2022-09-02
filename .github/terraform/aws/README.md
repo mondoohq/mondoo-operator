@@ -28,6 +28,75 @@ This folder contains Terraform automation code to provision the following:
 - [Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli) - `~> v1.0.5`
 - [`kubectl`]() - Kubectl must be installed on the host that you run `terraform` from.
 
+### Needed privileges for the AWS user
+
+These are custom policies assigned to the user:
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "iam:PassRole",
+                "iam:GetRole",
+                "iam:CreateOpenIDConnectProvider",
+                "iam:ListAttachedRolePolicies",
+                "iam:TagOpenIDConnectProvider",
+                "iam:GetOpenIDConnectProvider",
+                "iam:DeleteOpenIDConnectProvider"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+```
+
+```json
+{
+    "Statement": [
+        {
+            "Action": [
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ListGrants",
+                "kms:DescribeKey",
+                "kms:ScheduleKeyDeletion",
+                "kms:CreateGrant"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "*"
+            ]
+        }
+    ],
+    "Version": "2012-10-17"
+}
+```
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": "eks:*",
+            "Resource": "*"
+        }
+    ]
+}
+```
+
+Additional roles assigned to the user:
+
+- AmazonEC2FullAccess
+- CloudWatchLogsFullAccess
+- AmazonEKSClusterPolicy
+- AWSKeyManagementServicePowerUser
+
 ## Configuration
 
 Before provisioning set the following environment variables:

@@ -163,13 +163,13 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	listOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(cronJobLabels)}
 	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, cronJobs, listOpts))
 
-	nodes := &corev1.NodeList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodes))
+	nodeList := &corev1.NodeList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodeList))
 
 	// Verify the amount of CronJobs created is equal to the amount of nodes
 	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
 		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, cronJobs, listOpts))
-		if len(nodes.Items) == len(cronJobs.Items) {
+		if len(nodeList.Items) == len(cronJobs.Items) {
 			return true, nil
 		}
 		return false, nil
@@ -177,11 +177,11 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	s.NoErrorf(
 		err,
 		"The amount of node scanning CronJobs is not equal to the amount of cluster nodes. expected: %d; actual: %d",
-		len(nodes.Items), len(cronJobs.Items))
+		len(nodeList.Items), len(cronJobs.Items))
 
 	for _, c := range cronJobs.Items {
 		found := false
-		for _, n := range nodes.Items {
+		for _, n := range nodeList.Items {
 			if n.Name == c.Spec.JobTemplate.Spec.Template.Spec.NodeName {
 				found = true
 			}
@@ -193,8 +193,10 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	selector := utils.LabelsToLabelSelector(cronJobLabels)
 	s.True(s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(selector, auditConfig.Namespace), "Not all CronJobs have run successfully.")
 
-	for _, node := range nodes.Items {
-		err := s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-node-"+node.Name)
+	base := fmt.Sprintf("%s%s", auditConfig.Name, nodes.CronJobNameBase)
+	for _, node := range nodeList.Items {
+		nodeIdentifier := nodes.NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), node.Name)
+		err := s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-node-"+nodeIdentifier)
 		s.NoErrorf(err, "Couldn't find NodeScan Pod for node "+node.Name+" in Podlist of the MondooAuditConfig Status")
 	}
 
