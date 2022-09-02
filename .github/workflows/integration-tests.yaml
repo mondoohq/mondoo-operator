@@ -95,9 +95,14 @@ jobs:
           which mondoo
           echo $MONDOO_CONFIG_PATH
           ls -l $MONDOO_CONFIG_PATH
+          echo "mondoo version"
           mondoo version
           #mondoo --config $MONDOO_CONFIG_PATH status
-          mondoo --config ./creds.json status
+          echo "mondoo status"
+          mondoo status || true
+          echo "mondoo status w/ export"
+          export $MONDOO_CONFIG_PATH
+          mondoo status || true
           cat creds.json | jq '.api_endpoint' 
           cat creds.json | jq '.space_mrn'
           ./scripts/cleanup_operator_assets.sh

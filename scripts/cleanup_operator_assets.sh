@@ -7,7 +7,7 @@ then
 	exit 1
 fi
 
-TOKEN=$(mondoo --config ./creds.json auth generate-api-access-token 2>&1 | grep Bearer | tr -d "[]")
+TOKEN=$(mondoo auth generate-api-access-token 2>&1 | grep Bearer | tr -d "[]")
 if [[ $TOKEN == "" ]]
 then
 	echo "Couldn't get API token!"
