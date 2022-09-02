@@ -127,9 +127,10 @@ jobs:
           name: test-logs-aks-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
 
-  release-tests-eks:
+
+  eks-integration-test:
     runs-on: ubuntu-latest
-    name: Release tests
+    name: EKS integration tests
     
     strategy:
       fail-fast: false
