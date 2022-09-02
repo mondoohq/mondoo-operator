@@ -1,20 +1,20 @@
 #!/bin/bash
 
-SPACE_MRN=$(mondoo status -o json 2>/dev/null | jq '.agent.spaceMrn' -r)
+SPACE_MRN=$(mondoo --config ./creds.json status -o json 2>/dev/null | jq '.agent.spaceMrn' -r)
 if [[ $SPACE_MRN == "" ]]
 then
 	echo "Couldn't fetch spaceMrn from Mondoo status!"
 	exit 1
 fi
 
-TOKEN=$(mondoo auth generate-api-access-token 2>&1 | grep Bearer | tr -d "[]")
+TOKEN=$(mondoo --config ./creds.json auth generate-api-access-token 2>&1 | grep Bearer | tr -d "[]")
 if [[ $TOKEN == "" ]]
 then
 	echo "Couldn't get API token!"
 	exit 1
 fi
 
-API_ENDPOINT=$(mondoo status -o json 2>/dev/null | jq '.api.endpoint' -r)
+API_ENDPOINT=$(mondoo --config ./creds.json status -o json 2>/dev/null | jq '.api.endpoint' -r)
 if [[ $API_ENDPOINT == "" ]]
 then
 	echo "Couldn't get API endpoint!"
@@ -49,7 +49,7 @@ ASSET_QUERY="$ASSET_QUERY
 }"
 echo $ASSET_QUERY > /tmp/mondoo_asset_query.json
 
-/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_asset_query.json $API_ENDPOINT/query | jq
+echo "Get MRNs"
 MRNS=$(/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_asset_query.json $API_ENDPOINT/query | jq '.data.assets.edges[].node.mrn' -r | xargs -I{} echo "\"{}\"," | tr -d "\n")
 
 echo "Going to delete these assets:"
@@ -73,5 +73,4 @@ DELETE_QUERY="$DELETE_QUERY
 }"
 
 echo $DELETE_QUERY > /tmp/mondoo_delete_query.json
-echo $DELETE_QUERY
 #/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_delete_query.json $API_ENDPOINT/query | jq
