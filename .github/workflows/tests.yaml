@@ -49,16 +49,16 @@ jobs:
       - uses: actions/checkout@v3
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
-      - name: Setup Mondoo
-        uses: mondoohq/actions/setup@main
-        with:
-          args: status
-          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
-      - name: Scan terraform with Mondoo
+      - name: Scan AWS terraform with Mondoo
         uses: mondoohq/actions/terraform@main
         with:
           service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
-          path: ".github/terraform/*"
+          path: ".github/terraform/aws/main.tf"
+      - name: Scan Azure terraform with Mondoo
+        uses: mondoohq/actions/terraform@main
+        with:
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
+          path: ".github/terraform/aks/main.tf"
       - name: Generate manifests
         run: make generate-manifests IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE }}'
       - name: Scan Kubernetes Manifest with Mondoo
