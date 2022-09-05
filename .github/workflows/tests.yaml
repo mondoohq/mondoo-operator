@@ -46,6 +46,7 @@ jobs:
       - name: Setup Mondoo
         uses: mondoohq/actions/setup@main
         with:
+          args: status
           service_account_credentials: ${{ secrets.MONDOO_CLIENT }}
       - name: Scan terraform with Mondoo
         uses: mondoohq/actions@main
