@@ -47,11 +47,11 @@ jobs:
         uses: mondoohq/actions/setup@main
         with:
           args: status
-          service_account_credentials: ${{ secrets.MONDOO_CLIENT }}
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
       - name: Scan terraform with Mondoo
         uses: mondoohq/actions@main
         with:
-          service_account_credentials: ${{ secrets.MONDOO_CLIENT }}
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
           scan_type: terraform
           path: ".github/terraform"
       - name: Generate manifests
@@ -59,13 +59,13 @@ jobs:
       - name: Scan Kubernetes Manifest with Mondoo
         uses: mondoohq/actions@main
         with:
-          service_account_credentials: ${{ secrets.MONDOO_CLIENT }}
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
           scan_type: k8s
           path: "mondoo-operator-manifests.yaml"
       - name: Scan Dockerfile with Mondoo
         uses: mondoohq/actions@main
         with:
-          service_account_credentials: ${{ secrets.MONDOO_CLIENT }}
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
           scan_type: docker_image_from_dockerfile
           path: Dockerfile
       - uses: actions/upload-artifact@v3  # upload test results
