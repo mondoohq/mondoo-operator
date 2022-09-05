@@ -39,6 +39,12 @@ jobs:
     needs: [unit-tests]
     runs-on: ubuntu-latest
     name: Security tests
+    env:
+      # Use docker.io for Docker Hub if empty
+      REGISTRY: ghcr.io
+      # github.repository as <account>/<repo>
+      IMAGE_NAME: ${{ github.repository }}
+      RELEASE: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v3
       - name: Import environment variables from file
@@ -52,7 +58,7 @@ jobs:
         uses: mondoohq/actions/terraform@main
         with:
           service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
-          path: ".github/terraform"
+          path: ".github/terraform/*"
       - name: Generate manifests
         run: make generate-manifests IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE }}'
       - name: Scan Kubernetes Manifest with Mondoo
