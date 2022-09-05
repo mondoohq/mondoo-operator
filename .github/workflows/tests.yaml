@@ -66,11 +66,6 @@ jobs:
         with:
           service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
           path: "mondoo-operator-manifests.yaml"
-      - uses: actions/upload-artifact@v3  # upload test results
-        if: success() || failure()        # run this step even if previous step failed
-        with:
-          name: test-results
-          path: security-tests.xml
   integration-tests:
     needs: [unit-tests]
     uses: ./.github/workflows/integration-tests.yaml
