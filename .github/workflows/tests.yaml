@@ -49,25 +49,17 @@ jobs:
           args: status
           service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
       - name: Scan terraform with Mondoo
-        uses: mondoohq/actions@main
+        uses: mondoohq/actions/terraform@main
         with:
           service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
-          scan_type: terraform
           path: ".github/terraform"
       - name: Generate manifests
         run: make generate-manifests IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE }}'
       - name: Scan Kubernetes Manifest with Mondoo
-        uses: mondoohq/actions@main
+        uses: mondoohq/actions/k8s-manifest@main
         with:
           service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
-          scan_type: k8s
           path: "mondoo-operator-manifests.yaml"
-      - name: Scan Dockerfile with Mondoo
-        uses: mondoohq/actions@main
-        with:
-          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
-          scan_type: docker_image_from_dockerfile
-          path: Dockerfile
       - uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:
