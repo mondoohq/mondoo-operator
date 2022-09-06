@@ -238,20 +238,23 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
-        test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
 GOTESTSUM = $(LOCALBIN)/gotestsum
-gotestsum: $(LOCALBIN) ## Download gotestsum locally if necessary.
-        test -s $(LOCALBIN)/gotestsum || GOBIN=$(LOCALBIN) go install gotest.tools/gotestsum@latest
+gotestsum: $(GOTESTSUM) ## Download gotestsum locally if necessary.
+$(GOTESTSUM): $(LOCALBIN)
+	test -s $(LOCALBIN)/gotestsum || GOBIN=$(LOCALBIN) go install gotest.tools/gotestsum@latest
 
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
-golangci-lint: $(LOCALBIN) ## Download golangci-lint locally if necessary.
-        test -s $(LOCALBIN)/golangci-lint || GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.48
+golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
+$(GOLANGCI_LINT): $(LOCALBIN)
+	test -s $(LOCALBIN)/golangci-lint || GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.48
 
 GOMOCKGEN = $(LOCALBIN)/mockgen
 .PHONY: gomockgen
-gomockgen: $(LOCALBIN) ## Download go mockgen locally if necessary.
-        test -s $(LOCALBIN)/mockgen || GOBIN=$(LOCALBIN) go install github.com/golang/mock/mockgen@v1.6.0
+gomockgen: $(GOMOCKGEN) ## Download go mockgen locally if necessary.
+$(GOMOCKGEN): $(LOCALBIN)
+	test -s $(LOCALBIN)/mockgen || GOBIN=$(LOCALBIN) go install github.com/golang/mock/mockgen@v1.6.0
 
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 
