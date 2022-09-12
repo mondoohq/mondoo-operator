@@ -27,6 +27,8 @@ on:
         required: true
       AWS_SECRET_ACCESS_KEY:
         required: true
+      GCP_SERVICE_ACCOUNT:
+        required: true
 
 env:
   MONDOO_OPERATOR_IMAGE_TAG: ${{ github.event.inputs.mondooOperatorImageTag }}
@@ -72,6 +74,8 @@ jobs:
 
       - name: Terraform apply
         run: terraform apply -auto-approve aks-${{ matrix.k8s-version }}.json
+        env:
+          TF_VAR_k8s_version: ${{ matrix.k8s-version }}
         working-directory: .github/terraform/aks
 
       - uses: actions/setup-go@v2
@@ -120,8 +124,6 @@ jobs:
         with:
           name: test-logs-aks-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
-
-
 
   eks-integration-test:
     runs-on: ubuntu-latest
@@ -209,10 +211,101 @@ jobs:
           name: test-logs-eks-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
 
+  gke-integration-test:
+    runs-on: ubuntu-latest
+    name: GKE integration tests
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        k8s-version: ["1.23"]
+
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ format('{0}/{1}', github.workspace, 'gcp_sa.json') }}
+      KUBECONFIG: ${{ format('{0}/{1}', github.workspace, '.github/terraform/gke/kubeconfig') }}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
+
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+
+      - name: Setup GCP service account
+        run: echo ${{ secrets.GCP_SERVICE_ACCOUNT }} > gcp_sa.json
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      - run: terraform init
+        working-directory: .github/terraform/gke
+
+      - name: Plan GKE
+        run: terraform plan -out gke-${{ matrix.k8s-version }}.json
+        env:
+          TF_VAR_k8s_version: ${{ matrix.k8s-version }}
+        working-directory: .github/terraform/gke
+      
+      - name: Apply GKE
+        run: terraform apply -auto-approve gke-${{ matrix.k8s-version }}.json
+        env:
+          TF_VAR_k8s_version: ${{ matrix.k8s-version }}
+        working-directory: .github/terraform/gke
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "${{ env.golang-version }}"
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-test-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-test-
+
+      - name: Store creds
+        run: |
+          echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+
+      - name: Wait a bit for the cluster to become more stable
+        run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
+
+      - name: Run integration tests
+        run: VERSION=${{ env.MONDOO_OPERATOR_IMAGE_TAG }} K8S_DISTRO=gke make test/integration/ci
+
+      - name: Clean up GKE terraform
+        run: terraform destroy -auto-approve
+        working-directory: .github/terraform/gke
+        if: success() || failure()
+
+      - name: Cleanup GCP service account
+        run: rm gcp_sa.json
+        if: success() || failure()
+
+      - run: mv integration-tests.xml integration-tests-gke-${{ matrix.k8s-version }}.xml
+        if: success() || failure()
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3  # upload test results
+        if: success() || failure()        # run this step even if previous step failed
+        with:                             # upload a combined archive with unit and integration test results
+          name: cloud-test-results
+          path: integration-tests-gke-${{ matrix.k8s-version }}.xml
+
+      - name: Upload test logs artifact
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: test-logs-gke-${{ matrix.k8s-version }}
+          path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
+
   test-report:
     name: Report test results
     runs-on: ubuntu-latest
-    needs: [eks-integration-test,aks-integration-test]
+    needs: [eks-integration-test,aks-integration-test,gke-integration-test]
     if: always()
     steps:
     - uses: actions/checkout@v3
