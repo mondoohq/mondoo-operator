@@ -4,6 +4,6 @@ variable "k8s_version" {
 }
 
 variable "project_id" {
-  default     = "mondoo-dev-262313"
+  default     = "mondoo-operator-testing"
   description = "The GCP project ID in which the cluster will be created."
 }
