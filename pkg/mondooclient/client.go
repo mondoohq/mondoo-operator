@@ -213,6 +213,10 @@ func (s *mondooClient) RunKubernetesManifest(ctx context.Context, in *Kubernetes
 type KubernetesManifestJob struct {
 	Files  []*File           `json:"files,omitempty"`
 	Labels map[string]string `json:"labels,omitempty"`
+	// Additional options for the manifest job
+	Options map[string]string `json:"options,omitempty"`
+	// Additional discovery settings for the manifest job
+	Discovery *inventory.Discovery `json:"discovery,omitempty"`
 }
 
 type File struct {
