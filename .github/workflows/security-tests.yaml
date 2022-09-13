@@ -1,0 +1,57 @@
+name: Security Tests
+on:
+  workflow_call:
+    secrets:
+      MONDOO_CLIENT:
+        required: true
+
+jobs:
+  security-tests:
+    runs-on: ubuntu-latest
+    name: Security tests
+    if: |
+      (
+        github.event_name == 'pull_request'
+        && (
+          github.actor == 'dependabot[bot]'
+          || github.actor == 'imilchev'
+          || github.actor == 'joelddiaz'
+          || github.actor == 'tas50'
+          || github.actor == 'chris-rock'
+          || github.actor == 'misterpantz'
+          || github.actor == 'scottford-io'
+          || github.actor == 'atomic111'
+          || github.actor == 'czunker'
+        )
+      )
+      || (contains(github.event.pull_request.labels.*.name, 'safe to test'))
+    env:
+      # Use docker.io for Docker Hub if empty
+      REGISTRY: ghcr.io
+      # github.repository as <account>/<repo>
+      IMAGE_NAME: ${{ github.repository }}
+      RELEASE: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+      - name: Scan AWS terraform with Mondoo
+        uses: mondoohq/actions/terraform@main
+        with:
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
+          path: ".github/terraform/aws/main.tf"
+      - name: Scan Azure terraform with Mondoo
+        uses: mondoohq/actions/terraform@main
+        with:
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
+          path: ".github/terraform/aks/main.tf"
+      - name: Generate manifests
+        run: make generate-manifests IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE }}'
+      - name: Scan Kubernetes Manifest with Mondoo
+        uses: mondoohq/actions/k8s-manifest@main
+        with:
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
+          path: "mondoo-operator-manifests.yaml"

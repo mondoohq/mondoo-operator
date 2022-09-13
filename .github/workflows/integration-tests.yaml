@@ -17,6 +17,22 @@ jobs:
   integration-tests:
     runs-on: ubuntu-latest
     name: Integration tests
+    if: |
+      (
+        github.event_name == 'pull_request'
+        && (
+          github.actor == 'dependabot[bot]'
+          || github.actor == 'imilchev'
+          || github.actor == 'joelddiaz'
+          || github.actor == 'tas50'
+          || github.actor == 'chris-rock'
+          || github.actor == 'misterpantz'
+          || github.actor == 'scottford-io'
+          || github.actor == 'atomic111'
+          || github.actor == 'czunker'
+        )
+      )
+      || (contains(github.event.pull_request.labels.*.name, 'safe to test'))
     
     strategy:
       fail-fast: false
@@ -27,6 +43,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
           fetch-depth: 0 # fetch is nneded for "git tag --list" in the Makefile
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
