@@ -18,6 +18,8 @@ import (
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
+	"go.mondoo.com/mondoo-operator/pkg/inventory"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/webhooks/utils"
 )
@@ -118,14 +120,22 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		return
 	}
 
-	result, err := a.scanner.RunKubernetesManifest(ctx, &mondooclient.KubernetesManifestJob{
+	scanJob := &mondooclient.KubernetesManifestJob{
 		Files: []*mondooclient.File{
 			{
 				Data: k8sObjectData,
 			},
 		},
 		Labels: k8sLabels,
-	})
+	}
+	if feature_flags.GetEnableWorkloadDiscovery() {
+		scanJob.Options = map[string]string{"all-namespaces": "true"}
+		scanJob.Discovery = &inventory.Discovery{
+			Targets: []string{"pods", "deployments", "daemonsets", "statefulsets", "replicasets", "jobs", "cronjobs"},
+		}
+	}
+
+	result, err := a.scanner.RunKubernetesManifest(ctx, scanJob)
 	if err != nil {
 		handlerlog.Error(err, "error returned from scan request")
 		return

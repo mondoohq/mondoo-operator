@@ -21,6 +21,7 @@ import (
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
+	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 )
 
 const (
@@ -108,6 +109,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 								InitialDelaySeconds: int32(15),
 								PeriodSeconds:       int32(20),
 							},
+							Env:  feature_flags.AllFeatureFlagsAsEnv(),
 							Name: "webhook",
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
