@@ -20,7 +20,10 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceRoot}/cmd/mondoo-operator/main.go",
-            "args": ["operator"]
+            "args": ["operator"],
+            "env": {
+                "MONDOO_NAMESPACE_OVERRIDE": "mondoo-operator"
+            }
         }
     ]
 }

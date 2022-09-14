@@ -25,6 +25,7 @@ import (
 	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers"
 	"go.mondoo.com/mondoo-operator/controllers/integration"
+	"go.mondoo.com/mondoo-operator/controllers/resource_monitor"
 	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
@@ -115,6 +116,11 @@ func init() {
 			Scheme: mgr.GetScheme(),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "MondooOperatorConfig")
+			return err
+		}
+
+		if err = resource_monitor.RegisterResourceMonitors(mgr); err != nil {
+			setupLog.Error(err, "unable to register resource monitors", "controller", "resource_monitor")
 			return err
 		}
 
