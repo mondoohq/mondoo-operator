@@ -34,6 +34,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/admission"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
+	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -53,6 +54,7 @@ type MondooAuditConfigReconciler struct {
 	MondooAuditConfig      *v1alpha2.MondooAuditConfig
 	StatusReporter         *status.StatusReporter
 	RunningOnOpenShift     bool
+	ScanApiStore           scan_api_store.ScanApiStore
 }
 
 // so we can mock out the mondoo client for testing
@@ -252,6 +254,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: r.ContainerImageResolver,
+		ScanApiStore:           r.ScanApiStore,
 	}
 
 	result, reconcileError = workloads.Reconcile(ctx)

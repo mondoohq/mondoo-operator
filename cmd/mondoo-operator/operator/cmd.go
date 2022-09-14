@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -8,6 +9,7 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -22,15 +24,19 @@ import (
 	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers"
 	"go.mondoo.com/mondoo-operator/controllers/integration"
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor"
+	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
+	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -101,12 +107,19 @@ func init() {
 			return err
 		}
 
+		scanApiStore := scan_api_store.NewScanApiStore()
+		go scanApiStore.Start()
+		if err := preloadScanApiUrls(scanApiStore, scheme, setupLog); err != nil {
+			setupLog.Error(err, "failed to preload scan API URLs")
+			return err
+		}
 		if err = (&controllers.MondooAuditConfigReconciler{
 			Client:                 mgr.GetClient(),
 			MondooClientBuilder:    controllers.MondooClientBuilder,
 			ContainerImageResolver: mondoo.NewContainerImageResolver(isOpenShift),
 			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder, v),
 			RunningOnOpenShift:     isOpenShift,
+			ScanApiStore:           scanApiStore,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "MondooAuditConfig")
 			return err
@@ -119,7 +132,7 @@ func init() {
 			return err
 		}
 
-		if err = resource_monitor.RegisterResourceMonitors(mgr); err != nil {
+		if err = resource_monitor.RegisterResourceMonitors(mgr, scanApiStore); err != nil {
 			setupLog.Error(err, "unable to register resource monitors", "controller", "resource_monitor")
 			return err
 		}
@@ -175,4 +188,31 @@ func preflightApiChecks(log logr.Logger) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func preloadScanApiUrls(scanApiStore scan_api_store.ScanApiStore, scheme *runtime.Scheme, log logr.Logger) error {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		log.Error(err, "unable to get k8s config")
+		return err
+	}
+
+	k8s, err := client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		log.Error(err, "unable to create k8s client")
+		return err
+	}
+
+	ctx := context.Background()
+	auditConfigs := &v1alpha2.MondooAuditConfigList{}
+	if err := k8s.List(ctx, auditConfigs); err != nil {
+		return err
+	}
+
+	for _, auditConfig := range auditConfigs.Items {
+		if auditConfig.Spec.KubernetesResources.Enable {
+			scanApiStore.Add(scanapi.ScanApiServiceUrl(auditConfig))
+		}
+	}
+	return nil
 }
