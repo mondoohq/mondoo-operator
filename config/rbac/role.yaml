@@ -20,7 +20,10 @@ rules:
 - apiGroups:
   - apps
   resources:
+  - daemonsets
   - deployments
+  - replicasets
+  - statefulsets
   verbs:
   - create
   - delete
@@ -33,6 +36,7 @@ rules:
   - batch
   resources:
   - cronjobs
+  - jobs
   verbs:
   - create
   - delete
@@ -69,13 +73,9 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - daemonsets
-  - jobs
   - namespaces
   - nodes
   - pods
-  - replicasets
-  - statefulsets
   verbs:
   - get
   - list
@@ -87,15 +87,6 @@ rules:
   verbs:
   - create
   - delete
-- apiGroups:
-  - ""
-  resourceNames:
-  - mondoo-client
-  - mondoo-private-registries-secrets
-  - mondoo-token
-  resources:
-  - secrets
-  verbs:
   - get
 - apiGroups:
   - ""

@@ -9,6 +9,7 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 package debouncer
 
 import (
+	"context"
 	"time"
 
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
@@ -42,11 +43,15 @@ func (d *debouncer) Start() {
 		case res := <-d.resChan:
 			d.resources[res] = struct{}{}
 		case <-time.After(5 * time.Second):
-			urls := d.scanApiStore.GetAll()
+			clients := d.scanApiStore.GetAll()
+			ctx := context.Background()
 
 			for res := range d.resources {
-				for _, u := range urls {
-					logger.Info("Reconciling change", "request", res, "url", u)
+				for _, c := range clients {
+					logger.Info("Reconciling change", "request", res, "url", c)
+					if _, err := c.Client.ScheduleKubernetesResourceScan(ctx, c.IntegrationMrn, res); err != nil {
+						logger.Error(err, "Failed to schedule resource scan", "request", res)
+					}
 				}
 			}
 			d.resources = make(map[string]struct{})

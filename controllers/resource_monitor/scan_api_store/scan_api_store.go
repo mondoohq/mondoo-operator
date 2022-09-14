@@ -8,9 +8,27 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 package scan_api_store
 
-import "sigs.k8s.io/controller-runtime/pkg/log"
+import (
+	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+)
 
 var logger = log.Log.WithName("scan-api-store")
+
+type ScanApiStore interface {
+	Start()
+	// Add adds a scan api url to the store. The operatorion is idempotent.
+	Add(url, token, integrationMrn string)
+	// Delete deletes a scan api url from the store. The operatorion is idempotent.
+	Delete(url string)
+	// GetAll returns all scan api urls.
+	GetAll() []ClientConfiguration
+}
+
+type ClientConfiguration struct {
+	Client         mondooclient.Client
+	IntegrationMrn string
+}
 
 type requestType string
 
@@ -20,15 +38,10 @@ const (
 )
 
 type urlRequest struct {
-	requestType requestType
-	url         string
-}
-
-type ScanApiStore interface {
-	Start()
-	Add(url string)
-	Delete(url string)
-	GetAll() []string
+	requestType    requestType
+	url            string
+	token          string
+	integrationMrn string
 }
 
 type scanApiStore struct {
@@ -39,16 +52,18 @@ type scanApiStore struct {
 	getChan chan struct{}
 
 	// outChan is used to return all scan api urls
-	outChan     chan []string
-	scanApiUrls map[string]struct{}
+	outChan             chan []ClientConfiguration
+	scanClients         map[string]ClientConfiguration
+	mondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
 }
 
 func NewScanApiStore() ScanApiStore {
 	return &scanApiStore{
-		urlReqChan:  make(chan urlRequest),
-		getChan:     make(chan struct{}),
-		outChan:     make(chan []string),
-		scanApiUrls: make(map[string]struct{}),
+		urlReqChan:          make(chan urlRequest),
+		getChan:             make(chan struct{}),
+		outChan:             make(chan []ClientConfiguration),
+		scanClients:         make(map[string]ClientConfiguration),
+		mondooClientBuilder: mondooclient.NewClient,
 	}
 }
 
@@ -58,27 +73,33 @@ func (s *scanApiStore) Start() {
 		case req := <-s.urlReqChan:
 			switch req.requestType {
 			case AddRequest:
-				s.scanApiUrls[req.url] = struct{}{}
+				s.scanClients[req.url] = ClientConfiguration{
+					Client: s.mondooClientBuilder(
+						mondooclient.ClientOptions{ApiEndpoint: req.url, Token: req.token}),
+					IntegrationMrn: req.integrationMrn,
+				}
 			case DeleteRequest:
-				delete(s.scanApiUrls, req.url)
+				delete(s.scanClients, req.url)
 			default:
 				logger.Error(nil, "Unknown request type", "requestType", req.requestType)
 			}
 		case <-s.getChan:
-			urls := make([]string, 0, len(s.scanApiUrls))
-			for u := range s.scanApiUrls {
-				urls = append(urls, u)
+			clients := make([]ClientConfiguration, 0, len(s.scanClients))
+			for _, c := range s.scanClients {
+				clients = append(clients, c)
 			}
-			s.outChan <- urls
+			s.outChan <- clients
 		}
 	}
 }
 
 // Add adds a scan api url to the store. The operatorion is idempotent.
-func (s *scanApiStore) Add(url string) {
+func (s *scanApiStore) Add(url, token, integrationMrn string) {
 	s.urlReqChan <- urlRequest{
-		requestType: AddRequest,
-		url:         url,
+		requestType:    AddRequest,
+		url:            url,
+		token:          token,
+		integrationMrn: integrationMrn,
 	}
 }
 
@@ -91,7 +112,7 @@ func (s *scanApiStore) Delete(url string) {
 }
 
 // GetAll returns all scan api urls.
-func (s *scanApiStore) GetAll() []string {
+func (s *scanApiStore) GetAll() []ClientConfiguration {
 	s.getChan <- struct{}{}
 	return <-s.outChan
 }

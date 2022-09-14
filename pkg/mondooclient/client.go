@@ -39,6 +39,7 @@ type Client interface {
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	RunKubernetesManifest(context.Context, *KubernetesManifestJob) (*ScanResult, error)
 	ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool) (*ScanResult, error)
+	ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey string) (*Empty, error)
 
 	IntegrationRegister(context.Context, *IntegrationRegisterInput) (*IntegrationRegisterOutput, error)
 	IntegrationCheckIn(context.Context, *IntegrationCheckInInput) (*IntegrationCheckInOutput, error)
@@ -299,6 +300,67 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationM
 	}
 
 	out := &ScanResult{}
+	if err = json.Unmarshal(respBodyBytes, out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal proto response: %v", err)
+	}
+
+	return out, nil
+}
+
+type Empty struct{}
+
+const ScheduleKubernetesResourceScanEndpoint = "/Scan/Schedule"
+
+func (s *mondooClient) ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey string) (*Empty, error) {
+	url := s.ApiEndpoint + ScheduleKubernetesResourceScanEndpoint
+	scanJob := ScanJob{
+		ReportType: ReportType_ERROR,
+		Inventory: inventory.MondooInventory{
+			Spec: inventory.MondooInventorySpec{
+				Assets: []inventory.Asset{
+					{
+						Connections: []inventory.TransportConfig{
+							{
+								Backend: inventory.TransportBackend_CONNECTION_K8S,
+								Options: map[string]string{
+									"k8s-resources": resourceKey,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if integrationMrn != "" {
+		if scanJob.Inventory.Spec.Assets[0].Labels == nil {
+			scanJob.Inventory.Spec.Assets[0].Labels = make(map[string]string)
+		}
+		scanJob.Inventory.Spec.Assets[0].Labels[constants.MondooAssetsIntegrationLabel] = integrationMrn
+	}
+
+	if feature_flags.GetEnableWorkloadDiscovery() {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Options["all-namespaces"] = "true"
+	}
+
+	if feature_flags.GetEnableWorkloadDiscovery() {
+		// We cannot discover "all" because that includes container images.
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets,
+			"pods", "deployments", "daemonsets", "statefulsets", "replicasets", "jobs", "cronjobs")
+	}
+
+	reqBodyBytes, err := json.Marshal(scanJob)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	respBodyBytes, err := s.request(ctx, url, reqBodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	out := &Empty{}
 	if err = json.Unmarshal(respBodyBytes, out); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal proto response: %v", err)
 	}

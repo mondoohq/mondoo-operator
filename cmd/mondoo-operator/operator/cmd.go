@@ -14,6 +14,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -197,7 +198,7 @@ func preloadScanApiUrls(scanApiStore scan_api_store.ScanApiStore, scheme *runtim
 		return err
 	}
 
-	k8s, err := client.New(cfg, client.Options{Scheme: scheme})
+	kubeClient, err := client.New(cfg, client.Options{Scheme: scheme})
 	if err != nil {
 		log.Error(err, "unable to create k8s client")
 		return err
@@ -205,13 +206,24 @@ func preloadScanApiUrls(scanApiStore scan_api_store.ScanApiStore, scheme *runtim
 
 	ctx := context.Background()
 	auditConfigs := &v1alpha2.MondooAuditConfigList{}
-	if err := k8s.List(ctx, auditConfigs); err != nil {
+	if err := kubeClient.List(ctx, auditConfigs); err != nil {
 		return err
 	}
 
 	for _, auditConfig := range auditConfigs.Items {
 		if auditConfig.Spec.KubernetesResources.Enable {
-			scanApiStore.Add(scanapi.ScanApiServiceUrl(auditConfig))
+			secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: scanapi.TokenSecretName(auditConfig.Name), Namespace: auditConfig.Namespace}}
+			if err := kubeClient.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+				log.Error(err, "Failed to get scanapi secret", "namespace", secret.Namespace, "name", secret.Name)
+				return err
+			}
+			integrationMrn, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, kubeClient, auditConfig)
+			if err != nil {
+				log.Error(err,
+					"failed to retrieve integration-mrn for MondooAuditConfig", "namespace", auditConfig, "name", auditConfig.Name)
+				return err
+			}
+			scanApiStore.Add(scanapi.ScanApiServiceUrl(auditConfig), string(secret.Data["token"]), integrationMrn)
 		}
 	}
 	return nil
