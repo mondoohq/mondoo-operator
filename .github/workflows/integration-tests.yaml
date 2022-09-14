@@ -18,22 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     name: Integration tests
     if: |
-      (
-        github.event_name == 'pull_request'
-        && (
-          github.actor == 'dependabot[bot]'
-          || github.actor == 'imilchev'
-          || github.actor == 'joelddiaz'
-          || github.actor == 'tas50'
-          || github.actor == 'chris-rock'
-          || github.actor == 'misterpantz'
-          || github.actor == 'scottford-io'
-          || github.actor == 'atomic111'
-          || github.actor == 'czunker'
-        )
-      )
-      || (contains(github.event.pull_request.labels.*.name, 'safe to test'))
-    
+      ! github.event.pull_request.head.repo.fork ||
+      (github.event.pull_request.head.repo.fork && github.actor == 'dependabot[bot]') ||
+      (github.event.pull_request.head.repo.fork && contains(github.event.pull_request.labels.*.name, 'safe to test')
     strategy:
       fail-fast: false
       matrix:
