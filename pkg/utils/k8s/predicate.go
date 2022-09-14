@@ -47,10 +47,7 @@ func (p CreateUpdateEventsPredicate) Create(e event.CreateEvent) bool {
 func (p CreateUpdateEventsPredicate) Update(e event.UpdateEvent) bool {
 	// If the deletion timestamp is set, the object is being deleted so we
 	// can ignore the event.
-	if e.ObjectNew.GetDeletionTimestamp() != nil {
-		return false
-	}
-	return true
+	return e.ObjectNew.GetDeletionTimestamp() == nil
 }
 
 func (p CreateUpdateEventsPredicate) Delete(e event.DeleteEvent) bool {

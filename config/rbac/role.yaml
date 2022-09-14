@@ -69,9 +69,13 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - daemonsets
+  - jobs
   - namespaces
   - nodes
   - pods
+  - replicasets
+  - statefulsets
   verbs:
   - get
   - list

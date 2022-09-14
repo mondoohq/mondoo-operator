@@ -67,7 +67,7 @@ var MondooClientBuilder = mondooclient.NewClient
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=pods;namespaces;nodes,verbs=get;list;watch
+//+kubebuilder:rbac:groups=core,resources=pods;jobs;replicasets;statefulsets;daemonsets;namespaces;nodes,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // Just neeed to be able to create a Secret to hold the generated ScanAPI token
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=create;delete
