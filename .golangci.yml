@@ -1,0 +1,6 @@
+linters:
+  enable:
+    - gofumpt
+
+run:
+  go: '1.19'

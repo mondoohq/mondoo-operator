@@ -111,7 +111,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 lint: golangci-lint
-	$(GOLANGCI_LINT) run --enable gofumpt
+	$(GOLANGCI_LINT) run
 
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) --arch=amd64 use $(ENVTEST_K8S_VERSION) -p path)" go test $(UNIT_TEST_PACKAGES) -coverprofile cover.out
@@ -248,7 +248,7 @@ $(GOTESTSUM): $(LOCALBIN)
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
-	test -s $(LOCALBIN)/golangci-lint || GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.48
+	test -s $(LOCALBIN)/golangci-lint || GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.49
 
 GOMOCKGEN = $(LOCALBIN)/mockgen
 .PHONY: gomockgen
