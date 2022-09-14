@@ -17,10 +17,7 @@ jobs:
   integration-tests:
     runs-on: ubuntu-latest
     name: Integration tests
-    if: |
-      ! github.event.pull_request.head.repo.fork ||
-      (github.event.pull_request.head.repo.fork && github.actor == 'dependabot[bot]') ||
-      (github.event.pull_request.head.repo.fork && contains(github.event.pull_request.labels.*.name, 'safe to test'))
+    if: ! github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]'
     strategy:
       fail-fast: false
       matrix:
