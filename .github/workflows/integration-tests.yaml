@@ -20,7 +20,7 @@ jobs:
     if: |
       ! github.event.pull_request.head.repo.fork ||
       (github.event.pull_request.head.repo.fork && github.actor == 'dependabot[bot]') ||
-      (github.event.pull_request.head.repo.fork && contains(github.event.pull_request.labels.*.name, 'safe to test')
+      (github.event.pull_request.head.repo.fork && contains(github.event.pull_request.labels.*.name, 'safe to test'))
     strategy:
       fail-fast: false
       matrix:
