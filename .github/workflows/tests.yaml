@@ -1,7 +1,6 @@
 name: Unit Tests
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
+  pull_request_target:
   push:
     paths-ignore:
       - 'docs/**'
@@ -9,16 +8,16 @@ on:
       - "main"
     tags: ["v*.*.*"]
 
-################################################################################
-# These Jobs do not have access to secrets!
-# Only the re-usable workflows called below have access to secrets.
-################################################################################
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]' || !github.event.pull_request.head.repo.fork
     name: Unit tests
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
       - uses: actions/setup-go@v2
