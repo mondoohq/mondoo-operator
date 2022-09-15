@@ -25,6 +25,7 @@ func init() {
 	integrationMrn := Cmd.Flags().String("integration-mrn", "", "The Mondoo integration MRN to label scanned items with if the MondooAuditConfig is configured with Mondoo integration.")
 	scanContainerImages := Cmd.Flags().Bool("scan-container-images", false, "A value indicating whether to scan container images.")
 	timeout := Cmd.Flags().Int64("timeout", 0, "The timeout in minutes for the scan request.")
+	setManagedBy := Cmd.Flags().String("set-managed-by", "", "String to set the ManagedBy field for scanned/discovered assets")
 
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(logger.NewLogger())
@@ -55,7 +56,7 @@ func init() {
 		logger.Info("triggering Kubernetes resources scan")
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration((*timeout))*time.Minute)
 		defer cancel()
-		res, err := client.ScanKubernetesResources(ctx, *integrationMrn, *scanContainerImages)
+		res, err := client.ScanKubernetesResources(ctx, *integrationMrn, *scanContainerImages, *setManagedBy)
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				logger.Error(err, "failed to receive a response before the timeout was exceeded", "timeout", *timeout)

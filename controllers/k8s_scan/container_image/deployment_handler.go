@@ -60,8 +60,14 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
+	clusterUid, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
+	if err != nil {
+		logger.Error(err, "Failed to get cluster's UID")
+		return err
+	}
+
 	existing := &batchv1.CronJob{}
-	desired := CronJob(mondooClientImage, integrationMrn, *n.Mondoo)
+	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, *n.Mondoo)
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 		return err

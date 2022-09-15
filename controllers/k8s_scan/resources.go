@@ -24,7 +24,7 @@ import (
 
 const CronJobNameSuffix = "-k8s-scan"
 
-func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
@@ -41,6 +41,15 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 
 	if integrationMrn != "" {
 		containerArgs = append(containerArgs, []string{"--integration-mrn", integrationMrn}...)
+	}
+
+	// use the clusterUid to uniquely set the managedBy field on assets managed by this instance of the mondoo-operator
+	if clusterUid == "" {
+		logger.Info("no clusterUid provided, will not set ManagedBy field on scanned/discovered assets")
+	} else {
+		scannedAssetsManagedBy := "mondoo-operator-" + clusterUid
+
+		containerArgs = append(containerArgs, []string{"--set-managed-by", scannedAssetsManagedBy}...)
 	}
 
 	return &batchv1.CronJob{

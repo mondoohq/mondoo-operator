@@ -38,7 +38,7 @@ type Client interface {
 
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	RunKubernetesManifest(context.Context, *KubernetesManifestJob) (*ScanResult, error)
-	ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool) (*ScanResult, error)
+	ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool, managedBy string) (*ScanResult, error)
 	ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey string) (*Empty, error)
 
 	IntegrationRegister(context.Context, *IntegrationRegisterInput) (*IntegrationRegisterOutput, error)
@@ -242,7 +242,7 @@ type Score struct {
 
 const ScanKubernetesResourcesEndpoint = "/Scan/Run"
 
-func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool) (*ScanResult, error) {
+func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool, managedBy string) (*ScanResult, error) {
 	url := s.ApiEndpoint + ScanKubernetesResourcesEndpoint
 	scanJob := ScanJob{
 		ReportType: ReportType_ERROR,
@@ -255,6 +255,7 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationM
 								Backend: inventory.TransportBackend_CONNECTION_K8S,
 							},
 						},
+						ManagedBy: managedBy,
 					},
 				},
 			},
