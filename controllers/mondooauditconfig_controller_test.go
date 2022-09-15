@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
 	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	mockmondoo "go.mondoo.com/mondoo-operator/pkg/mondooclient/mock"
@@ -312,10 +313,13 @@ func TestTokenRegistration(t *testing.T) {
 
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjects...).Build()
 
+			scanApiStore := scan_api_store.NewScanApiStore()
+			go scanApiStore.Start()
 			reconciler := &MondooAuditConfigReconciler{
 				MondooClientBuilder: testMondooClientBuilder,
 				Client:              fakeClient,
 				StatusReporter:      status.NewStatusReporter(fakeClient, testMondooClientBuilder, k8sVersion),
+				ScanApiStore:        scanApiStore,
 			}
 
 			// Act
@@ -363,10 +367,13 @@ func TestMondooAuditConfigStatus(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(mondooAuditConfig, testToken).Build()
 
+	scanApiStore := scan_api_store.NewScanApiStore()
+	go scanApiStore.Start()
 	reconciler := &MondooAuditConfigReconciler{
 		MondooClientBuilder: testMondooClientBuilder,
 		Client:              fakeClient,
 		MondooAuditConfig:   mondooAuditConfig,
+		ScanApiStore:        scanApiStore,
 	}
 
 	_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{

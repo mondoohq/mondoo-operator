@@ -17,6 +17,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
+	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -52,7 +54,13 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 
 func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
 	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", true, false, false)
-	s.fakeClientBuilder = fake.NewClientBuilder()
+	s.fakeClientBuilder = fake.NewClientBuilder().WithObjects(&corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanapi.TokenSecretName(s.auditConfig.Name),
+			Namespace: s.auditConfig.Namespace,
+		},
+		Data: map[string][]byte{"token": []byte("token")},
+	})
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Create() {
@@ -258,11 +266,14 @@ func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
 }
 
 func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {
+	scanApiStore := scan_api_store.NewScanApiStore()
+	go scanApiStore.Start()
 	return DeploymentHandler{
 		KubeClient:             s.fakeClientBuilder.Build(),
 		Mondoo:                 &s.auditConfig,
 		ContainerImageResolver: s.containerImageResolver,
 		MondooOperatorConfig:   &mondoov1alpha2.MondooOperatorConfig{},
+		ScanApiStore:           scanApiStore,
 	}
 }
 
