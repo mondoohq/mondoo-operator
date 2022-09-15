@@ -15,9 +15,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
+	scanapistoremock "go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store/mock"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
@@ -43,6 +44,8 @@ type DeploymentHandlerSuite struct {
 
 	auditConfig       mondoov1alpha2.MondooAuditConfig
 	fakeClientBuilder *fake.ClientBuilder
+	mockCtrl          *gomock.Controller
+	scanApiStoreMock  *scanapistoremock.MockScanApiStore
 }
 
 func (s *DeploymentHandlerSuite) SetupSuite() {
@@ -50,6 +53,8 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 	s.scheme = clientgoscheme.Scheme
 	s.Require().NoError(mondoov1alpha2.AddToScheme(s.scheme))
 	s.containerImageResolver = fakeMondoo.NewNoOpContainerImageResolver()
+	s.mockCtrl = gomock.NewController(s.T())
+	s.scanApiStoreMock = scanapistoremock.NewMockScanApiStore(s.mockCtrl)
 }
 
 func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
@@ -63,8 +68,15 @@ func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
 	})
 }
 
+func (s *DeploymentHandlerSuite) AfterTest(suiteName, testName string) {
+	s.mockCtrl.Finish()
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	d := s.createDeploymentHandler()
+
+	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
+	s.scanApiStoreMock.EXPECT().Add(scanApiUrl, "token", "").Times(1)
 
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
@@ -98,6 +110,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 	d := s.createDeploymentHandler()
 
 	integrationMrn := utils.RandString(20)
+	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
+	s.scanApiStoreMock.EXPECT().Add(scanApiUrl, "token", integrationMrn).Times(1)
+
 	sa, err := json.Marshal(mondooclient.ServiceAccountCredentials{Mrn: "test-mrn"})
 	s.NoError(err)
 	clientSecret := &corev1.Secret{
@@ -143,6 +158,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	d := s.createDeploymentHandler()
 
+	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
+	s.scanApiStoreMock.EXPECT().Add(scanApiUrl, "token", "").Times(1)
+
 	image, err := s.containerImageResolver.MondooOperatorImage("", "", false)
 	s.NoError(err)
 
@@ -176,6 +194,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 
 func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	d := s.createDeploymentHandler()
+
+	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
+	s.scanApiStoreMock.EXPECT().Add(scanApiUrl, "token", "").Times(3)
 
 	// Reconcile to create all resources
 	result, err := d.Reconcile(s.ctx)
@@ -233,6 +254,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	s.Equal(corev1.ConditionFalse, condition.Status)
 
 	d.Mondoo.Spec.KubernetesResources.Enable = false
+	s.scanApiStoreMock.EXPECT().Delete(scanApiUrl).Times(1)
 
 	// Reconcile to update the audit config status
 	result, err = d.Reconcile(s.ctx)
@@ -249,6 +271,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
 	d := s.createDeploymentHandler()
 
+	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
+	s.scanApiStoreMock.EXPECT().Add(scanApiUrl, "token", "").Times(1)
+
 	// Reconcile to create all resources
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
@@ -256,6 +281,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
 
 	// Reconcile again to delete the resources
 	d.Mondoo.Spec.KubernetesResources.Enable = false
+	s.scanApiStoreMock.EXPECT().Delete(scanApiUrl).Times(1)
 	result, err = d.Reconcile(s.ctx)
 	s.NoError(err)
 	s.True(result.IsZero())
@@ -266,14 +292,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
 }
 
 func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {
-	scanApiStore := scan_api_store.NewScanApiStore()
-	go scanApiStore.Start()
 	return DeploymentHandler{
 		KubeClient:             s.fakeClientBuilder.Build(),
 		Mondoo:                 &s.auditConfig,
 		ContainerImageResolver: s.containerImageResolver,
 		MondooOperatorConfig:   &mondoov1alpha2.MondooOperatorConfig{},
-		ScanApiStore:           scanApiStore,
+		ScanApiStore:           s.scanApiStoreMock,
 	}
 }
 

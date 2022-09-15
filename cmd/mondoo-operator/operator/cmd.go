@@ -108,7 +108,9 @@ func init() {
 			return err
 		}
 
-		scanApiStore := scan_api_store.NewScanApiStore()
+		ctx := ctrl.SetupSignalHandler()
+
+		scanApiStore := scan_api_store.NewScanApiStore(ctx)
 		go scanApiStore.Start()
 		if err := preloadScanApiUrls(scanApiStore, scheme, setupLog); err != nil {
 			setupLog.Error(err, "failed to preload scan API URLs")
@@ -133,7 +135,7 @@ func init() {
 			return err
 		}
 
-		if err = resource_monitor.RegisterResourceMonitors(mgr, scanApiStore); err != nil {
+		if err = resource_monitor.RegisterResourceMonitors(ctx, mgr, scanApiStore); err != nil {
 			setupLog.Error(err, "unable to register resource monitors", "controller", "resource_monitor")
 			return err
 		}
@@ -154,7 +156,7 @@ func init() {
 		}
 
 		setupLog.Info("starting manager", "operator-version", version.Version, "k8s-version", v.GitVersion)
-		if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		if err := mgr.Start(ctx); err != nil {
 			setupLog.Error(err, "problem running manager")
 			return err
 		}

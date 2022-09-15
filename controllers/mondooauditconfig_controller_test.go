@@ -313,7 +313,7 @@ func TestTokenRegistration(t *testing.T) {
 
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjects...).Build()
 
-			scanApiStore := scan_api_store.NewScanApiStore()
+			scanApiStore := scan_api_store.NewScanApiStore(context.Background())
 			go scanApiStore.Start()
 			reconciler := &MondooAuditConfigReconciler{
 				MondooClientBuilder: testMondooClientBuilder,
@@ -367,7 +367,7 @@ func TestMondooAuditConfigStatus(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(mondooAuditConfig, testToken).Build()
 
-	scanApiStore := scan_api_store.NewScanApiStore()
+	scanApiStore := scan_api_store.NewScanApiStore(context.Background())
 	go scanApiStore.Start()
 	reconciler := &MondooAuditConfigReconciler{
 		MondooClientBuilder: testMondooClientBuilder,

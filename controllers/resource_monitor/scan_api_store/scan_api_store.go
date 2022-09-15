@@ -9,11 +9,15 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 package scan_api_store
 
 import (
+	"context"
+
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var logger = log.Log.WithName("scan-api-store")
+
+//go:generate ./../../../bin/mockgen -source=./scan_api_store.go -destination=./mock/scan_api_store_generated.go -package=mock
 
 type ScanApiStore interface {
 	Start()
@@ -45,6 +49,8 @@ type urlRequest struct {
 }
 
 type scanApiStore struct {
+	ctx context.Context
+
 	// urlReqChan is used to add or delete a scan api url
 	urlReqChan chan urlRequest
 
@@ -57,8 +63,9 @@ type scanApiStore struct {
 	mondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
 }
 
-func NewScanApiStore() ScanApiStore {
+func NewScanApiStore(ctx context.Context) ScanApiStore {
 	return &scanApiStore{
+		ctx:                 ctx,
 		urlReqChan:          make(chan urlRequest),
 		getChan:             make(chan struct{}),
 		outChan:             make(chan []ClientConfiguration),
@@ -70,6 +77,8 @@ func NewScanApiStore() ScanApiStore {
 func (s *scanApiStore) Start() {
 	for {
 		select {
+		case <-s.ctx.Done():
+			return
 		case req := <-s.urlReqChan:
 			switch req.requestType {
 			case AddRequest:
