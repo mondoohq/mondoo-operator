@@ -99,5 +99,6 @@ jobs:
           echo "mondoo status"
           mondoo --config ./creds.json status
           ./scripts/cleanup_operator_assets.sh
+          ./scripts/cleanup_operator_assets_cicd.sh
         env:
           MONDOO_CONFIG_PATH: ${{ format('{0}/{1}', github.workspace, 'creds.json') }}

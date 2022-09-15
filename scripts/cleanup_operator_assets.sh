@@ -73,4 +73,4 @@ DELETE_QUERY="$DELETE_QUERY
 }"
 
 echo $DELETE_QUERY > /tmp/mondoo_delete_query.json
-#/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_delete_query.json $API_ENDPOINT/query | jq
+/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_delete_query.json $API_ENDPOINT/query | jq
