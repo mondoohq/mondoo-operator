@@ -8,8 +8,6 @@ on:
     secrets:
       MONDOO_CLIENT:
         required: true
-      MONDOO_CLIENT_EDITOR:
-        required: true
 
 env:
   MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag }}
@@ -23,8 +21,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: [v1.22.13]
-        k8s-distro: [k3d]
+        k8s-version: [v1.22.13, v1.23.10, v1.24.4]
+        k8s-distro: [minikube, k3d]
 
     steps:
       - uses: actions/checkout@v3
@@ -33,12 +31,12 @@ jobs:
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
 
-      #- name: Start minikube
-      #  uses: medyagh/setup-minikube@master
-      #  if: matrix.k8s-distro == 'minikube'
-      #  with:
-      #    memory: 4000m
-      #    kubernetes-version: ${{ matrix.k8s-version }}
+      - name: Start minikube
+        uses: medyagh/setup-minikube@master
+        if: matrix.k8s-distro == 'minikube'
+        with:
+          memory: 4000m
+          kubernetes-version: ${{ matrix.k8s-version }}
 
       - name: Start k3d
         uses: nolar/setup-k3d-k3s@v1
@@ -58,10 +56,6 @@ jobs:
       - name: Store creds
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
-      
-      - name: Store cleanup creds
-        run: |
-          echo ${{ secrets.MONDOO_CLIENT_EDITOR }} | base64 -d > creds_editor.json
 
       # Now that dependencies are cached the tests start almost immediately after minikube has started
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
