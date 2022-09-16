@@ -1,10 +1,4 @@
-Backend
-backend
-Cron
-github
 hashicorp
-https
-ssh
-Terraform
+redhat
 terraform
-ubuntu
+Terraform

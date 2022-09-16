@@ -3,7 +3,6 @@ AKS
 arttor
 authn
 authz
-aws
 bpke
 CAcreateserial
 certs
@@ -14,12 +13,10 @@ crt
 daemonsets
 dataloss
 DISTRO
-eks
 extfile
 finalizers
 GCP
 genrsa
-ghcr
 GKE
 helmify
 img
@@ -45,7 +42,6 @@ Plugins
 psp
 RKE
 screenshots
-sdk
 serviceaccounts
 sigs
 supplychain
