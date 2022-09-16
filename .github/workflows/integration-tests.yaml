@@ -31,23 +31,23 @@ jobs:
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
 
-      - name: Start minikube
-        uses: medyagh/setup-minikube@master
-        if: matrix.k8s-distro == 'minikube'
+      #- name: Start minikube
+      #  uses: medyagh/setup-minikube@master
+      #  if: matrix.k8s-distro == 'minikube'
+      #  with:
+      #    memory: 4000m
+      #    kubernetes-version: ${{ matrix.k8s-version }}
+
+      - name: Start k3d
+        uses: nolar/setup-k3d-k3s@v1
+        if: matrix.k8s-distro == 'k3d'
         with:
-          memory: 4000m
-          kubernetes-version: ${{ matrix.k8s-version }}
+          version: ${{ matrix.k8s-version }}
+          k3d-args: --k3s-arg=--disable=traefik@server:*
 
-      #- name: Start k3d
-      #  uses: nolar/setup-k3d-k3s@v1
-      #  if: matrix.k8s-distro == 'k3d'
-      #  with:
-      #    version: ${{ matrix.k8s-version }}
-      #    k3d-args: --k3s-arg=--disable=traefik@server:*
-
-      #- uses: actions/setup-go@v2
-      #  with:
-      #    go-version: "${{ env.golang-version }}"
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "${{ env.golang-version }}"
 
       # Makes it easier to see what was the input for this workflow in case we need to debug.
       - name: Print workflow inputs
@@ -56,37 +56,41 @@ jobs:
       - name: Store creds
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+      
+      - name: Store cleanup creds
+        run: |
+          echo ${{ secrets.MONDOO_CLIENT_EDITOR }} | base64 -d > creds_editor.json
 
       # Now that dependencies are cached the tests start almost immediately after minikube has started
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
       # before the test execution starts.
-      #- name: Wait a bit for the runner to become more stable
-      #  run: for i in 1 2 3 4 5; do kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=180s && break || sleep 10; done
+      - name: Wait a bit for the runner to become more stable
+        run: for i in 1 2 3 4 5; do kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=180s && break || sleep 10; done
 
-      #- name: Run integration tests
-      #  run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration/ci
+      - name: Run integration tests
+        run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration/ci
 
-      #- run: mv integration-tests.xml integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
-      #  if: success() || failure()
+      - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
+        if: success() || failure()
 
-      #- uses: actions/upload-artifact@v3  # upload test results
-      #  if: success() || failure()        # run this step even if previous step failed
-      #  with:                             # upload a combined archive with unit and integration test results
-      #    name: test-results
-      #    path: integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
+      - uses: actions/upload-artifact@v3  # upload test results
+        if: success() || failure()        # run this step even if previous step failed
+        with:                             # upload a combined archive with unit and integration test results
+          name: test-results
+          path: integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
 
-      #- name: Upload test logs artifact
-      #  uses: actions/upload-artifact@v3
-      #  if: failure()
-      #  with:
-      #    name: test-logs-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
-      #    path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
+      - name: Upload test logs artifact
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: test-logs-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
+          path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
 
       - uses: mondoohq/actions/setup@main
         id: mondoo-status
         if: success() || failure()
         with:
-          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT_EDITOR }}
           args: status
 
       - name: Cleanup Mondoo space "GitHub Actions Mondoo Operator"
@@ -97,8 +101,9 @@ jobs:
           ls -l $MONDOO_CONFIG_PATH
           mondoo version
           echo "mondoo status"
-          mondoo --config ./creds.json status
+          mondoo status || true
+          mondoo --config ./creds_editor.json status
           ./scripts/cleanup_operator_assets.sh
           ./scripts/cleanup_operator_assets_cicd.sh
         env:
-          MONDOO_CONFIG_PATH: ${{ format('{0}/{1}', github.workspace, 'creds.json') }}
+          MONDOO_CONFIG_PATH: ${{ format('{0}/{1}', github.workspace, 'creds_editor.json') }}
