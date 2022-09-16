@@ -60,18 +60,13 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		return ctrl.Result{}, n.down(ctx)
 	}
 
-	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: scanapi.TokenSecretName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
-	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
-		logger.Error(err, "Failed to get scanapi secret", "namespace", secret.Namespace, "name", secret.Name)
+	if err := scan_api_store.HandleAuditConfig(ctx, n.KubeClient, n.ScanApiStore, *n.Mondoo); err != nil {
+		logger.Error(
+			err, "failed to add scan API URL to the store for audit config",
+			"namespace", n.Mondoo.Namespace,
+			"name", n.Mondoo.Name)
 		return ctrl.Result{}, err
 	}
-	integrationMrn, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
-	if err != nil {
-		logger.Error(err,
-			"failed to retrieve integration-mrn for MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
-		return ctrl.Result{}, err
-	}
-	n.ScanApiStore.Add(scanapi.ScanApiServiceUrl(*n.Mondoo), string(secret.Data["token"]), integrationMrn)
 
 	return ctrl.Result{}, n.syncCronJob(ctx)
 }

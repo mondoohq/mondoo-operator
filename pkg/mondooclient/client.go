@@ -261,12 +261,7 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationM
 		},
 	}
 
-	if integrationMrn != "" {
-		if scanJob.Inventory.Spec.Assets[0].Labels == nil {
-			scanJob.Inventory.Spec.Assets[0].Labels = make(map[string]string)
-		}
-		scanJob.Inventory.Spec.Assets[0].Labels[constants.MondooAssetsIntegrationLabel] = integrationMrn
-	}
+	setIntegrationMrn(integrationMrn, &scanJob)
 
 	if scanContainerImages || feature_flags.GetEnablePodDiscovery() || feature_flags.GetEnableWorkloadDiscovery() {
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Options = make(map[string]string)
@@ -333,12 +328,7 @@ func (s *mondooClient) ScheduleKubernetesResourceScan(ctx context.Context, integ
 		},
 	}
 
-	if integrationMrn != "" {
-		if scanJob.Inventory.Spec.Assets[0].Labels == nil {
-			scanJob.Inventory.Spec.Assets[0].Labels = make(map[string]string)
-		}
-		scanJob.Inventory.Spec.Assets[0].Labels[constants.MondooAssetsIntegrationLabel] = integrationMrn
-	}
+	setIntegrationMrn(integrationMrn, &scanJob)
 
 	if feature_flags.GetEnableWorkloadDiscovery() {
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Options["all-namespaces"] = "true"
@@ -536,4 +526,13 @@ func (s *mondooClient) IntegrationReportStatus(ctx context.Context, in *ReportSt
 	}
 
 	return nil
+}
+
+func setIntegrationMrn(integrationMrn string, scanJob *ScanJob) {
+	if integrationMrn != "" {
+		if scanJob.Inventory.Spec.Assets[0].Labels == nil {
+			scanJob.Inventory.Spec.Assets[0].Labels = make(map[string]string)
+		}
+		scanJob.Inventory.Spec.Assets[0].Labels[constants.MondooAssetsIntegrationLabel] = integrationMrn
+	}
 }

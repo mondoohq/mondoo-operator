@@ -94,8 +94,8 @@ func (s *ScanApiStoreSuite) TestDelete() {
 
 	s.scanApiStore.Add(url, token, integrationMrn)
 
-	url2 := url + "1"
-	integrationMrn2 := integrationMrn + "1"
+	url2 := url + "2"
+	integrationMrn2 := integrationMrn + "2"
 	s.scanApiStore.mondooClientBuilder = func(opts mondooclient.ClientOptions) mondooclient.Client {
 		s.Equal(url2, opts.ApiEndpoint)
 		s.Equal(token, opts.Token)
