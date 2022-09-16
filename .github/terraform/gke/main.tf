@@ -21,6 +21,7 @@ resource "google_container_node_pool" "node_pool" {
   node_count = 1
 
   node_config {
+    spot         = true
     machine_type = "e2-standard-2"
   }
 }
