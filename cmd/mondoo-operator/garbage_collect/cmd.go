@@ -127,7 +127,7 @@ func buildOlderThanTimestamp(olderThanString string) (string, error) {
 		timestamp = time.Now().Add(time.Minute * time.Duration(-age))
 
 	} else if strings.HasSuffix(olderThanString, "h") {
-		ageStr := strings.TrimSuffix(olderThanString, "m")
+		ageStr := strings.TrimSuffix(olderThanString, "h")
 		age, err := strconv.Atoi(ageStr)
 		if err != nil {
 			return "", err

@@ -38,7 +38,7 @@ func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditCon
 		// The job runs hourly and we need to make sure that the previous one is killed before the new one is started so we don't stack them.
 		"--timeout", "55",
 		// Cleanup any resources more than 2 hours old
-		"--cleanup-older-than", "2h",
+		"--cleanup-assets-older-than", "2h",
 	}
 
 	if integrationMrn != "" {
