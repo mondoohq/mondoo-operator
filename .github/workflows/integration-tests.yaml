@@ -87,20 +87,3 @@ jobs:
         with:
           name: test-logs-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
-
-      - uses: mondoohq/actions/setup@main
-        id: mondoo-status
-        if: success() || failure()
-        with:
-          service-account-credentials: ${{ secrets.MONDOO_CLIENT_EDITOR }}
-          args: status
-
-      - name: Cleanup Mondoo space "GitHub Actions Mondoo Operator"
-        if: success() || failure()
-        run: |
-          which mondoo
-          mondoo --config ${{ env.MONDOO_CONFIG_PATH }} status
-          ./scripts/cleanup_operator_assets.sh
-          ./scripts/cleanup_operator_space_cicd.sh
-        env:
-          MONDOO_CONFIG_PATH: ${{ format('{0}/{1}', github.workspace, 'creds_editor.json') }}

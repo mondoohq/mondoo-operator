@@ -1,0 +1,28 @@
+name: "Cleanup Mondoo space"
+on:
+  schedule:
+  - cron: "11 3 * * *" # 3:11am UTC
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    name: Cleanup Assets and Projects in Mondoo
+    steps:
+      - uses: actions/checkout@v2
+      - name: Store cleanup creds
+        run: |
+          echo ${{ secrets.MONDOO_CLIENT_EDITOR }} | base64 -d > creds_editor.json
+      - uses: mondoohq/actions/setup@main
+        if: success() || failure()
+        with:
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT_EDITOR }}
+          args: status
+
+      - name: Cleanup Mondoo space "GitHub Actions Mondoo Operator"
+        if: success() || failure()
+        run: |
+          mondoo --config ${{ env.MONDOO_CONFIG_PATH }} status
+          ./scripts/cleanup_operator_assets.sh
+          ./scripts/cleanup_operator_space_cicd.sh
+        env:
+          MONDOO_CONFIG_PATH: ${{ format('{0}/{1}', github.workspace, 'creds_editor.json') }}
