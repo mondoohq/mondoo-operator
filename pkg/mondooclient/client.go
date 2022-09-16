@@ -20,6 +20,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
+	"go.mondoo.com/mondoo-operator/pkg/garbagecollection"
 	"go.mondoo.com/mondoo-operator/pkg/inventory"
 )
 
@@ -40,6 +41,7 @@ type Client interface {
 	RunKubernetesManifest(context.Context, *KubernetesManifestJob) (*ScanResult, error)
 	ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool, managedBy string) (*ScanResult, error)
 	ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey string) (*Empty, error)
+	GarbageCollectAssets(context.Context, *garbagecollection.GarbageCollectOptions) error
 
 	IntegrationRegister(context.Context, *IntegrationRegisterInput) (*IntegrationRegisterOutput, error)
 	IntegrationCheckIn(context.Context, *IntegrationCheckInInput) (*IntegrationCheckInOutput, error)
@@ -536,4 +538,22 @@ func setIntegrationMrn(integrationMrn string, scanJob *ScanJob) {
 		}
 		scanJob.Inventory.Spec.Assets[0].Labels[constants.MondooAssetsIntegrationLabel] = integrationMrn
 	}
+}
+
+const GarbageCollectAssetsEndpoint = "/Scan/GarbageCollectAssets"
+
+func (s *mondooClient) GarbageCollectAssets(ctx context.Context, in *garbagecollection.GarbageCollectOptions) error {
+	url := s.ApiEndpoint + GarbageCollectAssetsEndpoint
+
+	reqBodyBytes, err := json.Marshal(in)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	_, err = s.request(ctx, url, reqBodyBytes)
+	if err != nil {
+		return fmt.Errorf("error calling GarbageCollectAssets: %s", err)
+	}
+
+	return nil
 }

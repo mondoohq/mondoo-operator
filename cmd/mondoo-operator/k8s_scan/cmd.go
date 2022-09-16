@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"go.mondoo.com/mondoo-operator/cmd/mondoo-operator/garbage_collect"
+	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -26,6 +28,7 @@ func init() {
 	scanContainerImages := Cmd.Flags().Bool("scan-container-images", false, "A value indicating whether to scan container images.")
 	timeout := Cmd.Flags().Int64("timeout", 0, "The timeout in minutes for the scan request.")
 	setManagedBy := Cmd.Flags().String("set-managed-by", "", "String to set the ManagedBy field for scanned/discovered assets")
+	cleanupOlderThan := Cmd.Flags().String("cleanup-assets-older-than", "", "Set the age for which assets which have not been updated in over the time provided should be garbage collected (eg 12m or 48h)")
 
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(logger.NewLogger())
@@ -73,6 +76,19 @@ func init() {
 			err := fmt.Errorf("scan API returned not OK. %+v", res)
 			logger.Error(err, "Kubernetes resources scan was not successful")
 			return err
+		}
+
+		// If scanning successful, now attempt some cleanup of older assets
+		if feature_flags.GetEnableGarbageCollection() && *setManagedBy != "" && *cleanupOlderThan != "" {
+			platformRuntime := garbage_collect.RUNTIME_KUBERNETES_CLUSTER
+			if *scanContainerImages {
+				platformRuntime = garbage_collect.RUNTIME_DOCKER_REGISTRY
+			}
+
+			err = garbage_collect.GarbageCollectCmd(ctx, client, platformRuntime, *cleanupOlderThan, *setManagedBy, logger)
+			if err != nil {
+				logger.Error(err, "error while garbage collecting assets; will attempt on next scan")
+			}
 		}
 
 		return nil

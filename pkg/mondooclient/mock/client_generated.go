@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	garbagecollection "go.mondoo.com/mondoo-operator/pkg/garbagecollection"
 	mondooclient "go.mondoo.com/mondoo-operator/pkg/mondooclient"
 )
 
@@ -48,6 +49,20 @@ func (m *MockClient) ExchangeRegistrationToken(arg0 context.Context, arg1 *mondo
 func (mr *MockClientMockRecorder) ExchangeRegistrationToken(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExchangeRegistrationToken", reflect.TypeOf((*MockClient)(nil).ExchangeRegistrationToken), arg0, arg1)
+}
+
+// GarbageCollectAssets mocks base method.
+func (m *MockClient) GarbageCollectAssets(arg0 context.Context, arg1 *garbagecollection.GarbageCollectOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GarbageCollectAssets", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// GarbageCollectAssets indicates an expected call of GarbageCollectAssets.
+func (mr *MockClientMockRecorder) GarbageCollectAssets(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GarbageCollectAssets", reflect.TypeOf((*MockClient)(nil).GarbageCollectAssets), arg0, arg1)
 }
 
 // HealthCheck mocks base method.
