@@ -8,6 +8,8 @@ on:
     secrets:
       MONDOO_CLIENT:
         required: true
+      MONDOO_CLIENT_EDITOR:
+        required: true
 
 env:
   MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag }}
@@ -97,13 +99,6 @@ jobs:
         if: success() || failure()
         run: |
           which mondoo
-          echo $MONDOO_CONFIG_PATH
-          ls -l $MONDOO_CONFIG_PATH
-          mondoo version
-          echo "mondoo status"
-          mondoo status || true
           mondoo --config ./creds_editor.json status
           ./scripts/cleanup_operator_assets.sh
-          ./scripts/cleanup_operator_assets_cicd.sh
-        env:
-          MONDOO_CONFIG_PATH: ${{ format('{0}/{1}', github.workspace, 'creds_editor.json') }}
+          ./scripts/cleanup_operator_space_cicd.sh

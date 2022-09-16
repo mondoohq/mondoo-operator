@@ -1,8 +1,5 @@
 #!/bin/bash
 
-echo $MONDOO_CONFIG_PATH
-ls -l $MONDOO_CONFIG_PATH
-
 SPACE_MRN=$(jq '.space_mrn' -r  ./creds_editor.json)
 if [[ $SPACE_MRN == "" ]]
 then
