@@ -1,24 +1,24 @@
 #!/bin/bash
 
 echo "#########################"
-echo " Deleteing CI/CD Projects"
+echo " Deleting CI/CD Projects"
 echo "#########################"
 
-SPACE_MRN=$(jq '.space_mrn' -r  ./creds_editor.json)
+SPACE_MRN=$(jq '.space_mrn' -r ${MONDOO_CONFIG_PATH})
 if [[ $SPACE_MRN == "" ]]
 then
 	echo "Couldn't fetch spaceMrn from Mondoo status!"
 	exit 1
 fi
 
-TOKEN=$(mondoo --config ./creds_editor.json auth generate-api-access-token 2>&1 | grep Bearer | tr -d "[]")
+TOKEN=$(mondoo --config ${MONDOO_CONFIG_PATH} auth generate-api-access-token 2>&1 | grep Bearer | tr -d "[]")
 if [[ $TOKEN == "" ]]
 then
 	echo "Couldn't get API token!"
         exit 1
 fi
 
-API_ENDPOINT=$(jq '.api_endpoint' -r ./creds_editor.json)
+API_ENDPOINT=$(jq '.api_endpoint' -r ${MONDOO_CONFIG_PATH})
 if [[ $API_ENDPOINT == "" ]]
 then
 	echo "Couldn't get API endpoint!"

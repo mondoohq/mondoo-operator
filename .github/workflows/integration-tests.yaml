@@ -99,6 +99,8 @@ jobs:
         if: success() || failure()
         run: |
           which mondoo
-          mondoo --config ./creds_editor.json status
+          mondoo --config ${{ env.MONDOO_CONFIG_PATH }} status
           ./scripts/cleanup_operator_assets.sh
           ./scripts/cleanup_operator_space_cicd.sh
+        env:
+          MONDOO_CONFIG_PATH: ${{ format('{0}/{1}', github.workspace, 'creds_editor.json') }}
