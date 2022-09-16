@@ -39,8 +39,8 @@ PROJECTS_QUERY="$PROJECTS_QUERY
         \"spaceMrn\":\"$SPACE_MRN\"
       }
     }
-}
-"    
+}"
+
 echo $PROJECTS_QUERY > /tmp/mondoo_project_query_cicd.json
 
 MRNS=$(/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_project_query_cicd.json $API_ENDPOINT/query | jq '.data.cicdProjects.projects.edges[].node.mrn' -r | xargs -I{} echo "\"{}\"§" | tr -d "\n")
@@ -56,13 +56,13 @@ for mrn_to_delete in $MRNS; do
   MRN_BATCH="${MRN_BATCH}${mrn_to_delete},"
   if [[ $(($LOOP_INDEX % 11)) == 0 ]]
   then
-	  DELETE_QUERY="$DELETE_QUERY_STATIC
-		\"variables\":{
-	  	  \"input\":{
-	    	    \"mrns\":[${MRN_BATCH%?}]
-          	  }
-        	}
-        }"
+    DELETE_QUERY="$DELETE_QUERY_STATIC
+    \"variables\":{
+        \"input\":{
+          \"mrns\":[${MRN_BATCH%?}]
+        }
+      }
+    }"
     echo $DELETE_QUERY > /tmp/mondoo_delete_query_cicd.json
     /usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_delete_query_cicd.json $API_ENDPOINT/query | jq
     MRN_BATCH=""
@@ -75,8 +75,8 @@ DELETE_QUERY="$DELETE_QUERY_STATIC
 	\"variables\":{
   	  \"input\":{
     	    \"mrns\":[${MRN_BATCH%?}]
-       	  }
        	}
+    }
 }"
 
 

@@ -48,7 +48,7 @@ ASSET_QUERY="$ASSET_QUERY
           \"direction\":\"DESC\"
         },
         \"queryTerms\":[],
-        \"first\":25
+        \"first\":100
     }
 }"
 echo $ASSET_QUERY > /tmp/mondoo_asset_query.json
