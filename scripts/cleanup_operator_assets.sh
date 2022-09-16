@@ -1,5 +1,9 @@
 #!/bin/bash
 
+echo "#########################"
+echo " Deleteing Assets"
+echo "#########################"
+
 SPACE_MRN=$(jq '.space_mrn' -r  ./creds_editor.json)
 if [[ $SPACE_MRN == "" ]]
 then
@@ -55,8 +59,7 @@ MRNS=$(/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authoriz
 DELETE_QUERY_STATIC='{
     "operationName":"DeleteAssets",
     "query":"mutation DeleteAssets($input: DeleteAssetsInput) {\n  deleteAssets(input: $input) {\n    assetMrns\n    errors\n    __typename\n  }\n}\n",'
-#echo /usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_asset_query.json $API_ENDPOINT/query
-#/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_asset_query.json $API_ENDPOINT/query | jq
+
 while [ true ]
 do
   MRNS=$(/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_asset_query.json $API_ENDPOINT/query | jq '.data.assets.edges[].node.mrn' -r | xargs -I{} echo "\"{}\"," | tr -d "\n")
@@ -65,9 +68,6 @@ do
     echo "All assets deleted"
     break
   fi
-
-  echo "Going to delete these assets:"
-  echo $MRNS
 
   DELETE_QUERY="$DELETE_QUERY_STATIC
     \"variables\":
@@ -84,7 +84,6 @@ do
   }"
 
   echo $DELETE_QUERY > /tmp/mondoo_delete_query.json
-  #$CURL -s --data "$(echo $DELETE_QUERY)" $API_ENDPOINT/query | jq
   /usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_delete_query.json $API_ENDPOINT/query | jq
   sleep 1
 done

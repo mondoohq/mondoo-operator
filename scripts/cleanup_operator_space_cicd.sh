@@ -1,5 +1,9 @@
 #!/bin/bash
 
+echo "#########################"
+echo " Deleteing CI/CD Projects"
+echo "#########################"
+
 SPACE_MRN=$(jq '.space_mrn' -r  ./creds_editor.json)
 if [[ $SPACE_MRN == "" ]]
 then
@@ -39,8 +43,6 @@ PROJECTS_QUERY="$PROJECTS_QUERY
 "    
 echo $PROJECTS_QUERY > /tmp/mondoo_project_query_cicd.json
 
-echo "#Total Projects:"
-/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_project_query_cicd.json $API_ENDPOINT/query | jq '.data.cicdProjects.projects.totalCount'
 MRNS=$(/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_project_query_cicd.json $API_ENDPOINT/query | jq '.data.cicdProjects.projects.edges[].node.mrn' -r | xargs -I{} echo "\"{}\"§" | tr -d "\n")
 
 
