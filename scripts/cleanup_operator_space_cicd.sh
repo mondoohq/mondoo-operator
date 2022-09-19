@@ -43,8 +43,10 @@ PROJECTS_QUERY="$PROJECTS_QUERY
 
 echo $PROJECTS_QUERY > /tmp/mondoo_project_query_cicd.json
 
-MRNS=$(/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_project_query_cicd.json $API_ENDPOINT/query | jq '.data.cicdProjects.projects.edges[].node.mrn' -r | xargs -I{} echo "\"{}\"§" | tr -d "\n")
-
+/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_project_query_cicd.json $API_ENDPOINT/query > /tmp/cicd_query_result.json
+TOTAL_COUNT=$(jq '.data.cicdProjects.projects.totalCount' -r /tmp/cicd_query_result.json)
+echo "#CI/CD projects: $TOTAL_COUNT"
+MRNS=$(jq '.data.cicdProjects.projects.edges[].node.mrn' -r /tmp/cicd_query_result.json | tac | xargs -I{} echo "\"{}\"§" | tr -d "\n")
 
 DELETE_QUERY_STATIC='{"operationName":"DeleteCicdProjects","query":"mutation DeleteCicdProjects($input: DeleteProjectsInput!) {\n  deleteCicdProjects(input: $input) {\n    mrns\n    __typename\n  }\n}\n",'
 
@@ -53,6 +55,12 @@ MRN_BATCH=""
 LOOP_INDEX=0
 for mrn_to_delete in $MRNS; do
   LOOP_INDEX=$(($LOOP_INDEX+1))
+  ITEMS_LEFT=$(($TOTAL_COUNT-$LOOP_INDEX))
+  if [[ $ITEMS_LEFT -lt 50 ]]
+  then
+    echo "Less than 50 CI/CD projects left, will stop to not interfere with tests."
+    break
+  fi
   MRN_BATCH="${MRN_BATCH}${mrn_to_delete},"
   if [[ $(($LOOP_INDEX % 11)) == 0 ]]
   then
@@ -66,7 +74,6 @@ for mrn_to_delete in $MRNS; do
     echo $DELETE_QUERY > /tmp/mondoo_delete_query_cicd.json
     /usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_delete_query_cicd.json $API_ENDPOINT/query | jq
     MRN_BATCH=""
-    LOOP_INDEX=0
   fi
 done
 # delete rest after the loop

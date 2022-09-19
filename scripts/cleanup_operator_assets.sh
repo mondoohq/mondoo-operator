@@ -45,7 +45,7 @@ ASSET_QUERY="$ASSET_QUERY
         \"orderBy\":
         {
           \"field\":\"LAST_UPDATED\",
-          \"direction\":\"DESC\"
+          \"direction\":\"ASC\"
         },
         \"queryTerms\":[],
         \"first\":100
@@ -53,21 +53,21 @@ ASSET_QUERY="$ASSET_QUERY
 }"
 echo $ASSET_QUERY > /tmp/mondoo_asset_query.json
 
-echo "Get MRNs"
-MRNS=$(/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_asset_query.json $API_ENDPOINT/query | jq '.data.assets.edges[].node.mrn' -r | xargs -I{} echo "\"{}\"," | tr -d "\n")
-
 DELETE_QUERY_STATIC='{
     "operationName":"DeleteAssets",
     "query":"mutation DeleteAssets($input: DeleteAssetsInput) {\n  deleteAssets(input: $input) {\n    assetMrns\n    errors\n    __typename\n  }\n}\n",'
 
 while [ true ]
 do
-  MRNS=$(/usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_asset_query.json $API_ENDPOINT/query | jq '.data.assets.edges[].node.mrn' -r | xargs -I{} echo "\"{}\"," | tr -d "\n")
-  if [[ ${#MRNS} == 0 ]]
+  /usr/bin/curl -s -X POST -H "Content-Type: application/json" -H "authorization: $TOKEN" --data @/tmp/mondoo_asset_query.json $API_ENDPOINT/query > /tmp/query_assets_result.json
+  TOTAL_COUNT=$(jq '.data.assets.totalCount' -r /tmp/query_assets_result.json)
+  echo "#assets: $TOTAL_COUNT"
+  if [[ $TOTAL_COUNT -lt 500 ]]
   then
-    echo "All assets deleted"
+    echo "Less then 500 assets left, will stop to not interfere with currently running tests!"
     break
   fi
+  MRNS=$(jq '.data.assets.edges[].node.mrn' -r /tmp/query_assets_result.json | xargs -I{} echo "\"{}\"," | tr -d "\n")
 
   DELETE_QUERY="$DELETE_QUERY_STATIC
     \"variables\":
