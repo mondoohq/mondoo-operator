@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -33,7 +32,7 @@ func init() {
 	timeout := Cmd.Flags().Int64("timeout", 0, "The timeout in minutes for the garbage collection request.")
 	filterPlatformRuntime := Cmd.Flags().String("filter-platform-runtime", "", "Cleanup assets by an asset's PlatformRuntime.")
 	filterManagedBy := Cmd.Flags().String("filter-managed-by", "", "Cleanup assets with matching ManagedBy field")
-	filterOlderThan := Cmd.Flags().String("filter-older-than", "", "Cleanup assets which have not been updated in over the time provided (eg 12m or 48h)")
+	filterOlderThan := Cmd.Flags().String("filter-older-than", "", "Cleanup assets which have not been updated in over the time provided (eg 12m or 48h or anything time.ParseDuration() accepts)")
 
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(logger.NewLogger())
@@ -86,7 +85,7 @@ func GarbageCollectCmd(ctx context.Context, client mondooclient.Client, platform
 	if olderThan != "" {
 		timestamp, err := buildOlderThanTimestamp(olderThan)
 		if err != nil {
-			logger.Error(err, fmt.Sprintf("failed to convert provided older-than parameter (%s) into RFC3339 timestamp", olderThan))
+			logger.Error(err, fmt.Sprintf("failed to parse provided older-than parameter (%s) into RFC3339 timestamp", olderThan))
 			return err
 		}
 
@@ -116,25 +115,10 @@ func GarbageCollectCmd(ctx context.Context, client mondooclient.Client, platform
 }
 
 func buildOlderThanTimestamp(olderThanString string) (string, error) {
-	var timestamp time.Time
-	if strings.HasSuffix(olderThanString, "m") {
-		ageStr := strings.TrimSuffix(olderThanString, "m")
-		age, err := strconv.Atoi(ageStr)
-		if err != nil {
-			return "", err
-		}
-
-		timestamp = time.Now().Add(time.Minute * time.Duration(-age))
-
-	} else if strings.HasSuffix(olderThanString, "h") {
-		ageStr := strings.TrimSuffix(olderThanString, "h")
-		age, err := strconv.Atoi(ageStr)
-		if err != nil {
-			return "", err
-		}
-
-		timestamp = time.Now().Add(time.Hour * time.Duration(-age))
+	duration, err := time.ParseDuration(olderThanString)
+	if err != nil {
+		return "", err
 	}
 
-	return timestamp.Format(time.RFC3339), nil
+	return time.Now().Add(-duration).Format(time.RFC3339), nil
 }
