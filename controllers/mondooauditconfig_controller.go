@@ -34,6 +34,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/admission"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
+	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -53,6 +54,7 @@ type MondooAuditConfigReconciler struct {
 	MondooAuditConfig      *v1alpha2.MondooAuditConfig
 	StatusReporter         *status.StatusReporter
 	RunningOnOpenShift     bool
+	ScanApiStore           scan_api_store.ScanApiStore
 }
 
 // so we can mock out the mondoo client for testing
@@ -65,14 +67,16 @@ var MondooClientBuilder = mondooclient.NewClient
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooauditconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondoooperatorconfigs,verbs=get;watch;list
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=deployments;replicasets;daemonsets;statefulsets,verbs=get;list;watch
 //+kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=batch,resources=cronjobs;jobs,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods;namespaces;nodes,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // Just neeed to be able to create a Secret to hold the generated ScanAPI token
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=create;delete
 // Need to be able to check for the existence of Secrets with tokens, Mondoo service accounts, and private image pull secrets without asking for permission to read all Secrets
-//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get,resourceNames=mondoo-client;mondoo-token;mondoo-private-registries-secrets
+//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get
 //+kubebuilder:rbac:groups=cert-manager.io,resources=certificates;issuers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
@@ -252,6 +256,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: r.ContainerImageResolver,
+		ScanApiStore:           r.ScanApiStore,
 	}
 
 	result, reconcileError = workloads.Reconcile(ctx)

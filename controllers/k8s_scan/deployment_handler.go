@@ -22,6 +22,8 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan/container_image"
+	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
+	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
@@ -38,6 +40,7 @@ type DeploymentHandler struct {
 	Mondoo                 *v1alpha2.MondooAuditConfig
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
+	ScanApiStore           scan_api_store.ScanApiStore
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
@@ -53,7 +56,16 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 	}
 
 	if !n.Mondoo.Spec.KubernetesResources.Enable {
+		n.ScanApiStore.Delete(scanapi.ScanApiServiceUrl(*n.Mondoo))
 		return ctrl.Result{}, n.down(ctx)
+	}
+
+	if err := scan_api_store.HandleAuditConfig(ctx, n.KubeClient, n.ScanApiStore, *n.Mondoo); err != nil {
+		logger.Error(
+			err, "failed to add scan API URL to the store for audit config",
+			"namespace", n.Mondoo.Namespace,
+			"name", n.Mondoo.Name)
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, n.syncCronJob(ctx)
