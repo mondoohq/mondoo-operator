@@ -34,12 +34,12 @@ type Asset struct {
 	Annotations map[string]string `protobuf:"bytes,19,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// additional options for that asset
 	Options map[string]string `protobuf:"bytes,20,rep,name=options,proto3" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// relationships to parent
-	ParentPlatformId string `protobuf:"bytes,30,opt,name=parent_platform_id,json=parentPlatformId,proto3" json:"parent_platform_id,omitempty"`
 	// platform id detection mechanisms
 	IdDetector []string `protobuf:"bytes,31,rep,name=id_detector,json=idDetector,proto3" json:"id_detector,omitempty"`
 	// indicator is this is a fleet asset or a CI/CD run
 	// Category AssetCategory `protobuf:"varint,32,opt,name=category,proto3,enum=mondoo.motor.asset.v1.AssetCategory" json:"category,omitempty"`
+	// RelatedAssets []*Asset `protobuf:"bytes,33,rep,name=related_assets,json=relatedAssets,proto3" json:"related_assets,omitempty"`
+	ManagedBy string `protobuf:"bytes,34,opt,name=managed_by,json=managedBy,proto3" json:"managed_by,omitempty"`
 }
 
 // TransportConfig is copy pasted from the protobuf-generated go files.

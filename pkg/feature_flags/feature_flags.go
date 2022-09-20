@@ -12,6 +12,7 @@ const FeatureFlagPrefix = "FEATURE_"
 var (
 	enablePodDiscovery      bool
 	enableWorkloadDiscovery bool
+	enableGarbageCollection bool
 	allFeatureFlags         = make(map[string]string)
 )
 
@@ -47,11 +48,17 @@ func GetEnableWorkloadDiscovery() bool {
 	return enableWorkloadDiscovery
 }
 
+func GetEnableGarbageCollection() bool {
+	return enableGarbageCollection
+}
+
 func setGlobalFlags(k, v string) {
 	switch k {
 	case "FEATURE_DISCOVER_PODS":
 		enablePodDiscovery = true
 	case "FEATURE_DISCOVER_WORKLOADS":
 		enableWorkloadDiscovery = true
+	case "FEATURE_ENABLE_GARBAGE_COLLECTION":
+		enableGarbageCollection = true
 	}
 }

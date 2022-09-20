@@ -24,7 +24,7 @@ import (
 
 const CronJobNameSuffix = "-k8s-images-scan"
 
-func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
 	// We want to start the cron job one minute after it was enabled.
@@ -40,10 +40,21 @@ func CronJob(image, integrationMrn string, m v1alpha2.MondooAuditConfig) *batchv
 
 		// The job runs daily and we need to make sure that the previous one is killed before the new one is started so we don't stack them.
 		"--timeout", "1430",
+		// For a daily schedule, we will delete resources that are older than 2 days old
+		"--cleanup-assets-older-than", "48h",
 	}
 
 	if integrationMrn != "" {
 		containerArgs = append(containerArgs, []string{"--integration-mrn", integrationMrn}...)
+	}
+
+	// use the clusterUid to uniquely set the managedBy field on assets managed by this instance of the mondoo-operator
+	if clusterUid == "" {
+		logger.Info("no clusterUid provided, will not set ManagedBy field on scanned/discovered assets")
+	} else {
+		scannedAssetsManagedBy := "mondoo-operator-" + clusterUid
+
+		containerArgs = append(containerArgs, []string{"--set-managed-by", scannedAssetsManagedBy}...)
 	}
 
 	return &batchv1.CronJob{

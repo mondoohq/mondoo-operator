@@ -15,11 +15,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/pkg/constants"
-	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
-	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
-	"go.mondoo.com/mondoo-operator/tests/framework/utils"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +25,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
+	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
+	"go.mondoo.com/mondoo-operator/pkg/utils/test"
+	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 )
 
 type DeploymentHandlerSuite struct {
@@ -51,7 +54,8 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
 	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", true, false, false)
 	s.auditConfig.Spec.KubernetesResources.ContainerImageScanning = true
-	s.fakeClientBuilder = fake.NewClientBuilder()
+
+	s.fakeClientBuilder = fake.NewClientBuilder().WithObjects(test.TestKubeSystemNamespace())
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Create() {
@@ -67,7 +71,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	image, err := s.containerImageResolver.MondooOperatorImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", s.auditConfig)
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -109,7 +113,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 	image, err := s.containerImageResolver.MondooOperatorImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, integrationMrn, s.auditConfig)
+	expected := CronJob(image, integrationMrn, test.KubeSystemNamespaceUid, s.auditConfig)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -133,7 +137,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.NoError(err)
 
 	// Make sure a cron job exists with different container command
-	cronJob := CronJob(image, "", s.auditConfig)
+	cronJob := CronJob(image, "", "", s.auditConfig)
 	cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, cronJob))
 
@@ -141,7 +145,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	expected := CronJob(image, "", s.auditConfig)
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets

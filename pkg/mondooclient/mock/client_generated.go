@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	garbagecollection "go.mondoo.com/mondoo-operator/pkg/garbagecollection"
 	mondooclient "go.mondoo.com/mondoo-operator/pkg/mondooclient"
 )
 
@@ -48,6 +49,20 @@ func (m *MockClient) ExchangeRegistrationToken(arg0 context.Context, arg1 *mondo
 func (mr *MockClientMockRecorder) ExchangeRegistrationToken(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExchangeRegistrationToken", reflect.TypeOf((*MockClient)(nil).ExchangeRegistrationToken), arg0, arg1)
+}
+
+// GarbageCollectAssets mocks base method.
+func (m *MockClient) GarbageCollectAssets(arg0 context.Context, arg1 *garbagecollection.GarbageCollectOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GarbageCollectAssets", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// GarbageCollectAssets indicates an expected call of GarbageCollectAssets.
+func (mr *MockClientMockRecorder) GarbageCollectAssets(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GarbageCollectAssets", reflect.TypeOf((*MockClient)(nil).GarbageCollectAssets), arg0, arg1)
 }
 
 // HealthCheck mocks base method.
@@ -125,18 +140,18 @@ func (mr *MockClientMockRecorder) RunKubernetesManifest(arg0, arg1 interface{}) 
 }
 
 // ScanKubernetesResources mocks base method.
-func (m *MockClient) ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool) (*mondooclient.ScanResult, error) {
+func (m *MockClient) ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool, managedBy string) (*mondooclient.ScanResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ScanKubernetesResources", ctx, integrationMrn, scanContainerImages)
+	ret := m.ctrl.Call(m, "ScanKubernetesResources", ctx, integrationMrn, scanContainerImages, managedBy)
 	ret0, _ := ret[0].(*mondooclient.ScanResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ScanKubernetesResources indicates an expected call of ScanKubernetesResources.
-func (mr *MockClientMockRecorder) ScanKubernetesResources(ctx, integrationMrn, scanContainerImages interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) ScanKubernetesResources(ctx, integrationMrn, scanContainerImages, managedBy interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScanKubernetesResources", reflect.TypeOf((*MockClient)(nil).ScanKubernetesResources), ctx, integrationMrn, scanContainerImages)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScanKubernetesResources", reflect.TypeOf((*MockClient)(nil).ScanKubernetesResources), ctx, integrationMrn, scanContainerImages, managedBy)
 }
 
 // ScheduleKubernetesResourceScan mocks base method.
