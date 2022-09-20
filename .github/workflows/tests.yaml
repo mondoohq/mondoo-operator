@@ -1,6 +1,6 @@
 name: Unit Tests
 on:
-  pull_request_target:
+  pull_request:
   push:
     paths-ignore:
       - 'docs/**'
@@ -11,12 +11,11 @@ on:
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]' || !github.event.pull_request.head.repo.fork
+    if: github.actor == 'dependabot[bot]' || !github.event.pull_request_target.head.repo.fork
     name: Unit tests
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: false
       - name: Import environment variables from file
@@ -40,19 +39,4 @@ jobs:
         with:
           name: test-results
           path: unit-tests.xml
-
-  security-tests:
-    needs: [unit-tests]
-    uses: ./.github/workflows/security-tests.yaml
-    if: needs.unit-tests.result == 'success' # run only if unit-tests are successful
-    name: Security tests
-    secrets: inherit
-  integration-tests:
-    needs: [unit-tests]
-    uses: ./.github/workflows/integration-tests.yaml
-    if: needs.unit-tests.result == 'success' # run only if unit-tests are successful
-    name: Integration tests
-    with:
-      mondooClientImageTag: ""
-    secrets: inherit
    

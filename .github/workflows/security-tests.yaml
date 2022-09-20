@@ -4,12 +4,21 @@ on:
     secrets:
       MONDOO_CLIENT:
         required: true
+  workflow_run:
+    workflows: ["Unit Tests"]
+    types:
+      - completed
+
+# https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
+permissions:
+  contents: read
+# Attention: These jobs still have access to all the secrets when triggered by a workflow_run event.
 
 jobs:
   security-tests:
     runs-on: ubuntu-latest
     name: Security tests
-    if: github.actor == 'dependabot[bot]' || !github.event.pull_request.head.repo.fork
+    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_call'
     env:
       # Use docker.io for Docker Hub if empty
       REGISTRY: ghcr.io
@@ -19,7 +28,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: false
       - name: Import environment variables from file
