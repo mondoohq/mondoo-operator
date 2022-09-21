@@ -543,7 +543,7 @@ func (s *AuditConfigBaseSuite) getWebhookCheckPod() *corev1.Pod {
 						PeriodSeconds:       2,
 						ProbeHandler: corev1.ProbeHandler{
 							Exec: &corev1.ExecAction{
-								Command: []string{"/bin/sh", "-c", "curl --fail -k https://mondoo-client-webhook-service:443"},
+								Command: []string{"/bin/sh", "-c", "curl -s --fail -k https://mondoo-client-webhook-service:443/validate-k8s-mondoo-com > /dev/null"},
 							},
 						},
 					},
@@ -661,6 +661,7 @@ func (s *AuditConfigBaseSuite) checkPods(auditConfig *mondoov2.MondooAuditConfig
 		s.NoErrorf(err, "Failed creating a Pod in permissive mode.")
 	}
 
+	zap.S().Info("Start deleteing test Pods.")
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(passingPod), "Failed to delete passingPod")
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(failingPod), "Failed to delete failingPod")
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(webhookCheckPod), "Failed to delete webhookCheckPod")
