@@ -20,6 +20,17 @@ rules:
 - apiGroups:
   - apps
   resources:
+  - daemonsets
+  - deployments
+  - replicasets
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
   - deployments
   verbs:
   - create
@@ -40,6 +51,15 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs
+  - jobs
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - cert-manager.io
@@ -83,15 +103,6 @@ rules:
   verbs:
   - create
   - delete
-- apiGroups:
-  - ""
-  resourceNames:
-  - mondoo-client
-  - mondoo-private-registries-secrets
-  - mondoo-token
-  resources:
-  - secrets
-  verbs:
   - get
 - apiGroups:
   - ""
