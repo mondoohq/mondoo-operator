@@ -22,6 +22,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/garbagecollection"
 	"go.mondoo.com/mondoo-operator/pkg/inventory"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -39,6 +40,7 @@ type Client interface {
 
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	RunKubernetesManifest(context.Context, *KubernetesManifestJob) (*ScanResult, error)
+	RunAdmissionReview(context.Context, *AdmissionReviewJob) (*ScanResult, error)
 	ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool, managedBy string) (*ScanResult, error)
 	ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey string) (*Empty, error)
 	GarbageCollectAssets(context.Context, *garbagecollection.GarbageCollectOptions) error
@@ -216,6 +218,40 @@ func (s *mondooClient) RunKubernetesManifest(ctx context.Context, in *Kubernetes
 type KubernetesManifestJob struct {
 	Files  []*File           `json:"files,omitempty"`
 	Labels map[string]string `json:"labels,omitempty"`
+	// Additional options for the manifest job
+	Options map[string]string `json:"options,omitempty"`
+	// Additional discovery settings for the manifest job
+	Discovery *inventory.Discovery `json:"discovery,omitempty"`
+}
+
+const RunAdmissionReviewEndpoint = "/Scan/RunAdmissionReview"
+
+func (s *mondooClient) RunAdmissionReview(ctx context.Context, in *AdmissionReviewJob) (*ScanResult, error) {
+	url := s.ApiEndpoint + RunAdmissionReviewEndpoint
+
+	reqBodyBytes, err := json.Marshal(in)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	respBodyBytes, err := s.request(ctx, url, reqBodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	out := &ScanResult{}
+	if err = json.Unmarshal(respBodyBytes, out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal proto response: %v", err)
+	}
+
+	return out, nil
+}
+
+type AdmissionReviewJob struct {
+	Data *structpb.Struct `json:"data,omitempty"`
+	// Map of string keys and values that can be used to organize and categorize the assets
+	Labels     map[string]string `json:"labels,omitempty"`
+	ReportType ReportType        `json:"report_type,omitempty"`
 	// Additional options for the manifest job
 	Options map[string]string `json:"options,omitempty"`
 	// Additional discovery settings for the manifest job

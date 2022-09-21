@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"google.golang.org/protobuf/types/known/structpb"
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -98,13 +100,6 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		response = admission.Denied(defaultScanFail)
 	}
 
-	// Call into Mondoo Scan Service to scan the resource
-	k8sObjectData, err := yaml.Marshal(req.Object)
-	if err != nil {
-		handlerlog.Error(err, "failed to marshal incoming request")
-		return
-	}
-
 	obj, err := a.objFromRaw(req.Object)
 	handlerlog.Info("admission obj", "obj", obj)
 	if err == nil {
@@ -120,12 +115,29 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		return
 	}
 
-	scanJob := &mondooclient.KubernetesManifestJob{
-		Files: []*mondooclient.File{
-			{
-				Data: k8sObjectData,
-			},
-		},
+	// Call into Mondoo Scan Service to scan the resource
+	reqData, err := yaml.Marshal(admissionv1.AdmissionReview{
+		TypeMeta: metav1.TypeMeta{Kind: "AdmissionReview", APIVersion: "admission.k8s.io/v1"},
+		Request:  &req.AdmissionRequest,
+	})
+	if err != nil {
+		handlerlog.Error(err, "failed to marshal incoming request")
+		return
+	}
+
+	mapData := make(map[string]interface{})
+	if err := yaml.Unmarshal(reqData, &mapData); err != nil {
+		handlerlog.Error(err, "failed to unmarshal object to map")
+		return
+	}
+
+	data, err := structpb.NewStruct(mapData)
+	if err != nil {
+		handlerlog.Error(err, "failed to create proto struct from admission request")
+		return
+	}
+	scanJob := &mondooclient.AdmissionReviewJob{
+		Data:   data,
 		Labels: k8sLabels,
 	}
 	if feature_flags.GetEnableWorkloadDiscovery() {
@@ -135,7 +147,7 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		}
 	}
 
-	result, err := a.scanner.RunKubernetesManifest(ctx, scanJob)
+	result, err := a.scanner.RunAdmissionReview(ctx, scanJob)
 	if err != nil {
 		handlerlog.Error(err, "error returned from scan request")
 		return
