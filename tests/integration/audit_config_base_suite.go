@@ -663,8 +663,10 @@ func (s *AuditConfigBaseSuite) checkPods(auditConfig *mondoov2.MondooAuditConfig
 
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(passingPod), "Failed to delete passingPod")
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(failingPod), "Failed to delete failingPod")
+	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(webhookCheckPod), "Failed to delete webhookCheckPod")
 	s.NoErrorf(s.testCluster.K8sHelper.WaitForResourceDeletion(passingPod), "Error waiting for deleteion of passingPod")
 	s.NoErrorf(s.testCluster.K8sHelper.WaitForResourceDeletion(failingPod), "Error waiting for deleteion of failingPod")
+	s.NoErrorf(s.testCluster.K8sHelper.WaitForResourceDeletion(webhookCheckPod), "Error waiting for deleteion of webhookCheckPod")
 }
 
 func (s *AuditConfigBaseSuite) getWebhookLabelsString() string {
