@@ -140,11 +140,15 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		Data:   data,
 		Labels: k8sLabels,
 	}
+
+	scanJob.Discovery = &inventory.Discovery{}
 	if feature_flags.GetEnableWorkloadDiscovery() {
 		scanJob.Options = map[string]string{"all-namespaces": "true"}
-		scanJob.Discovery = &inventory.Discovery{
-			Targets: []string{"pods", "deployments", "daemonsets", "statefulsets", "replicasets", "jobs", "cronjobs"},
-		}
+		scanJob.Discovery.Targets = []string{"pods", "deployments", "daemonsets", "statefulsets", "replicasets", "jobs", "cronjobs"}
+	}
+
+	if feature_flags.GetAdmissionReviewDiscovery() {
+		scanJob.Discovery.Targets = append(scanJob.Discovery.Targets, "admissionreviews")
 	}
 
 	result, err := a.scanner.RunAdmissionReview(ctx, scanJob)
