@@ -41,16 +41,7 @@ func TestScanner(t *testing.T) {
 	err = yaml.Unmarshal(webhookPayload, &request)
 	require.NoError(t, err)
 
-	k8sObjectData, err := yaml.Marshal(request.Object)
-	require.NoError(t, err)
-
-	result, err := mClient.RunKubernetesManifest(context.Background(), &mondooclient.KubernetesManifestJob{
-		Files: []*mondooclient.File{
-			{
-				Data: k8sObjectData,
-			},
-			{},
-		},
+	result, err := mClient.RunAdmissionReview(context.Background(), &mondooclient.AdmissionReviewJob{
 		Labels: map[string]string{
 			"k8s.mondoo.com/author":     request.UserInfo.Username,
 			"k8s.mondoo.com/operation":  string(request.Operation),

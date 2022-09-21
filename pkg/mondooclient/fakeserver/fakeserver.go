@@ -25,7 +25,7 @@ func FakeServer() *httptest.Server {
 		}
 	})
 
-	mux.HandleFunc(mondooclient.RunKubernetesManifestEndpoint, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(mondooclient.RunAdmissionReviewEndpoint, func(w http.ResponseWriter, r *http.Request) {
 		result := &mondooclient.ScanResult{
 			Ok: true,
 			WorstScore: &mondooclient.Score{

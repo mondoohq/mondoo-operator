@@ -39,7 +39,6 @@ type Client interface {
 	ExchangeRegistrationToken(context.Context, *ExchangeRegistrationTokenInput) (*ExchangeRegistrationTokenOutput, error)
 
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
-	RunKubernetesManifest(context.Context, *KubernetesManifestJob) (*ScanResult, error)
 	RunAdmissionReview(context.Context, *AdmissionReviewJob) (*ScanResult, error)
 	ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool, managedBy string) (*ScanResult, error)
 	ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey string) (*Empty, error)
@@ -189,42 +188,10 @@ type HealthCheckResponse struct {
 }
 
 const (
-	RunKubernetesManifestEndpoint = "/Scan/RunKubernetesManifest"
+	RunAdmissionReviewEndpoint = "/Scan/RunAdmissionReview"
 	// A valid result would come back as a '2'
 	ValidScanResult = uint32(2)
 )
-
-func (s *mondooClient) RunKubernetesManifest(ctx context.Context, in *KubernetesManifestJob) (*ScanResult, error) {
-	url := s.ApiEndpoint + RunKubernetesManifestEndpoint
-
-	reqBodyBytes, err := json.Marshal(in)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %v", err)
-	}
-
-	respBodyBytes, err := s.request(ctx, url, reqBodyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse response: %v", err)
-	}
-
-	out := &ScanResult{}
-	if err = json.Unmarshal(respBodyBytes, out); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal proto response: %v", err)
-	}
-
-	return out, nil
-}
-
-type KubernetesManifestJob struct {
-	Files  []*File           `json:"files,omitempty"`
-	Labels map[string]string `json:"labels,omitempty"`
-	// Additional options for the manifest job
-	Options map[string]string `json:"options,omitempty"`
-	// Additional discovery settings for the manifest job
-	Discovery *inventory.Discovery `json:"discovery,omitempty"`
-}
-
-const RunAdmissionReviewEndpoint = "/Scan/RunAdmissionReview"
 
 func (s *mondooClient) RunAdmissionReview(ctx context.Context, in *AdmissionReviewJob) (*ScanResult, error) {
 	url := s.ApiEndpoint + RunAdmissionReviewEndpoint
