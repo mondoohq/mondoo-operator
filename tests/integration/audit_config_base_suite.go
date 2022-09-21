@@ -255,15 +255,12 @@ func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.Mondo
 
 	s.verifyWebhookAndStart(webhookListOpts, caCert)
 
-	zap.S().Info("Webhook should be working by now.")
-
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionFalse)
 	s.NoErrorf(err, "Admission shouldn't be in degraded state")
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 
-	time.Sleep(10 * time.Second)
 	s.checkPods(&auditConfig)
 }
 
@@ -506,6 +503,64 @@ func (s *AuditConfigBaseSuite) disableContainerImageResolution() func() {
 	}
 }
 
+func (s *AuditConfigBaseSuite) getWebhookCheckPod() *corev1.Pod {
+	labels := map[string]string{
+		"check-webhook": "true",
+	}
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "check-webhook",
+			Namespace: "mondoo-operator",
+			Labels:    labels,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:            "curl",
+					Image:           "curlimages/curl",
+					Command:         []string{"/bin/sh", "-c"},
+					Args:            []string{"sleep 60"},
+					ImagePullPolicy: corev1.PullAlways,
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+					SecurityContext: &corev1.SecurityContext{
+						RunAsNonRoot:             pointer.Bool(true),
+						RunAsUser:                pointer.Int64(1000),
+						ReadOnlyRootFilesystem:   pointer.Bool(true),
+						AllowPrivilegeEscalation: pointer.Bool(false),
+						Privileged:               pointer.Bool(false),
+					},
+					ReadinessProbe: &corev1.Probe{
+						InitialDelaySeconds: 2,
+						PeriodSeconds:       2,
+						ProbeHandler: corev1.ProbeHandler{
+							Exec: &corev1.ExecAction{
+								Command: []string{"/bin/sh", "-c", "curl --fail -k https://mondoo-client-webhook-service:443"},
+							},
+						},
+					},
+					LivenessProbe: &corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							Exec: &corev1.ExecAction{
+								Command: []string{"/bin/sh", "-c", "exit 0"},
+							},
+						},
+					},
+				},
+			},
+			AutomountServiceAccountToken: pointer.Bool(false),
+		},
+	}
+}
+
 func (s *AuditConfigBaseSuite) getPassingPod() *corev1.Pod {
 	labels := map[string]string{
 		"admission-result": "pass",
@@ -578,6 +633,19 @@ func (s *AuditConfigBaseSuite) getFailingPod() *corev1.Pod {
 func (s *AuditConfigBaseSuite) checkPods(auditConfig *mondoov2.MondooAuditConfig) {
 	passingPod := s.getPassingPod()
 	failingPod := s.getFailingPod()
+
+	webhookCheckPod := s.getWebhookCheckPod()
+	webhookCheckPod.Namespace = auditConfig.Namespace
+
+	zap.S().Info("Create a Pod which checks the webhook availability.")
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, webhookCheckPod),
+		"Failed to create Pod which checks the webhook availability.")
+
+	s.Truef(
+		s.testCluster.K8sHelper.IsPodReady(utils.LabelsToLabelSelector(webhookCheckPod.Labels), auditConfig.Namespace),
+		"Mondoo webhook check Pod is not in a Ready state.")
+	zap.S().Info("Webhook should be working by now.")
 
 	zap.S().Info("Create a Pod which should pass.")
 	s.NoErrorf(
