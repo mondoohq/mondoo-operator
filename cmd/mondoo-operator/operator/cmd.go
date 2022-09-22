@@ -1,7 +1,6 @@
 package operator
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -24,7 +23,6 @@ import (
 	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
-	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers"
 	"go.mondoo.com/mondoo-operator/controllers/integration"
@@ -35,7 +33,6 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -110,10 +107,6 @@ func init() {
 
 		scanApiStore := scan_api_store.NewScanApiStore(ctx)
 		go scanApiStore.Start()
-		if err := preloadScanApiUrls(scanApiStore, scheme, setupLog); err != nil {
-			setupLog.Error(err, "failed to preload scan API URLs")
-			return err
-		}
 		if err = (&controllers.MondooAuditConfigReconciler{
 			Client:                 mgr.GetClient(),
 			MondooClientBuilder:    controllers.MondooClientBuilder,
@@ -189,32 +182,4 @@ func preflightApiChecks(log logr.Logger) (bool, error) {
 	}
 
 	return true, nil
-}
-
-func preloadScanApiUrls(scanApiStore scan_api_store.ScanApiStore, scheme *runtime.Scheme, log logr.Logger) error {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		log.Error(err, "unable to get k8s config")
-		return err
-	}
-
-	kubeClient, err := client.New(cfg, client.Options{Scheme: scheme})
-	if err != nil {
-		log.Error(err, "unable to create k8s client")
-		return err
-	}
-
-	ctx := context.Background()
-	auditConfigs := &v1alpha2.MondooAuditConfigList{}
-	if err := kubeClient.List(ctx, auditConfigs); err != nil {
-		return err
-	}
-
-	for _, auditConfig := range auditConfigs.Items {
-		if err := scan_api_store.HandleAuditConfig(ctx, kubeClient, scanApiStore, auditConfig); err != nil {
-			log.Error(err, "failed to handle audit config", "namespace", auditConfig.Namespace, "name", auditConfig.Name)
-			return err
-		}
-	}
-	return nil
 }
