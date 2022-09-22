@@ -33,7 +33,6 @@ type ResourceMonitorController struct {
 }
 
 func NewResourceMonitorController(
-	ctx context.Context,
 	kubeClient client.Client,
 	createRes func() client.Object,
 	scanApiStore scan_api_store.ScanApiStore,
@@ -47,7 +46,7 @@ func NewResourceMonitorController(
 	return &ResourceMonitorController{
 		Client:       kubeClient,
 		createRes:    createRes,
-		debouncer:    debouncer.NewDebouncer(ctx, scanApiStore),
+		debouncer:    debouncer.NewDebouncer(scanApiStore),
 		resourceType: strings.ToLower(gvk.Kind),
 		scanApiStore: scanApiStore,
 	}
@@ -61,7 +60,17 @@ func (r *ResourceMonitorController) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r); err != nil {
 		return err
 	}
-	go r.debouncer.Start()
+
+	// This makes sure the debouncer is only started when the operator manager has started.
+	// It also couples the lifetime of the debouncer to the lifetime of the manager.
+	if err := mgr.Add(r); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *ResourceMonitorController) Start(ctx context.Context) error {
+	r.debouncer.Start(ctx)
 	return nil
 }
 

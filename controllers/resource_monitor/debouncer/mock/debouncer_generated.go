@@ -5,6 +5,7 @@
 package mock
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -46,13 +47,13 @@ func (mr *MockDebouncerMockRecorder) Add(res interface{}) *gomock.Call {
 }
 
 // Start mocks base method.
-func (m *MockDebouncer) Start() {
+func (m *MockDebouncer) Start(ctx context.Context) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Start")
+	m.ctrl.Call(m, "Start", ctx)
 }
 
 // Start indicates an expected call of Start.
-func (mr *MockDebouncerMockRecorder) Start() *gomock.Call {
+func (mr *MockDebouncerMockRecorder) Start(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockDebouncer)(nil).Start))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockDebouncer)(nil).Start), ctx)
 }

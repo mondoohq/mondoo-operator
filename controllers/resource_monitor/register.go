@@ -9,8 +9,6 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 package resource_monitor
 
 import (
-	"context"
-
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -29,9 +27,9 @@ var resourceTypes = []func() client.Object{
 	func() client.Object { return &batchv1.CronJob{} },
 }
 
-func RegisterResourceMonitors(ctx context.Context, mgr manager.Manager, scanApiStore scan_api_store.ScanApiStore) error {
+func RegisterResourceMonitors(mgr manager.Manager, scanApiStore scan_api_store.ScanApiStore) error {
 	for _, r := range resourceTypes {
-		if err := NewResourceMonitorController(ctx, mgr.GetClient(), r, scanApiStore).SetupWithManager(mgr); err != nil {
+		if err := NewResourceMonitorController(mgr.GetClient(), r, scanApiStore).SetupWithManager(mgr); err != nil {
 			return err
 		}
 	}
