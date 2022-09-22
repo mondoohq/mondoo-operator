@@ -124,19 +124,19 @@ func (mr *MockClientMockRecorder) IntegrationReportStatus(arg0, arg1 interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IntegrationReportStatus", reflect.TypeOf((*MockClient)(nil).IntegrationReportStatus), arg0, arg1)
 }
 
-// RunKubernetesManifest mocks base method.
-func (m *MockClient) RunKubernetesManifest(arg0 context.Context, arg1 *mondooclient.KubernetesManifestJob) (*mondooclient.ScanResult, error) {
+// RunAdmissionReview mocks base method.
+func (m *MockClient) RunAdmissionReview(arg0 context.Context, arg1 *mondooclient.AdmissionReviewJob) (*mondooclient.ScanResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RunKubernetesManifest", arg0, arg1)
+	ret := m.ctrl.Call(m, "RunAdmissionReview", arg0, arg1)
 	ret0, _ := ret[0].(*mondooclient.ScanResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// RunKubernetesManifest indicates an expected call of RunKubernetesManifest.
-func (mr *MockClientMockRecorder) RunKubernetesManifest(arg0, arg1 interface{}) *gomock.Call {
+// RunAdmissionReview indicates an expected call of RunAdmissionReview.
+func (mr *MockClientMockRecorder) RunAdmissionReview(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunKubernetesManifest", reflect.TypeOf((*MockClient)(nil).RunKubernetesManifest), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunAdmissionReview", reflect.TypeOf((*MockClient)(nil).RunAdmissionReview), arg0, arg1)
 }
 
 // ScanKubernetesResources mocks base method.

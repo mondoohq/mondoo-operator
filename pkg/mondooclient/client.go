@@ -22,6 +22,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/garbagecollection"
 	"go.mondoo.com/mondoo-operator/pkg/inventory"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -38,7 +39,7 @@ type Client interface {
 	ExchangeRegistrationToken(context.Context, *ExchangeRegistrationTokenInput) (*ExchangeRegistrationTokenOutput, error)
 
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
-	RunKubernetesManifest(context.Context, *KubernetesManifestJob) (*ScanResult, error)
+	RunAdmissionReview(context.Context, *AdmissionReviewJob) (*ScanResult, error)
 	ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool, managedBy string) (*ScanResult, error)
 	ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey string) (*Empty, error)
 	GarbageCollectAssets(context.Context, *garbagecollection.GarbageCollectOptions) error
@@ -187,13 +188,13 @@ type HealthCheckResponse struct {
 }
 
 const (
-	RunKubernetesManifestEndpoint = "/Scan/RunKubernetesManifest"
+	RunAdmissionReviewEndpoint = "/Scan/RunAdmissionReview"
 	// A valid result would come back as a '2'
 	ValidScanResult = uint32(2)
 )
 
-func (s *mondooClient) RunKubernetesManifest(ctx context.Context, in *KubernetesManifestJob) (*ScanResult, error) {
-	url := s.ApiEndpoint + RunKubernetesManifestEndpoint
+func (s *mondooClient) RunAdmissionReview(ctx context.Context, in *AdmissionReviewJob) (*ScanResult, error) {
+	url := s.ApiEndpoint + RunAdmissionReviewEndpoint
 
 	reqBodyBytes, err := json.Marshal(in)
 	if err != nil {
@@ -213,9 +214,11 @@ func (s *mondooClient) RunKubernetesManifest(ctx context.Context, in *Kubernetes
 	return out, nil
 }
 
-type KubernetesManifestJob struct {
-	Files  []*File           `json:"files,omitempty"`
-	Labels map[string]string `json:"labels,omitempty"`
+type AdmissionReviewJob struct {
+	Data *structpb.Struct `json:"data,omitempty"`
+	// Map of string keys and values that can be used to organize and categorize the assets
+	Labels     map[string]string `json:"labels,omitempty"`
+	ReportType ReportType        `json:"report_type,omitempty"`
 	// Additional options for the manifest job
 	Options map[string]string `json:"options,omitempty"`
 	// Additional discovery settings for the manifest job
