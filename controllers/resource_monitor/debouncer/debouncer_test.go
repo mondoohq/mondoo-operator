@@ -44,7 +44,23 @@ func (s *DebouncerSuite) AfterTest(suiteName, testName string) {
 	s.mockCtrl.Finish()
 }
 
+func (s *DebouncerSuite) TestStart_IgnoreInitialResources() {
+	go s.debouncer.Start()
+
+	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
+	for _, k := range keys {
+		for i := 0; i < 100; i++ {
+			s.debouncer.Add(k)
+		}
+	}
+
+	time.Sleep(s.debouncer.flushTimeout + 100*time.Millisecond)
+
+	s.Empty(s.debouncer.resources)
+}
+
 func (s *DebouncerSuite) TestStart_Debounce() {
+	s.debouncer.isFirstFlush = false
 	go s.debouncer.Start()
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
@@ -73,6 +89,7 @@ func (s *DebouncerSuite) TestStart_Debounce() {
 }
 
 func (s *DebouncerSuite) TestStart_NoScanApiClients() {
+	s.debouncer.isFirstFlush = false
 	go s.debouncer.Start()
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
@@ -91,6 +108,7 @@ func (s *DebouncerSuite) TestStart_NoScanApiClients() {
 }
 
 func (s *DebouncerSuite) TestStart_MultipleScanApiClients() {
+	s.debouncer.isFirstFlush = false
 	go s.debouncer.Start()
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}

@@ -28,6 +28,7 @@ type Debouncer interface {
 }
 
 type debouncer struct {
+	isFirstFlush bool
 	ctx          context.Context
 	flushTimeout time.Duration
 	resChan      chan string
@@ -37,6 +38,7 @@ type debouncer struct {
 
 func NewDebouncer(ctx context.Context, scanApiStore scan_api_store.ScanApiStore) Debouncer {
 	return &debouncer{
+		isFirstFlush: true,
 		ctx:          ctx,
 		flushTimeout: defaultFlushTimeout * time.Second,
 		resChan:      make(chan string),
@@ -53,6 +55,15 @@ func (d *debouncer) Start() {
 		case res := <-d.resChan:
 			d.resources[res] = struct{}{}
 		case <-time.After(d.flushTimeout):
+			// If this is the first flush do not trigger scan for the resources. Initially, when the operator
+			// starts all current cluster resources are observed as "new". We don't want to scan the entire
+			// cluster for every operator start.
+			if d.isFirstFlush {
+				d.resources = make(map[string]struct{})
+				d.isFirstFlush = false
+				continue
+			}
+
 			clients := d.scanApiStore.GetAll()
 
 			for res := range d.resources {
