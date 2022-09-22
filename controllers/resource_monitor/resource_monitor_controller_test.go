@@ -44,7 +44,6 @@ func (s *ResourceMonitorControllerSuite) AfterTest(suiteName, testName string) {
 func (s *ResourceMonitorControllerSuite) TestReconcile_Pod() {
 	ctx := context.Background()
 	r := NewResourceMonitorController(
-		ctx,
 		s.fakeClientBuilder.Build(),
 		func() client.Object { return &corev1.Pod{} },
 		nil)

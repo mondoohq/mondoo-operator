@@ -35,7 +35,7 @@ func (s *DebouncerSuite) BeforeTest(suiteName, testName string) {
 	s.mockCtrl = gomock.NewController(s.T())
 	s.mockMondooClient = mock.NewMockClient(s.mockCtrl)
 	s.scanApiStore = scanapistoremock.NewMockScanApiStore(s.mockCtrl)
-	s.debouncer = NewDebouncer(s.ctx, s.scanApiStore).(*debouncer)
+	s.debouncer = NewDebouncer(s.scanApiStore).(*debouncer)
 	s.debouncer.flushTimeout = 1 * time.Second
 }
 
@@ -44,8 +44,24 @@ func (s *DebouncerSuite) AfterTest(suiteName, testName string) {
 	s.mockCtrl.Finish()
 }
 
+func (s *DebouncerSuite) TestStart_IgnoreInitialResources() {
+	go s.debouncer.Start(s.ctx)
+
+	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
+	for _, k := range keys {
+		for i := 0; i < 100; i++ {
+			s.debouncer.Add(k)
+		}
+	}
+
+	time.Sleep(s.debouncer.flushTimeout + 100*time.Millisecond)
+
+	s.Empty(s.debouncer.resources)
+}
+
 func (s *DebouncerSuite) TestStart_Debounce() {
-	go s.debouncer.Start()
+	s.debouncer.isFirstFlush = false
+	go s.debouncer.Start(s.ctx)
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
 	for _, k := range keys {
@@ -73,7 +89,8 @@ func (s *DebouncerSuite) TestStart_Debounce() {
 }
 
 func (s *DebouncerSuite) TestStart_NoScanApiClients() {
-	go s.debouncer.Start()
+	s.debouncer.isFirstFlush = false
+	go s.debouncer.Start(s.ctx)
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
 	for _, k := range keys {
@@ -91,7 +108,8 @@ func (s *DebouncerSuite) TestStart_NoScanApiClients() {
 }
 
 func (s *DebouncerSuite) TestStart_MultipleScanApiClients() {
-	go s.debouncer.Start()
+	s.debouncer.isFirstFlush = false
+	go s.debouncer.Start(s.ctx)
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
 	for _, k := range keys {

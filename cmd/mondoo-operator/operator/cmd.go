@@ -126,7 +126,7 @@ func init() {
 			return err
 		}
 
-		if err = resource_monitor.RegisterResourceMonitors(ctx, mgr, scanApiStore); err != nil {
+		if err = resource_monitor.RegisterResourceMonitors(mgr, scanApiStore); err != nil {
 			setupLog.Error(err, "unable to register resource monitors", "controller", "resource_monitor")
 			return err
 		}
