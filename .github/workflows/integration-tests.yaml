@@ -31,8 +31,6 @@ jobs:
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
 
-      - run: exit 1
-
       - name: Start minikube
         uses: medyagh/setup-minikube@master
         if: matrix.k8s-distro == 'minikube'
@@ -88,13 +86,13 @@ jobs:
     runs-on: ubuntu-latest
     name: Send Discord notification
     needs: [integration-tests]
-    if: ${{ always() && contains(join(needs.*.result, ','), 'fail') }}
+    # Run only if the previous job has failed and only if it's running against the main branch
+    if: ${{ always() && contains(join(needs.*.result, ','), 'fail') && github.ref_name == 'main' }}
     steps:
       - uses: sarisia/actions-status-discord@v1
-         #&& github.ref_name == 'main'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           status: Failure
           url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          description: Workflow ${{ github.workflow }} failed.
+          description: Workflow ${{ github.workflow }} failed for commit ${{ github.sha }}.
           color: 0xff4d4d
