@@ -81,3 +81,11 @@ jobs:
         with:
           name: test-logs-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
+
+      - uses: sarisia/actions-status-discord@v1
+        if: failure() && GITHUB_REF_NAME == 'main'
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          url: ${{ env.GITHUB_SERVER_URL}}/${{ env.GITHUB_REPOSITORY }}/actions/runs/${{ env.GITHUB_RUN_ID }}
+          description: Workflow ${{ github.workflow }} failed.
+          color: 0xff4d4d
