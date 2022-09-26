@@ -31,6 +31,8 @@ jobs:
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
 
+      - run: exit 1
+
       - name: Start minikube
         uses: medyagh/setup-minikube@master
         if: matrix.k8s-distro == 'minikube'
@@ -82,10 +84,17 @@ jobs:
           name: test-logs-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
 
+  discord-notification:
+    runs-on: ubuntu-latest
+    name: Send Discord notification
+    needs: [integration-tests]
+    if: ${{ always() && contains(join(needs.*.result, ','), 'fail') }}
+    steps:
       - uses: sarisia/actions-status-discord@v1
-        if: failure() && github.ref_name == 'main'
+         #&& github.ref_name == 'main'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          url: ${{ env.GITHUB_SERVER_URL}}/${{ env.GITHUB_REPOSITORY }}/actions/runs/${{ env.GITHUB_RUN_ID }}
+          status: Failure
+          url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           description: Workflow ${{ github.workflow }} failed.
           color: 0xff4d4d
