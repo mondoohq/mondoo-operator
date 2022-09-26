@@ -81,3 +81,18 @@ jobs:
         with:
           name: test-logs-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
+
+  discord-notification:
+    runs-on: ubuntu-latest
+    name: Send Discord notification
+    needs: [integration-tests]
+    # Run only if the previous job has failed and only if it's running against the main branch
+    if: ${{ always() && contains(join(needs.*.result, ','), 'fail') && github.ref_name == 'main' }}
+    steps:
+      - uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: Failure
+          url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          description: Workflow ${{ github.workflow }} failed for commit ${{ github.sha }}.
+          color: 0xff4d4d

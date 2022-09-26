@@ -8,8 +8,9 @@ on:
         type: string
 
 jobs:
-  integration_tests:
+  integration-tests:
     uses: ./.github/workflows/integration-tests.yaml
     with:
       mondooClientImageTag: ${{ github.event.inputs.mondooClientImageTag }}
     secrets: inherit
+    
