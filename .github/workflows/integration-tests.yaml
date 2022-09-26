@@ -83,7 +83,7 @@ jobs:
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
 
       - uses: sarisia/actions-status-discord@v1
-        if: failure() && GITHUB_REF_NAME == 'main'
+        if: failure() && github.ref_name == 'main'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           url: ${{ env.GITHUB_SERVER_URL}}/${{ env.GITHUB_REPOSITORY }}/actions/runs/${{ env.GITHUB_RUN_ID }}
