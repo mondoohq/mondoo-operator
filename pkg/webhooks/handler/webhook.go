@@ -101,7 +101,6 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 	}
 
 	obj, err := a.objFromRaw(req.Object)
-	handlerlog.Info("admission obj", "obj", obj)
 	if err == nil {
 		if !shouldScanObject(obj) {
 			handlerlog.Info("skipping because the resource has a parent", "resource", resource)
@@ -162,7 +161,7 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		passed = true
 	}
 
-	handlerlog.Info("Scan result", "shouldAdmit", passed, "kind", req.Kind.Kind, "resource", resource)
+	handlerlog.Info("Scan result", "shouldAdmit", passed, "kind", req.Kind.Kind, "resource", resource, "worstscore", result.WorstScore)
 
 	// Depending on the mode, we either just allow the resource through no matter the scan result
 	// or allow/deny based on the scan result
