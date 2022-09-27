@@ -1,4 +1,4 @@
-name: Validate Github Actions
+name: Validate GitHub Actions
 on:
   pull_request:
   push:
@@ -9,7 +9,7 @@ on:
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
-    name: Verify Github Actions
+    name: Verify GitHub Actions
     steps:
       - uses: actions/checkout@v3
       - name: Import environment variables from file
