@@ -579,13 +579,13 @@ func (s *AuditConfigBaseSuite) getFailingDeployment() *appsv1.Deployment {
 	labels := map[string]string{
 		"admission-result": "fail",
 	}
-	pod := s.getPassingDeployment().DeepCopy()
-	pod.ObjectMeta.Name = "failing-deployment"
-	pod.ObjectMeta.Labels = labels
-	pod.Spec.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
+	deployment := s.getPassingDeployment().DeepCopy()
+	deployment.ObjectMeta.Name = "failing-deployment"
+	deployment.ObjectMeta.Labels = labels
+	deployment.Spec.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
 		Privileged: pointer.Bool(true),
 	}
-	return pod
+	return deployment
 }
 
 func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAuditConfig) {
