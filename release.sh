@@ -1,6 +1,9 @@
 #!/bin/bash
 # This script updates all the versions to do a release:
 # ./release.sh 0.0.13 0.1.6
+
+set -e
+
 echo "previous version: $1";
 PREV_VERSION=$1
 
