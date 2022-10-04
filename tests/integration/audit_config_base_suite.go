@@ -751,7 +751,10 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 		return fmt.Errorf("couldn't create NodePort service for webhook: %w", err)
 	}
 	defer func() {
-		s.testCluster.K8sHelper.DeleteResourceIfExists(nodePortService)
+		err := s.testCluster.K8sHelper.DeleteResourceIfExists(nodePortService)
+		if err != nil {
+			zap.S().Warnf("Couldn't delete NodePort service for webhook: %v", err)
+		}
 	}()
 
 	nodeList := &corev1.NodeList{}
@@ -763,8 +766,9 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{Transport: customTransport}
 	for i := 0; i < maxRetries; i++ {
-		_, err = client.Get(webhookUrl)
+		resp, err := client.Get(webhookUrl)
 		if err == nil {
+			resp.Body.Close()
 			return nil
 		}
 		time.Sleep(1 * time.Second)
