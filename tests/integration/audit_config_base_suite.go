@@ -764,8 +764,13 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	s.NotEmptyf(nodeList.Items, "Couldn't find any nodes in the cluster")
 
 	// DEBUG ONLY
-	nodePortServiceEndpoints := &corev1.Endpoints{}
-	err = s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(nodePortService), nodePortServiceEndpoints)
+	nodePortServiceEndpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nodePortService.Name,
+			Namespace: nodePortService.Namespace,
+		},
+	}
+	err = s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(nodePortServiceEndpoints), nodePortServiceEndpoints)
 	s.NoErrorf(err, "Couldn't get endpoints for NodePort service for webhook")
 	zap.S().Info("Endpoints for NodePort service: ", nodePortServiceEndpoints)
 	zap.S().Info("Addresses for nodes: ", nodeList.Items[0].Status.Addresses)
