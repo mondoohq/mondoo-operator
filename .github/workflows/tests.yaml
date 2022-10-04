@@ -11,7 +11,6 @@ on:
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]' || !github.event.pull_request_target.head.repo.fork
     name: Unit tests
     steps:
       - uses: actions/checkout@v3
