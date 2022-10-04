@@ -763,6 +763,16 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodeList))
 	s.NotEmptyf(nodeList.Items, "Couldn't find any nodes in the cluster")
 
+	// DEBUG ONLY
+	nodePortServiceEndpoints := &corev1.Endpoints{}
+	err = s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(nodePortService), nodePortServiceEndpoints)
+	s.NoErrorf(err, "Couldn't get endpoints for NodePort service for webhook")
+	zap.S().Info("Endpoints for NodePort service: ", nodePortServiceEndpoints)
+	zap.S().Info("Addresses for nodes: ", nodeList.Items[0].Status.Addresses)
+	err = s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(nodePortService), nodePortService)
+	s.NoErrorf(err, "Couldn't get NodePort service for webhook")
+	zap.S().Info("Endpoints of NodePort Service: ", nodePortService)
+	// END DEBUG ONLY
 	maxRetries := 30
 	webhookUrl := fmt.Sprintf("https://%s:%d/validate-k8s-mondoo-com", nodeList.Items[0].Status.Addresses[0].Address, webhookNodePort)
 	zap.S().Infof("Webhook URL: %s", webhookUrl)
