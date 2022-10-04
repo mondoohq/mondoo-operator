@@ -14,7 +14,9 @@ import batchv1 "k8s.io/api/batch/v1"
 // successful.
 func AreCronJobsSuccessful(cs []batchv1.CronJob) bool {
 	for _, c := range cs {
-		if c.Status.LastSuccessfulTime.Before(c.Status.LastScheduleTime) {
+		// If there are no active jobs at the moment and the last successful run is not before the last
+		// scheduled job everything is working correctly.
+		if len(c.Status.Active) == 0 && c.Status.LastSuccessfulTime.Before(c.Status.LastScheduleTime) {
 			return false
 		}
 	}
