@@ -383,7 +383,8 @@ func TestMondooAuditConfigStatus(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(mondooAuditConfig), mondooAuditConfig)
+	err = fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(mondooAuditConfig), mondooAuditConfig)
+	assert.NoError(t, err)
 
 	assert.NotEmptyf(t, mondooAuditConfig.Status, "Status shouldn't be empty")
 	assert.NotEmptyf(t, mondooAuditConfig.Status.ReconciledByOperatorVersion, "ReconciledByOperatorVersion shouldn't be empty")
