@@ -51,7 +51,6 @@ type MondooAuditConfigReconciler struct {
 	client.Client
 	MondooClientBuilder    func(mondooclient.ClientOptions) mondooclient.Client
 	ContainerImageResolver mondoo.ContainerImageResolver
-	MondooAuditConfig      *v1alpha2.MondooAuditConfig
 	StatusReporter         *status.StatusReporter
 	RunningOnOpenShift     bool
 	ScanApiStore           scan_api_store.ScanApiStore
@@ -98,7 +97,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	mondooAuditConfig := &v1alpha2.MondooAuditConfig{}
 
 	reconcileError = r.Get(ctx, req.NamespacedName, mondooAuditConfig)
-	r.MondooAuditConfig = mondooAuditConfig
 
 	if reconcileError != nil {
 		if errors.IsNotFound(reconcileError) {
@@ -195,16 +193,11 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			statusPodNames := sets.NewString(mondooAuditConfig.Status.Pods...)
 
 			if !statusPodNames.Equal(podListNames) {
-				r.MondooAuditConfig.Status.Pods = podListNames.List()
+				mondooAuditConfig.Status.Pods = podListNames.List()
 			}
 		}
 
-		// Update status.ReconciledByOperatorVersion to the running operator version
-		if r.MondooAuditConfig.Status.ReconciledByOperatorVersion != version.Version {
-			r.MondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
-		}
-
-		deferFuncErr = mondoo.UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, r.MondooAuditConfig, log)
+		deferFuncErr = mondoo.UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log)
 		// do not overwrite errors which happened before the defered function is called
 		// but in case an error happend in the defered func, also overwrite the reconcileResult
 		if reconcileError == nil && deferFuncErr != nil {
@@ -285,7 +278,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	// Update status.ReconciledByOperatorVersion to the running operator version
 	// This should only happen, after all objects have been reconciled
-	r.MondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
+	mondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
 
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
 }

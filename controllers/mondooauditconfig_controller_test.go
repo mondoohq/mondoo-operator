@@ -372,7 +372,6 @@ func TestMondooAuditConfigStatus(t *testing.T) {
 	reconciler := &MondooAuditConfigReconciler{
 		MondooClientBuilder: testMondooClientBuilder,
 		Client:              fakeClient,
-		MondooAuditConfig:   mondooAuditConfig,
 		ScanApiStore:        scanApiStore,
 	}
 
@@ -384,9 +383,11 @@ func TestMondooAuditConfigStatus(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	assert.NotEmptyf(t, reconciler.MondooAuditConfig.Status, "Status shouldn't be empty")
-	assert.NotEmptyf(t, reconciler.MondooAuditConfig.Status.ReconciledByOperatorVersion, "ReconciledByOperatorVersion shouldn't be empty")
-	assert.Equalf(t, reconciler.MondooAuditConfig.Status.ReconciledByOperatorVersion, version.Version, "expected versions to be equal")
+	fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(mondooAuditConfig), mondooAuditConfig)
+
+	assert.NotEmptyf(t, mondooAuditConfig.Status, "Status shouldn't be empty")
+	assert.NotEmptyf(t, mondooAuditConfig.Status.ReconciledByOperatorVersion, "ReconciledByOperatorVersion shouldn't be empty")
+	assert.Equalf(t, mondooAuditConfig.Status.ReconciledByOperatorVersion, version.Version, "expected versions to be equal")
 }
 
 func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {
