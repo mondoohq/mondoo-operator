@@ -199,7 +199,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	d := s.createDeploymentHandler()
 
 	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
-	s.scanApiStoreMock.EXPECT().Add(scanApiUrl, "token", "").Times(3)
+	s.scanApiStoreMock.EXPECT().Add(scanApiUrl, "token", "").Times(4)
 
 	// Reconcile to create all resources
 	result, err := d.Reconcile(s.ctx)
@@ -251,6 +251,24 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	s.True(result.IsZero())
 
 	// Verify the kubernetes resources scanning status is set to available
+	condition = d.Mondoo.Status.Conditions[1]
+	s.Equal("Kubernetes Resources Scanning is Available", condition.Message)
+	s.Equal("KubernetesResourcesScanningAvailable", condition.Reason)
+	s.Equal(corev1.ConditionFalse, condition.Status)
+
+	// Make the jobs active
+	cronJobs.Items[0].Status.LastScheduleTime = &metaNow
+	cronJobs.Items[0].Status.LastSuccessfulTime = &metaHourAgo
+	// Add an entry of an active job
+	cronJobs.Items[0].Status.Active = append(cronJobs.Items[0].Status.Active, corev1.ObjectReference{})
+	s.NoError(d.KubeClient.Update(s.ctx, &cronJobs.Items[0]))
+
+	// Reconcile to update the audit config status
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Verify the kubernetes resources scanning status is set to available when there is an active scan
 	condition = d.Mondoo.Status.Conditions[1]
 	s.Equal("Kubernetes Resources Scanning is Available", condition.Message)
 	s.Equal("KubernetesResourcesScanningAvailable", condition.Reason)
