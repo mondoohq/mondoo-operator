@@ -3,7 +3,9 @@ package integration
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -17,8 +19,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	mondooadmission "go.mondoo.com/mondoo-operator/controllers/admission"
@@ -32,6 +36,8 @@ import (
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
+
+const webhookNodePort = 31234
 
 type AuditConfigBaseSuite struct {
 	suite.Suite
@@ -263,7 +269,8 @@ func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.Mondo
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 
-	time.Sleep(10 * time.Second)
+	err = s.checkWebhookAvailability()
+	s.NoErrorf(err, "Couldn't access Webhook via NodePort")
 	s.checkDeployments(&auditConfig)
 }
 
@@ -716,4 +723,51 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 	s.NoErrorf(s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc), "Failed to add CA data to Webhook")
 
 	zap.S().Info("Wait for webhook to start working.")
+}
+
+func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
+	nodePortService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-webhook-nodeport-service", s.auditConfig.Name),
+			Namespace: s.auditConfig.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					NodePort:   int32(webhookNodePort),
+					Protocol:   corev1.ProtocolTCP,
+					TargetPort: intstr.FromInt(webhook.DefaultPort),
+					Port:       int32(443),
+				},
+			},
+
+			Type:     corev1.ServiceTypeNodePort,
+			Selector: mondooadmission.WebhookDeploymentLabels(),
+		},
+	}
+
+	err := s.testCluster.K8sHelper.Clientset.Create(s.ctx, nodePortService)
+	if err != nil {
+		return fmt.Errorf("couldn't create NodePort service for webhook: %w", err)
+	}
+	defer func() {
+		s.testCluster.K8sHelper.DeleteResourceIfExists(nodePortService)
+	}()
+
+	nodeList := &corev1.NodeList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodeList))
+
+	maxRetries := 30
+	webhookUrl := fmt.Sprintf("https://%s:%d/validate-k8s-mondoo-com", nodeList.Items[0].Status.Addresses[0].Address, webhookNodePort)
+	customTransport := http.DefaultTransport.(*http.Transport).Clone()
+	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	client := &http.Client{Transport: customTransport}
+	for i := 0; i < maxRetries; i++ {
+		_, err = client.Get(webhookUrl)
+		if err == nil {
+			return nil
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return fmt.Errorf("webhook not available: %w", err)
 }

@@ -114,6 +114,14 @@ module "eks" {
       type        = "ingress"
       cidr_blocks = ["0.0.0.0/0"]
     }
+    ingress_webhook_node_port = {
+      description = "Allow ingress to Mondoo webhook NodePort (integration tests only!)"
+      protocol    = "tcp"
+      from_port   = 31234
+      to_port     = 31234
+      type        = "ingress"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
     ingress_self_all = {
       description = "Node to node all ports/protocols"
       protocol    = "-1"
