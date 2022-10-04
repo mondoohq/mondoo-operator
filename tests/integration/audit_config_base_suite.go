@@ -757,21 +757,28 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 		}
 	}()
 
+	zap.S().Info("Created NodePort service for webhook.")
+
 	nodeList := &corev1.NodeList{}
 	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodeList))
+	s.NotEmptyf(nodeList.Items, "Couldn't find any nodes in the cluster")
 
 	maxRetries := 30
 	webhookUrl := fmt.Sprintf("https://%s:%d/validate-k8s-mondoo-com", nodeList.Items[0].Status.Addresses[0].Address, webhookNodePort)
+	zap.S().Infof("Webhook URL: %s", webhookUrl)
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{Transport: customTransport}
 	for i := 0; i < maxRetries; i++ {
+		time.Sleep(1 * time.Second)
 		resp, err := client.Get(webhookUrl)
 		if err == nil {
+			zap.S().Infof("Webhook is available: %s", resp.Status)
 			resp.Body.Close()
 			return nil
+		} else {
+			zap.S().Warnf("Webhook is not available yet: %v", err)
 		}
-		time.Sleep(1 * time.Second)
 	}
 	return fmt.Errorf("webhook not available: %w", err)
 }
