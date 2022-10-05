@@ -63,4 +63,6 @@ resource "azurerm_network_security_rule" "nodeport_webhook" {
   destination_address_prefix  = "*"
   resource_group_name         = azurerm_kubernetes_cluster.cluster.node_resource_group
   network_security_group_name = data.azurerm_resources.node_nsg.resources.0.name
+
+  depends_on = [azurerm_resources.node_nsg]
 }

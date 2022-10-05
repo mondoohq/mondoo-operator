@@ -38,6 +38,7 @@ resource "google_compute_firewall" "nodeport_webhook" {
     ports     = ["31234"]
   }
 
+source_ranges = ["0.0.0.0/0"]
   target_tags = ["operator-integration-tests"]
 }
 
