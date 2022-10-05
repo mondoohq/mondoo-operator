@@ -1,3 +1,4 @@
+
 # Mondoo Operator for Kubernetes
 
 [![Tests](https://github.com/mondoohq/mondoo-operator/actions/workflows/tests.yaml/badge.svg)](https://github.com/mondoohq/mondoo-operator/actions/workflows/tests.yaml)
