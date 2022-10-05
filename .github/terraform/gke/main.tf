@@ -23,23 +23,7 @@ resource "google_container_node_pool" "node_pool" {
   node_config {
     spot         = true
     machine_type = "e2-standard-2"
-    tags         = ["operator-integration-tests"]
   }
-}
-
-resource "google_compute_firewall" "nodeport_webhook" {
-  project     = var.project_id
-  name        = "webhook-node-port"
-  network     = "default"
-  description = "Allow acces to the NodePort of the admission webhook"
-
-  allow {
-    protocol  = "tcp"
-    ports     = ["31234"]
-  }
-
-source_ranges = ["0.0.0.0/0"]
-  target_tags = ["operator-integration-tests"]
 }
 
 data "google_client_config" "default" {}

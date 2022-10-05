@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -19,10 +20,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	mondooadmission "go.mondoo.com/mondoo-operator/controllers/admission"
@@ -37,7 +36,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-const webhookNodePort = 31234
+const webhookNodePort = 18443
 
 type AuditConfigBaseSuite struct {
 	suite.Suite
@@ -270,7 +269,7 @@ func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.Mondo
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 
 	err = s.checkWebhookAvailability()
-	s.NoErrorf(err, "Couldn't access Webhook via NodePort")
+	s.NoErrorf(err, "Couldn't access Webhook via port-forward")
 	s.checkDeployments(&auditConfig)
 }
 
@@ -726,55 +725,31 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 }
 
 func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
-	nodePortService := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-webhook-nodeport-service", s.auditConfig.Name),
-			Namespace: s.auditConfig.Namespace,
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					NodePort:   int32(webhookNodePort),
-					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(webhook.DefaultPort),
-					Port:       int32(443),
-				},
-			},
-
-			Type:     corev1.ServiceTypeNodePort,
-			Selector: mondooadmission.WebhookDeploymentLabels(),
-		},
+	webhookService := mondooadmission.WebhookService(s.auditConfig.Namespace, s.auditConfig)
+	// there is this package https://pkg.go.dev/k8s.io/client-go/tools/portforward
+	// But it seems this is a bit complicated in combination with minijube
+	// b/c of that we use kubectl dirrectly
+	kubectlArgs := []string{
+		"-n",
+		webhookService.Namespace,
+		"port-forward",
+		"svc/" + webhookService.Name,
+		fmt.Sprintf("%d:%d", webhookNodePort, webhookService.Spec.Ports[0].Port),
 	}
 
-	err := s.testCluster.K8sHelper.Clientset.Create(s.ctx, nodePortService)
+	cmd := exec.Command("kubectl", kubectlArgs...)
+	err := cmd.Start()
 	if err != nil {
-		return fmt.Errorf("couldn't create NodePort service for webhook: %w", err)
+		return fmt.Errorf("couldn't start port-forward: %w", err)
 	}
 	defer func() {
-		err := s.testCluster.K8sHelper.DeleteResourceIfExists(nodePortService)
-		if err != nil {
-			zap.S().Warnf("Couldn't delete NodePort service for webhook: %v", err)
-		}
+		zap.S().Info("Killing port-forward with pid: ", cmd.Process.Pid)
+		cmd.Process.Kill()
 	}()
+	zap.S().Info("Created port-forward via kubectl for webhook with pid: ", cmd.Process.Pid)
 
-	zap.S().Info("Created NodePort service for webhook.")
-
-	nodeList := &corev1.NodeList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodeList))
-	s.NotEmptyf(nodeList.Items, "Couldn't find any nodes in the cluster")
-
-	// DEBUG ONLY
-	zap.S().Info("Addresses for nodes: ", nodeList.Items[0].Status.Addresses)
-	// END DEBUG ONLY
-	nodeIPAddress := nodeList.Items[0].Status.Addresses[0].Address
-	for _, address := range nodeList.Items[0].Status.Addresses {
-		if address.Type == corev1.NodeExternalIP {
-			nodeIPAddress = address.Address
-			break
-		}
-	}
 	maxRetries := 30
-	webhookUrl := fmt.Sprintf("https://%s:%d/validate-k8s-mondoo-com", nodeIPAddress, webhookNodePort)
+	webhookUrl := fmt.Sprintf("https://127.0.0.1:%d/validate-k8s-mondoo-com", webhookNodePort)
 	zap.S().Infof("Webhook URL: %s", webhookUrl)
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}

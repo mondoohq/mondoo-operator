@@ -17,6 +17,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -574,4 +575,12 @@ func (k8sh *K8sHelper) CheckForReconciledOperatorVersion(auditConfig *api.Mondoo
 	})
 
 	return err
+}
+
+func (k8sh *K8sHelper) GetPortForwardUrl(resourceType, resourceName, resourceNamespace string) *url.URL {
+	return k8sh.kubeClient.RESTClient().Post().
+		Resource(resourceType).
+		Namespace(resourceNamespace).
+		Name(resourceName).
+		SubResource("portforward").URL()
 }

@@ -42,31 +42,3 @@ resource "azurerm_kubernetes_cluster" "cluster" {
     Environment = "Mondoo Operator Tests"
   }
 }
-
-resource "time_sleep" "wait_for_nsg" {
-  create_duration = "30s"
-# although the cluster is already created, the Network Security Group might take longer
-  depends_on = [azurerm_kubernetes_cluster.cluster]
-}
-
-data "azurerm_resources" "node_nsg" {
-  resource_group_name = azurerm_kubernetes_cluster.cluster.node_resource_group
-
-  type = "Microsoft.Network/networkSecurityGroups"
-
-  depends_on = [time_sleep.wait_for_nsg]
-}
-
-resource "azurerm_network_security_rule" "nodeport_webhook" {
-  name                        = "webhook-node-port"
-  priority                    = 101
-  direction                   = "Inbound"
-  access                      = "Allow"
-  protocol                    = "Tcp"
-  source_port_range           = "*"
-  destination_port_range      = "31234"
-  source_address_prefix       = "*"
-  destination_address_prefix  = "*"
-  resource_group_name         = azurerm_kubernetes_cluster.cluster.node_resource_group
-  network_security_group_name = data.azurerm_resources.node_nsg.resources.0.name
-}
