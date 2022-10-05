@@ -764,22 +764,17 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	s.NotEmptyf(nodeList.Items, "Couldn't find any nodes in the cluster")
 
 	// DEBUG ONLY
-	nodePortServiceEndpoints := &corev1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      nodePortService.Name,
-			Namespace: nodePortService.Namespace,
-		},
-	}
-	err = s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(nodePortServiceEndpoints), nodePortServiceEndpoints)
-	s.NoErrorf(err, "Couldn't get endpoints for NodePort service for webhook")
-	zap.S().Info("Endpoints for NodePort service: ", nodePortServiceEndpoints)
 	zap.S().Info("Addresses for nodes: ", nodeList.Items[0].Status.Addresses)
-	err = s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(nodePortService), nodePortService)
-	s.NoErrorf(err, "Couldn't get NodePort service for webhook")
-	zap.S().Info("Endpoints of NodePort Service: ", nodePortService)
 	// END DEBUG ONLY
+	nodeIPAddress := nodeList.Items[0].Status.Addresses[0].Address
+	for _, address := range nodeList.Items[0].Status.Addresses {
+		if address.Type == corev1.NodeExternalIP {
+			nodeIPAddress = address.Address
+			break
+		}
+	}
 	maxRetries := 30
-	webhookUrl := fmt.Sprintf("https://%s:%d/validate-k8s-mondoo-com", nodeList.Items[0].Status.Addresses[0].Address, webhookNodePort)
+	webhookUrl := fmt.Sprintf("https://%s:%d/validate-k8s-mondoo-com", nodeIPAddress, webhookNodePort)
 	zap.S().Infof("Webhook URL: %s", webhookUrl)
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
