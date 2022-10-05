@@ -744,7 +744,10 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	}
 	defer func() {
 		zap.S().Info("Killing port-forward with pid: ", cmd.Process.Pid)
-		cmd.Process.Kill()
+		err := cmd.Process.Kill()
+		if err != nil {
+			zap.S().Error("Failed to kill port-forward: ", err)
+		}
 	}()
 	zap.S().Info("Created port-forward via kubectl for webhook with pid: ", cmd.Process.Pid)
 
