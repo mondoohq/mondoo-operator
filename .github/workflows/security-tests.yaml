@@ -1,0 +1,51 @@
+name: Security Tests
+on:
+  workflow_call:
+    secrets:
+      MONDOO_CLIENT:
+        required: true
+  workflow_run:
+    workflows: ["Unit Tests"]
+    types:
+      - completed
+
+# https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
+permissions:
+  contents: read
+# Attention: These jobs still have access to all the secrets when triggered by a workflow_run event.
+
+jobs:
+  security-tests:
+    runs-on: ubuntu-latest
+    name: Security tests
+    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_call'
+    env:
+      # Use docker.io for Docker Hub if empty
+      REGISTRY: ghcr.io
+      # github.repository as <account>/<repo>
+      IMAGE_NAME: ${{ github.repository }}
+      RELEASE: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+      - name: Scan AWS terraform with Mondoo
+        uses: mondoohq/actions/terraform@main
+        with:
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
+          path: ".github/terraform/aws/main.tf"
+      - name: Scan Azure terraform with Mondoo
+        uses: mondoohq/actions/terraform@main
+        with:
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
+          path: ".github/terraform/aks/main.tf"
+      - name: Generate manifests
+        run: make generate-manifests IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE }}'
+      - name: Scan Kubernetes Manifest with Mondoo
+        uses: mondoohq/actions/k8s-manifest@main
+        with:
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
+          path: "mondoo-operator-manifests.yaml"

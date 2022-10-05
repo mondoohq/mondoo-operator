@@ -8,16 +8,24 @@ on:
     secrets:
       MONDOO_CLIENT:
         required: true
+  workflow_run:
+    workflows: ["Unit Tests"]
+    types:
+      - completed
 
 env:
   MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag }}
 
+# https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
+permissions:
+  contents: read
+# Attention: These jobs still have access to all the secrets when triggered by a workflow_run event.
 
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
     name: Integration tests
-    
+    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_call'
     strategy:
       fail-fast: false
       matrix:
@@ -27,6 +35,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
           fetch-depth: 0 # fetch is nneded for "git tag --list" in the Makefile
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
