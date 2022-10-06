@@ -18,7 +18,9 @@ env:
 
 # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
 permissions:
-  contents: read
+      contents: read
+      pull-requests: read
+      actions: read
 # Attention: These jobs still have access to all the secrets when triggered by a workflow_run event.
 
 jobs:
@@ -35,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
           fetch-depth: 0 # fetch is nneded for "git tag --list" in the Makefile
       - name: Import environment variables from file
