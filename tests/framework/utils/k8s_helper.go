@@ -17,7 +17,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -135,8 +134,8 @@ func (k8sh *K8sHelper) DeleteResourceIfExists(r client.Object) error {
 	return nil
 }
 
-// IsPodInExpectedState waits for a pod to be in a Ready state
-// If the pod is in expected state within the time retry limit true is returned, if not false
+// IsPodReady waits for a pod to be in a Ready state
+// If the pod is in ready state within the time retry limit true is returned, if not false
 func (k8sh *K8sHelper) IsPodReady(labelSelector, namespace string) bool {
 	listOpts, err := LabelSelectorListOptions(labelSelector)
 	if err != nil {
@@ -575,12 +574,4 @@ func (k8sh *K8sHelper) CheckForReconciledOperatorVersion(auditConfig *api.Mondoo
 	})
 
 	return err
-}
-
-func (k8sh *K8sHelper) GetPortForwardUrl(resourceType, resourceName, resourceNamespace string) *url.URL {
-	return k8sh.kubeClient.RESTClient().Post().
-		Resource(resourceType).
-		Namespace(resourceNamespace).
-		Name(resourceName).
-		SubResource("portforward").URL()
 }

@@ -260,16 +260,16 @@ func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.Mondo
 
 	s.verifyWebhookAndStart(webhookListOpts, caCert)
 
-	zap.S().Info("Webhook should be working by now.")
-
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionFalse)
 	s.NoErrorf(err, "Admission shouldn't be in degraded state")
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 
+	zap.S().Info("Waiting for Webhook to accept connections (max 120s).")
 	err = s.checkWebhookAvailability()
 	s.NoErrorf(err, "Couldn't access Webhook via port-forward")
+	zap.S().Info("Webhook should be working by now.")
 	s.checkDeployments(&auditConfig)
 }
 
@@ -727,8 +727,8 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	webhookService := mondooadmission.WebhookService(s.auditConfig.Namespace, s.auditConfig)
 	// there is this package https://pkg.go.dev/k8s.io/client-go/tools/portforward
-	// But it seems this is a bit complicated in combination with minijube
-	// b/c of that we use kubectl dirrectly
+	// But it seems this is a bit complicated in combination with minikube
+	// because of that we use kubectl directly
 	kubectlArgs := []string{
 		"-n",
 		webhookService.Namespace,
@@ -751,9 +751,8 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	}()
 	zap.S().Info("Created port-forward via kubectl for webhook with pid: ", cmd.Process.Pid)
 
-	maxRetries := 30
+	maxRetries := 120
 	webhookUrl := fmt.Sprintf("https://127.0.0.1:%d/validate-k8s-mondoo-com", webhookNodePort)
-	zap.S().Infof("Webhook URL: %s", webhookUrl)
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{Transport: customTransport}
@@ -764,8 +763,6 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 			zap.S().Infof("Webhook is available: %s", resp.Status)
 			resp.Body.Close()
 			return nil
-		} else {
-			zap.S().Warnf("Webhook is not available yet: %v", err)
 		}
 	}
 	return fmt.Errorf("webhook not available: %w", err)
