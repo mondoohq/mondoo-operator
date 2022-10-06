@@ -35,12 +35,12 @@ jobs:
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
       - name: Scan AWS terraform with Mondoo
-        uses: mondoohq/actions/terraform@main
+        uses: mondoohq/actions/terraform-hcl@main
         with:
           service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
           path: ".github/terraform/aws/main.tf"
       - name: Scan Azure terraform with Mondoo
-        uses: mondoohq/actions/terraform@main
+        uses: mondoohq/actions/terraform-hcl@main
         with:
           service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
           path: ".github/terraform/aks/main.tf"
