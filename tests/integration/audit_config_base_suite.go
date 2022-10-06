@@ -742,6 +742,8 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	if err != nil {
 		return fmt.Errorf("couldn't start port-forward: %w", err)
 	}
+	// kubectl port-forwarding does not return but will run until interrupted
+	// We have to get ride of the port-forward at the end, because we need to create a new one for each test
 	defer func() {
 		zap.S().Info("Killing port-forward with pid: ", cmd.Process.Pid)
 		err := cmd.Process.Kill()
