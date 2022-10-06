@@ -36,7 +36,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-const webhookNodePort = 18443
+const webhookLocalPort = 18443
 
 type AuditConfigBaseSuite struct {
 	suite.Suite
@@ -734,7 +734,7 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 		webhookService.Namespace,
 		"port-forward",
 		"svc/" + webhookService.Name,
-		fmt.Sprintf("%d:%d", webhookNodePort, webhookService.Spec.Ports[0].Port),
+		fmt.Sprintf("%d:%d", webhookLocalPort, webhookService.Spec.Ports[0].Port),
 	}
 
 	cmd := exec.Command("kubectl", kubectlArgs...)
@@ -752,7 +752,7 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	zap.S().Info("Created port-forward via kubectl for webhook with pid: ", cmd.Process.Pid)
 
 	maxRetries := 120
-	webhookUrl := fmt.Sprintf("https://127.0.0.1:%d/validate-k8s-mondoo-com", webhookNodePort)
+	webhookUrl := fmt.Sprintf("https://127.0.0.1:%d/validate-k8s-mondoo-com", webhookLocalPort)
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{Transport: customTransport}
