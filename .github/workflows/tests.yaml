@@ -23,7 +23,7 @@ jobs:
       pull-requests: write
     steps:
       - name: remove labels
-        uses: andymckay/labeler@v1
+        uses: andymckay/labeler@1.0.4
         with:
           remove-labels: "ok to test"
   unit-tests:
