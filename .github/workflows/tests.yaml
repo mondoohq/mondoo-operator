@@ -14,9 +14,9 @@ jobs:
     name: Check label
     runs-on: ubuntu-latest
     if: |
-      !github.event.repository.fork
+      !github.event.pull_request.head.repo.fork
       || (github.actor == 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'ok to test'))
-      || (github.event.repository.fork && contains(github.event.pull_request.labels.*.name, 'ok to test'))
+      || (github.event.pull_request.head.repo.fork && contains(github.event.pull_request.labels.*.name, 'ok to test'))
     permissions:
       issues: write
       pull-requests: write
