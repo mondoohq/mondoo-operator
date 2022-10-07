@@ -36,8 +36,6 @@ jobs:
     needs: [unit-tests]
     if: needs.unit-tests.result == 'success'
     uses: ./.github/workflows/security-tests.yaml
-    with:
-      mondooClientImageTag: ""
     secrets: inherit
   integration-tests:
     name: Integration tests
