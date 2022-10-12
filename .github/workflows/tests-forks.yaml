@@ -1,6 +1,7 @@
-name: Run Test
+name: Run Test (forks & dependabot)
 on:
-  pull_request:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
   push:
     paths-ignore:
       - 'docs/**'
@@ -17,7 +18,8 @@ jobs:
     name: Check label
     runs-on: ubuntu-latest
     if: |
-      !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'      
+      (github.actor == 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'ok to test'))
+      || (github.event.pull_request.head.repo.fork && contains(github.event.pull_request.labels.*.name, 'ok to test'))
     permissions:
       issues: write
       pull-requests: write
