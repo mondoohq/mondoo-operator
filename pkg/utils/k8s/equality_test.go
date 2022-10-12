@@ -71,6 +71,12 @@ func TestAreDeploymentsEqual(t *testing.T) {
 							PeriodSeconds:       5,
 							FailureThreshold:    5,
 						},
+						SecurityContext: &corev1.SecurityContext{
+							Privileged: pointer.Bool(false),
+							Capabilities: &corev1.Capabilities{
+								Add: []corev1.Capability{"NET_ADMIN"},
+							},
+						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "config",
@@ -232,6 +238,24 @@ func TestAreDeploymentsEqual(t *testing.T) {
 			createB: func(a appsv1.Deployment) appsv1.Deployment {
 				b := *a.DeepCopy()
 				b.Spec.Template.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.Items[0].Key = "differentkey"
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when securityContext differ",
+			createB: func(a appsv1.Deployment) appsv1.Deployment {
+				b := *a.DeepCopy()
+				b.Spec.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{}
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
+			name: "should not be equal when securityContext.capabilities differ",
+			createB: func(a appsv1.Deployment) appsv1.Deployment {
+				b := *a.DeepCopy()
+				b.Spec.Template.Spec.Containers[0].SecurityContext.Capabilities.Add = []corev1.Capability{"NET_RAW"}
 				return b
 			},
 			shouldBeEqual: false,
