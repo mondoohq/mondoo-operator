@@ -76,6 +76,11 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 										ReadOnlyRootFilesystem:   pointer.Bool(true),
 										RunAsNonRoot:             pointer.Bool(false),
 										RunAsUser:                pointer.Int64(0),
+										Capabilities: &corev1.Capabilities{
+											Drop: []corev1.Capability{
+												"ALL",
+											},
+										},
 									},
 									VolumeMounts: []corev1.VolumeMount{
 										{

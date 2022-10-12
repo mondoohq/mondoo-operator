@@ -53,6 +53,7 @@ func AreSecurityContextsEqual(a, b *corev1.SecurityContext) bool {
 	return reflect.DeepEqual(a.AllowPrivilegeEscalation, b.AllowPrivilegeEscalation) &&
 		reflect.DeepEqual(a.ReadOnlyRootFilesystem, b.ReadOnlyRootFilesystem) &&
 		reflect.DeepEqual(a.RunAsNonRoot, b.RunAsNonRoot) &&
+		reflect.DeepEqual(a.Capabilities, b.Capabilities) &&
 		reflect.DeepEqual(a.RunAsUser, b.RunAsUser)
 }
 
@@ -81,6 +82,7 @@ func AreCronJobsEqual(a, b batchv1.CronJob) bool {
 		reflect.DeepEqual(aPodSpec.Containers[0].VolumeMounts, bPodSpec.Containers[0].VolumeMounts) &&
 		AreEnvVarsEqual(aPodSpec.Containers[0].Env, bPodSpec.Containers[0].Env) &&
 		AreResouceRequirementsEqual(aPodSpec.Containers[0].Resources, bPodSpec.Containers[0].Resources) &&
+		AreSecurityContextsEqual(aPodSpec.Containers[0].SecurityContext, bPodSpec.Containers[0].SecurityContext) &&
 		reflect.DeepEqual(aPodSpec.Volumes, bPodSpec.Volumes) &&
 		reflect.DeepEqual(a.Spec.SuccessfulJobsHistoryLimit, b.Spec.SuccessfulJobsHistoryLimit) &&
 		reflect.DeepEqual(a.Spec.FailedJobsHistoryLimit, b.Spec.FailedJobsHistoryLimit) &&

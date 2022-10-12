@@ -96,6 +96,11 @@ func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditCon
 									SecurityContext: &corev1.SecurityContext{
 										AllowPrivilegeEscalation: pointer.Bool(false),
 										ReadOnlyRootFilesystem:   pointer.Bool(true),
+										Capabilities: &corev1.Capabilities{
+											Drop: []corev1.Capability{
+												"ALL",
+											},
+										},
 									},
 									VolumeMounts: []corev1.VolumeMount{
 										{

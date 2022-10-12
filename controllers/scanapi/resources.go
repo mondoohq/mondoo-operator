@@ -109,6 +109,11 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 							// This is needed to prevent:
 							// Error: container has runAsNonRoot and image has non-numeric user (mondoo), cannot verify user is non-root ...
 							RunAsUser: pointer.Int64(101),
+							Capabilities: &corev1.Capabilities{
+								Drop: []corev1.Capability{
+									"ALL",
+								},
+							},
 						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
