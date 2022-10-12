@@ -1,6 +1,8 @@
-name: Unit Tests
+name: Run Test
 on:
   pull_request:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
   push:
     paths-ignore:
       - 'docs/**'
@@ -8,33 +10,42 @@ on:
       - "main"
     tags: ["v*.*.*"]
 
-jobs:
-  unit-tests:
-    runs-on: ubuntu-latest
-    name: Unit tests
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          persist-credentials: false
-      - name: Import environment variables from file
-        run: cat ".github/env" >> $GITHUB_ENV
-      - uses: actions/setup-go@v2
-        with:
-          go-version: "${{ env.golang-version }}"
-      
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+# https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
+permissions:
+  contents: read
 
-      - run: make test/ci
-      - uses: actions/upload-artifact@v3  # upload test results
-        if: success() || failure()        # run this step even if previous step failed
+jobs:
+  check-label:
+    name: Check label
+    runs-on: ubuntu-latest
+    if: |
+      (!github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]')
+      || (github.actor == 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'ok to test'))
+      || (github.event.pull_request.head.repo.fork && contains(github.event.pull_request.labels.*.name, 'ok to test'))
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: remove labels
+        uses: andymckay/labeler@1.0.4
         with:
-          name: test-results
-          path: unit-tests.xml
-   
+          remove-labels: "ok to test"
+  unit-tests:
+    needs: [check-label]
+    if: needs.check-label.result == 'success'
+    uses: ./.github/workflows/unit-tests.yaml
+    name: Unit tests
+  security-tests:
+    name: Security tests
+    needs: [unit-tests]
+    if: needs.unit-tests.result == 'success'
+    uses: ./.github/workflows/security-tests.yaml
+    secrets: inherit
+  integration-tests:
+    name: Integration tests
+    needs: [unit-tests]
+    if: needs.unit-tests.result == 'success'
+    uses: ./.github/workflows/integration-tests.yaml
+    with:
+      mondooClientImageTag: ""
+    secrets: inherit
