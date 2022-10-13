@@ -13,22 +13,9 @@ permissions:
   contents: read
 
 jobs:
-  check-label:
-    name: Check label
-    runs-on: ubuntu-latest
-    if: |
-      !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'      
-    permissions:
-      issues: write
-      pull-requests: write
-    steps:
-      - name: remove labels
-        uses: andymckay/labeler@1.0.4
-        with:
-          remove-labels: "ok to test"
   unit-tests:
-    needs: [check-label]
-    if: needs.check-label.result == 'success'
+    if: |
+      !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'
     uses: ./.github/workflows/unit-tests.yaml
     name: Unit tests
   security-tests:
