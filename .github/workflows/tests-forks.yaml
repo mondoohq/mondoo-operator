@@ -1,6 +1,7 @@
-name: Run Test
+name: Run Test (forks & dependabot)
 on:
-  pull_request:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
   push:
     paths-ignore:
       - 'docs/**'
@@ -13,9 +14,23 @@ permissions:
   contents: read
 
 jobs:
-  unit-tests:
+  check-label:
+    name: Check label
+    runs-on: ubuntu-latest
     if: |
-      !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'
+      (github.actor == 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'ok to test'))
+      || (github.event.pull_request.head.repo.fork && contains(github.event.pull_request.labels.*.name, 'ok to test'))
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: remove labels
+        uses: andymckay/labeler@1.0.4
+        with:
+          remove-labels: "ok to test"
+  unit-tests:
+    needs: [check-label]
+    if: needs.check-label.result == 'success'
     uses: ./.github/workflows/unit-tests.yaml
     name: Unit tests
   security-tests:
