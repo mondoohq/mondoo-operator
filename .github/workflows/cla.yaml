@@ -25,4 +25,4 @@ jobs:
           remote-organization-name: mondoohq
           # branch should not be protected
           branch: 'main'
-          allowlist: mondoo-tools
+          allowlist: mondoo-tools, *bot
