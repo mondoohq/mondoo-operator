@@ -2,12 +2,6 @@ name: Run Test (forks & dependabot)
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, labeled]
-  push:
-    paths-ignore:
-      - 'docs/**'
-    branches:
-      - "main"
-    tags: ["v*.*.*"]
 
 # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
 permissions:
@@ -17,8 +11,9 @@ jobs:
   check-label:
     name: Check label
     runs-on: ubuntu-latest
+    # sender.login is needed for runs re-triggered from GitHub UI
     if: |
-      (github.actor == 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'ok to test'))
+      ((github.actor == 'dependabot[bot]' || github.event.sender.login == 'dependabot[bot]') && contains(github.event.pull_request.labels.*.name, 'ok to test'))
       || (github.event.pull_request.head.repo.fork && contains(github.event.pull_request.labels.*.name, 'ok to test'))
     permissions:
       issues: write
