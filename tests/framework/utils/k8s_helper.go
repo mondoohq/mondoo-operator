@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	api "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.uber.org/zap"
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -58,6 +60,7 @@ type K8sHelper struct {
 	RunningInCluster bool
 	executor         *CommandExecutor
 	kubeClient       *kubernetes.Clientset // needed only to retrieve logs
+	dynamicClient    dynamic.Interface
 }
 
 // CreateK8sHelper creates a instance of k8sHelper
@@ -79,7 +82,12 @@ func CreateK8sHelper() (*K8sHelper, error) {
 		return nil, fmt.Errorf("failed to get kubernetes client. %+v", err)
 	}
 
-	h := &K8sHelper{executor: executor, Clientset: clientset, kubeClient: kubeClient}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kubernetes dynamic client. %+v", err)
+	}
+
+	h := &K8sHelper{executor: executor, Clientset: clientset, kubeClient: kubeClient, dynamicClient: dynamicClient}
 	if strings.Contains(config.Host, "//10.") {
 		h.RunningInCluster = true
 	}
@@ -263,6 +271,18 @@ func (k8sh *K8sHelper) GetDescribeFromNamespace(namespace, testName string) {
 	for _, p := range deployments.Items {
 		k8sh.appendDeploymentDescribe(file, namespace, p.Name)
 	}
+
+	auditConfigs, err := k8sh.dynamicClient.Resource(v1alpha2.GroupVersion.WithResource("mondooauditconfigs")).
+		Namespace(namespace).
+		List(ctx, metav1.ListOptions{})
+	if err != nil {
+		zap.S().Errorf("failed to list mondooauditconfig in namespace %s. %+v", namespace, err)
+		return
+	}
+
+	for _, a := range auditConfigs.Items {
+		k8sh.appendAuditConfigDescribe(file, namespace, a.GetName())
+	}
 }
 
 func (k8sh *K8sHelper) GetEventsFromNamespace(namespace, testName string) {
@@ -326,9 +346,9 @@ func (k8sh *K8sHelper) appendDeploymentDescribe(file *os.File, namespace, name s
 	if description == "" {
 		return
 	}
-	writeHeader(file, fmt.Sprintf("Pod: %s\n", name)) //nolint // ok to ignore this test logging
-	file.WriteString(description)                     //nolint // ok to ignore this test logging
-	file.WriteString("\n")                            //nolint // ok to ignore this test logging
+	writeHeader(file, fmt.Sprintf("Deployment: %s\n", name)) //nolint // ok to ignore this test logging
+	file.WriteString(description)                            //nolint // ok to ignore this test logging
+	file.WriteString("\n")                                   //nolint // ok to ignore this test logging
 }
 
 func (k8sh *K8sHelper) appendPodDescribe(file *os.File, namespace, name string) {
@@ -339,6 +359,16 @@ func (k8sh *K8sHelper) appendPodDescribe(file *os.File, namespace, name string) 
 	writeHeader(file, fmt.Sprintf("Pod: %s\n", name)) //nolint // ok to ignore this test logging
 	file.WriteString(description)                     //nolint // ok to ignore this test logging
 	file.WriteString("\n")                            //nolint // ok to ignore this test logging
+}
+
+func (k8sh *K8sHelper) appendAuditConfigDescribe(file *os.File, namespace, name string) {
+	description := k8sh.getAuditConfigDescribe(namespace, name)
+	if description == "" {
+		return
+	}
+	writeHeader(file, fmt.Sprintf("MondooAuditConfig: %s\n", name)) //nolint // ok to ignore this test logging
+	file.WriteString(description)                                   //nolint // ok to ignore this test logging
+	file.WriteString("\n")                                          //nolint // ok to ignore this test logging
 }
 
 func (k8sh *K8sHelper) PrintPodDescribe(namespace string, args ...string) {
@@ -361,6 +391,16 @@ func (k8sh *K8sHelper) getDeploymentDescribe(namespace string, args ...string) s
 
 func (k8sh *K8sHelper) getPodDescribe(namespace string, args ...string) string {
 	args = append([]string{"get", "pod", "-o", "yaml", "-n", namespace}, args...)
+	description, err := k8sh.Kubectl(args...)
+	if err != nil {
+		zap.S().Errorf("failed to describe pod. %v %+v", args, err)
+		return ""
+	}
+	return description
+}
+
+func (k8sh *K8sHelper) getAuditConfigDescribe(namespace string, args ...string) string {
+	args = append([]string{"get", "mondooauditconfig", "-o", "yaml", "-n", namespace}, args...)
 	description, err := k8sh.Kubectl(args...)
 	if err != nil {
 		zap.S().Errorf("failed to describe pod. %v %+v", args, err)
