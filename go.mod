@@ -7,7 +7,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/jetstack/cert-manager v1.7.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.60.1
-	github.com/spf13/cobra v1.5.0
+	github.com/spf13/cobra v1.6.0
 	github.com/stretchr/testify v1.8.0
 	k8s.io/api v0.25.2
 	k8s.io/apimachinery v0.25.2
@@ -29,7 +29,7 @@ require (
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
