@@ -3,7 +3,10 @@ package integration
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net/http"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -32,6 +35,8 @@ import (
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
+
+const webhookLocalPort = 18443
 
 type AuditConfigBaseSuite struct {
 	suite.Suite
@@ -255,15 +260,16 @@ func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.Mondo
 
 	s.verifyWebhookAndStart(webhookListOpts, caCert)
 
-	zap.S().Info("Webhook should be working by now.")
-
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionFalse)
 	s.NoErrorf(err, "Admission shouldn't be in degraded state")
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 
-	time.Sleep(10 * time.Second)
+	zap.S().Info("Waiting for Webhook to accept connections (max 120s).")
+	err = s.checkWebhookAvailability()
+	s.NoErrorf(err, "Couldn't access Webhook via port-forward")
+	zap.S().Info("Webhook should be working by now.")
 	s.checkDeployments(&auditConfig)
 }
 
@@ -716,4 +722,50 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 	s.NoErrorf(s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc), "Failed to add CA data to Webhook")
 
 	zap.S().Info("Wait for webhook to start working.")
+}
+
+func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
+	webhookService := mondooadmission.WebhookService(s.auditConfig.Namespace, s.auditConfig)
+	// there is this package https://pkg.go.dev/k8s.io/client-go/tools/portforward
+	// But it seems this is a bit complicated in combination with minikube
+	// because of that we use kubectl directly
+	kubectlArgs := []string{
+		"-n",
+		webhookService.Namespace,
+		"port-forward",
+		"svc/" + webhookService.Name,
+		fmt.Sprintf("%d:%d", webhookLocalPort, webhookService.Spec.Ports[0].Port),
+	}
+
+	cmd := exec.Command("kubectl", kubectlArgs...)
+	err := cmd.Start()
+	if err != nil {
+		return fmt.Errorf("couldn't start port-forward: %w", err)
+	}
+	// kubectl port-forwarding does not return but will run until interrupted
+	// We have to get ride of the port-forward at the end, because we need to create a new one for each test
+	defer func() {
+		zap.S().Info("Killing port-forward with pid: ", cmd.Process.Pid)
+		err := cmd.Process.Kill()
+		if err != nil {
+			zap.S().Error("Failed to kill port-forward: ", err)
+		}
+	}()
+	zap.S().Info("Created port-forward via kubectl for webhook with pid: ", cmd.Process.Pid)
+
+	maxRetries := 120
+	webhookUrl := fmt.Sprintf("https://127.0.0.1:%d/validate-k8s-mondoo-com", webhookLocalPort)
+	customTransport := http.DefaultTransport.(*http.Transport).Clone()
+	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	client := &http.Client{Transport: customTransport}
+	for i := 0; i < maxRetries; i++ {
+		time.Sleep(1 * time.Second)
+		resp, err := client.Get(webhookUrl)
+		if err == nil {
+			zap.S().Infof("Webhook is available: %s", resp.Status)
+			resp.Body.Close()
+			return nil
+		}
+	}
+	return fmt.Errorf("webhook not available: %w", err)
 }

@@ -134,8 +134,8 @@ func (k8sh *K8sHelper) DeleteResourceIfExists(r client.Object) error {
 	return nil
 }
 
-// IsPodInExpectedState waits for a pod to be in a Ready state
-// If the pod is in expected state within the time retry limit true is returned, if not false
+// IsPodReady waits for a pod to be in a Ready state
+// If the pod is in ready state within the time retry limit true is returned, if not false
 func (k8sh *K8sHelper) IsPodReady(labelSelector, namespace string) bool {
 	listOpts, err := LabelSelectorListOptions(labelSelector)
 	if err != nil {
