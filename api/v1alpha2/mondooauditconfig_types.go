@@ -97,6 +97,10 @@ type Admission struct {
 	// +kubebuilder:default=1
 	Replicas                *int32                  `json:"replicas,omitempty"`
 	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
+	// ServiceAccountName specifies the Kubernetes ServiceAccount the webhook should use
+	// during its operation.
+	// +kubebuilder:default=mondoo-operator-webhook
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 type Image struct {
