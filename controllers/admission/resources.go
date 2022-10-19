@@ -160,6 +160,9 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: pointer.Bool(true),
 					},
+					// service account used during the initial bringup of the webhook
+					// by the supporting controller-runtime packages
+					ServiceAccountName:            m.Spec.Admission.ServiceAccountName,
 					TerminationGracePeriodSeconds: pointer.Int64(10),
 					Volumes: []corev1.Volume{
 						{

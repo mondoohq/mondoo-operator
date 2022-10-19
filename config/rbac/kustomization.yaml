@@ -20,5 +20,4 @@ resources:
 - k8s_resources_scanning_service_account.yaml
 - k8s_resources_scanning_clusterrole.yaml
 - k8s_resources_scanning_clusterrolebinding.yaml
-
-
+- webhook_service_account.yaml

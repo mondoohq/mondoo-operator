@@ -15,9 +15,10 @@ import (
 
 type AuditConfigCustomNamespaceSuite struct {
 	AuditConfigBaseSuite
-	objsToCleanup []client.Object
-	ns            *corev1.Namespace
-	sa            *corev1.ServiceAccount
+	objsToCleanup         []client.Object
+	ns                    *corev1.Namespace
+	sa                    *corev1.ServiceAccount
+	webhookServiceAccount *corev1.ServiceAccount
 }
 
 func (s *AuditConfigCustomNamespaceSuite) SetupSuite() {
@@ -31,6 +32,13 @@ func (s *AuditConfigCustomNamespaceSuite) SetupSuite() {
 
 	s.Require().NoErrorf(s.testCluster.CreateClientSecret(s.ns.Name), "Failed to create client secret.")
 	zap.S().Infof("Created client secret in namespace %q.", s.ns.Name)
+
+	s.webhookServiceAccount = &corev1.ServiceAccount{}
+	s.webhookServiceAccount.Name = "webhook-sa"
+	s.webhookServiceAccount.Namespace = s.ns.Name
+	s.Require().NoErrorf(s.testCluster.K8sHelper.Clientset.Create(s.ctx, s.webhookServiceAccount), "Failed to create webhook ServiceAccount")
+	s.objsToCleanup = append(s.objsToCleanup, s.webhookServiceAccount)
+	zap.S().Infof("Created webhook ServiceAccount %q in namespace %q.", s.webhookServiceAccount.Name, s.webhookServiceAccount.Namespace)
 
 	s.sa = &corev1.ServiceAccount{}
 	s.sa.Name = "mondoo-sa"
@@ -83,12 +91,14 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes() {
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Admission() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true)
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
+	auditConfig.Spec.Admission.ServiceAccountName = s.webhookServiceAccount.Name
 	s.testMondooAuditConfigAdmission(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_AdmissionMissingSA() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true)
 	auditConfig.Spec.Scanner.ServiceAccountName = "missing-serviceaccount"
+	auditConfig.Spec.Admission.ServiceAccountName = s.webhookServiceAccount.Name
 	s.testMondooAuditConfigAdmissionMissingSA(auditConfig)
 }
 
