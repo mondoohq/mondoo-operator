@@ -10,6 +10,12 @@ PREV_VERSION=$1
 echo "new version: $2";
 VERSION=$2
 
+if [[ -z "${PREV_VERSION}" || -z "${VERSION}" ]]
+then
+	echo "Must pass the previous and next version as parameters"
+	exit 1
+fi
+
 make manifests
 
 make bundle IMG="ghcr.io/mondoohq/mondoo-operator:v${VERSION}" VERSION="${VERSION}"
