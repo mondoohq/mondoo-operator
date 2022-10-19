@@ -88,6 +88,11 @@ spec:
                     format: int32
                     minimum: 1
                     type: integer
+                  serviceAccountName:
+                    default: mondoo-operator-webhook
+                    description: ServiceAccountName specifies the Kubernetes ServiceAccount
+                      the webhook should use during its operation.
+                    type: string
                 type: object
               consoleIntegration:
                 properties:
