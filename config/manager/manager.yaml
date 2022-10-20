@@ -1,6 +1,14 @@
 apiVersion: v1
 kind: Namespace
 metadata:
+  annotations:
+    policies.k8s.mondoo.com/cis-kubernetes-v1-23-benchmark--5_2_3: ignore
+    policies.k8s.mondoo.com/cis-kubernetes-v1-23-benchmark--5_2_4: ignore
+    policies.k8s.mondoo.com/cis-kubernetes-v1-23-benchmark--5_2_5: ignore
+    policies.k8s.mondoo.com/cis-kubernetes-v1-23-benchmark--5_2_6: ignore
+    policies.k8s.mondoo.com/cis-kubernetes-v1-23-benchmark--5_2_7: ignore
+    policies.k8s.mondoo.com/cis-kubernetes-v1-23-benchmark--5_2_8: ignore
+    policies.k8s.mondoo.com/cis-kubernetes-v1-23-benchmark--5_2_9: ignore
   labels:
     app.kubernetes.io/name: mondoo-operator
   name: system
