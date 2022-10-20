@@ -65,12 +65,12 @@ jobs:
         run: echo "${{ toJSON(github.event.inputs) }}"
 
       - name: Store creds (edge)
-        if: ${{ github.event.inputs.useEdge }}
+        if: ${{ inputs.useEdge == true }}
         run: |
           echo ${{ secrets.MONDOO_CLIENT_EDGE }} | base64 -d > creds.json
 
       - name: Store creds (prod)
-        if: ${{ !github.event.inputs.useEdge }}
+        if: ${{ inputs.useEdge == false }}
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
