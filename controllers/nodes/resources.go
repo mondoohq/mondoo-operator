@@ -32,6 +32,10 @@ const (
 
 	// Execute hourly
 	CronTab = "0 * * * *"
+
+	ignoreQueryAnnotationPrefix = "policies.k8s.mondoo.com/"
+
+	ignoreAnnotationValue = "ignore"
 )
 
 func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
@@ -41,6 +45,9 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 	unsetHostPath := corev1.HostPathUnset
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-cronjob-runasnonroot": ignoreAnnotationValue,
+			},
 			Name:      CronJobName(m.Name, node.Name),
 			Namespace: m.Namespace,
 			Labels:    CronJobLabels(m),
@@ -49,10 +56,20 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 			Schedule:          cronTab,
 			ConcurrencyPolicy: batchv1.AllowConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: ls},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-job-runasnonroot": ignoreAnnotationValue,
+					},
+					Labels: ls,
+				},
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{Labels: ls},
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-pod-runasnonroot": ignoreAnnotationValue,
+							},
+							Labels: ls,
+						},
 						Spec: corev1.PodSpec{
 							NodeName:      node.Name,
 							RestartPolicy: corev1.RestartPolicyOnFailure,
