@@ -32,6 +32,22 @@ type MondooAuditConfigSpec struct {
 	Nodes               Nodes               `json:"nodes,omitempty"`
 	Admission           Admission           `json:"admission,omitempty"`
 	ConsoleIntegration  ConsoleIntegration  `json:"consoleIntegration,omitempty"`
+	Filtering           Filtering           `json:"filtering,omitempty"`
+}
+
+type Filtering struct {
+	Namespaces FilteringSpec `json:"namespaces,omitempty"`
+}
+
+type FilteringSpec struct {
+	// Include is the list of resources to watch/scan. Setting Include overrides anything in the
+	// Exclude list as specifying an Include list is effectively excluding everying except for what
+	// is on the Include list.
+	Include []string `json:"include,omitempty"`
+
+	// Exclude is the list of resources to ignore for any watching/scanning actions. Use this if
+	// the goal is to watch/scan all resources except for this Exclude list.
+	Exclude []string `json:"exclude,omitempty"`
 }
 
 type ConsoleIntegration struct {
