@@ -10,9 +10,12 @@ package debouncer
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
+	"go.mondoo.com/mondoo-operator/pkg/utils"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -66,9 +69,18 @@ func (d *debouncer) Start(ctx context.Context, managedBy string) {
 
 			for res := range d.resources {
 				for _, c := range clients {
-					logger.Info("Reconciling change", "request", res, "integration-mrn", c.IntegrationMrn)
-					if _, err := c.Client.ScheduleKubernetesResourceScan(ctx, c.IntegrationMrn, res, managedBy); err != nil {
-						logger.Error(err, "Failed to schedule resource scan", "request", res)
+					fields := strings.Split(res, ":")
+					if len(fields) != 3 {
+						err := fmt.Errorf("unpacking resource to scan has unexpected number of fields")
+						logger.Error(err, "skipping resource", "request", res)
+						continue
+					}
+					namespace := fields[1]
+					if utils.AllowNamespace(namespace, c.IncludeNamespaces, c.ExcludeNamespaces) {
+						logger.Info("Reconciling change", "request", res, "integration-mrn", c.IntegrationMrn)
+						if _, err := c.Client.ScheduleKubernetesResourceScan(ctx, c.IntegrationMrn, res, managedBy); err != nil {
+							logger.Error(err, "Failed to schedule resource scan", "request", res)
+						}
 					}
 				}
 			}

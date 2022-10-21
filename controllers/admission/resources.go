@@ -10,6 +10,7 @@ package admission
 
 import (
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -69,6 +70,10 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 		scanApiUrl,
 		"--cluster-id",
 		clusterID,
+		"--namespaces",
+		strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
+		"--namespaces-exclude",
+		strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
 	}
 
 	if integrationMRN != "" {

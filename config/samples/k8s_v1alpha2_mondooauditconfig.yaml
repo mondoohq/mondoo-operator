@@ -30,4 +30,11 @@ spec:
       tag: latest
     # could be "permissive" or "enforcing"
     mode: permissive
-  
+  filtering:
+    namespaces:
+      exclude:
+        - kube-system
+      include:
+        - default
+        - my-workload
+        - mondoo-operator

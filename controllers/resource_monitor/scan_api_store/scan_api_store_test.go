@@ -52,7 +52,11 @@ func (s *ScanApiStoreSuite) TestAdd() {
 		return s.mockMondooClient
 	}
 
-	s.scanApiStore.Add(url, token, integrationMrn)
+	s.scanApiStore.Add(&ScanApiStoreAddOpts{
+		Url:            url,
+		Token:          token,
+		IntegrationMrn: integrationMrn,
+	})
 
 	clients := s.scanApiStore.GetAll()
 	s.Equal(1, len(clients))
@@ -72,7 +76,11 @@ func (s *ScanApiStoreSuite) TestAdd_Idempotence() {
 	}
 
 	for i := 0; i < 100; i++ {
-		s.scanApiStore.Add(url, token, integrationMrn)
+		s.scanApiStore.Add(&ScanApiStoreAddOpts{
+			Url:            url,
+			Token:          token,
+			IntegrationMrn: integrationMrn,
+		})
 	}
 
 	clients := s.scanApiStore.GetAll()
@@ -92,7 +100,11 @@ func (s *ScanApiStoreSuite) TestDelete() {
 		return s.mockMondooClient
 	}
 
-	s.scanApiStore.Add(url, token, integrationMrn)
+	s.scanApiStore.Add(&ScanApiStoreAddOpts{
+		Url:            url,
+		Token:          token,
+		IntegrationMrn: integrationMrn,
+	})
 
 	url2 := url + "2"
 	integrationMrn2 := integrationMrn + "2"
@@ -101,7 +113,11 @@ func (s *ScanApiStoreSuite) TestDelete() {
 		s.Equal(token, opts.Token)
 		return s.mockMondooClient
 	}
-	s.scanApiStore.Add(url2, token, integrationMrn2)
+	s.scanApiStore.Add(&ScanApiStoreAddOpts{
+		Url:            url2,
+		Token:          token,
+		IntegrationMrn: integrationMrn2,
+	})
 
 	clients := s.scanApiStore.GetAll()
 	s.Equal(2, len(clients))

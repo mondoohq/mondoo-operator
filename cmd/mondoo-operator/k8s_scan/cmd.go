@@ -29,6 +29,8 @@ func init() {
 	timeout := Cmd.Flags().Int64("timeout", 0, "The timeout in minutes for the scan request.")
 	setManagedBy := Cmd.Flags().String("set-managed-by", "", "String to set the ManagedBy field for scanned/discovered assets")
 	cleanupOlderThan := Cmd.Flags().String("cleanup-assets-older-than", "", "Set the age for which assets which have not been updated in over the time provided should be garbage collected (eg 12m or 48h)")
+	includeNamespaces := Cmd.Flags().StringSlice("namespaces", nil, "Only resources residing in this list of Namespaces will be scanned")
+	excludeNamespaces := Cmd.Flags().StringSlice("namespaces-exclude", nil, "Ignore resources residing in any of the specified Namespaces")
 
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(logger.NewLogger())
@@ -59,7 +61,14 @@ func init() {
 		logger.Info("triggering Kubernetes resources scan")
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration((*timeout))*time.Minute)
 		defer cancel()
-		res, err := client.ScanKubernetesResources(ctx, *integrationMrn, *scanContainerImages, *setManagedBy)
+		scanOpts := &mondooclient.ScanKubernetesResourcesOpts{
+			IntegrationMrn:      *integrationMrn,
+			ScanContainerImages: *scanContainerImages,
+			ManagedBy:           *setManagedBy,
+			IncludeNamespaces:   *includeNamespaces,
+			ExcludeNamespaces:   *excludeNamespaces,
+		}
+		res, err := client.ScanKubernetesResources(ctx, scanOpts)
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				logger.Error(err, "failed to receive a response before the timeout was exceeded", "timeout", *timeout)

@@ -35,15 +35,15 @@ func (m *MockScanApiStore) EXPECT() *MockScanApiStoreMockRecorder {
 }
 
 // Add mocks base method.
-func (m *MockScanApiStore) Add(url, token, integrationMrn string) {
+func (m *MockScanApiStore) Add(opts *scan_api_store.ScanApiStoreAddOpts) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Add", url, token, integrationMrn)
+	m.ctrl.Call(m, "Add", opts)
 }
 
 // Add indicates an expected call of Add.
-func (mr *MockScanApiStoreMockRecorder) Add(url, token, integrationMrn interface{}) *gomock.Call {
+func (mr *MockScanApiStoreMockRecorder) Add(opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockScanApiStore)(nil).Add), url, token, integrationMrn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockScanApiStore)(nil).Add), opts)
 }
 
 // Delete mocks base method.
