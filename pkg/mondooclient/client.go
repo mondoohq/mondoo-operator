@@ -258,6 +258,10 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationM
 						Connections: []inventory.TransportConfig{
 							{
 								Backend: inventory.TransportBackend_CONNECTION_K8S,
+								Discover: inventory.Discovery{
+									// always disocver the cluster, this is needed for the asset explorer
+									Targets: []string{"clusters"},
+								},
 							},
 						},
 						ManagedBy: managedBy,
