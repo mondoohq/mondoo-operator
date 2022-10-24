@@ -41,7 +41,7 @@ type Client interface {
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	RunAdmissionReview(context.Context, *AdmissionReviewJob) (*ScanResult, error)
 	ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool, managedBy string) (*ScanResult, error)
-	ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey string) (*Empty, error)
+	ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey, managedBy string) (*Empty, error)
 	GarbageCollectAssets(context.Context, *garbagecollection.GarbageCollectOptions) error
 
 	IntegrationRegister(context.Context, *IntegrationRegisterInput) (*IntegrationRegisterOutput, error)
@@ -316,7 +316,7 @@ type Empty struct{}
 
 const ScheduleKubernetesResourceScanEndpoint = "/Scan/Schedule"
 
-func (s *mondooClient) ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey string) (*Empty, error) {
+func (s *mondooClient) ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey, managedBy string) (*Empty, error) {
 	url := s.ApiEndpoint + ScheduleKubernetesResourceScanEndpoint
 	scanJob := ScanJob{
 		ReportType: ReportType_ERROR,
@@ -336,6 +336,10 @@ func (s *mondooClient) ScheduleKubernetesResourceScan(ctx context.Context, integ
 				},
 			},
 		},
+	}
+
+	if len(managedBy) > 0 {
+		scanJob.Inventory.Spec.Assets[0].ManagedBy = managedBy
 	}
 
 	setIntegrationMrn(integrationMrn, &scanJob)

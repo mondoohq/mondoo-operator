@@ -43,10 +43,11 @@ func (s *ResourceMonitorControllerSuite) AfterTest(suiteName, testName string) {
 
 func (s *ResourceMonitorControllerSuite) TestReconcile_Pod() {
 	ctx := context.Background()
-	r := NewResourceMonitorController(
+	r, err := NewResourceMonitorController(
 		s.fakeClientBuilder.Build(),
 		func() client.Object { return &corev1.Pod{} },
 		nil)
+	s.Require().NoError(err)
 	r.debouncer = s.debouncerMock
 
 	ns := utils.RandString(10)

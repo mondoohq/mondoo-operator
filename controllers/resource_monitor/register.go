@@ -29,7 +29,11 @@ var resourceTypes = []func() client.Object{
 
 func RegisterResourceMonitors(mgr manager.Manager, scanApiStore scan_api_store.ScanApiStore) error {
 	for _, r := range resourceTypes {
-		if err := NewResourceMonitorController(mgr.GetClient(), r, scanApiStore).SetupWithManager(mgr); err != nil {
+		resMon, err := NewResourceMonitorController(mgr.GetClient(), r, scanApiStore)
+		if err != nil {
+			return err
+		}
+		if err := resMon.SetupWithManager(mgr); err != nil {
 			return err
 		}
 	}

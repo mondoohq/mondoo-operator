@@ -155,16 +155,16 @@ func (mr *MockClientMockRecorder) ScanKubernetesResources(ctx, integrationMrn, s
 }
 
 // ScheduleKubernetesResourceScan mocks base method.
-func (m *MockClient) ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey string) (*mondooclient.Empty, error) {
+func (m *MockClient) ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey, managedBy string) (*mondooclient.Empty, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ScheduleKubernetesResourceScan", ctx, integrationMrn, resourceKey)
+	ret := m.ctrl.Call(m, "ScheduleKubernetesResourceScan", ctx, integrationMrn, resourceKey, managedBy)
 	ret0, _ := ret[0].(*mondooclient.Empty)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ScheduleKubernetesResourceScan indicates an expected call of ScheduleKubernetesResourceScan.
-func (mr *MockClientMockRecorder) ScheduleKubernetesResourceScan(ctx, integrationMrn, resourceKey interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) ScheduleKubernetesResourceScan(ctx, integrationMrn, resourceKey, managedBy interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScheduleKubernetesResourceScan", reflect.TypeOf((*MockClient)(nil).ScheduleKubernetesResourceScan), ctx, integrationMrn, resourceKey)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScheduleKubernetesResourceScan", reflect.TypeOf((*MockClient)(nil).ScheduleKubernetesResourceScan), ctx, integrationMrn, resourceKey, managedBy)
 }

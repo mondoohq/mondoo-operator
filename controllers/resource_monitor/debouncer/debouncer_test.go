@@ -35,7 +35,7 @@ func (s *DebouncerSuite) BeforeTest(suiteName, testName string) {
 	s.mockCtrl = gomock.NewController(s.T())
 	s.mockMondooClient = mock.NewMockClient(s.mockCtrl)
 	s.scanApiStore = scanapistoremock.NewMockScanApiStore(s.mockCtrl)
-	s.debouncer = NewDebouncer(s.scanApiStore).(*debouncer)
+	s.debouncer = NewDebouncer(s.scanApiStore, "").(*debouncer)
 	s.debouncer.flushTimeout = 1 * time.Second
 }
 
@@ -78,7 +78,37 @@ func (s *DebouncerSuite) TestStart_Debounce() {
 	// Verify we schedule a scan once per resource.
 	for _, k := range keys {
 		s.mockMondooClient.EXPECT().
-			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn, k).
+			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn, k, "").
+			Times(1).
+			Return(nil, nil)
+	}
+
+	time.Sleep(s.debouncer.flushTimeout + 100*time.Millisecond)
+
+	s.Empty(s.debouncer.resources)
+}
+
+func (s *DebouncerSuite) TestStart_DebounceManagedBy() {
+	s.debouncer.isFirstFlush = false
+	s.debouncer.managedBy = "test"
+	go s.debouncer.Start(s.ctx)
+
+	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
+	for _, k := range keys {
+		for i := 0; i < 100; i++ {
+			s.debouncer.Add(k)
+		}
+	}
+
+	integrationMrn := "integration-mrn"
+	s.scanApiStore.EXPECT().GetAll().Times(1).Return([]scan_api_store.ClientConfiguration{
+		{Client: s.mockMondooClient, IntegrationMrn: integrationMrn},
+	})
+
+	// Verify we schedule a scan once per resource.
+	for _, k := range keys {
+		s.mockMondooClient.EXPECT().
+			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn, k, "test").
 			Times(1).
 			Return(nil, nil)
 	}
@@ -129,11 +159,11 @@ func (s *DebouncerSuite) TestStart_MultipleScanApiClients() {
 	// Verify we schedule a scan once per resource per client.
 	for _, k := range keys {
 		s.mockMondooClient.EXPECT().
-			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn, k).
+			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn, k, "").
 			Times(1).
 			Return(nil, nil)
 		mockMondooClient2.EXPECT().
-			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn+"2", k).
+			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn+"2", k, "").
 			Times(1).
 			Return(nil, nil)
 	}

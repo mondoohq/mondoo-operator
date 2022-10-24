@@ -36,20 +36,33 @@ func NewResourceMonitorController(
 	kubeClient client.Client,
 	createRes func() client.Object,
 	scanApiStore scan_api_store.ScanApiStore,
-) *ResourceMonitorController {
+) (*ResourceMonitorController, error) {
 	gvk, err := apiutil.GVKForObject(createRes(), kubeClient.Scheme())
 	if err != nil {
 		logger.Error(err, "Failed to get GVK for resource") // This should never happen in practice
 		panic(err)
 	}
 
+	ctx := context.Background()
+	clusterUid, err := k8s.GetClusterUID(ctx, kubeClient, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	var managedBy string
+	if clusterUid == "" {
+		logger.Info("no clusterUid provided, will not set ManagedBy field on scanned/discovered assets")
+	} else {
+		managedBy = "mondoo-operator-" + clusterUid
+	}
+
 	return &ResourceMonitorController{
 		Client:       kubeClient,
 		createRes:    createRes,
-		debouncer:    debouncer.NewDebouncer(scanApiStore),
+		debouncer:    debouncer.NewDebouncer(scanApiStore, managedBy),
 		resourceType: strings.ToLower(gvk.Kind),
 		scanApiStore: scanApiStore,
-	}
+	}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
