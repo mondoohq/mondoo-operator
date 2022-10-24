@@ -237,6 +237,86 @@ func TestLabels(t *testing.T) {
 	require.Equal(t, "", labels[mondooResourceVersionLabel], "Expect empty value for a CREATE webhook")
 }
 
+func TestWebhookNamespaceFiltering(t *testing.T) {
+	decoder := setupDecoder(t)
+	tests := []struct {
+		name         string
+		expectReason string
+		excludeList  []string
+		includeList  []string
+		object       runtime.RawExtension
+	}{
+		{
+			name:         "no namespace filtering",
+			expectReason: defaultScanPass,
+			object:       testExamplePod(),
+			excludeList:  []string{testNamespace},
+		},
+		{
+			name:         "excluded resource",
+			expectReason: defaultScanPass,
+			object:       testExamplePod(),
+			excludeList:  []string{testNamespace},
+		},
+		{
+			name:         "included resource",
+			expectReason: passedScan,
+			object:       testExamplePod(),
+			includeList:  []string{testNamespace},
+		},
+		{
+			name:         "included resource with include and exclude lists",
+			expectReason: passedScan,
+			object:       testExamplePod(),
+			includeList:  []string{testNamespace},
+			excludeList:  []string{testNamespace}, // include masks exclude list
+		},
+		{
+			name:         "resource not in include list",
+			expectReason: defaultScanPass,
+			object:       testExamplePod(),
+			includeList:  []string{"other-namespace"},
+		},
+		{
+			name:         "resource not in exclude list",
+			expectReason: passedScan,
+			object:       testExamplePod(),
+			excludeList:  []string{"other-namespace"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			testserver := fakeserver.FakeServer()
+			validator := &webhookValidator{
+				excludeNamespaces: test.excludeList,
+				includeNamespaces: test.includeList,
+				decoder:           decoder,
+				mode:              mondoov1alpha2.Permissive,
+				scanner: mondooclient.NewClient(mondooclient.ClientOptions{
+					ApiEndpoint: testserver.URL,
+				}),
+				uniDecoder: serializer.NewCodecFactory(clientgoscheme.Scheme).UniversalDeserializer(),
+			}
+
+			request := admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Object: test.object,
+				},
+			}
+
+			// Act
+			response := validator.Handle(context.TODO(), request)
+
+			t.Logf("Handle() response: %+v", response)
+
+			// Assert
+			assert.Equal(t, test.expectReason, string(response.AdmissionResponse.Result.Reason))
+		})
+	}
+}
+
 func testExamplePod(modifiers ...func(*corev1.Pod)) runtime.RawExtension {
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
