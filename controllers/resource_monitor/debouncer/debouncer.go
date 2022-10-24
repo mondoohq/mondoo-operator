@@ -23,7 +23,7 @@ var logger = log.Log.WithName("scan-api-store")
 //go:generate ./../../../bin/mockgen -source=./debouncer.go -destination=./mock/debouncer_generated.go -package=mock
 
 type Debouncer interface {
-	Start(ctx context.Context)
+	Start(ctx context.Context, managedBy string)
 	Add(res string)
 }
 
@@ -33,21 +33,19 @@ type debouncer struct {
 	resChan      chan string
 	resources    map[string]struct{}
 	scanApiStore scan_api_store.ScanApiStore
-	managedBy    string
 }
 
-func NewDebouncer(scanApiStore scan_api_store.ScanApiStore, managedBy string) Debouncer {
+func NewDebouncer(scanApiStore scan_api_store.ScanApiStore) Debouncer {
 	return &debouncer{
 		isFirstFlush: true,
 		flushTimeout: defaultFlushTimeout * time.Second,
 		resChan:      make(chan string),
 		resources:    make(map[string]struct{}),
 		scanApiStore: scanApiStore,
-		managedBy:    managedBy,
 	}
 }
 
-func (d *debouncer) Start(ctx context.Context) {
+func (d *debouncer) Start(ctx context.Context, managedBy string) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -69,7 +67,7 @@ func (d *debouncer) Start(ctx context.Context) {
 			for res := range d.resources {
 				for _, c := range clients {
 					logger.Info("Reconciling change", "request", res, "integration-mrn", c.IntegrationMrn)
-					if _, err := c.Client.ScheduleKubernetesResourceScan(ctx, c.IntegrationMrn, res, d.managedBy); err != nil {
+					if _, err := c.Client.ScheduleKubernetesResourceScan(ctx, c.IntegrationMrn, res, managedBy); err != nil {
 						logger.Error(err, "Failed to schedule resource scan", "request", res)
 					}
 				}

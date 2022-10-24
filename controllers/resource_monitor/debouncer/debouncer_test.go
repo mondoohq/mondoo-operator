@@ -35,7 +35,7 @@ func (s *DebouncerSuite) BeforeTest(suiteName, testName string) {
 	s.mockCtrl = gomock.NewController(s.T())
 	s.mockMondooClient = mock.NewMockClient(s.mockCtrl)
 	s.scanApiStore = scanapistoremock.NewMockScanApiStore(s.mockCtrl)
-	s.debouncer = NewDebouncer(s.scanApiStore, "").(*debouncer)
+	s.debouncer = NewDebouncer(s.scanApiStore).(*debouncer)
 	s.debouncer.flushTimeout = 1 * time.Second
 }
 
@@ -45,7 +45,7 @@ func (s *DebouncerSuite) AfterTest(suiteName, testName string) {
 }
 
 func (s *DebouncerSuite) TestStart_IgnoreInitialResources() {
-	go s.debouncer.Start(s.ctx)
+	go s.debouncer.Start(s.ctx, "")
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
 	for _, k := range keys {
@@ -61,7 +61,7 @@ func (s *DebouncerSuite) TestStart_IgnoreInitialResources() {
 
 func (s *DebouncerSuite) TestStart_Debounce() {
 	s.debouncer.isFirstFlush = false
-	go s.debouncer.Start(s.ctx)
+	go s.debouncer.Start(s.ctx, "")
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
 	for _, k := range keys {
@@ -90,8 +90,7 @@ func (s *DebouncerSuite) TestStart_Debounce() {
 
 func (s *DebouncerSuite) TestStart_DebounceManagedBy() {
 	s.debouncer.isFirstFlush = false
-	s.debouncer.managedBy = "test"
-	go s.debouncer.Start(s.ctx)
+	go s.debouncer.Start(s.ctx, "test")
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
 	for _, k := range keys {
@@ -120,7 +119,7 @@ func (s *DebouncerSuite) TestStart_DebounceManagedBy() {
 
 func (s *DebouncerSuite) TestStart_NoScanApiClients() {
 	s.debouncer.isFirstFlush = false
-	go s.debouncer.Start(s.ctx)
+	go s.debouncer.Start(s.ctx, "")
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
 	for _, k := range keys {
@@ -139,7 +138,7 @@ func (s *DebouncerSuite) TestStart_NoScanApiClients() {
 
 func (s *DebouncerSuite) TestStart_MultipleScanApiClients() {
 	s.debouncer.isFirstFlush = false
-	go s.debouncer.Start(s.ctx)
+	go s.debouncer.Start(s.ctx, "")
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
 	for _, k := range keys {
