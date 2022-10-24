@@ -47,13 +47,13 @@ func (mr *MockDebouncerMockRecorder) Add(res interface{}) *gomock.Call {
 }
 
 // Start mocks base method.
-func (m *MockDebouncer) Start(ctx context.Context) {
+func (m *MockDebouncer) Start(ctx context.Context, managedBy string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Start", ctx)
+	m.ctrl.Call(m, "Start", ctx, managedBy)
 }
 
 // Start indicates an expected call of Start.
-func (mr *MockDebouncerMockRecorder) Start(ctx interface{}) *gomock.Call {
+func (mr *MockDebouncerMockRecorder) Start(ctx, managedBy interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockDebouncer)(nil).Start), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockDebouncer)(nil).Start), ctx, managedBy)
 }

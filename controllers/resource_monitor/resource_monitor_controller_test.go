@@ -18,6 +18,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/debouncer/mock"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,7 +35,7 @@ type ResourceMonitorControllerSuite struct {
 func (s *ResourceMonitorControllerSuite) BeforeTest(suiteName, testName string) {
 	s.mockCtrl = gomock.NewController(s.T())
 	s.debouncerMock = mock.NewMockDebouncer(s.mockCtrl)
-	s.fakeClientBuilder = fake.NewClientBuilder()
+	s.fakeClientBuilder = fake.NewClientBuilder().WithObjects(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system"}})
 }
 
 func (s *ResourceMonitorControllerSuite) AfterTest(suiteName, testName string) {
@@ -43,10 +44,11 @@ func (s *ResourceMonitorControllerSuite) AfterTest(suiteName, testName string) {
 
 func (s *ResourceMonitorControllerSuite) TestReconcile_Pod() {
 	ctx := context.Background()
-	r := NewResourceMonitorController(
+	r, err := NewResourceMonitorController(
 		s.fakeClientBuilder.Build(),
 		func() client.Object { return &corev1.Pod{} },
 		nil)
+	s.Require().NoError(err)
 	r.debouncer = s.debouncerMock
 
 	ns := utils.RandString(10)

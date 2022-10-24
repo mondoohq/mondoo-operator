@@ -45,7 +45,7 @@ func (s *DebouncerSuite) AfterTest(suiteName, testName string) {
 }
 
 func (s *DebouncerSuite) TestStart_IgnoreInitialResources() {
-	go s.debouncer.Start(s.ctx)
+	go s.debouncer.Start(s.ctx, "")
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
 	for _, k := range keys {
@@ -61,7 +61,7 @@ func (s *DebouncerSuite) TestStart_IgnoreInitialResources() {
 
 func (s *DebouncerSuite) TestStart_Debounce() {
 	s.debouncer.isFirstFlush = false
-	go s.debouncer.Start(s.ctx)
+	go s.debouncer.Start(s.ctx, "")
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
 	for _, k := range keys {
@@ -78,7 +78,36 @@ func (s *DebouncerSuite) TestStart_Debounce() {
 	// Verify we schedule a scan once per resource.
 	for _, k := range keys {
 		s.mockMondooClient.EXPECT().
-			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn, k).
+			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn, k, "").
+			Times(1).
+			Return(nil, nil)
+	}
+
+	time.Sleep(s.debouncer.flushTimeout + 100*time.Millisecond)
+
+	s.Empty(s.debouncer.resources)
+}
+
+func (s *DebouncerSuite) TestStart_DebounceManagedBy() {
+	s.debouncer.isFirstFlush = false
+	go s.debouncer.Start(s.ctx, "test")
+
+	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
+	for _, k := range keys {
+		for i := 0; i < 100; i++ {
+			s.debouncer.Add(k)
+		}
+	}
+
+	integrationMrn := "integration-mrn"
+	s.scanApiStore.EXPECT().GetAll().Times(1).Return([]scan_api_store.ClientConfiguration{
+		{Client: s.mockMondooClient, IntegrationMrn: integrationMrn},
+	})
+
+	// Verify we schedule a scan once per resource.
+	for _, k := range keys {
+		s.mockMondooClient.EXPECT().
+			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn, k, "test").
 			Times(1).
 			Return(nil, nil)
 	}
@@ -90,7 +119,7 @@ func (s *DebouncerSuite) TestStart_Debounce() {
 
 func (s *DebouncerSuite) TestStart_NoScanApiClients() {
 	s.debouncer.isFirstFlush = false
-	go s.debouncer.Start(s.ctx)
+	go s.debouncer.Start(s.ctx, "")
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
 	for _, k := range keys {
@@ -109,7 +138,7 @@ func (s *DebouncerSuite) TestStart_NoScanApiClients() {
 
 func (s *DebouncerSuite) TestStart_MultipleScanApiClients() {
 	s.debouncer.isFirstFlush = false
-	go s.debouncer.Start(s.ctx)
+	go s.debouncer.Start(s.ctx, "")
 
 	keys := []string{"pod:default:test", "deployment:test-ns:dep"}
 	for _, k := range keys {
@@ -129,11 +158,11 @@ func (s *DebouncerSuite) TestStart_MultipleScanApiClients() {
 	// Verify we schedule a scan once per resource per client.
 	for _, k := range keys {
 		s.mockMondooClient.EXPECT().
-			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn, k).
+			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn, k, "").
 			Times(1).
 			Return(nil, nil)
 		mockMondooClient2.EXPECT().
-			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn+"2", k).
+			ScheduleKubernetesResourceScan(gomock.Any(), integrationMrn+"2", k, "").
 			Times(1).
 			Return(nil, nil)
 	}
