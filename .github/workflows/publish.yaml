@@ -362,6 +362,8 @@ jobs:
     uses: ./.github/workflows/release-manifests.yaml
     needs:
       - push-virtual-tag
+# this should ensure the manifest is tagged latest, which is required for the install automation
+      - release-helm
 
   # publish helm chart after the release of container images is complete
   run-helm-tests:
