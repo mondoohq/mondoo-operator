@@ -364,8 +364,8 @@ Please extend RBAC in a way, that the `ServiceAccount` `mondoo-operator-k8s-reso
 
 You can deploy the mondoo client into multiple namespaces with just a single operator running inside the cluster.
 
-We asume you already have the operator running inside the default namespace.
-Now you want to send the data from a different namespace into a different Mondoo Space.
+We assume you already have the operator running inside the default namespace.
+Now you want to send the data from a different namespace into another Mondoo Space.
 To do so, follow these steps:
 
 1. Create an additional [Space in Mondoo](https://mondoo.com/docs/platform/spaces/)
@@ -397,11 +397,11 @@ subjects:
   name: mondoo-operator-k8s-resources-scanning
   namespace: 2nd-namespace
 ```
-6. Add the Mondoo Service Account as secret to the namespace as described [here](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual.md#configuring-the-mondoo-secret)
+6. Add the Mondoo Service Account as a secret to the namespace as described [here](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual.md#configuring-the-mondoo-secret)
 7. Create a `MondooAuditConfig` in `2nd-namespace` as described [here](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual.md#creating-a-mondooauditconfig)
 8. (Optional) In case you want to separate which Kubernetes namespaces show up in which Mondoo Space, you can add [filtering](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual.md#filter-kubernetes-objects-based-on-namespace).
 
-After some seconds you should see that the operator picked up the new `MondooAuditConfig` and starts creating objects.
+After some seconds, you should see that the operator picked up the new `MondooAuditConfig` and starts creating objects.
 
 
 ## Uninstalling the Mondoo operator
