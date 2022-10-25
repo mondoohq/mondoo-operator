@@ -24,6 +24,31 @@
             "env": {
                 "MONDOO_NAMESPACE_OVERRIDE": "mondoo-operator"
             }
+        },
+        {
+            "name": "operator-gc",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceRoot}/cmd/mondoo-operator/main.go",
+            "args": [
+                "garbage-collect",
+                "--filter-managed-by",
+                "mondoo-operator-82120122-b293-4011-95f6-ed5a4e957fb1",
+                "--filter-older-than",
+                "100h",
+                "--filter-platform-runtime",
+                "k8s-cluster",
+                "--scan-api-url",
+                "http://127.0.0.1:8080/",
+                "--timeout",
+                "1",
+                "--token-file-path",
+                "/tmp/token-local"
+            ],
+            "env": {
+                "MONDOO_NAMESPACE_OVERRIDE": "mondoo-operator"
+            }
         }
     ]
 }

@@ -16,6 +16,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -386,6 +387,7 @@ type ScanJob struct {
 }
 
 func NewClient(opts ClientOptions) Client {
+	opts.ApiEndpoint = strings.TrimRight(opts.ApiEndpoint, "/")
 	mClient := &mondooClient{
 		ApiEndpoint: opts.ApiEndpoint,
 		Token:       opts.Token,
