@@ -16,6 +16,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -32,7 +33,15 @@ func HandleAuditConfig(ctx context.Context, kubeClient client.Client, scanApiSto
 		if err != nil {
 			return err
 		}
-		scanApiStore.Add(scanapi.ScanApiServiceUrl(auditConfig), string(secret.Data["token"]), integrationMrn)
+
+		opts := &ScanApiStoreAddOpts{
+			Url:               scanapi.ScanApiServiceUrl(auditConfig),
+			Token:             string(secret.Data[constants.MondooTokenSecretKey]),
+			IntegrationMrn:    integrationMrn,
+			IncludeNamespaces: auditConfig.Spec.Filtering.Namespaces.Include,
+			ExcludeNamespaces: auditConfig.Spec.Filtering.Namespaces.Exclude,
+		}
+		scanApiStore.Add(opts)
 	}
 	return nil
 }

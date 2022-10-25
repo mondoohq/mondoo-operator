@@ -30,4 +30,14 @@ spec:
       tag: latest
     # could be "permissive" or "enforcing"
     mode: permissive
-  
+  filtering:
+    namespaces:
+      include:
+        - default
+        - my-workload
+        - mondoo-operator
+      # Specifying both include and exclude results in the exclude
+      # list being ignored, as the include list is effectively the
+      # same as exclude ALL except for the include list.
+      exclude:
+        - kube-system

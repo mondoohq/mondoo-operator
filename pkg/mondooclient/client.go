@@ -41,7 +41,7 @@ type Client interface {
 
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	RunAdmissionReview(context.Context, *AdmissionReviewJob) (*ScanResult, error)
-	ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool, managedBy string) (*ScanResult, error)
+	ScanKubernetesResources(ctx context.Context, scanOpts *ScanKubernetesResourcesOpts) (*ScanResult, error)
 	ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey, managedBy string) (*Empty, error)
 	GarbageCollectAssets(context.Context, *garbagecollection.GarbageCollectOptions) error
 
@@ -246,9 +246,17 @@ type Score struct {
 	Message         string `json:"message,omitempty"`
 }
 
+type ScanKubernetesResourcesOpts struct {
+	IntegrationMrn      string
+	ScanContainerImages bool
+	ManagedBy           string
+	IncludeNamespaces   []string
+	ExcludeNamespaces   []string
+}
+
 const ScanKubernetesResourcesEndpoint = "/Scan/Run"
 
-func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationMrn string, scanContainerImages bool, managedBy string) (*ScanResult, error) {
+func (s *mondooClient) ScanKubernetesResources(ctx context.Context, scanOpts *ScanKubernetesResourcesOpts) (*ScanResult, error) {
 	url := s.ApiEndpoint + ScanKubernetesResourcesEndpoint
 	scanJob := ScanJob{
 		ReportType: ReportType_ERROR,
@@ -265,22 +273,25 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, integrationM
 								},
 							},
 						},
-						ManagedBy: managedBy,
+						ManagedBy: scanOpts.ManagedBy,
+						Options: map[string]string{
+							"namespaces":         strings.Join(scanOpts.IncludeNamespaces, ","),
+							"namespaces-exclude": strings.Join(scanOpts.ExcludeNamespaces, ","),
+						},
 					},
 				},
 			},
 		},
 	}
 
-	setIntegrationMrn(integrationMrn, &scanJob)
+	setIntegrationMrn(scanOpts.IntegrationMrn, &scanJob)
 
-	if scanContainerImages || feature_flags.GetEnablePodDiscovery() || feature_flags.GetEnableWorkloadDiscovery() {
+	if scanOpts.ScanContainerImages || feature_flags.GetEnablePodDiscovery() || feature_flags.GetEnableWorkloadDiscovery() {
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Options = make(map[string]string)
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Options["all-namespaces"] = "true"
-
 	}
 
-	if scanContainerImages {
+	if scanOpts.ScanContainerImages {
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets, "container-images")
 	}
 

@@ -10,6 +10,7 @@ package k8s_scan
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -39,6 +40,8 @@ func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditCon
 		"--timeout", "55",
 		// Cleanup any resources more than 2 hours old
 		"--cleanup-assets-older-than", "2h",
+		"--namespaces", strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
+		"--namespaces-exclude", strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
 	}
 
 	if integrationMrn != "" {

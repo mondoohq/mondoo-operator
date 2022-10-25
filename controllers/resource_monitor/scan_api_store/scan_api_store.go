@@ -22,7 +22,7 @@ var logger = log.Log.WithName("scan-api-store")
 type ScanApiStore interface {
 	Start()
 	// Add adds a scan api url to the store. The operatorion is idempotent.
-	Add(url, token, integrationMrn string)
+	Add(opts *ScanApiStoreAddOpts)
 	// Delete deletes a scan api url from the store. The operatorion is idempotent.
 	Delete(url string)
 	// GetAll returns all scan api urls.
@@ -30,8 +30,10 @@ type ScanApiStore interface {
 }
 
 type ClientConfiguration struct {
-	Client         mondooclient.Client
-	IntegrationMrn string
+	Client            mondooclient.Client
+	IntegrationMrn    string
+	IncludeNamespaces []string
+	ExcludeNamespaces []string
 }
 
 type requestType string
@@ -42,10 +44,12 @@ const (
 )
 
 type urlRequest struct {
-	requestType    requestType
-	url            string
-	token          string
-	integrationMrn string
+	requestType       requestType
+	url               string
+	token             string
+	integrationMrn    string
+	includeNamespaces []string
+	excludeNamespaces []string
 }
 
 type scanApiStore struct {
@@ -85,7 +89,9 @@ func (s *scanApiStore) Start() {
 				s.scanClients[req.url] = ClientConfiguration{
 					Client: s.mondooClientBuilder(
 						mondooclient.ClientOptions{ApiEndpoint: req.url, Token: req.token}),
-					IntegrationMrn: req.integrationMrn,
+					IntegrationMrn:    req.integrationMrn,
+					IncludeNamespaces: req.includeNamespaces,
+					ExcludeNamespaces: req.excludeNamespaces,
 				}
 			case DeleteRequest:
 				delete(s.scanClients, req.url)
@@ -102,13 +108,23 @@ func (s *scanApiStore) Start() {
 	}
 }
 
+type ScanApiStoreAddOpts struct {
+	Url               string
+	Token             string
+	IntegrationMrn    string
+	IncludeNamespaces []string
+	ExcludeNamespaces []string
+}
+
 // Add adds a scan api url to the store. The operatorion is idempotent.
-func (s *scanApiStore) Add(url, token, integrationMrn string) {
+func (s *scanApiStore) Add(opts *ScanApiStoreAddOpts) {
 	s.urlReqChan <- urlRequest{
-		requestType:    AddRequest,
-		url:            url,
-		token:          token,
-		integrationMrn: integrationMrn,
+		requestType:       AddRequest,
+		url:               opts.Url,
+		token:             opts.Token,
+		integrationMrn:    opts.IntegrationMrn,
+		includeNamespaces: opts.IncludeNamespaces,
+		excludeNamespaces: opts.ExcludeNamespaces,
 	}
 }
 

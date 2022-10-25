@@ -1,3 +1,11 @@
+/*
+Copyright 2022 Mondoo, Inc.
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at https://mozilla.org/MPL/2.0/.
+*/
+
 package webhook
 
 import (
@@ -29,6 +37,8 @@ func init() {
 	webhookMode := Cmd.Flags().String("enforcement-mode", string(v1alpha2.Permissive), "Mode 'permissive' allows resources that had a failing scan result pass, and mode 'enforcing' will deny resources with failed scanning result.")
 	integrationMRN := Cmd.Flags().String("integration-mrn", "", "The Mondoo integration MRN to label scanned items with if the MondooAuditConfig is configured with Mondoo integration.")
 	clusterID := Cmd.Flags().String("cluster-id", "", "A cluster-unique ID for associating the webhook payloads with the underlying cluster.")
+	includeNamespaces := Cmd.Flags().StringSlice("namespaces", nil, "Only process k8s resources matching the provided list of Namespaces.")
+	excludeNamespaces := Cmd.Flags().StringSlice("namespaces-exclude", nil, "Ignore k8s resources matching the provided list of Namespaces.")
 
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(logger.NewLogger())
@@ -67,7 +77,17 @@ func init() {
 
 		webhookLog.Info("registering webhooks to the webhook server")
 
-		webhookValidator, err := webhookhandler.NewWebhookValidator(mgr.GetClient(), *webhookMode, *scanApiUrl, token, *integrationMRN, *clusterID)
+		webhookOpts := &webhookhandler.NewWebhookValidatorOpts{
+			Client:            mgr.GetClient(),
+			Mode:              *webhookMode,
+			ScanUrl:           *scanApiUrl,
+			Token:             token,
+			IntegrationMrn:    *integrationMRN,
+			ClusterId:         *clusterID,
+			IncludeNamespaces: *includeNamespaces,
+			ExcludeNamespaces: *excludeNamespaces,
+		}
+		webhookValidator, err := webhookhandler.NewWebhookValidator(webhookOpts)
 		if err != nil {
 			webhookLog.Error(err, "failed to setup Core Webhook")
 			return err

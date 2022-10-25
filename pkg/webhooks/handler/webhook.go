@@ -23,7 +23,8 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/inventory"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
-	"go.mondoo.com/mondoo-operator/pkg/webhooks/utils"
+	"go.mondoo.com/mondoo-operator/pkg/utils"
+	wutils "go.mondoo.com/mondoo-operator/pkg/webhooks/utils"
 )
 
 // Have kubebuilder generate a ValidatingWebhookConfiguration under the path /validate-k8s-mondoo-com that watches Pod/Deployment creation/updates
@@ -58,33 +59,48 @@ const (
 )
 
 type webhookValidator struct {
-	client         client.Client
-	decoder        *admission.Decoder
-	mode           mondoov1alpha2.AdmissionMode
-	scanner        mondooclient.Client
-	integrationMRN string
-	clusterID      string
-	uniDecoder     runtime.Decoder
+	client            client.Client
+	decoder           *admission.Decoder
+	mode              mondoov1alpha2.AdmissionMode
+	scanner           mondooclient.Client
+	integrationMRN    string
+	clusterID         string
+	uniDecoder        runtime.Decoder
+	includeNamespaces []string
+	excludeNamespaces []string
+}
+
+type NewWebhookValidatorOpts struct {
+	Client            client.Client
+	Mode              string
+	ScanUrl           string
+	Token             string
+	IntegrationMrn    string
+	ClusterId         string
+	IncludeNamespaces []string
+	ExcludeNamespaces []string
 }
 
 // NewWebhookValidator will initialize a CoreValidator with the provided k8s Client and
 // set it to the provided mode. Returns error if mode is invalid.
-func NewWebhookValidator(client client.Client, mode, scanURL, token, integrationMRN, clusterID string) (admission.Handler, error) {
-	webhookMode, err := utils.ModeStringToAdmissionMode(mode)
+func NewWebhookValidator(opts *NewWebhookValidatorOpts) (admission.Handler, error) {
+	webhookMode, err := wutils.ModeStringToAdmissionMode(opts.Mode)
 	if err != nil {
 		return nil, err
 	}
 
 	return &webhookValidator{
-		client: client,
+		client: opts.Client,
 		mode:   webhookMode,
 		scanner: mondooclient.NewClient(mondooclient.ClientOptions{
-			ApiEndpoint: scanURL,
-			Token:       token,
+			ApiEndpoint: opts.ScanUrl,
+			Token:       opts.Token,
 		}),
-		integrationMRN: integrationMRN,
-		clusterID:      clusterID,
-		uniDecoder:     serializer.NewCodecFactory(client.Scheme()).UniversalDeserializer(),
+		integrationMRN:    opts.IntegrationMrn,
+		clusterID:         opts.ClusterId,
+		uniDecoder:        serializer.NewCodecFactory(opts.Client.Scheme()).UniversalDeserializer(),
+		includeNamespaces: opts.IncludeNamespaces,
+		excludeNamespaces: opts.ExcludeNamespaces,
 	}, nil
 }
 
@@ -106,6 +122,11 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 			handlerlog.Info("skipping because the resource has a parent", "resource", resource)
 			return
 		}
+	}
+
+	if a.skipNamespace(obj) {
+		handlerlog.Info("skipping based on namespace filtering", "resource", resource)
+		return
 	}
 
 	k8sLabels, err := a.generateLabels(req, obj)
@@ -215,6 +236,16 @@ func (a *webhookValidator) objFromRaw(rawObj runtime.RawExtension) (runtime.Obje
 		}
 	}
 	return obj, err
+}
+
+func (a *webhookValidator) skipNamespace(obj runtime.Object) bool {
+	objmeta, err := meta.Accessor(obj)
+	if err != nil {
+		handlerlog.Error(err, "error getting metadata from object")
+		return false
+	}
+
+	return !utils.AllowNamespace(objmeta.GetNamespace(), a.includeNamespaces, a.excludeNamespaces)
 }
 
 func generateLabelsFromAdmissionRequest(req admission.Request, obj runtime.Object) (map[string]string, error) {

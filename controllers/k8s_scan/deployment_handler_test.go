@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
 	scanapistoremock "go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store/mock"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -79,7 +80,10 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	d := s.createDeploymentHandler()
 
 	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
-	s.scanApiStoreMock.EXPECT().Add(scanApiUrl, "token", "").Times(1)
+	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
+		Url:   scanApiUrl,
+		Token: "token",
+	}).Times(1)
 
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
@@ -114,7 +118,11 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 
 	integrationMrn := utils.RandString(20)
 	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
-	s.scanApiStoreMock.EXPECT().Add(scanApiUrl, "token", integrationMrn).Times(1)
+	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
+		Url:            scanApiUrl,
+		Token:          "token",
+		IntegrationMrn: integrationMrn,
+	}).Times(1)
 
 	sa, err := json.Marshal(mondooclient.ServiceAccountCredentials{Mrn: "test-mrn"})
 	s.NoError(err)
@@ -162,7 +170,10 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	d := s.createDeploymentHandler()
 
 	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
-	s.scanApiStoreMock.EXPECT().Add(scanApiUrl, "token", "").Times(1)
+	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
+		Url:   scanApiUrl,
+		Token: "token",
+	}).Times(1)
 
 	image, err := s.containerImageResolver.MondooOperatorImage("", "", false)
 	s.NoError(err)
@@ -199,7 +210,10 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	d := s.createDeploymentHandler()
 
 	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
-	s.scanApiStoreMock.EXPECT().Add(scanApiUrl, "token", "").Times(4)
+	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
+		Url:   scanApiUrl,
+		Token: "token",
+	}).Times(4)
 
 	// Reconcile to create all resources
 	result, err := d.Reconcile(s.ctx)
@@ -293,7 +307,10 @@ func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
 	d := s.createDeploymentHandler()
 
 	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
-	s.scanApiStoreMock.EXPECT().Add(scanApiUrl, "token", "").Times(1)
+	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
+		Url:   scanApiUrl,
+		Token: "token",
+	}).Times(1)
 
 	// Reconcile to create all resources
 	result, err := d.Reconcile(s.ctx)
