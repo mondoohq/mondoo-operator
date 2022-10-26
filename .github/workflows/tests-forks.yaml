@@ -6,8 +6,18 @@ on:
 # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
 permissions:
   contents: read
+  issues: read         # needed for the "labeled" event?
+  pull-requests: read  # needed for the "labeled" event?
 
 jobs:
+  # Makes it easier to see what was the input for this workflow in case we need to debug.
+  debug-event:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print workflow actor
+        run: echo "${{ toJSON(github.actor) }}"
+      - name: Print workflow event
+        run: echo "${{ toJSON(github.event) }}"
   check-label:
     name: Check label
     runs-on: ubuntu-latest
