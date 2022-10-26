@@ -112,6 +112,32 @@ Once the Secret is configured, configure the operator to define the scan targets
     kubectl apply -f mondoo-config.yaml
     ```
 
+### Filter Kubernetes objects based on namespace
+
+To exclude specific namespaces add this to your `MondooAuditConfig`:
+```
+...
+spec:
+...
+  filtering:
+    namespaces:
+      exclude:
+        - kube-system
+```
+
+When you only want to scan specific namespaces:
+```
+...
+spec:
+...
+  filtering:
+    namespaces:
+      include:
+        - app1
+        - backend2
+        - ...
+```
+
 ## Deploying the admission controller
 Kubernetes webhooks require TLS certs to establish the trust between the certificate authority listed in  `ValidatingWebhookConfiguration.Webhooks[].ClientConfig.CABundle` and the TLS certificates presented when connecting to the HTTPS endpoint specified in the webhook.
 
@@ -333,6 +359,50 @@ You can find examples of creating such a secret [here](https://kubernetes.io/doc
 
 It is also possible to create a secret with a different name, but by default the operator isn't allowed to read the secret.
 Please extend RBAC in a way, that the `ServiceAccount` `mondoo-operator-k8s-resources-scanning` has the privilege to get the secret.
+
+## Installing Mondoo into multiple namespaces
+
+You can deploy the mondoo client into multiple namespaces with just a single operator running inside the cluster.
+
+We assume you already have the operator running inside the default namespace.
+Now you want to send the data from a different namespace into another Mondoo Space.
+To do so, follow these steps:
+
+1. Create an additional [Space in Mondoo](https://mondoo.com/docs/platform/spaces/)
+2. Create a [Mondoo Service Account](https://mondoo.com/docs/platform/service_accounts/) for this space
+3. Create the new namespace in Kubernetes:
+```
+kubectl create namespace 2nd-namespace
+```
+4. Create a Kubernetes Service Account in this namespace:
+```
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mondoo-operator-k8s-resources-scanning
+  namespace: 2nd-namespace
+```
+5. Bind this Service Account to a Cluster Role which was created during the installation of the operator:
+```
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k8s-resources-scanning
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mondoo-operator-k8s-resources-scanning
+subjects:
+- kind: ServiceAccount
+  name: mondoo-operator-k8s-resources-scanning
+  namespace: 2nd-namespace
+```
+6. Add the Mondoo Service Account as a secret to the namespace as described [here](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual.md#configuring-the-mondoo-secret)
+7. Create a `MondooAuditConfig` in `2nd-namespace` as described [here](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual.md#creating-a-mondooauditconfig)
+8. (Optional) In case you want to separate which Kubernetes namespaces show up in which Mondoo Space, you can add [filtering](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual.md#filter-kubernetes-objects-based-on-namespace).
+
+After some seconds, you should see that the operator picked up the new `MondooAuditConfig` and starts creating objects.
+
 
 ## Uninstalling the Mondoo operator
 Before uninstalling the Mondoo operator, be sure to delete all `MondooAuditConfig` and `MondooOperatorConfig` objects. You can find any in your cluster by running:
