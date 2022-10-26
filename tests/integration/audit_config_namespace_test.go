@@ -75,6 +75,7 @@ func (s *AuditConfigCustomNamespaceSuite) TearDownSuite() {
 	s.AuditConfigBaseSuite.TearDownSuite()
 }
 
+/*
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_KubernetesResources() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, true, false, false)
 	auditConfig.Spec.KubernetesResources.ContainerImageScanning = true
@@ -87,6 +88,7 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes() {
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigNodes(auditConfig)
 }
+*/
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Admission() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true)

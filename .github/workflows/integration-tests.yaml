@@ -31,7 +31,7 @@ jobs:
       fail-fast: false
       matrix:
         k8s-version: [v1.22.13, v1.23.10, v1.24.4]
-        k8s-distro: [minikube, k3d]
+        k8s-distro: [k3d]
 
     steps:
       - uses: actions/checkout@v3

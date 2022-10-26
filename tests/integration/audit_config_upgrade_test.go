@@ -1,19 +1,10 @@
 package integration
 
-import (
-	"testing"
-
-	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
-
-	"go.mondoo.com/mondoo-operator/tests/framework/installer"
-	"go.mondoo.com/mondoo-operator/tests/framework/utils"
-)
-
 type AuditConfigUpgradeSuite struct {
 	AuditConfigBaseSuite
 }
 
+/*
 func (s *AuditConfigUpgradeSuite) AfterTest(suiteName, testName string) {
 	if s.testCluster != nil {
 		s.testCluster.GatherAllMondooLogs(testName, installer.MondooNamespace)
@@ -41,3 +32,4 @@ func TestAuditConfigUpgradeSuite(t *testing.T) {
 	}(s)
 	suite.Run(t, s)
 }
+*/
