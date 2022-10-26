@@ -90,11 +90,14 @@ jobs:
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
+      - name: Get operator version
+        run: echo "OPERATOR_VERSION=$(docker run ghcr.io/mondoohq/mondoo-operator:${{ env.MONDOO_OPERATOR_IMAGE_TAG }} version)" >> $GITHUB_ENV
+
       - name: Wait a bit for the cluster to become more stable
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
       - name: Run integration tests
-        run: VERSION=${{ env.MONDOO_OPERATOR_IMAGE_TAG }} K8S_DISTRO=aks make test/integration/ci
+        run: VERSION=${{ env.OPERATOR_VERSION }} K8S_DISTRO=aks make test/integration/ci
 
       - name: Clean up AKS terraform
         run: terraform destroy -auto-approve
@@ -170,11 +173,14 @@ jobs:
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
+      - name: Get operator version
+        run: echo "OPERATOR_VERSION=$(docker run ghcr.io/mondoohq/mondoo-operator:${{ env.MONDOO_OPERATOR_IMAGE_TAG }} version)" >> $GITHUB_ENV
+
       - name: Wait a bit for the cluster to become more stable
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
       - name: Run integration tests
-        run: VERSION=${{ env.MONDOO_OPERATOR_IMAGE_TAG }} K8S_DISTRO=eks make test/integration/ci
+        run: VERSION=${{ env.OPERATOR_VERSION }} K8S_DISTRO=eks make test/integration/ci
 
       - name: Clean up EKS terraform
         run: terraform destroy -auto-approve
@@ -249,11 +255,14 @@ jobs:
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
+      - name: Get operator version
+        run: echo "OPERATOR_VERSION=$(docker run ghcr.io/mondoohq/mondoo-operator:${{ env.MONDOO_OPERATOR_IMAGE_TAG }} version)" >> $GITHUB_ENV
+
       - name: Wait a bit for the cluster to become more stable
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
       - name: Run integration tests
-        run: VERSION=${{ env.MONDOO_OPERATOR_IMAGE_TAG }} K8S_DISTRO=gke make test/integration/ci
+        run: VERSION=${{ env.OPERATOR_VERSION }} K8S_DISTRO=gke make test/integration/ci
 
       - name: Clean up GKE terraform
         run: terraform destroy -auto-approve
