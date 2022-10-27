@@ -17,7 +17,7 @@ jobs:
       - name: Print workflow actor
         run: echo "${{ toJSON(github.actor) }}"
       - name: Print workflow event
-        run: echo "${{ toJSON(github.event) }}"
+        run: jq '.' $GITHUB_EVENT_PATH
   check-label:
     name: Check label
     runs-on: ubuntu-latest
