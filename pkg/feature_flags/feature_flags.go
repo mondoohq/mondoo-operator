@@ -10,8 +10,6 @@ import (
 const FeatureFlagPrefix = "FEATURE_"
 
 var (
-	enablePodDiscovery             bool
-	enableWorkloadDiscovery        bool
 	enableGarbageCollection        bool
 	enableAdmissionReviewDiscovery bool
 	allFeatureFlags                = make(map[string]string)
@@ -41,14 +39,6 @@ func AllFeatureFlagsAsEnv() []corev1.EnvVar {
 	return env
 }
 
-func GetEnablePodDiscovery() bool {
-	return enablePodDiscovery
-}
-
-func GetEnableWorkloadDiscovery() bool {
-	return enableWorkloadDiscovery
-}
-
 func GetEnableGarbageCollection() bool {
 	return enableGarbageCollection
 }
@@ -59,10 +49,6 @@ func GetAdmissionReviewDiscovery() bool {
 
 func setGlobalFlags(k, v string) {
 	switch k {
-	case "FEATURE_DISCOVER_PODS":
-		enablePodDiscovery = true
-	case "FEATURE_DISCOVER_WORKLOADS":
-		enableWorkloadDiscovery = true
 	case "FEATURE_ENABLE_GARBAGE_COLLECTION":
 		enableGarbageCollection = true
 	case "FEATURE_ENABLE_ADMISSION_REVIEW_DISCOVERY":

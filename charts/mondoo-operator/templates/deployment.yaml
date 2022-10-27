@@ -48,8 +48,6 @@ spec:
         command:
         - /mondoo-operator
         env:
-        - name: FEATURE_DISCOVER_WORKLOADS
-          value: "1"
         - name: FEATURE_ENABLE_GARBAGE_COLLECTION
           value: "1"
         - name: KUBERNETES_CLUSTER_DOMAIN
