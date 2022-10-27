@@ -7,7 +7,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/jetstack/cert-manager v1.7.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.60.1
-	github.com/spf13/cobra v1.6.0
+	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.1
 	k8s.io/api v0.25.2
 	k8s.io/apimachinery v0.25.2
