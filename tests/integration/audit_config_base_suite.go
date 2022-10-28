@@ -37,7 +37,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-const webhookLocalPort = 18443
+const (
+	webhookLocalPort         = 18443
+	maxRetriesWebhookConnect = 120
+	maxRetriesProcessGone    = 5
+	maxRetriesCreate         = 5
+)
 
 type AuditConfigBaseSuite struct {
 	suite.Suite
@@ -603,24 +608,14 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	//   Internal error occurred: failed calling webhook "policy.k8s.mondoo.com":
 	//   failed to call webhook:
 	//   Post "https://mondoo-client-webhook-service.mondoo-operator.svc:443/validate-k8s-mondoo-com?timeout=10s": EOF
-	zap.S().Info("Create a Deployment which should pass. (max. 3 retries)")
-	maxRetries := 3
+	zap.S().Infof("Create a Deployment which should pass. (max. %d retries)", maxRetriesCreate)
 	var err error
-	for i := 0; i < maxRetries; i++ {
+	for i := 0; i < maxRetriesCreate; i++ {
 		err = s.testCluster.K8sHelper.Clientset.Create(s.ctx, passingDeployment)
 		if err == nil {
 			break
 		}
-
-		if err != nil {
-			if strings.HasSuffix(err.Error(), "EOF") {
-				zap.S().Infof("Failed to create Deployment: %s. Retrying...", err)
-				s.testCluster.K8sHelper.DeleteResourceIfExists(passingDeployment)
-				time.Sleep(1 * time.Second)
-			} else {
-				break
-			}
-		}
+		time.Sleep(1 * time.Second)
 	}
 	s.NoErrorf(err, "Failed to create Deployment which should pass.")
 
@@ -739,20 +734,12 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(vwc), vwc),
 		"Failed to retrieve ValidatingWebhookConfiguration")
-	zap.S().Info("Setting Webhook failure policy.")
 	*vwc.Webhooks[0].FailurePolicy = currentFailurePolicy
 	s.NoErrorf(s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc), "Failed to add CA data to Webhook")
-	zap.S().Info("Added CA data to webhook.")
 
-	time.Sleep(1 * time.Second)
-	// it seems the update of the ValidatingWebhookConfiguration triggers a restart of the webhook pods
+	// Sometime the Pod restart takes longer than 1 second, so we wait for the endpoints to be ready
 	// when accessing the endpoints later on, we came across such errors:
 	// ... pod mondoo-client-webhook-manager-6c5ccc449d-d7zn9 and container webhook. Container is in state ContainerCreating
-	s.Truef(
-		s.testCluster.K8sHelper.IsPodReady(utils.LabelsToLabelSelector(webhookLabels), s.auditConfig.Namespace),
-		"Mondoo webhook Pod is not in a Ready state.")
-	zap.S().Info("Webhook Pod is ready after adding CA data to ValidatingWebhookConfiguration.")
-
 	endpoints := &corev1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-webhook-service", s.auditConfig.Name),
@@ -761,8 +748,7 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 		Subsets: []corev1.EndpointSubset{},
 	}
 	zap.S().Info("Getting endpoints for webhook.")
-	maxRetries := 5
-	for i := 0; i < maxRetries; i++ {
+	for i := 0; i < maxRetriesCreate; i++ {
 		s.NoErrorf(
 			s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(endpoints), endpoints),
 			"Failed to retrieve endpoints for webhook")
@@ -792,15 +778,8 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	}
 
 	cmd := exec.Command("kubectl", kubectlArgs...)
-	/*
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("couldn't get combined output of command: %w", err)
-		}
-	*/
 	err := cmd.Start()
 	if err != nil {
-		// zap.S().Errorf("couldn't start kubectl port-forward: %s", out)
 		return fmt.Errorf("couldn't start port-forward: %w", err)
 	}
 	// kubectl port-forwarding does not return but will run until interrupted
@@ -814,16 +793,14 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	}()
 	zap.S().Info("Created port-forward via kubectl for webhook with pid: ", cmd.Process.Pid)
 
-	maxRetries := 120
 	webhookUrl := fmt.Sprintf("https://127.0.0.1:%d/validate-k8s-mondoo-com", webhookLocalPort)
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{Transport: customTransport}
-	client.Timeout = 1 * time.Second
+	client.Timeout = 500 * time.Millisecond
 	var resp *http.Response
-	for i := 0; i < maxRetries; i++ {
+	for i := 0; i < maxRetriesWebhookConnect; i++ {
 		time.Sleep(1 * time.Second)
-		// try POST, because API server will also send a POST request
 		resp, err = client.Post(webhookUrl, "application/json", strings.NewReader("{}"))
 		if err == nil {
 			zap.S().Infof("Webhook is available: %s", resp.Status)
@@ -831,27 +808,34 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 			return nil
 		} else {
 			zap.S().Debug("Webhook is not available yet: ", err)
+			// this error will not recover itself over time, we have to re-connect
 			if strings.HasSuffix(err.Error(), "connection refused") {
-				zap.S().Debug("Trying to restart port-forward")
-				err := cmd.Process.Kill()
-				if err != nil {
-					zap.S().Error("Failed to kill port-forward: ", err)
-				}
-				for i := 0; i < 5; i++ {
-					err = cmd.Process.Signal(syscall.Signal(0))
-					if err != nil {
-						zap.S().Info("Port-forward is not running anymore: %v", err)
-						break
-					}
-					time.Sleep(1 * time.Second)
-				}
-				err = cmd.Start()
-				if err != nil {
-					// zap.S().Errorf("couldn't start kubectl port-forward: %s", out)
-					return fmt.Errorf("couldn't start port-forward: %w", err)
-				}
+				err = s.restartCmd(cmd)
 			}
 		}
 	}
 	return fmt.Errorf("webhook not available: %w", err)
+}
+
+func (s *AuditConfigBaseSuite) restartCmd(cmd *exec.Cmd) error {
+	zap.S().Debug("Trying to restart port-forward")
+	err := cmd.Process.Kill()
+	if err != nil {
+		return fmt.Errorf("couldn't kill kubectl port-forward: %w", err)
+	}
+	// Wait for process to be gone
+	for i := 0; i < maxRetriesProcessGone; i++ {
+		err = cmd.Process.Signal(syscall.Signal(0))
+		// error will be, e.g.,  "no such process" when gone
+		if err != nil {
+			zap.S().Debug("Port-forward is not running anymore: %v", err)
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	err = cmd.Start()
+	if err != nil {
+		return fmt.Errorf("couldn't start kubectl port-forward: %w", err)
+	}
+	return nil
 }
