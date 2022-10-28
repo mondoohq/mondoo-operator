@@ -4,10 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
-
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
+	"go.uber.org/zap"
 )
 
 type AuditConfigUpgradeSuite struct {

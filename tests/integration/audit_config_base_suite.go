@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/stretchr/testify/suite"
@@ -36,7 +37,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-const webhookLocalPort = 18443
+const (
+	webhookLocalPort         = 18443
+	maxRetriesWebhookConnect = 120
+	maxRetriesProcessGone    = 5
+	maxRetriesCreate         = 5
+)
 
 type AuditConfigBaseSuite struct {
 	suite.Suite
@@ -598,13 +604,23 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	passingDeployment := s.getPassingDeployment()
 	failingDeployment := s.getFailingDeployment()
 
-	zap.S().Info("Create a Deployment which should pass.")
-	s.NoErrorf(
-		s.testCluster.K8sHelper.Clientset.Create(s.ctx, passingDeployment),
-		"Failed to create Deployment which should pass.")
+	// retry because sometimes we see these errors, although all previous checks reached the endpoint:
+	//   Internal error occurred: failed calling webhook "policy.k8s.mondoo.com":
+	//   failed to call webhook:
+	//   Post "https://mondoo-client-webhook-service.mondoo-operator.svc:443/validate-k8s-mondoo-com?timeout=10s": EOF
+	zap.S().Infof("Create a Deployment which should pass. (max. %d retries)", maxRetriesCreate)
+	var err error
+	for i := 0; i < maxRetriesCreate; i++ {
+		err = s.testCluster.K8sHelper.Clientset.Create(s.ctx, passingDeployment)
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	s.NoErrorf(err, "Failed to create Deployment which should pass.")
 
 	zap.S().Info("Create a Deployment which should be denied in enforcing mode.")
-	err := s.testCluster.K8sHelper.Clientset.Create(s.ctx, failingDeployment)
+	err = s.testCluster.K8sHelper.Clientset.Create(s.ctx, failingDeployment)
 
 	if auditConfig.Spec.Admission.Mode == mondoov2.Enforcing {
 		s.Errorf(err, "Created Deployment which should have been denied.")
@@ -721,6 +737,30 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 	*vwc.Webhooks[0].FailurePolicy = currentFailurePolicy
 	s.NoErrorf(s.testCluster.K8sHelper.Clientset.Update(s.ctx, vwc), "Failed to add CA data to Webhook")
 
+	// Sometime the Pod restart takes longer than 1 second, so we wait for the endpoints to be ready
+	// when accessing the endpoints later on, we came across such errors:
+	// ... pod mondoo-client-webhook-manager-6c5ccc449d-d7zn9 and container webhook. Container is in state ContainerCreating
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-webhook-service", s.auditConfig.Name),
+			Namespace: s.auditConfig.Namespace,
+		},
+		Subsets: []corev1.EndpointSubset{},
+	}
+	zap.S().Info("Getting endpoints for webhook.")
+	for i := 0; i < maxRetriesCreate; i++ {
+		s.NoErrorf(
+			s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(endpoints), endpoints),
+			"Failed to retrieve endpoints for webhook")
+		if len(endpoints.Subsets) > 0 {
+			break
+		}
+		zap.S().Debug("Endpoints for webhook are not ready yet. Retrying...")
+		time.Sleep(1 * time.Second)
+	}
+	zap.S().Info("endpoints Addresses: ", endpoints.Subsets[0].Addresses)
+	zap.S().Info("endpoints NotReadyAddresses: ", endpoints.Subsets[0].NotReadyAddresses)
+
 	zap.S().Info("Wait for webhook to start working.")
 }
 
@@ -753,19 +793,49 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	}()
 	zap.S().Info("Created port-forward via kubectl for webhook with pid: ", cmd.Process.Pid)
 
-	maxRetries := 120
 	webhookUrl := fmt.Sprintf("https://127.0.0.1:%d/validate-k8s-mondoo-com", webhookLocalPort)
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{Transport: customTransport}
-	for i := 0; i < maxRetries; i++ {
+	client.Timeout = 500 * time.Millisecond
+	var resp *http.Response
+	for i := 0; i < maxRetriesWebhookConnect; i++ {
 		time.Sleep(1 * time.Second)
-		resp, err := client.Get(webhookUrl)
+		resp, err = client.Post(webhookUrl, "application/json", strings.NewReader("{}"))
 		if err == nil {
 			zap.S().Infof("Webhook is available: %s", resp.Status)
 			resp.Body.Close()
 			return nil
+		} else {
+			zap.S().Debug("Webhook is not available yet: ", err)
+			// this error will not recover itself over time, we have to re-connect
+			if strings.HasSuffix(err.Error(), "connection refused") {
+				err = s.restartCmd(cmd)
+			}
 		}
 	}
 	return fmt.Errorf("webhook not available: %w", err)
+}
+
+func (s *AuditConfigBaseSuite) restartCmd(cmd *exec.Cmd) error {
+	zap.S().Debug("Trying to restart port-forward")
+	err := cmd.Process.Kill()
+	if err != nil {
+		return fmt.Errorf("couldn't kill kubectl port-forward: %w", err)
+	}
+	// Wait for process to be gone
+	for i := 0; i < maxRetriesProcessGone; i++ {
+		err = cmd.Process.Signal(syscall.Signal(0))
+		// error will be, e.g.,  "no such process" when gone
+		if err != nil {
+			zap.S().Debug("Port-forward is not running anymore: %v", err)
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	err = cmd.Start()
+	if err != nil {
+		return fmt.Errorf("couldn't start kubectl port-forward: %w", err)
+	}
+	return nil
 }
