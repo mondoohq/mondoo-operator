@@ -271,13 +271,13 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, scanOpts *Sc
 									// always disocver the cluster, this is needed for the asset explorer
 									Targets: []string{"clusters"},
 								},
+								Options: map[string]string{
+									"namespaces":         strings.Join(scanOpts.IncludeNamespaces, ","),
+									"namespaces-exclude": strings.Join(scanOpts.ExcludeNamespaces, ","),
+								},
 							},
 						},
 						ManagedBy: scanOpts.ManagedBy,
-						Options: map[string]string{
-							"namespaces":         strings.Join(scanOpts.IncludeNamespaces, ","),
-							"namespaces-exclude": strings.Join(scanOpts.ExcludeNamespaces, ","),
-						},
 					},
 				},
 			},
@@ -285,11 +285,6 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, scanOpts *Sc
 	}
 
 	setIntegrationMrn(scanOpts.IntegrationMrn, &scanJob)
-
-	if scanOpts.ScanContainerImages || feature_flags.GetEnablePodDiscovery() || feature_flags.GetEnableWorkloadDiscovery() {
-		scanJob.Inventory.Spec.Assets[0].Connections[0].Options = make(map[string]string)
-		scanJob.Inventory.Spec.Assets[0].Connections[0].Options["all-namespaces"] = "true"
-	}
 
 	if scanOpts.ScanContainerImages {
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets, "container-images")
