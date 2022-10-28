@@ -119,9 +119,10 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		return err
 	}
 	if !found {
-		logger.Info("private registries pull secret not found, will not scan private images",
+		logger.Info("private registries pull secret not found",
 			" namespace=", n.Mondoo.Namespace,
 			" secretname=", privateRegistriesSecretName)
+		logger.Info("trying to fetch imagePullSecrets for each discovered image")
 		privateRegistriesSecretName = ""
 	}
 
