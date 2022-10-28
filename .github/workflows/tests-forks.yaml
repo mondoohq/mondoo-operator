@@ -30,9 +30,8 @@ jobs:
       pull-requests: write
     steps:
       - name: remove labels
-        uses: andymckay/labeler@1.0.4
-        with:
-          remove-labels: "ok to test"
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} --remove-label "ok to test"
   unit-tests:
     needs: [check-label]
     if: needs.check-label.result == 'success'
