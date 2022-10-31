@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"go.mondoo.com/mondoo-operator/pkg/constants"
-	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/garbagecollection"
 	"go.mondoo.com/mondoo-operator/pkg/inventory"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -267,13 +266,12 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, scanOpts *Sc
 						Connections: []inventory.TransportConfig{
 							{
 								Backend: inventory.TransportBackend_CONNECTION_K8S,
-								Discover: inventory.Discovery{
-									// always disocver the cluster, this is needed for the asset explorer
-									Targets: []string{"clusters"},
-								},
 								Options: map[string]string{
 									"namespaces":         strings.Join(scanOpts.IncludeNamespaces, ","),
 									"namespaces-exclude": strings.Join(scanOpts.ExcludeNamespaces, ","),
+								},
+								Discover: inventory.Discovery{
+									Targets: []string{"auto"},
 								},
 							},
 						},
@@ -288,17 +286,6 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, scanOpts *Sc
 
 	if scanOpts.ScanContainerImages {
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets, "container-images")
-	}
-
-	// Only enter this branch if workload discovery is disabled since workload discovery will add pods as well.
-	if feature_flags.GetEnablePodDiscovery() && !feature_flags.GetEnableWorkloadDiscovery() {
-		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets, "pods")
-	}
-
-	if feature_flags.GetEnableWorkloadDiscovery() {
-		// We cannot discover "all" because that includes container images.
-		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets,
-			"pods", "deployments", "daemonsets", "statefulsets", "replicasets", "jobs", "cronjobs")
 	}
 
 	reqBodyBytes, err := json.Marshal(scanJob)
@@ -337,6 +324,9 @@ func (s *mondooClient) ScheduleKubernetesResourceScan(ctx context.Context, integ
 								Options: map[string]string{
 									"k8s-resources": resourceKey,
 								},
+								Discover: inventory.Discovery{
+									Targets: []string{"auto"},
+								},
 							},
 						},
 					},
@@ -350,16 +340,6 @@ func (s *mondooClient) ScheduleKubernetesResourceScan(ctx context.Context, integ
 	}
 
 	setIntegrationMrn(integrationMrn, &scanJob)
-
-	if feature_flags.GetEnableWorkloadDiscovery() {
-		scanJob.Inventory.Spec.Assets[0].Connections[0].Options["all-namespaces"] = "true"
-	}
-
-	if feature_flags.GetEnableWorkloadDiscovery() {
-		// We cannot discover "all" because that includes container images.
-		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets,
-			"pods", "deployments", "daemonsets", "statefulsets", "replicasets", "jobs", "cronjobs")
-	}
 
 	reqBodyBytes, err := json.Marshal(scanJob)
 	if err != nil {
