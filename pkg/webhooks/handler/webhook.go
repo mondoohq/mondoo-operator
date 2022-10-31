@@ -163,6 +163,7 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 
 	scanJob.Discovery = &inventory.Discovery{}
 	scanJob.Options = map[string]string{"all-namespaces": "true"}
+	// do not use auto discovery here, because we do not want to scan the cluster
 	scanJob.Discovery.Targets = []string{"pods", "deployments", "daemonsets", "statefulsets", "replicasets", "jobs", "cronjobs"}
 
 	if feature_flags.GetAdmissionReviewDiscovery() {
