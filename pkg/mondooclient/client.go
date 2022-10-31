@@ -267,7 +267,9 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, scanOpts *Sc
 							{
 								Backend: inventory.TransportBackend_CONNECTION_K8S,
 								Options: map[string]string{
-									"all-namespaces": "true",
+									"all-namespaces":     "true",
+									"namespaces":         strings.Join(scanOpts.IncludeNamespaces, ","),
+									"namespaces-exclude": strings.Join(scanOpts.ExcludeNamespaces, ","),
 								},
 								Discover: inventory.Discovery{
 									Targets: []string{
@@ -280,10 +282,6 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, scanOpts *Sc
 										"jobs",
 										"cronjobs",
 									},
-								},
-								Options: map[string]string{
-									"namespaces":         strings.Join(scanOpts.IncludeNamespaces, ","),
-									"namespaces-exclude": strings.Join(scanOpts.ExcludeNamespaces, ","),
 								},
 							},
 						},
