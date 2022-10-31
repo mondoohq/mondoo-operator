@@ -124,7 +124,12 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		}
 	}
 
-	if a.skipNamespace(obj) {
+	skip, err := a.skipNamespace(obj)
+	if err != nil {
+		handlerlog.Error(err, "error while checking whether to skip resource based on namespace")
+		return
+	}
+	if skip {
 		handlerlog.Info("skipping based on namespace filtering", "resource", resource)
 		return
 	}
@@ -237,14 +242,15 @@ func (a *webhookValidator) objFromRaw(rawObj runtime.RawExtension) (runtime.Obje
 	return obj, err
 }
 
-func (a *webhookValidator) skipNamespace(obj runtime.Object) bool {
+func (a *webhookValidator) skipNamespace(obj runtime.Object) (bool, error) {
 	objmeta, err := meta.Accessor(obj)
 	if err != nil {
 		handlerlog.Error(err, "error getting metadata from object")
-		return false
+		return false, nil
 	}
 
-	return !utils.AllowNamespace(objmeta.GetNamespace(), a.includeNamespaces, a.excludeNamespaces)
+	allow, err := utils.AllowNamespace(objmeta.GetNamespace(), a.includeNamespaces, a.excludeNamespaces)
+	return !allow, err
 }
 
 func generateLabelsFromAdmissionRequest(req admission.Request, obj runtime.Object) (map[string]string, error) {

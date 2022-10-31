@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFiltering(t *testing.T) {
@@ -50,11 +51,25 @@ func TestFiltering(t *testing.T) {
 			excludedList:   []string{"other-namespace"},
 			expectedResult: true,
 		},
+		{
+			name:           "include glob middle of string",
+			input:          "test-namespace",
+			includedList:   []string{"*name*"},
+			expectedResult: true,
+		},
+		{
+			name:           "exclude glob beginning of string",
+			input:          "test-namespace",
+			excludedList:   []string{"test*"},
+			expectedResult: false,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := AllowNamespace(test.input, test.includedList, test.excludedList)
+			result, err := AllowNamespace(test.input, test.includedList, test.excludedList)
+
+			require.NoError(t, err, "unexpected error testing whether a Namespace should be allowed or not")
 
 			assert.Equal(t, test.expectedResult, result, "unexpected result when checking namespace filtering")
 		})

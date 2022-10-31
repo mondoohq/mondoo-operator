@@ -34,7 +34,7 @@ spec:
     namespaces:
       include:
         - default
-        - my-workload
+        - my-work*
         - mondoo-operator
       # Specifying both include and exclude results in the exclude
       # list being ignored, as the include list is effectively the

@@ -8,20 +8,32 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 package utils
 
-func AllowNamespace(namespace string, includeNamespaces, excludeNamespaces []string) bool {
+import (
+	"github.com/gobwas/glob"
+)
+
+func AllowNamespace(namespace string, includeNamespaces, excludeNamespaces []string) (bool, error) {
 	if len(includeNamespaces) > 0 {
 		for _, ns := range includeNamespaces {
-			if ns == namespace {
-				return true
+			g, err := glob.Compile(ns)
+			if err != nil {
+				return false, err
+			}
+			if g.Match(namespace) {
+				return true, nil
 			}
 		}
-		return false
+		return false, nil
 	}
 
 	for _, ns := range excludeNamespaces {
-		if ns == namespace {
-			return false
+		g, err := glob.Compile(ns)
+		if err != nil {
+			return false, nil
+		}
+		if g.Match(namespace) {
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }
