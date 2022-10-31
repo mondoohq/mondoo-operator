@@ -270,7 +270,6 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, scanOpts *Sc
 									"all-namespaces": "true",
 								},
 								Discover: inventory.Discovery{
-									// always disocver the cluster, this is needed for the asset explorer
 									Targets: []string{
 										"clusters",
 										"pods",
@@ -339,7 +338,6 @@ func (s *mondooClient) ScheduleKubernetesResourceScan(ctx context.Context, integ
 									"all-namespaces": "true",
 								},
 								Discover: inventory.Discovery{
-									// always disocver the cluster, this is needed for the asset explorer
 									Targets: []string{
 										"clusters",
 										"pods",
