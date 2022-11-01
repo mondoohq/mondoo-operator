@@ -453,6 +453,31 @@ Run:
 kubectl edit  mondooauditconfigs -n mondoo-operator
 ```
 
+### How do I run asset garbage collection manually?
+The operator will trigger garbage collection after each successful cluster scan. This will delete all old assets that were created 
+by the operator but are no longer present in the cluster. It is possible to trigger garbage collection manually. To do this it is required
+to have the Mondoo Client API running locally:
+```bash
+mondoo serve --api --token abcdefgh
+```
+
+Retrieve the cluster UID:
+```bash
+kubectl get ns kube-system -o yaml | grep uid 
+```
+
+Then you can trigger asset garbage collection for workloads by the following command:
+```bash
+mondoo-operator garbage-collect --filter-managed-by mondoo-operator-<<cluster UID>> --filter-older-than 2h --filter-platform-runtime k8s-cluster --scan-api-url http://127.0.0.1:8989 --token abcdefgh
+```
+
+For container images use:
+```bash
+mondoo-operator garbage-collect --filter-managed-by mondoo-operator-<<cluster UID>> --filter-older-than 48h --filter-platform-runtime docker-registry --scan-api-url http://127.0.0.1:8989 --token abcdefgh
+```
+
+For different use-cases adjust the CLI arguments.
+
 ### Why is there a deployment marked as unschedulable?
 For development testing, you can see the allocated resources for the Mondoo Client:
 

@@ -28,7 +28,8 @@ var Cmd = &cobra.Command{
 
 func init() {
 	scanApiUrl := Cmd.Flags().String("scan-api-url", "", "The URL of the service to send scan requests to.")
-	tokenFilePath := Cmd.Flags().String("token-file-path", "", "Path to a file containing token to use when making requests to the scan API.")
+	tokenInput := Cmd.Flags().String("token", "", "The token to use when making requests to the scan API. Cannot be specified in combination with --token-file-path.")
+	tokenFilePath := Cmd.Flags().String("token-file-path", "", "Path to a file containing token to use when making requests to the scan API. Cannot be specified in combination with --token.")
 	timeout := Cmd.Flags().Int64("timeout", 0, "The timeout in minutes for the garbage collection request.")
 	filterPlatformRuntime := Cmd.Flags().String("filter-platform-runtime", "", "Cleanup assets by an asset's PlatformRuntime.")
 	filterManagedBy := Cmd.Flags().String("filter-managed-by", "", "Cleanup assets with matching ManagedBy field")
@@ -41,19 +42,25 @@ func init() {
 		if *scanApiUrl == "" {
 			return fmt.Errorf("--scan-api-url must be provided")
 		}
-		if *tokenFilePath == "" {
-			return fmt.Errorf("--token-file-path must be provided")
+		if *tokenFilePath == "" && *tokenInput == "" {
+			return fmt.Errorf("either --token or --token-file-path must be provided")
+		}
+		if *tokenFilePath != "" && *tokenInput != "" {
+			return fmt.Errorf("only one of --token or --token-file-path must be provided")
 		}
 		if *timeout <= 0 {
 			return fmt.Errorf("--timeout must be greater than 0")
 		}
 
-		tokenBytes, err := os.ReadFile(*tokenFilePath)
-		if err != nil {
-			logger.Error(err, "failed to read in file with token content")
-			return err
+		token := *tokenInput
+		if *tokenFilePath != "" {
+			tokenBytes, err := os.ReadFile(*tokenFilePath)
+			if err != nil {
+				logger.Error(err, "failed to read in file with token content")
+				return err
+			}
+			token = strings.TrimSuffix(string(tokenBytes), "\n")
 		}
-		token := strings.TrimSuffix(string(tokenBytes), "\n")
 
 		client := mondooclient.NewClient(mondooclient.ClientOptions{
 			ApiEndpoint: *scanApiUrl,
@@ -68,12 +75,7 @@ func init() {
 			return fmt.Errorf("no filters provided to garbage collect by")
 		}
 
-		err = GarbageCollectCmd(ctx, client, *filterPlatformRuntime, *filterOlderThan, *filterManagedBy, logger)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return GarbageCollectCmd(ctx, client, *filterPlatformRuntime, *filterOlderThan, *filterManagedBy, logger)
 	}
 }
 
