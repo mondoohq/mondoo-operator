@@ -21,6 +21,13 @@ env:
   RELEASE: ${{ github.ref_name }}
 
 jobs:
+  debug-event:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print workflow actor
+        run: echo "${{ toJSON(github.actor) }}"
+      - name: Print workflow event
+        run: jq '.' $GITHUB_EVENT_PATH
   build-operator:
     name: Build operator binaries
     runs-on: ubuntu-latest
@@ -393,9 +400,7 @@ jobs:
           kubernetes-version: ${{ matrix.k8s-version }}
 
       - name: Install Helm
-        uses: azure/setup-helm@v1
-        with:
-          version: "v3.8.0" # default is latest stable
+        uses: azure/setup-helm@v3
         id: install
 
       - name: Store creds
@@ -451,9 +456,7 @@ jobs:
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Install Helm
-        uses: azure/setup-helm@v1
-        with:
-          version: "v3.8.0" # default is latest stable
+        uses: azure/setup-helm@v3
         id: install
 
       - name: Run chart-releaser

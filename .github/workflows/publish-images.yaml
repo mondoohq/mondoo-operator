@@ -1,0 +1,57 @@
+name: Publish Container Images (workflow_run)
+on:
+  workflow_run:
+    workflows: ['Publish Container Images']
+    types:
+      - completed
+
+env:
+  # Use docker.io for Docker Hub if empty
+  REGISTRY: ghcr.io
+  # github.repository as <account>/<repo>
+  IMAGE_NAME: ${{ github.repository }}
+  RELEASE: ${{ github.ref_name }}
+
+jobs:
+  debug-event:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Print workflow actor
+        run: echo "${{ toJSON(github.actor) }}"
+      - name: Print workflow event
+        run: jq '.' $GITHUB_EVENT_PATH
+  publish:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [amd64, arm64, arm]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=schedule,pattern=main
+            type=ref,event=branch
+            type=ref,event=tag
+            type=ref,event=pr
+          flavor: |
+            suffix=-${{ matrix.arch }},onlatest=true
+
+      # Extract metadata (tags, labels) for Docker
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker metadata (without suffixes)
+        id: meta_clean
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
