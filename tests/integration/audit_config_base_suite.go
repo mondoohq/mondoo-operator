@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/stretchr/testify/suite"
@@ -769,26 +768,17 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	// there is this package https://pkg.go.dev/k8s.io/client-go/tools/portforward
 	// But it seems this is a bit complicated in combination with minikube
 	// because of that we use kubectl directly
-	kubectlArgs := []string{
-		"-n",
-		webhookService.Namespace,
-		"port-forward",
-		"svc/" + webhookService.Name,
-		fmt.Sprintf("%d:%d", webhookLocalPort, webhookService.Spec.Ports[0].Port),
-	}
-
-	cmd := exec.Command("kubectl", kubectlArgs...)
+	cmd := s.createPortForwardCmd(webhookService)
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("couldn't start port-forward: %w", err)
 	}
 	// kubectl port-forwarding does not return but will run until interrupted
-	// We have to get ride of the port-forward at the end, because we need to create a new one for each test
+	// We have to get rid of the port-forward at the end, because we need to create a new one for each test
 	defer func() {
-		zap.S().Info("Killing port-forward with pid: ", cmd.Process.Pid)
-		err := cmd.Process.Kill()
+		err := s.stopCmd(cmd)
 		if err != nil {
-			zap.S().Error("Failed to kill port-forward: ", err)
+			zap.S().Errorf("couldn't stop port-forward: %v\n", err)
 		}
 	}()
 	zap.S().Info("Created port-forward via kubectl for webhook with pid: ", cmd.Process.Pid)
@@ -799,43 +789,53 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	client := &http.Client{Transport: customTransport}
 	client.Timeout = 500 * time.Millisecond
 	var resp *http.Response
+	var webhookErr error
 	for i := 0; i < maxRetriesWebhookConnect; i++ {
 		time.Sleep(1 * time.Second)
-		resp, err = client.Post(webhookUrl, "application/json", strings.NewReader("{}"))
-		if err == nil {
+		resp, webhookErr = client.Post(webhookUrl, "application/json", strings.NewReader("{}"))
+		if webhookErr == nil {
 			zap.S().Infof("Webhook is available: %s", resp.Status)
 			resp.Body.Close()
 			return nil
 		} else {
-			zap.S().Debug("Webhook is not available yet: ", err)
+			zap.S().Debug("Webhook is not available yet: ", webhookErr)
 			// this error will not recover itself over time, we have to re-connect
-			if strings.HasSuffix(err.Error(), "connection refused") {
-				err = s.restartCmd(cmd)
+			if strings.HasSuffix(webhookErr.Error(), "connection refused") {
+				zap.S().Debug("Trying to restart port-forward")
+				err := s.stopCmd(cmd)
+				if err != nil {
+					zap.S().Errorf("couldn't stop port-forward: %v\n", err)
+					continue
+				}
+				cmd = s.createPortForwardCmd(webhookService)
+				err = cmd.Start()
+				if err != nil {
+					zap.S().Errorf("couldn't start port-forward: %v\n", err)
+				}
 			}
 		}
 	}
-	return fmt.Errorf("webhook not available: %w", err)
+	return fmt.Errorf("webhook not available: %w", webhookErr)
 }
 
-func (s *AuditConfigBaseSuite) restartCmd(cmd *exec.Cmd) error {
-	zap.S().Debug("Trying to restart port-forward")
+func (s *AuditConfigBaseSuite) stopCmd(cmd *exec.Cmd) error {
+	zap.S().Debug("Trying to stop port-forward")
 	err := cmd.Process.Kill()
 	if err != nil {
 		return fmt.Errorf("couldn't kill kubectl port-forward: %w", err)
 	}
-	// Wait for process to be gone
-	for i := 0; i < maxRetriesProcessGone; i++ {
-		err = cmd.Process.Signal(syscall.Signal(0))
-		// error will be, e.g.,  "no such process" when gone
-		if err != nil {
-			zap.S().Debug("Port-forward is not running anymore: %v", err)
-			break
-		}
-		time.Sleep(1 * time.Second)
+	_, err = cmd.Process.Wait()
+	return err
+}
+
+func (s *AuditConfigBaseSuite) createPortForwardCmd(webhookService *corev1.Service) *exec.Cmd {
+	kubectlArgs := []string{
+		"-n",
+		webhookService.Namespace,
+		"port-forward",
+		"svc/" + webhookService.Name,
+		fmt.Sprintf("%d:%d", webhookLocalPort, webhookService.Spec.Ports[0].Port),
 	}
-	err = cmd.Start()
-	if err != nil {
-		return fmt.Errorf("couldn't start kubectl port-forward: %w", err)
-	}
-	return nil
+
+	return exec.Command("kubectl", kubectlArgs...)
 }
