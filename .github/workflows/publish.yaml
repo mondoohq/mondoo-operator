@@ -314,9 +314,9 @@ jobs:
       - name: Install Mondoo operator using OLM
         run: |
           operator-sdk olm install
-          kubectl -n olm wait --for=condition=Ready pods --all --timeout=30s
+          kubectl -n olm wait --for=condition=Ready pods --all --timeout=60s
           kubectl create ns mondoo-operator
-          operator-sdk run bundle --index-image=quay.io/operator-framework/opm:v1.23.0 ghcr.io/${{ github.repository }}-bundle:${{ github.ref_name }} --namespace mondoo-operator --timeout 3m0s
+          operator-sdk run bundle ghcr.io/${{ github.repository }}-bundle:${{ github.ref_name }} --namespace mondoo-operator --timeout 3m0s
 
       - name: Gather running pods
         if: failure()
