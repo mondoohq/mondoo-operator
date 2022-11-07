@@ -283,6 +283,12 @@ func TestWebhookNamespaceFiltering(t *testing.T) {
 			object:       testExamplePod(),
 			excludeList:  []string{"other-namespace"},
 		},
+		{
+			name:         "excluded with glob",
+			expectReason: defaultScanPass,
+			object:       testExamplePod(),
+			excludeList:  []string{"test*"},
+		},
 	}
 
 	for _, test := range tests {

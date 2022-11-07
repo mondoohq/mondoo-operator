@@ -76,7 +76,12 @@ func (d *debouncer) Start(ctx context.Context, managedBy string) {
 						continue
 					}
 					namespace := fields[1]
-					if utils.AllowNamespace(namespace, c.IncludeNamespaces, c.ExcludeNamespaces) {
+					allow, err := utils.AllowNamespace(namespace, c.IncludeNamespaces, c.ExcludeNamespaces)
+					if err != nil {
+						logger.Error(err, "skipping resource", "request", res)
+						continue
+					}
+					if allow {
 						logger.Info("Reconciling change", "request", res, "integration-mrn", c.IntegrationMrn)
 						if _, err := c.Client.ScheduleKubernetesResourceScan(ctx, c.IntegrationMrn, res, managedBy); err != nil {
 							logger.Error(err, "Failed to schedule resource scan", "request", res)
