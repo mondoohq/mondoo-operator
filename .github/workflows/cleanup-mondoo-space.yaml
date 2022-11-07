@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Cleanup Assets and Projects in Mondoo Prod
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Store cleanup creds
         run: |
           echo ${{ secrets.MONDOO_CLIENT_EDITOR }} | base64 -d > creds_editor.json
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Cleanup Assets and Projects in Mondoo Edge
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Store cleanup creds
         run: |
           echo ${{ secrets.MONDOO_CLIENT_EDITOR_EDGE }} | base64 -d > creds_editor.json
