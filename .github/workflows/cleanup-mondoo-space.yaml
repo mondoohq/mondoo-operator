@@ -2,11 +2,17 @@ name: "Cleanup Mondoo space"
 on:
   schedule:
   - cron: "11 3 * * *" # 3:11am UTC
+  workflow_dispatch:
+    secrets:
+      MONDOO_CLIENT_EDITOR:
+        required: true
+      MONDOO_CLIENT_EDITOR_EDGE:
+        required: true
 
 jobs:
-  cleanup:
+  cleanup-prod:
     runs-on: ubuntu-latest
-    name: Cleanup Assets and Projects in Mondoo
+    name: Cleanup Assets and Projects in Mondoo Prod
     steps:
       - uses: actions/checkout@v2
       - name: Store cleanup creds
@@ -19,6 +25,29 @@ jobs:
           args: status
 
       - name: Cleanup Mondoo space "GitHub Actions Mondoo Operator"
+        if: success() || failure()
+        run: |
+          mondoo --config ${{ env.MONDOO_CONFIG_PATH }} status
+          ./scripts/cleanup_operator_assets.sh
+          ./scripts/cleanup_operator_space_cicd.sh
+        env:
+          MONDOO_CONFIG_PATH: ${{ format('{0}/{1}', github.workspace, 'creds_editor.json') }}
+
+  cleanup-edge:
+    runs-on: ubuntu-latest
+    name: Cleanup Assets and Projects in Mondoo Edge
+    steps:
+      - uses: actions/checkout@v2
+      - name: Store cleanup creds
+        run: |
+          echo ${{ secrets.MONDOO_CLIENT_EDITOR_EDGE }} | base64 -d > creds_editor.json
+      - uses: mondoohq/actions/setup@main
+        if: success() || failure()
+        with:
+          service-account-credentials: ${{ secrets.MONDOO_CLIENT_EDITOR_EDGE }}
+          args: status
+
+      - name: Cleanup Mondoo Edge space "k8s-operator-edge-testing"
         if: success() || failure()
         run: |
           mondoo --config ${{ env.MONDOO_CONFIG_PATH }} status
