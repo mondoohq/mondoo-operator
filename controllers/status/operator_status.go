@@ -22,13 +22,14 @@ const (
 	NodeScanningIdentifier         = "node-scanning"
 	AdmissionControllerIdentifier  = "admission-controller"
 	ScanApiIdentifier              = "scan-api"
-	noStatusMessage                = "No status yet reported'"
+	noStatusMessage                = "No status reported yet"
 )
 
 type OperatorCustomState struct {
 	KubernetesVersion string
 	Nodes             []string
 	MondooAuditConfig MondooAuditConfig
+	OperatorVersion   string
 }
 
 type MondooAuditConfig struct {
@@ -141,8 +142,8 @@ func ReportStatusRequestFromAuditConfig(
 			Nodes:             nodeNames,
 			KubernetesVersion: k8sVersion.GitVersion,
 			MondooAuditConfig: MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
+			OperatorVersion:   version.Version,
 		},
 		Messages: mondooclient.Messages{Messages: messages},
-		Version:  version.Version,
 	}
 }
