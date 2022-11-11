@@ -19,6 +19,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient/mock"
+	operatorVersion "go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/credentials"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	v1 "k8s.io/api/core/v1"
@@ -85,9 +86,8 @@ func (s *StatusReporterSuite) TestReport() {
 	}
 
 	s.mockMondooClient.EXPECT().IntegrationReportStatus(gomock.Any(), &mondooclient.ReportStatusRequest{
-		Mrn:     testIntegrationMrn,
-		Status:  mondooclient.Status_ACTIVE,
-		Version: "latest",
+		Mrn:    testIntegrationMrn,
+		Status: mondooclient.Status_ACTIVE,
 		Messages: mondooclient.Messages{
 			Messages: []mondooclient.IntegrationMessage{
 				{
@@ -116,6 +116,7 @@ func (s *StatusReporterSuite) TestReport() {
 			KubernetesVersion: statusReport.k8sVersion.GitVersion,
 			Nodes:             nodeNames,
 			MondooAuditConfig: MondooAuditConfig{Name: s.auditConfig.Name, Namespace: s.auditConfig.Namespace},
+			OperatorVersion:   operatorVersion.Version,
 		},
 	}).Times(1).Return(nil)
 
@@ -135,9 +136,8 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 	}
 
 	expected := &mondooclient.ReportStatusRequest{
-		Mrn:     testIntegrationMrn,
-		Status:  mondooclient.Status_ACTIVE,
-		Version: "latest",
+		Mrn:    testIntegrationMrn,
+		Status: mondooclient.Status_ACTIVE,
 		Messages: mondooclient.Messages{
 			Messages: []mondooclient.IntegrationMessage{
 				{
@@ -166,6 +166,7 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 			KubernetesVersion: statusReport.k8sVersion.GitVersion,
 			Nodes:             nodeNames,
 			MondooAuditConfig: MondooAuditConfig{Name: s.auditConfig.Name, Namespace: s.auditConfig.Namespace},
+			OperatorVersion:   operatorVersion.Version,
 		},
 	}
 	s.mockMondooClient.EXPECT().IntegrationReportStatus(gomock.Any(), expected).Times(1).Return(nil)

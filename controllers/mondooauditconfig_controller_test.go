@@ -234,9 +234,8 @@ func TestTokenRegistration(t *testing.T) {
 				}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{}, nil)
 
 				mClient.EXPECT().IntegrationReportStatus(gomock.Any(), &mondooclient.ReportStatusRequest{
-					Mrn:     testIntegrationMRN,
-					Status:  mondooclient.Status_ACTIVE,
-					Version: "latest",
+					Mrn:    testIntegrationMRN,
+					Status: mondooclient.Status_ACTIVE,
 					Messages: mondooclient.Messages{
 						Messages: []mondooclient.IntegrationMessage{
 							{
@@ -265,6 +264,7 @@ func TestTokenRegistration(t *testing.T) {
 						KubernetesVersion: k8sVersion.GitVersion,
 						Nodes:             make([]string, 0),
 						MondooAuditConfig: status.MondooAuditConfig{Name: testMondooAuditConfigName, Namespace: testNamespace},
+						OperatorVersion:   version.Version,
 					},
 				}).Times(1).Return(nil)
 

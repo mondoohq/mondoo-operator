@@ -38,6 +38,7 @@ func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
 		Nodes:             []string{"node1", "node2"},
 		KubernetesVersion: v.GitVersion,
 		MondooAuditConfig: MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
+		OperatorVersion:   version.Version,
 	}, reportStatus.LastState)
 	messages := []mondooclient.IntegrationMessage{
 		{Identifier: K8sResourcesScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Kubernetes resources scanning is disabled"},
@@ -46,7 +47,6 @@ func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Scan API is disabled"},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
-	assert.Equal(t, version.Version, reportStatus.Version)
 }
 
 func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
@@ -76,6 +76,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		Nodes:             []string{"node1", "node2"},
 		KubernetesVersion: v.GitVersion,
 		MondooAuditConfig: MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
+		OperatorVersion:   version.Version,
 	}, reportStatus.LastState)
 	messages := []mondooclient.IntegrationMessage{
 		{Identifier: K8sResourcesScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[0].Message},
@@ -84,7 +85,6 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[3].Message},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
-	assert.Equal(t, version.Version, reportStatus.Version)
 }
 
 func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
@@ -114,6 +114,7 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		Nodes:             []string{"node1", "node2"},
 		KubernetesVersion: v.GitVersion,
 		MondooAuditConfig: MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
+		OperatorVersion:   version.Version,
 	}, reportStatus.LastState)
 	messages := []mondooclient.IntegrationMessage{
 		{Identifier: K8sResourcesScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[0].Message},
@@ -122,7 +123,6 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[3].Message},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
-	assert.Equal(t, version.Version, reportStatus.Version)
 }
 
 func testMondooAuditConfig() v1alpha2.MondooAuditConfig {
