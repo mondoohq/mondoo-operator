@@ -3,6 +3,7 @@ package webhookhandler
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"google.golang.org/protobuf/types/known/structpb"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -132,6 +133,23 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 	if skip {
 		handlerlog.Info("skipping based on namespace filtering", "resource", resource)
 		return
+	}
+
+	// updates with server-side apply (SSA) might only change the resourceVersion
+	// this is a known bug: https://github.com/kubernetes/kubernetes/issues/95460
+	// it is fixed in k8s 1.25, but we need to support older versions
+	// not skipping these updates floods our CI/CD with GKE, AKS, ... addon updates
+	// we might remove this code when all our customers are running k8s 1.26+
+	if req.AdmissionRequest.Operation == admissionv1.Update && req.AdmissionRequest.OldObject.Raw != nil {
+		skip, err := objectsOnlyDifferInResourceVersion(req.AdmissionRequest)
+		if err != nil {
+			handlerlog.Error(err, "failed to get difference between objects")
+			return
+		}
+		if skip {
+			handlerlog.Info("skipping because the old and new object only differ in resourceVersion; happens with server-side apply")
+			return
+		}
 	}
 
 	k8sLabels, err := a.generateLabels(req, obj)
@@ -297,4 +315,27 @@ func shouldScanObject(obj runtime.Object) bool {
 
 	// In case we couldn't access the meta object or there was no controller owner, then scan
 	return true
+}
+
+func objectsOnlyDifferInResourceVersion(admissionRequest admissionv1.AdmissionRequest) (bool, error) {
+	oldObjMapData := make(map[string]interface{})
+	if err := yaml.Unmarshal(admissionRequest.OldObject.Raw, &oldObjMapData); err != nil {
+		handlerlog.Error(err, "failed to unmarshal old object to map")
+		return false, err
+	}
+
+	objMapData := make(map[string]interface{})
+	if err := yaml.Unmarshal(admissionRequest.Object.Raw, &objMapData); err != nil {
+		handlerlog.Error(err, "failed to unmarshal new object to map")
+		return false, err
+	}
+
+	// we don't care about the actual difference, only whether the resourceVersion is the only difference or not
+	oldObjMapData["metadata"].(map[string]interface{})["resourceVersion"] = ""
+	objMapData["metadata"].(map[string]interface{})["resourceVersion"] = ""
+
+	if reflect.DeepEqual(oldObjMapData, objMapData) {
+		return true, nil
+	}
+	return false, nil
 }
