@@ -109,8 +109,9 @@ jobs:
 
       - name: Scan Image
         uses: mondoohq/actions/docker-image@main
+        env:
+          MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
         with:
-          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push-operator.outputs.digest }}
 
       # Sign the resulting Docker image digest except on PRs.

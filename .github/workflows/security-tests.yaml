@@ -29,18 +29,21 @@ jobs:
         run: cat ".github/env" >> $GITHUB_ENV
       - name: Scan AWS terraform with Mondoo
         uses: mondoohq/actions/terraform-hcl@main
+        env:
+          MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
         with:
-          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
           path: ".github/terraform/aws/main.tf"
       - name: Scan Azure terraform with Mondoo
         uses: mondoohq/actions/terraform-hcl@main
+        env:
+          MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
         with:
-          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
           path: ".github/terraform/aks/main.tf"
       - name: Generate manifests
         run: make generate-manifests IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE }}'
       - name: Scan Kubernetes Manifest with Mondoo
         uses: mondoohq/actions/k8s-manifest@main
+        env:
+          MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
         with:
-          service-account-credentials: ${{ secrets.MONDOO_CLIENT }}
           path: "mondoo-operator-manifests.yaml"
