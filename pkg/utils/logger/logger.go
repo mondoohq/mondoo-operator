@@ -8,8 +8,9 @@ import (
 
 func NewLogger() logr.Logger {
 	opts := zap.Options{
-		Development: true,
-		TimeEncoder: zapcore.RFC3339TimeEncoder,
+		Development:     true,
+		StacktraceLevel: zapcore.DPanicLevel,
+		TimeEncoder:     zapcore.RFC3339TimeEncoder,
 	}
 	return zap.New(zap.UseFlagOptions(&opts))
 }
