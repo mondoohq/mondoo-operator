@@ -21,12 +21,10 @@ import (
 )
 
 const (
-	MondooClientImage = "docker.io/mondoo/client"
-	MondooClientTag   = "7-rootless"
-	CnspecImage       = "docker.io/ivanmilchev/test"
-	// CnspecImage              = "docker.io/mondoo/cnspec"
-	// CnspecTag                = "7-rootless"
-	CnspecTag                = "api"
+	MondooClientImage        = "docker.io/mondoo/client"
+	MondooClientTag          = "7-rootless"
+	CnspecImage              = "docker.io/mondoo/cnspec"
+	CnspecTag                = "7-rootless"
 	OpenShiftMondooClientTag = "7-ubi-rootless"
 	MondooOperatorImage      = "ghcr.io/mondoohq/mondoo-operator"
 )
