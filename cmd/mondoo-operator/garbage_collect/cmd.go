@@ -81,7 +81,7 @@ func init() {
 
 func GarbageCollectCmd(ctx context.Context, client mondooclient.Client, platformRuntime, olderThan, managedBy string, logger logr.Logger) error {
 	gcOpts := &garbagecollection.GarbageCollectOptions{
-		MangagedBy: managedBy,
+		ManagedBy: managedBy,
 	}
 
 	if olderThan != "" {
