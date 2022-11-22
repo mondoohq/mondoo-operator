@@ -15,13 +15,18 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/imagecache"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 )
 
 const (
-	MondooClientImage        = "docker.io/mondoo/client"
-	MondooClientTag          = "7-rootless"
+	MondooClientImage = "docker.io/mondoo/client"
+	MondooClientTag   = "7-rootless"
+	CnspecImage       = "docker.io/ivanmilchev/test"
+	// CnspecImage              = "docker.io/mondoo/cnspec"
+	// CnspecTag                = "7-rootless"
+	CnspecTag                = "api"
 	OpenShiftMondooClientTag = "7-ubi-rootless"
 	MondooOperatorImage      = "ghcr.io/mondoohq/mondoo-operator"
 )
@@ -58,10 +63,21 @@ func NewContainerImageResolver(isOpenShift bool) ContainerImageResolver {
 
 func (c *containerImageResolver) MondooClientImage(userImage, userTag string, skipImageResolution bool) (string, error) {
 	defaultTag := MondooClientTag
-	if c.resolveForOpenShift {
+
+	// TODO: we don't have a UBI container for cnspec yet so we cannot use this tag
+	if c.resolveForOpenShift && !feature_flags.GetEnableCnspec() {
 		defaultTag = OpenShiftMondooClientTag
 	}
-	image := userImageOrDefault(MondooClientImage, defaultTag, userImage, userTag)
+
+	if feature_flags.GetEnableCnspec() {
+		defaultTag = CnspecTag
+	}
+
+	defaultImage := MondooClientImage
+	if feature_flags.GetEnableCnspec() {
+		defaultImage = CnspecImage
+	}
+	image := userImageOrDefault(defaultImage, defaultTag, userImage, userTag)
 	return c.resolveImage(image, skipImageResolution)
 }
 

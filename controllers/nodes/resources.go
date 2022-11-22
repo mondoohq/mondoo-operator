@@ -22,6 +22,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/inventory"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
@@ -43,6 +44,24 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
 	unsetHostPath := corev1.HostPathUnset
+
+	name := "mondoo-client"
+	cmd := []string{
+		"mondoo", "scan",
+		"--config", "/etc/opt/mondoo/mondoo.yml",
+		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
+		"--score-threshold", "0",
+	}
+	if feature_flags.GetEnableCnspec() {
+		name = "cnspec"
+		cmd = []string{
+			"cnspec", "scan", "local",
+			"--config", "/etc/opt/mondoo/mondoo.yml",
+			"--inventory-file", "/etc/opt/mondoo/inventory.yml",
+			"--score-threshold", "0",
+		}
+	}
+
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
@@ -79,14 +98,9 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 							AutomountServiceAccountToken: pointer.Bool(false),
 							Containers: []corev1.Container{
 								{
-									Image: image,
-									Name:  "mondoo-client",
-									Command: []string{
-										"mondoo", "scan",
-										"--config", "/etc/opt/mondoo/mondoo.yml",
-										"--inventory-file", "/etc/opt/mondoo/inventory.yml",
-										"--score-threshold", "0",
-									},
+									Image:     image,
+									Name:      name,
+									Command:   cmd,
 									Resources: k8s.NodeScanningResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources),
 									SecurityContext: &corev1.SecurityContext{
 										AllowPrivilegeEscalation: pointer.Bool(false),
