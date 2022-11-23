@@ -14,8 +14,10 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -89,6 +91,21 @@ func (i *MondooInstaller) InstallOperator() error {
 
 	if err := i.CreateClientSecret(i.Settings.Namespace); err != nil {
 		return err
+	}
+
+	// Set the cnspec feature flag for the operator if cnspec is enabled
+	if i.Settings.enableCnspec {
+		zap.S().Info("cnspec enabled for test suite")
+		ctx := context.Background()
+		dep := &appsv1.Deployment{}
+		if err := i.K8sHelper.Clientset.Get(ctx, types.NamespacedName{Namespace: i.Settings.Namespace, Name: "mondoo-operator-controller-manager"}, dep); err != nil {
+			return fmt.Errorf("failed to get mondoo-operator-controller-manager deployment: %v", err)
+		}
+
+		dep.Spec.Template.Spec.Containers[0].Env = append(dep.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: "FEATURE_ENABLE_CNSPEC", Value: "1"})
+		if err := i.K8sHelper.Clientset.Update(ctx, dep); err != nil {
+			return fmt.Errorf("failed to update mondoo-operator-controller-manager deployment: %v", err)
+		}
 	}
 
 	watchLabel := "app.kubernetes.io/name=mondoo-operator"
