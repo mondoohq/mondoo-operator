@@ -49,15 +49,21 @@ type AuditConfigBaseSuite struct {
 	testCluster    *TestCluster
 	auditConfig    mondoov2.MondooAuditConfig
 	installRelease bool
+	enableCnspec   bool
 }
 
 func (s *AuditConfigBaseSuite) SetupSuite() {
 	s.ctx = context.Background()
+	settings := installer.NewDefaultSettings()
 	if s.installRelease {
-		s.testCluster = StartTestCluster(installer.NewReleaseSettings(), s.T)
-	} else {
-		s.testCluster = StartTestCluster(installer.NewDefaultSettings(), s.T)
+		settings = installer.NewReleaseSettings()
 	}
+
+	if s.enableCnspec {
+		settings = settings.EnableCnspec()
+	}
+
+	s.testCluster = StartTestCluster(settings, s.T)
 }
 
 func (s *AuditConfigBaseSuite) TearDownSuite() {
