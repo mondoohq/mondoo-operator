@@ -97,14 +97,23 @@ func (i *MondooInstaller) InstallOperator() error {
 	if i.Settings.enableCnspec {
 		zap.S().Info("cnspec enabled for test suite")
 		ctx := context.Background()
-		dep := &appsv1.Deployment{}
-		if err := i.K8sHelper.Clientset.Get(ctx, types.NamespacedName{Namespace: i.Settings.Namespace, Name: "mondoo-operator-controller-manager"}, dep); err != nil {
-			return fmt.Errorf("failed to get mondoo-operator-controller-manager deployment: %v", err)
-		}
 
-		dep.Spec.Template.Spec.Containers[0].Env = append(dep.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: "FEATURE_ENABLE_CNSPEC", Value: "1"})
-		if err := i.K8sHelper.Clientset.Update(ctx, dep); err != nil {
-			return fmt.Errorf("failed to update mondoo-operator-controller-manager deployment: %v", err)
+		err := i.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+			dep := &appsv1.Deployment{}
+			if err := i.K8sHelper.Clientset.Get(ctx, types.NamespacedName{Namespace: i.Settings.Namespace, Name: "mondoo-operator-controller-manager"}, dep); err != nil {
+				zap.S().Warnf("failed to get mondoo-operator-controller-manager deployment: %v", err)
+				return false, nil
+			}
+
+			dep.Spec.Template.Spec.Containers[0].Env = append(dep.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: "FEATURE_ENABLE_CNSPEC", Value: "1"})
+			if err := i.K8sHelper.Clientset.Update(ctx, dep); err != nil {
+				zap.S().Warnf("failed to update mondoo-operator-controller-manager deployment: %v", err)
+				return false, nil
+			}
+			return true, nil
+		})
+		if err != nil {
+			return err
 		}
 	}
 
