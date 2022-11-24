@@ -180,8 +180,9 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		return
 	}
 	scanJob := &mondooclient.AdmissionReviewJob{
-		Data:   data,
-		Labels: k8sLabels,
+		Data:       data,
+		Labels:     k8sLabels,
+		ReportType: mondooclient.ReportType_ERROR,
 	}
 
 	scanJob.Discovery = &inventory.Discovery{}
