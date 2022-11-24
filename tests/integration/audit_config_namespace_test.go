@@ -76,27 +76,27 @@ func (s *AuditConfigCustomNamespaceSuite) TearDownSuite() {
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_KubernetesResources() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, true, false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, true, false, false, s.testCluster.Settings.GetEnableCnspec())
 	auditConfig.Spec.KubernetesResources.ContainerImageScanning = true
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigKubernetesResources(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, true, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, true, false, s.testCluster.Settings.GetEnableCnspec())
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigNodes(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Admission() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true, s.testCluster.Settings.GetEnableCnspec())
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	auditConfig.Spec.Admission.ServiceAccountName = s.webhookServiceAccount.Name
 	s.testMondooAuditConfigAdmission(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_AdmissionMissingSA() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true, s.testCluster.Settings.GetEnableCnspec())
 	auditConfig.Spec.Scanner.ServiceAccountName = "missing-serviceaccount"
 	auditConfig.Spec.Admission.ServiceAccountName = s.webhookServiceAccount.Name
 	s.testMondooAuditConfigAdmissionMissingSA(auditConfig)
