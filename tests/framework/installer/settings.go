@@ -13,6 +13,10 @@ func (s Settings) EnableCnspec() Settings {
 	return s
 }
 
+func (s Settings) GetEnableCnspec() bool {
+	return s.enableCnspec
+}
+
 func NewDefaultSettings() Settings {
 	return Settings{Namespace: MondooNamespace, installRelease: false}
 }
