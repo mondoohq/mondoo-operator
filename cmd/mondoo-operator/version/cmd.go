@@ -15,13 +15,12 @@ var Cmd = &cobra.Command{
 func init() {
 	simple := Cmd.Flags().Bool("simple", false, "Shows only the version of the binary")
 
-	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
+	Cmd.Run = func(cmd *cobra.Command, args []string) {
 		if *simple {
 			fmt.Println(version.Version)
-			return nil
+			return
 		}
 
 		fmt.Printf("Version: %s Commit: %s", version.Version, version.Commit)
-		return nil
 	}
 }
