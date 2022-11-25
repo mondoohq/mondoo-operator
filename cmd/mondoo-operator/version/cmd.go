@@ -11,6 +11,6 @@ var Cmd = &cobra.Command{
 	Use:   "version",
 	Short: "Displays the Mondoo Operator version",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(version.Version)
+		fmt.Println(fmt.Sprintf("Version: %s Commit: %s", version.Version, version.Commit))
 	},
 }

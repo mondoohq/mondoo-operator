@@ -146,7 +146,7 @@ func init() {
 			return err
 		}
 
-		setupLog.Info("starting manager", "operator-version", version.Version, "k8s-version", v.GitVersion)
+		setupLog.Info("starting manager", "operator-version", version.Version, "operator-commit", version.Commit, "k8s-version", v.GitVersion)
 		if err := mgr.Start(ctx); err != nil {
 			setupLog.Error(err, "problem running manager")
 			return err

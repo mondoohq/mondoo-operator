@@ -5,6 +5,8 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= sha256-$(shell git rev-parse HEAD).sig
 
+COMMIT_SHA ?= $(shell git rev-parse HEAD)
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -73,7 +75,7 @@ TARGET_ARCH?=$(shell go env GOARCH)
 TARGET_OS?=$(shell go env GOOS)
 
 # Linker flags to build the operator binary
-LDFLAGS="-s -w -X go.mondoo.com/mondoo-operator/pkg/version.Version=$(VERSION)"
+LDFLAGS="-s -w -X go.mondoo.com/mondoo-operator/pkg/version.Version=$(VERSION) -X go.mondoo.com/mondoo-operator/pkg/version.Commit=$(COMMIT_SHA)"
 
 all: build
 
