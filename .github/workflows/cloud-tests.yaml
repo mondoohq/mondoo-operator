@@ -311,3 +311,18 @@ jobs:
         name: Report cloud test results
         path: '*.xml'                     # Path to test results
         reporter: java-junit              # Format of test results
+
+  discord-notification:
+    runs-on: ubuntu-latest
+    name: Send Discord notification
+    needs: [eks-integration-test,aks-integration-test,gke-integration-test]
+    # Run only if the previous job has failed and only if it's running against the main branch
+    if: ${{ always() && contains(join(needs.*.result, ','), 'fail') && github.ref_name == 'main' }}
+    steps:
+      - uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: Failure
+          url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          description: Workflow ${{ github.workflow }} failed for commit ${{ github.sha }}.
+          color: 0xff4d4d
