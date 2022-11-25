@@ -91,7 +91,7 @@ jobs:
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
       - name: Get operator version
-        run: echo "OPERATOR_VERSION=$(docker run ghcr.io/mondoohq/mondoo-operator:${{ env.MONDOO_OPERATOR_IMAGE_TAG }} version)" >> $GITHUB_ENV
+        run: echo "OPERATOR_VERSION=$(docker run ghcr.io/mondoohq/mondoo-operator:${{ env.MONDOO_OPERATOR_IMAGE_TAG }} version --simple)" >> $GITHUB_ENV
 
       - name: Wait a bit for the cluster to become more stable
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
@@ -174,7 +174,7 @@ jobs:
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
       - name: Get operator version
-        run: echo "OPERATOR_VERSION=$(docker run ghcr.io/mondoohq/mondoo-operator:${{ env.MONDOO_OPERATOR_IMAGE_TAG }} version)" >> $GITHUB_ENV
+        run: echo "OPERATOR_VERSION=$(docker run ghcr.io/mondoohq/mondoo-operator:${{ env.MONDOO_OPERATOR_IMAGE_TAG }} version --simple)" >> $GITHUB_ENV
 
       - name: Wait a bit for the cluster to become more stable
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
@@ -256,7 +256,7 @@ jobs:
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
       - name: Get operator version
-        run: echo "OPERATOR_VERSION=$(docker run ghcr.io/mondoohq/mondoo-operator:${{ env.MONDOO_OPERATOR_IMAGE_TAG }} version)" >> $GITHUB_ENV
+        run: echo "OPERATOR_VERSION=$(docker run ghcr.io/mondoohq/mondoo-operator:${{ env.MONDOO_OPERATOR_IMAGE_TAG }} version --simple)" >> $GITHUB_ENV
 
       - name: Wait a bit for the cluster to become more stable
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s

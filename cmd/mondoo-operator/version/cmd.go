@@ -10,7 +10,17 @@ import (
 var Cmd = &cobra.Command{
 	Use:   "version",
 	Short: "Displays the Mondoo Operator version",
-	Run: func(cmd *cobra.Command, args []string) {
+}
+
+func init() {
+	simple := Cmd.Flags().Bool("simple", false, "Shows only the version of the binary")
+
+	Cmd.Run = func(cmd *cobra.Command, args []string) {
+		if *simple {
+			fmt.Println(version.Version)
+			return
+		}
+
 		fmt.Printf("Version: %s Commit: %s", version.Version, version.Commit)
-	},
+	}
 }
