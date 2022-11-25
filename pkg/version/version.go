@@ -8,4 +8,7 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 package version
 
-var Version = "latest"
+var (
+	Version = "latest"
+	Commit  = ""
+)

@@ -91,6 +91,11 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=schedule,pattern=main
+            type=ref,event=branch
+            type=ref,event=tag
+            type=ref,event=pr
 
       - name: Build binaries
         run: VERSION=${{ steps.meta_clean.outputs.version }} TARGET_OS=${{ matrix.os }} TARGET_ARCH=${{ matrix.arch }} make build

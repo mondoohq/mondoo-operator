@@ -72,7 +72,7 @@ func init() {
 		}
 
 		// Setup webhooks
-		webhookLog.Info("setting up webhook server", "version", version.Version)
+		webhookLog.Info("setting up webhook server", "version", version.Version, "commit", version.Commit)
 		hookServer := mgr.GetWebhookServer()
 
 		webhookLog.Info("registering webhooks to the webhook server")
