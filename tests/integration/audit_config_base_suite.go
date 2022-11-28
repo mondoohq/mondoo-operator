@@ -620,7 +620,7 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 		if err == nil {
 			break
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 	s.NoErrorf(err, "Failed to create Deployment which should pass.")
 
@@ -758,13 +758,13 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 			s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(endpoints), endpoints),
 			"Failed to retrieve endpoints for webhook")
 		if len(endpoints.Subsets) > 0 {
+			zap.S().Info("endpoints Addresses: ", endpoints.Subsets[0].Addresses)
+			zap.S().Info("endpoints NotReadyAddresses: ", endpoints.Subsets[0].NotReadyAddresses)
 			break
 		}
 		zap.S().Debug("Endpoints for webhook are not ready yet. Retrying...")
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
-	zap.S().Info("endpoints Addresses: ", endpoints.Subsets[0].Addresses)
-	zap.S().Info("endpoints NotReadyAddresses: ", endpoints.Subsets[0].NotReadyAddresses)
 
 	zap.S().Info("Wait for webhook to start working.")
 }
@@ -797,7 +797,7 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	var resp *http.Response
 	var webhookErr error
 	for i := 0; i < maxRetriesWebhookConnect; i++ {
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 		resp, webhookErr = client.Post(webhookUrl, "application/json", strings.NewReader("{}"))
 		if webhookErr == nil {
 			zap.S().Infof("Webhook is available: %s", resp.Status)
