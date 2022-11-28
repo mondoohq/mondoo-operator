@@ -763,6 +763,7 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 		zap.S().Debug("Endpoints for webhook are not ready yet. Retrying...")
 		time.Sleep(1 * time.Second)
 	}
+	s.Require().Greaterf(len(endpoints.Subsets), 0, "No active endpoints found for webhook service")
 	zap.S().Info("endpoints Addresses: ", endpoints.Subsets[0].Addresses)
 	zap.S().Info("endpoints NotReadyAddresses: ", endpoints.Subsets[0].NotReadyAddresses)
 
