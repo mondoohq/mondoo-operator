@@ -758,13 +758,13 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 			s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(endpoints), endpoints),
 			"Failed to retrieve endpoints for webhook")
 		if len(endpoints.Subsets) > 0 {
+			zap.S().Info("endpoints Addresses: ", endpoints.Subsets[0].Addresses)
+			zap.S().Info("endpoints NotReadyAddresses: ", endpoints.Subsets[0].NotReadyAddresses)
 			break
 		}
 		zap.S().Debug("Endpoints for webhook are not ready yet. Retrying...")
 		time.Sleep(2 * time.Second)
 	}
-	zap.S().Info("endpoints Addresses: ", endpoints.Subsets[0].Addresses)
-	zap.S().Info("endpoints NotReadyAddresses: ", endpoints.Subsets[0].NotReadyAddresses)
 
 	zap.S().Info("Wait for webhook to start working.")
 }
