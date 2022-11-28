@@ -139,15 +139,15 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 	// this is a known bug: https://github.com/kubernetes/kubernetes/issues/95460
 	// it is fixed in k8s 1.25, but we need to support older versions
 	// not skipping these updates floods our CI/CD with GKE, AKS, ... addon updates
-	// we might remove this code when all our customers are running k8s 1.26+
+	// SSA also changes the managedFields metadata, so we drop them also to get rid of the noise
 	if req.AdmissionRequest.Operation == admissionv1.Update && req.AdmissionRequest.OldObject.Raw != nil {
-		skip, err := objectsOnlyDifferInResourceVersion(req.AdmissionRequest)
+		skip, err := objectsOnlyDifferInSSAFields(req.AdmissionRequest)
 		if err != nil {
 			handlerlog.Error(err, "failed to get difference between objects")
 			return
 		}
 		if skip {
-			handlerlog.Info("skipping because the old and new object only differ in resourceVersion; happens with server-side apply")
+			handlerlog.V(9).Info("skipping because the old and new object only differ in resourceVersion; happens with server-side apply")
 			return
 		}
 	}
@@ -317,7 +317,7 @@ func shouldScanObject(obj runtime.Object) bool {
 	return true
 }
 
-func objectsOnlyDifferInResourceVersion(admissionRequest admissionv1.AdmissionRequest) (bool, error) {
+func objectsOnlyDifferInSSAFields(admissionRequest admissionv1.AdmissionRequest) (bool, error) {
 	oldObjMapData := make(map[string]interface{})
 	if err := yaml.Unmarshal(admissionRequest.OldObject.Raw, &oldObjMapData); err != nil {
 		handlerlog.Error(err, "failed to unmarshal old object to map")
@@ -334,8 +334,13 @@ func objectsOnlyDifferInResourceVersion(admissionRequest admissionv1.AdmissionRe
 	oldObjMapData["metadata"].(map[string]interface{})["resourceVersion"] = ""
 	objMapData["metadata"].(map[string]interface{})["resourceVersion"] = ""
 
+	// also ignore managedFields which get changed during SSA
+	oldObjMapData["metadata"].(map[string]interface{})["managedFields"] = ""
+	objMapData["metadata"].(map[string]interface{})["managedFields"] = ""
+
 	if reflect.DeepEqual(oldObjMapData, objMapData) {
 		return true, nil
 	}
+
 	return false, nil
 }
