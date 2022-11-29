@@ -817,6 +817,8 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 				err = cmd.Start()
 				if err != nil {
 					zap.S().Errorf("couldn't start port-forward: %v\n", err)
+				} else {
+					zap.S().Info("Created port-forward via kubectl for webhook with pid: ", cmd.Process.Pid)
 				}
 			}
 		}
@@ -825,7 +827,7 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 }
 
 func (s *AuditConfigBaseSuite) stopCmd(cmd *exec.Cmd) error {
-	zap.S().Debug("Trying to stop port-forward")
+	zap.S().Debug("Trying to stop port-forward with pid: ", cmd.Process.Pid)
 	err := cmd.Process.Kill()
 	if err != nil {
 		return fmt.Errorf("couldn't kill kubectl port-forward: %w", err)
