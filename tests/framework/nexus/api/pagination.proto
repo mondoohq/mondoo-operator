@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package mondoo.captain.v1;
+option go_package = "go.mondoo.com/mondoo-operator/tests/framework/nexus/api";
+
+message PageRequest {
+  string cursor = 1;
+  int32 pageSize = 2;
+  // default for backwards is false
+  bool backwards = 3;
+}
+
+message PageInfo {
+  string startCursor = 1;
+  string endCursor = 2;
+  int32 items = 3;
+  int32 total = 4;
+  bool hasMore = 5;
+}
+
+enum OrderDirection {
+  ORDER_ASC = 0;
+  ORDER_DESC = 1;
+}

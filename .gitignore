@@ -44,3 +44,6 @@ tests/integration/_output
 .github/terraform/**/.terraform*
 .github/terraform/**/terraform.tfstate*
 .github/terraform/aws/kubeconfig
+
+/cnquery
+/cnspec

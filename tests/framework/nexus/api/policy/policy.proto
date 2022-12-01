@@ -1,0 +1,163 @@
+syntax = "proto3";
+
+package mondoo.policy;
+option go_package = "go.mondoo.com/mondoo/nexus/api/policy";
+
+import "pagination.proto";
+import "motor/asset/asset.proto";
+import "motor/platform/platform.proto";
+import "motor/providers/provider.proto";
+
+service AssetStore {
+  rpc ListAssets(AssetSearchFilter) returns (AssetsPage);
+  rpc DeleteAssets(DeleteAssetsRequest) returns (DeleteAssetsConfirmation) {};
+}
+
+message AssetSearchFilter {
+  mondoo.captain.v1.PageRequest page = 1;
+  AssetOrder order_by = 2;
+  string space_mrn = 3;
+
+  // allows filtering by tag, name content etc.
+  repeated string query_terms = 20;
+  repeated string asset_mrns = 21;
+
+  // the query will use OR for slice requests
+  repeated string platform_ids = 22;
+
+  repeated ScoreRange score_range = 23;
+
+  // search for specific project_id
+  string cicd_project_mrn = 24;
+
+  // score type for the asset
+  ScoreType score_type = 25;
+
+  // filter based on contents of platformIDs
+  string platform_id_prefix = 26;
+
+  // return only assets of the specified kinds
+  repeated string kinds = 27;
+
+  // list of groups to filter by. Empty matches all
+  // groups
+  repeated GroupFilter groups = 28;
+
+  string related_to_asset_mrn = 29;
+  repeated string asset_types = 30;
+}
+
+message GroupFilter {
+  string group = 1;
+  // TODO: how do we define asset types
+  repeated string assetTypes = 2;
+}
+
+enum ScoreType {
+  UNKNOWN = 0;
+  RESULT = 2;
+  ERROR = 4;
+  UNSCORED = 16;
+}
+
+message ScoreRange {
+  uint32 begin = 1;
+  uint32 end = 2;
+}
+
+message AssetOrder {
+  mondoo.captain.v1.OrderDirection direction = 1;
+  AssetOrderField field = 2;
+}
+
+enum AssetOrderField {
+  ORDER_ID = 0;
+  ORDER_NAME = 2;
+  ORDER_PLATFORM = 3;
+  ORDER_SCORE = 4;
+  ORDER_LAST_UPDATED = 5;
+  ORDER_CREATED = 6;
+}
+
+message AssetsPage {
+  mondoo.captain.v1.PageInfo page = 1;
+  repeated Asset list = 2;
+}
+
+message Asset {
+  string mrn = 1;
+  string space = 2;
+
+  string name = 18;
+  // labels added by mondoo
+  map<string, string> labels = 19;
+  repeated string platform_ids = 20;
+  string updatedAt = 21;
+
+  // asset state
+  cnquery.motor.asset.v1.State state = 22;
+  // asset platform
+  // FIXME: remove in v8.0 vv
+  cnquery.motor.platform.v1.Platform platform = 23;
+  // annotations are user-added, editable
+  map<string, string> annotations = 24;
+
+  cnquery.motor.asset.v1.AssetCategory category = 25;
+  int64 id = 27;
+  string cicd_project_mrn = 26; // if the asset is a cicd asset the project is the owner
+
+  string asset_type = 28;
+
+  // Platform IDs
+  repeated string ids = 30;
+  // Platform Name
+  string platformName = 31;
+  // Platform Title
+  string title = 32;
+  // Platform Architecture
+  string arch = 33;
+  // Platform families
+  repeated string family = 34;
+  // Platform build
+  string build = 35;
+  // Platform version
+  string version = 36;
+  // Platform Kind
+  cnquery.motor.providers.v1.Kind kind = 37;
+  // Platform Runtime
+  string runtime = 38;
+  // Asset FQDN, when present
+  string fqdn = 39;
+  // ManagedBy for clients to "claim" responsbility for asset
+  string managed_by = 40;
+}
+
+message DeleteAssetsRequest {
+  string spaceMrn = 1;
+  repeated string asset_mrns = 2;
+  bool delete_all = 3; // if you want to delete all assets in the space
+  DateFilter date_filter = 4;
+  string managed_by = 5;
+  string platform_runtime = 6;
+}
+
+message DateFilter {
+  string timestamp = 1; // RFC3339
+  Comparison comparison = 2;
+  DateFilterField field = 3;
+}
+
+enum Comparison {
+  GREATER_THAN = 0;
+  LESS_THAN = 1;
+}
+
+enum DateFilterField {
+  FILTER_LAST_UPDATED = 0;
+  FILTER_CREATED = 1;
+}
+
+message DeleteAssetsConfirmation {
+  repeated string asset_mrns = 1;
+  map<string, string> errors = 2;
+}

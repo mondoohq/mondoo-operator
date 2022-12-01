@@ -183,7 +183,7 @@ func (i *MondooInstaller) CreateClientSecret(ns string) error {
 	secret := corev1.Secret{
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			"config": []byte(utils.ReadFile(MondooCredsFile)),
+			"config": []byte(i.Settings.Token()),
 		},
 	}
 	secret.Name = utils.MondooClientSecret

@@ -379,3 +379,15 @@ test/spell-check:
 	echo '{ "comment": { "body": "not_nil" } }' > $(TMP_ACT_JSON)
 	act -j spelling --container-architecture linux/amd64 --eventpath $(TMP_ACT_JSON)
 	rm /tmp/act-json.*
+
+# we need cnquery due to a few proto files requiring it. proto doesn't resolve dependencies for us
+# or download them from the internet, so we are making sure the repo exists this way.
+# An alternative (especially for local development) is to soft-link a local copy of the repo
+# yourself. We don't pin submodules at this time, but we may want to check if they are up to date here.
+prep/repos:
+	test -x cnquery || git clone https://github.com/mondoohq/cnquery.git
+	test -x cnspec || git clone https://github.com/mondoohq/cnspec.git
+
+prep/repos/update: prep/repos
+	cd cnquery; git checkout main && git pull; cd -;
+	cd cnspec; git checkout main && git pull; cd -;
