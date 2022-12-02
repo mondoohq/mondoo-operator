@@ -96,6 +96,11 @@ func (s *StatusReporterSuite) TestReport() {
 					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 				},
 				{
+					Message:    "Container image scanning is disabled",
+					Identifier: ContainerImageScanningIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+				},
+				{
 					Message:    "Node scanning is disabled",
 					Identifier: NodeScanningIdentifier,
 					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
@@ -113,10 +118,14 @@ func (s *StatusReporterSuite) TestReport() {
 			},
 		},
 		LastState: OperatorCustomState{
-			KubernetesVersion: statusReport.k8sVersion.GitVersion,
-			Nodes:             nodeNames,
-			MondooAuditConfig: MondooAuditConfig{Name: s.auditConfig.Name, Namespace: s.auditConfig.Namespace},
-			OperatorVersion:   operatorVersion.Version,
+			KubernetesVersion:      statusReport.k8sVersion.GitVersion,
+			Nodes:                  nodeNames,
+			MondooAuditConfig:      MondooAuditConfig{Name: s.auditConfig.Name, Namespace: s.auditConfig.Namespace},
+			OperatorVersion:        operatorVersion.Version,
+			K8sResourcesScanning:   s.auditConfig.Spec.KubernetesResources.Enable,
+			ContainerImageScanning: s.auditConfig.Spec.KubernetesResources.ContainerImageScanning,
+			NodeScanning:           s.auditConfig.Spec.Nodes.Enable,
+			AdmissionController:    s.auditConfig.Spec.Admission.Enable,
 		},
 	}).Times(1).Return(nil)
 
@@ -135,6 +144,16 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 		nodeNames[i] = nodes[i].GetName()
 	}
 
+	operatorState := OperatorCustomState{
+		KubernetesVersion:      statusReport.k8sVersion.GitVersion,
+		Nodes:                  nodeNames,
+		MondooAuditConfig:      MondooAuditConfig{Name: s.auditConfig.Name, Namespace: s.auditConfig.Namespace},
+		OperatorVersion:        operatorVersion.Version,
+		K8sResourcesScanning:   s.auditConfig.Spec.KubernetesResources.Enable,
+		ContainerImageScanning: s.auditConfig.Spec.KubernetesResources.ContainerImageScanning,
+		NodeScanning:           s.auditConfig.Spec.Nodes.Enable,
+		AdmissionController:    s.auditConfig.Spec.Admission.Enable,
+	}
 	expected := &mondooclient.ReportStatusRequest{
 		Mrn:    testIntegrationMrn,
 		Status: mondooclient.Status_ACTIVE,
@@ -143,6 +162,11 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 				{
 					Message:    "Kubernetes resources scanning is disabled",
 					Identifier: K8sResourcesScanningIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+				},
+				{
+					Message:    "Container image scanning is disabled",
+					Identifier: ContainerImageScanningIdentifier,
 					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 				},
 				{
@@ -162,12 +186,7 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 				},
 			},
 		},
-		LastState: OperatorCustomState{
-			KubernetesVersion: statusReport.k8sVersion.GitVersion,
-			Nodes:             nodeNames,
-			MondooAuditConfig: MondooAuditConfig{Name: s.auditConfig.Name, Namespace: s.auditConfig.Namespace},
-			OperatorVersion:   operatorVersion.Version,
-		},
+		LastState: operatorState,
 	}
 	s.mockMondooClient.EXPECT().IntegrationReportStatus(gomock.Any(), expected).Times(1).Return(nil)
 
@@ -178,9 +197,11 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 		{Message: "Node Scanning error", Status: v1.ConditionTrue, Type: v1alpha2.NodeScanningDegraded},
 	}
 
+	operatorState.NodeScanning = true
+	expected.LastState = operatorState
 	expected.Status = mondooclient.Status_ERROR
-	expected.Messages.Messages[1].Message = s.auditConfig.Status.Conditions[0].Message
-	expected.Messages.Messages[1].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+	expected.Messages.Messages[2].Message = s.auditConfig.Status.Conditions[0].Message
+	expected.Messages.Messages[2].Status = mondooclient.MessageStatus_MESSAGE_ERROR
 	s.mockMondooClient.EXPECT().IntegrationReportStatus(gomock.Any(), expected).Times(1).Return(nil)
 
 	// We call Report another time to make sure IntegrationReportStatus is only called whenever the status actually changes.

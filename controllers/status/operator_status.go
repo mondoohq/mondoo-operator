@@ -18,18 +18,23 @@ import (
 )
 
 const (
-	K8sResourcesScanningIdentifier = "k8s-resources-scanning"
-	NodeScanningIdentifier         = "node-scanning"
-	AdmissionControllerIdentifier  = "admission-controller"
-	ScanApiIdentifier              = "scan-api"
-	noStatusMessage                = "No status reported yet"
+	K8sResourcesScanningIdentifier   = "k8s-resources-scanning"
+	ContainerImageScanningIdentifier = "container-image-scanning"
+	NodeScanningIdentifier           = "node-scanning"
+	AdmissionControllerIdentifier    = "admission-controller"
+	ScanApiIdentifier                = "scan-api"
+	noStatusMessage                  = "No status reported yet"
 )
 
 type OperatorCustomState struct {
-	KubernetesVersion string
-	Nodes             []string
-	MondooAuditConfig MondooAuditConfig
-	OperatorVersion   string
+	KubernetesVersion      string
+	Nodes                  []string
+	MondooAuditConfig      MondooAuditConfig
+	OperatorVersion        string
+	K8sResourcesScanning   bool
+	ContainerImageScanning bool
+	NodeScanning           bool
+	AdmissionController    bool
 }
 
 type MondooAuditConfig struct {
@@ -45,7 +50,7 @@ func ReportStatusRequestFromAuditConfig(
 		nodeNames[i] = nodes[i].Name
 	}
 
-	messages := make([]mondooclient.IntegrationMessage, 4)
+	messages := make([]mondooclient.IntegrationMessage, 5)
 
 	// Kubernetes resources scanning status
 	messages[0].Identifier = K8sResourcesScanningIdentifier
@@ -67,63 +72,83 @@ func ReportStatusRequestFromAuditConfig(
 		messages[0].Message = "Kubernetes resources scanning is disabled"
 	}
 
-	// Node scanning status
-	messages[1].Identifier = NodeScanningIdentifier
-	if m.Spec.Nodes.Enable {
-		nodeScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.NodeScanningDegraded)
-		if nodeScanning != nil {
-			if nodeScanning.Status == v1.ConditionTrue {
+	// Container image scanning status
+	messages[1].Identifier = ContainerImageScanningIdentifier
+	if m.Spec.KubernetesResources.ContainerImageScanning {
+		k8sResourcesScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.K8sContainerImageScanningDegraded)
+		if k8sResourcesScanning != nil {
+			if k8sResourcesScanning.Status == v1.ConditionTrue {
 				messages[1].Status = mondooclient.MessageStatus_MESSAGE_ERROR
 			} else {
 				messages[1].Status = mondooclient.MessageStatus_MESSAGE_INFO
 			}
-			messages[1].Message = nodeScanning.Message
+			messages[1].Message = k8sResourcesScanning.Message
 		} else {
 			messages[1].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
 			messages[1].Message = noStatusMessage
 		}
 	} else {
 		messages[1].Status = mondooclient.MessageStatus_MESSAGE_INFO
-		messages[1].Message = "Node scanning is disabled"
+		messages[1].Message = "Container image scanning is disabled"
 	}
 
-	// Admission controller status
-	messages[2].Identifier = AdmissionControllerIdentifier
-	if m.Spec.Admission.Enable {
-		admissionControllerScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.AdmissionDegraded)
-		if admissionControllerScanning != nil {
-			if admissionControllerScanning.Status == v1.ConditionTrue {
+	// Node scanning status
+	messages[2].Identifier = NodeScanningIdentifier
+	if m.Spec.Nodes.Enable {
+		nodeScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.NodeScanningDegraded)
+		if nodeScanning != nil {
+			if nodeScanning.Status == v1.ConditionTrue {
 				messages[2].Status = mondooclient.MessageStatus_MESSAGE_ERROR
 			} else {
 				messages[2].Status = mondooclient.MessageStatus_MESSAGE_INFO
 			}
-			messages[2].Message = admissionControllerScanning.Message
+			messages[2].Message = nodeScanning.Message
 		} else {
 			messages[2].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
 			messages[2].Message = noStatusMessage
 		}
 	} else {
 		messages[2].Status = mondooclient.MessageStatus_MESSAGE_INFO
-		messages[2].Message = "Admission controller is disabled"
+		messages[2].Message = "Node scanning is disabled"
 	}
 
-	messages[3].Identifier = ScanApiIdentifier
-	if m.Spec.Admission.Enable || m.Spec.KubernetesResources.Enable {
-		scanApi := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.ScanAPIDegraded)
-		if scanApi != nil {
-			if scanApi.Status == v1.ConditionTrue {
+	// Admission controller status
+	messages[3].Identifier = AdmissionControllerIdentifier
+	if m.Spec.Admission.Enable {
+		admissionControllerScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.AdmissionDegraded)
+		if admissionControllerScanning != nil {
+			if admissionControllerScanning.Status == v1.ConditionTrue {
 				messages[3].Status = mondooclient.MessageStatus_MESSAGE_ERROR
 			} else {
 				messages[3].Status = mondooclient.MessageStatus_MESSAGE_INFO
 			}
-			messages[3].Message = scanApi.Message
+			messages[3].Message = admissionControllerScanning.Message
 		} else {
 			messages[3].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
 			messages[3].Message = noStatusMessage
 		}
 	} else {
 		messages[3].Status = mondooclient.MessageStatus_MESSAGE_INFO
-		messages[3].Message = "Scan API is disabled"
+		messages[3].Message = "Admission controller is disabled"
+	}
+
+	messages[4].Identifier = ScanApiIdentifier
+	if m.Spec.Admission.Enable || m.Spec.KubernetesResources.Enable {
+		scanApi := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.ScanAPIDegraded)
+		if scanApi != nil {
+			if scanApi.Status == v1.ConditionTrue {
+				messages[4].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+			} else {
+				messages[4].Status = mondooclient.MessageStatus_MESSAGE_INFO
+			}
+			messages[4].Message = scanApi.Message
+		} else {
+			messages[4].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
+			messages[4].Message = noStatusMessage
+		}
+	} else {
+		messages[4].Status = mondooclient.MessageStatus_MESSAGE_INFO
+		messages[4].Message = "Scan API is disabled"
 	}
 
 	// If there were any error messages, the overall status is error
@@ -139,10 +164,14 @@ func ReportStatusRequestFromAuditConfig(
 		Mrn:    integrationMrn,
 		Status: status,
 		LastState: OperatorCustomState{
-			Nodes:             nodeNames,
-			KubernetesVersion: k8sVersion.GitVersion,
-			MondooAuditConfig: MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
-			OperatorVersion:   version.Version,
+			Nodes:                  nodeNames,
+			KubernetesVersion:      k8sVersion.GitVersion,
+			MondooAuditConfig:      MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
+			OperatorVersion:        version.Version,
+			K8sResourcesScanning:   m.Spec.KubernetesResources.Enable,
+			ContainerImageScanning: m.Spec.KubernetesResources.ContainerImageScanning,
+			NodeScanning:           m.Spec.Nodes.Enable,
+			AdmissionController:    m.Spec.Admission.Enable,
 		},
 		Messages: mondooclient.Messages{Messages: messages},
 	}
