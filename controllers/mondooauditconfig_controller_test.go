@@ -244,6 +244,11 @@ func TestTokenRegistration(t *testing.T) {
 								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 							},
 							{
+								Message:    "Container image scanning is disabled",
+								Identifier: status.ContainerImageScanningIdentifier,
+								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+							},
+							{
 								Message:    "Node scanning is disabled",
 								Identifier: status.NodeScanningIdentifier,
 								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
