@@ -5,17 +5,20 @@ import (
 )
 
 type Client struct {
+	spaceMrn     string
 	integrations integrations.IntegrationsManager
 }
 
-func NewClient(integrations integrations.IntegrationsManager) *Client {
+func NewClient(spaceMrn string, integrations integrations.IntegrationsManager) *Client {
 	return &Client{
+		spaceMrn:     spaceMrn,
 		integrations: integrations,
 	}
 }
 
 func (k *Client) CreateIntegration(name string) *IntegrationBuilder {
 	return &IntegrationBuilder{
+		spaceMrn:     k.spaceMrn,
 		name:         name,
 		integrations: k.integrations,
 	}

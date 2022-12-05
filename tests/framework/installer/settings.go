@@ -1,6 +1,10 @@
 package installer
 
-import "go.mondoo.com/mondoo-operator/tests/framework/utils"
+import (
+	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/tests/framework/utils"
+	corev1 "k8s.io/api/core/v1"
+)
 
 const MondooNamespace = "mondoo-operator"
 
@@ -25,12 +29,24 @@ func (s Settings) SetToken(token string) Settings {
 	return s
 }
 
-func (s Settings) Token() string {
-	// If the token is not set yet, read it from the local file.
+// GetSecret returns the operator secret. If token is set, then mondoo-token secret is returned.
+// Otherwise, mondoo-client secret is returned.
+func (s Settings) GetSecret(ns string) corev1.Secret {
+	secret := corev1.Secret{Type: corev1.SecretTypeOpaque}
+	secret.Namespace = ns
+
 	if s.token == "" {
-		s.token = utils.ReadFile(MondooCredsFile)
+		secret.Name = utils.MondooClientSecret
+		secret.Data = map[string][]byte{
+			"config": []byte(utils.ReadFile(MondooCredsFile)),
+		}
+	} else {
+		secret.Name = utils.MondooTokenSecret
+		secret.Data = map[string][]byte{
+			constants.MondooTokenSecretKey: []byte(s.token),
+		}
 	}
-	return s.token
+	return secret
 }
 
 func NewDefaultSettings() Settings {

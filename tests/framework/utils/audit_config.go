@@ -13,6 +13,7 @@ import (
 
 const (
 	MondooClientSecret         = "mondoo-client"
+	MondooTokenSecret          = "mondoo-token"
 	MondooClientImageTagEnvVar = "MONDOO_CLIENT_IMAGE_TAG"
 )
 
@@ -37,6 +38,7 @@ func DefaultAuditConfigMinimal(ns string, workloads, nodes, admission, enableCns
 		},
 		Spec: mondoov2.MondooAuditConfigSpec{
 			MondooCredsSecretRef: corev1.LocalObjectReference{Name: MondooClientSecret},
+			MondooTokenSecretRef: corev1.LocalObjectReference{Name: MondooTokenSecret},
 			KubernetesResources:  mondoov2.KubernetesResources{Enable: workloads},
 			Nodes:                mondoov2.Nodes{Enable: nodes},
 			Admission:            mondoov2.Admission{Enable: admission},

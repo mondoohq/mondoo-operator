@@ -180,20 +180,13 @@ func (i *MondooInstaller) CleanupAuditConfigs() error {
 }
 
 func (i *MondooInstaller) CreateClientSecret(ns string) error {
-	secret := corev1.Secret{
-		Type: corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			"config": []byte(i.Settings.Token()),
-		},
-	}
-	secret.Name = utils.MondooClientSecret
-	secret.Namespace = ns
+	secret := i.Settings.GetSecret(ns)
 	created, err := k8s.CreateIfNotExist(i.ctx, i.K8sHelper.Clientset, &secret, &secret)
 	if err != nil {
 		return fmt.Errorf("failed to create Мondoo secret in namespace %s. %v", ns, err)
 	}
 	if created {
-		zap.S().Infof("Created Мondoo client secret %q.", utils.MondooClientSecret)
+		zap.S().Infof("Created Мondoo client secret %q.", secret.Name)
 	} else {
 		zap.S().Infof("Мondoo client secret %s/%s already exists.", secret.Namespace, secret.Name)
 	}

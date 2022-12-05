@@ -15,7 +15,6 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
 	nexusK8s "go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
@@ -29,7 +28,7 @@ import (
 type E2eTestSuite struct {
 	suite.Suite
 	ctx         context.Context
-	nexusClient *nexus.Client
+	spaceClient *nexus.Space
 	integration *nexusK8s.Integration
 	token       string
 	testCluster *TestCluster
@@ -39,17 +38,19 @@ type E2eTestSuite struct {
 
 func (s *E2eTestSuite) SetupSuite() {
 	s.ctx = context.Background()
-	nexusClient, err := nexus.NewClient(&upstream.ServiceAccountCredentials{
-		Mrn:         "//agents.api.mondoo.app/spaces/test-infallible-taussig-796596/serviceaccounts/2IGhvB7gzFSqo1E8R5wePR6P5mV",
-		ParentMrn:   "//captain.api.mondoo.app/spaces/test-infallible-taussig-796596",
-		PrivateKey:  "-----BEGIN PRIVATE KEY-----\nMIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDCD4LW1SK1KCY1WdajO\npUIuIeyi2EhT0D01rniyMh39QsTyTZcY0PoWyW7TxHmB+CyhZANiAARyikEXFDN2\nS/NTKRoiCqIkChZLOm3git+A+UNJu2FxXdFz8c1hPyHoknMSw3ZB7FR9WmfKPgfA\njMT50NDSz/10i8GflassD7SOmiNRDzccDasuWnIDhAt0L5sAuOpgol0=\n-----END PRIVATE KEY-----\n",
-		Certificate: "-----BEGIN CERTIFICATE-----\nMIICkDCCAhegAwIBAgIQS5YdYYa5x7vj9F7iq9BJrDAKBggqhkjOPQQDAzBJMUcw\nRQYDVQQKEz4vL2NhcHRhaW4uYXBpLm1vbmRvby5hcHAvc3BhY2VzL3Rlc3QtaW5m\nYWxsaWJsZS10YXVzc2lnLTc5NjU5NjAgFw0yMjExMzAxMzE0MTVaGA85OTk5MTIz\nMTIzNTk1OVowSTFHMEUGA1UEChM+Ly9jYXB0YWluLmFwaS5tb25kb28uYXBwL3Nw\nYWNlcy90ZXN0LWluZmFsbGlibGUtdGF1c3NpZy03OTY1OTYwdjAQBgcqhkjOPQIB\nBgUrgQQAIgNiAARyikEXFDN2S/NTKRoiCqIkChZLOm3git+A+UNJu2FxXdFz8c1h\nPyHoknMSw3ZB7FR9WmfKPgfAjMT50NDSz/10i8GflassD7SOmiNRDzccDasuWnID\nhAt0L5sAuOpgol2jgcEwgb4wDgYDVR0PAQH/BAQDAgWgMBMGA1UdJQQMMAoGCCsG\nAQUFBwMBMAwGA1UdEwEB/wQCMAAwdAYDVR0RBG0wa4JpLy9hZ2VudHMuYXBpLm1v\nbmRvby5hcHAvc3BhY2VzL3Rlc3QtaW5mYWxsaWJsZS10YXVzc2lnLTc5NjU5Ni9z\nZXJ2aWNlYWNjb3VudHMvMklHaHZCN2d6RlNxbzFFOFI1d2VQUjZQNW1WMBMGA1Ud\nJgQMDAp2ZXJzaW9uOnYyMAoGCCqGSM49BAMDA2cAMGQCMG5LJTJfgcBp5cO0nC9V\nGsCcTRRUheY5NJeVwVSOYOT0Gi+IIe7KEclggUthKA7h4gIwF39KfAHi0MQ4PeT4\nNs8jGggfH9Dqxe3iscPL1b6v9jHO6+gf6MPytrg1Ejy9T5bI\n-----END CERTIFICATE-----\n",
-		ApiEndpoint: "http://127.0.0.1:8989",
-	})
-	s.Require().NoError(err, "Failed to create Nexus client")
-	s.nexusClient = nexusClient
+	// nexusClient, err := nexus.NewClient(&upstream.ServiceAccountCredentials{
+	// 	Mrn:         "//agents.api.mondoo.app/spaces/test-infallible-taussig-796596/serviceaccounts/2IGhvB7gzFSqo1E8R5wePR6P5mV",
+	// 	ParentMrn:   "//captain.api.mondoo.app/spaces/test-infallible-taussig-796596",
+	// 	PrivateKey:  "-----BEGIN PRIVATE KEY-----\nMIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDCD4LW1SK1KCY1WdajO\npUIuIeyi2EhT0D01rniyMh39QsTyTZcY0PoWyW7TxHmB+CyhZANiAARyikEXFDN2\nS/NTKRoiCqIkChZLOm3git+A+UNJu2FxXdFz8c1hPyHoknMSw3ZB7FR9WmfKPgfA\njMT50NDSz/10i8GflassD7SOmiNRDzccDasuWnIDhAt0L5sAuOpgol0=\n-----END PRIVATE KEY-----\n",
+	// 	Certificate: "-----BEGIN CERTIFICATE-----\nMIICkDCCAhegAwIBAgIQS5YdYYa5x7vj9F7iq9BJrDAKBggqhkjOPQQDAzBJMUcw\nRQYDVQQKEz4vL2NhcHRhaW4uYXBpLm1vbmRvby5hcHAvc3BhY2VzL3Rlc3QtaW5m\nYWxsaWJsZS10YXVzc2lnLTc5NjU5NjAgFw0yMjExMzAxMzE0MTVaGA85OTk5MTIz\nMTIzNTk1OVowSTFHMEUGA1UEChM+Ly9jYXB0YWluLmFwaS5tb25kb28uYXBwL3Nw\nYWNlcy90ZXN0LWluZmFsbGlibGUtdGF1c3NpZy03OTY1OTYwdjAQBgcqhkjOPQIB\nBgUrgQQAIgNiAARyikEXFDN2S/NTKRoiCqIkChZLOm3git+A+UNJu2FxXdFz8c1h\nPyHoknMSw3ZB7FR9WmfKPgfAjMT50NDSz/10i8GflassD7SOmiNRDzccDasuWnID\nhAt0L5sAuOpgol2jgcEwgb4wDgYDVR0PAQH/BAQDAgWgMBMGA1UdJQQMMAoGCCsG\nAQUFBwMBMAwGA1UdEwEB/wQCMAAwdAYDVR0RBG0wa4JpLy9hZ2VudHMuYXBpLm1v\nbmRvby5hcHAvc3BhY2VzL3Rlc3QtaW5mYWxsaWJsZS10YXVzc2lnLTc5NjU5Ni9z\nZXJ2aWNlYWNjb3VudHMvMklHaHZCN2d6RlNxbzFFOFI1d2VQUjZQNW1WMBMGA1Ud\nJgQMDAp2ZXJzaW9uOnYyMAoGCCqGSM49BAMDA2cAMGQCMG5LJTJfgcBp5cO0nC9V\nGsCcTRRUheY5NJeVwVSOYOT0Gi+IIe7KEclggUthKA7h4gIwF39KfAHi0MQ4PeT4\nNs8jGggfH9Dqxe3iscPL1b6v9jHO6+gf6MPytrg1Ejy9T5bI\n-----END CERTIFICATE-----\n",
+	// 	ApiEndpoint: "http://127.0.0.1:8989",
+	// })
 
-	integration, err := s.nexusClient.K8s.CreateIntegration("test-integration").
+	nexusClient, err := nexus.NewClient(&upstream.ServiceAccountCredentials{})
+	s.Require().NoError(err, "Failed to create Nexus client")
+	s.spaceClient = nexusClient.GetSpace()
+
+	integration, err := s.spaceClient.K8s.CreateIntegration("test-integration").
 		EnableNodesScan().
 		EnableWorkloadsScan().
 		Run(s.ctx)
@@ -109,14 +110,14 @@ func (s *E2eTestSuite) AfterTest(suiteName, testName string) {
 	}
 }
 
-func (s *E2eTestSuite) TestE2e() {
+func (s *E2eTestSuite) TestE2e_NodeScan() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, true, false, s.testCluster.Settings.GetEnableCnspec())
 
 	s.testMondooAuditConfigNodes(auditConfig)
 
-	s.nexusClient.AssetStore.ListAssets(s.ctx, &policy.AssetSearchFilter{
-		SpaceMrn: "",
-	})
+	assets, err := s.spaceClient.ListAssets(s.ctx)
+	s.NoError(err, "Failed to list assets")
+	s.Len(assets, 1, "Expected one asset")
 }
 
 func (s *E2eTestSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
