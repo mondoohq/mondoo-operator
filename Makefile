@@ -109,10 +109,10 @@ generate: controller-gen gomockgen prep/repos prep/tools ## Generate code contai
 fmt: ## Run go fmt against code.
 	go fmt ./...
 
-vet: ## Run go vet against code.
+vet: ## Run go vet against code. 
 	go vet ./...
 
-lint: golangci-lint
+lint: golangci-lint generate
 	$(GOLANGCI_LINT) run
 
 test: manifests generate fmt vet envtest ## Run tests.

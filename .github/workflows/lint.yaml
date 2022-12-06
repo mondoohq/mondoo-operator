@@ -19,6 +19,7 @@ jobs:
       - uses: actions/setup-go@v3
         with:
           go-version: "${{ env.golang-version }}"
+      - run: make generate
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
