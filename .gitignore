@@ -47,3 +47,7 @@ tests/integration/_output
 
 /cnquery
 /cnspec
+
+tests/framework/**/*.actions.go
+tests/framework/**/*.pb.go
+tests/framework/**/*.ranger.go
