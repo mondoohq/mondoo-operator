@@ -102,7 +102,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd paths="./api/..." output:crd:artifacts:config=config/crd/bases
 	$(CONTROLLER_GEN) rbac:roleName=manager-role webhook paths="./pkg/webhooks/..."
 
-generate: controller-gen gomockgen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen gomockgen prep/repos prep/tools ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 	go generate ./controllers/... ./pkg/... ./tests/framework/nexus/...
 
@@ -384,6 +384,13 @@ test/spell-check:
 # or download them from the internet, so we are making sure the repo exists this way.
 # An alternative (especially for local development) is to soft-link a local copy of the repo
 # yourself. We don't pin submodules at this time, but we may want to check if they are up to date here.
+prep/tools: prep/tools/ranger
+	command -v protoc-gen-go || go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	command -v protoc-gen-rangerrpc-swagger || go install go.mondoo.com/ranger-rpc/protoc-gen-rangerrpc-swagger@latest
+
+prep/tools/ranger:
+	go install go.mondoo.com/ranger-rpc/protoc-gen-rangerrpc@latest
+
 prep/repos:
 	test -x cnquery || git clone https://github.com/mondoohq/cnquery.git
 	test -x cnspec || git clone https://github.com/mondoohq/cnspec.git
