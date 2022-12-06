@@ -31,6 +31,7 @@ type E2eTestSuite struct {
 	integration *nexusK8s.Integration
 	token       string
 	testCluster *TestCluster
+	managedBy   string
 
 	auditConfig mondoov2.MondooAuditConfig
 }
@@ -66,6 +67,9 @@ func (s *E2eTestSuite) SetupSuite() {
 	// }
 
 	s.testCluster = StartTestCluster(settings, s.T)
+	ns := &corev1.Namespace{}
+	s.Require().NoError(s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKey{Name: "kube-system"}, ns))
+	s.managedBy = "mondoo-operator-" + string(ns.UID)
 }
 
 func (s *E2eTestSuite) TearDownSuite() {
@@ -102,6 +106,8 @@ func (s *E2eTestSuite) AfterTest(suiteName, testName string) {
 
 		// not sure why the above list does not work. It returns zero deployments. So, first a plain sleep to stabilize the test.
 		zap.S().Info("Cleanup done. Cluster should be good to go for the next test.")
+
+		s.Require().NoError(s.spaceClient.DeleteAssetsManagedBy(s.ctx, s.managedBy), "Failed to delete assets for integration")
 	}
 }
 

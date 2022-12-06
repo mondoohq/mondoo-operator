@@ -32,7 +32,7 @@ func NewSpace(spaceMrn string, assetStore policy.AssetStore, reportsStore policy
 		ReportsStore: reportsStore,
 		Captain:      captain,
 		Integrations: integrations,
-		K8s:          k8s.NewClient(spaceMrn, integrations),
+		K8s:          k8s.NewClient(spaceMrn, integrations, assetStore),
 	}
 }
 
@@ -58,4 +58,9 @@ func (s *Space) ListAssetsWithScores(ctx context.Context) ([]AssetWithScore, err
 		assetScores[i] = AssetWithScore{Asset: asset, Score: scores.Scores[asset.Mrn]}
 	}
 	return assetScores, nil
+}
+
+func (s *Space) DeleteAssetsManagedBy(ctx context.Context, managedBy string) error {
+	_, err := s.AssetStore.DeleteAssets(ctx, &policy.DeleteAssetsRequest{SpaceMrn: s.spaceMrn, ManagedBy: managedBy})
+	return err
 }

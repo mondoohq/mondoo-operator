@@ -4,10 +4,12 @@ import (
 	"context"
 
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/integrations"
+	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
 )
 
 type IntegrationBuilder struct {
 	integrations integrations.IntegrationsManager
+	assetStore   policy.AssetStore
 
 	spaceMrn            string
 	name                string
@@ -56,7 +58,10 @@ func (b *IntegrationBuilder) Run(ctx context.Context) (*Integration, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Integration{integrations: b.integrations, mrn: resp.Integration.Mrn}, nil
+	return &Integration{
+		integrations: b.integrations,
+		mrn:          resp.Integration.Mrn,
+	}, nil
 }
 
 type Integration struct {
