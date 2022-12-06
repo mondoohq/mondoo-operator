@@ -63,7 +63,7 @@ func (s *AuditConfigBaseSuite) SetupSuite() {
 		settings = settings.EnableCnspec()
 	}
 
-	s.testCluster = StartTestCluster(settings, s.T)
+	s.testCluster = StartTestCluster(s.ctx, settings, s.T)
 }
 
 func (s *AuditConfigBaseSuite) TearDownSuite() {

@@ -1,24 +1,35 @@
 package integration
 
 import (
+	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type TestCluster struct {
 	*installer.MondooInstaller
-	T func() *testing.T
+	managedBy string
+	T         func() *testing.T
 }
 
-func StartTestCluster(settings installer.Settings, t func() *testing.T) *TestCluster {
+func StartTestCluster(ctx context.Context, settings installer.Settings, t func() *testing.T) *TestCluster {
 	cfg := zap.NewDevelopmentConfig()
 	logger, _ := cfg.Build()
 	zap.ReplaceGlobals(logger)
 
+	operatorInstaller := installer.NewMondooInstaller(settings, t)
+
+	ns := &corev1.Namespace{}
+	require.NoError(t(), operatorInstaller.K8sHelper.Clientset.Get(ctx, client.ObjectKey{Name: "kube-system"}, ns))
+
 	cluster := &TestCluster{
-		MondooInstaller: installer.NewMondooInstaller(settings, t),
+		MondooInstaller: operatorInstaller,
+		managedBy:       "mondoo-operator-" + string(ns.UID),
 		T:               t,
 	}
 
@@ -35,6 +46,10 @@ func StartTestCluster(settings installer.Settings, t func() *testing.T) *TestClu
 	}
 
 	return cluster
+}
+
+func (t *TestCluster) ManagedBy() string {
+	return t.managedBy
 }
 
 func HandlePanics(r interface{}, uninstaller func(), t func() *testing.T) {
