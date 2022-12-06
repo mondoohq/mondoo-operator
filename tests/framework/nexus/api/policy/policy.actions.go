@@ -4,6 +4,7 @@
 package policy
 
 const (
-	ACTION_MONDOO_POLICY_ASSETSTORE_LISTASSETS   = "mondoo.policy.AssetStore.ListAssets"
-	ACTION_MONDOO_POLICY_ASSETSTORE_DELETEASSETS = "mondoo.policy.AssetStore.DeleteAssets"
+	ACTION_MONDOO_POLICY_REPORTSSTORE_LISTASSETSCORES = "mondoo.policy.ReportsStore.ListAssetScores"
+	ACTION_MONDOO_POLICY_ASSETSTORE_LISTASSETS        = "mondoo.policy.AssetStore.ListAssets"
+	ACTION_MONDOO_POLICY_ASSETSTORE_DELETEASSETS      = "mondoo.policy.AssetStore.DeleteAssets"
 )

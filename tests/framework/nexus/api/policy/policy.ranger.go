@@ -18,6 +18,102 @@ import (
 
 // service interface definition
 
+type ReportsStore interface {
+	ListAssetScores(context.Context, *ListAssetScoresReq) (*ListAssetScoresRes, error)
+}
+
+// client implementation
+
+type ReportsStoreClient struct {
+	ranger.Client
+	httpclient ranger.HTTPClient
+	prefix     string
+}
+
+func NewReportsStoreClient(addr string, client ranger.HTTPClient, plugins ...ranger.ClientPlugin) (*ReportsStoreClient, error) {
+	base, err := url.Parse(ranger.SanitizeUrl(addr))
+	if err != nil {
+		return nil, err
+	}
+
+	u, err := url.Parse("./ReportsStore")
+	if err != nil {
+		return nil, err
+	}
+
+	serviceClient := &ReportsStoreClient{
+		httpclient: client,
+		prefix:     base.ResolveReference(u).String(),
+	}
+	serviceClient.AddPlugins(plugins...)
+	return serviceClient, nil
+}
+func (c *ReportsStoreClient) ListAssetScores(ctx context.Context, in *ListAssetScoresReq) (*ListAssetScoresRes, error) {
+	out := new(ListAssetScoresRes)
+	err := c.DoClientRequest(ctx, c.httpclient, strings.Join([]string{c.prefix, "/ListAssetScores"}, ""), in, out)
+	return out, err
+}
+
+// server implementation
+
+type ReportsStoreServerOption func(s *ReportsStoreServer)
+
+func WithUnknownFieldsForReportsStoreServer() ReportsStoreServerOption {
+	return func(s *ReportsStoreServer) {
+		s.allowUnknownFields = true
+	}
+}
+
+func NewReportsStoreServer(handler ReportsStore, opts ...ReportsStoreServerOption) http.Handler {
+	srv := &ReportsStoreServer{
+		handler: handler,
+	}
+
+	for i := range opts {
+		opts[i](srv)
+	}
+
+	service := ranger.Service{
+		Name: "ReportsStore",
+		Methods: map[string]ranger.Method{
+			"ListAssetScores": srv.ListAssetScores,
+		},
+	}
+	return ranger.NewRPCServer(&service)
+}
+
+type ReportsStoreServer struct {
+	handler            ReportsStore
+	allowUnknownFields bool
+}
+
+func (p *ReportsStoreServer) ListAssetScores(ctx context.Context, reqBytes *[]byte) (pb.Message, error) {
+	var req ListAssetScoresReq
+	var err error
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not access header")
+	}
+
+	switch md.First("Content-Type") {
+	case "application/protobuf", "application/octet-stream", "application/grpc+proto":
+		err = pb.Unmarshal(*reqBytes, &req)
+	default:
+		// handle case of empty object
+		if len(*reqBytes) > 0 {
+			err = jsonpb.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(*reqBytes, &req)
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	return p.handler.ListAssetScores(ctx, &req)
+}
+
+// service interface definition
+
 type AssetStore interface {
 	ListAssets(context.Context, *AssetSearchFilter) (*AssetsPage, error)
 	DeleteAssets(context.Context, *DeleteAssetsRequest) (*DeleteAssetsConfirmation, error)

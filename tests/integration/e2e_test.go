@@ -6,15 +6,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.mondoo.com/cnquery/upstream"
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	mondooadmission "go.mondoo.com/mondoo-operator/controllers/admission"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
-	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus"
+	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
 	nexusK8s "go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
@@ -38,15 +37,11 @@ type E2eTestSuite struct {
 
 func (s *E2eTestSuite) SetupSuite() {
 	s.ctx = context.Background()
-	// nexusClient, err := nexus.NewClient(&upstream.ServiceAccountCredentials{
-	// 	Mrn:         "//agents.api.mondoo.app/spaces/test-infallible-taussig-796596/serviceaccounts/2IGhvB7gzFSqo1E8R5wePR6P5mV",
-	// 	ParentMrn:   "//captain.api.mondoo.app/spaces/test-infallible-taussig-796596",
-	// 	PrivateKey:  "-----BEGIN PRIVATE KEY-----\nMIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDCD4LW1SK1KCY1WdajO\npUIuIeyi2EhT0D01rniyMh39QsTyTZcY0PoWyW7TxHmB+CyhZANiAARyikEXFDN2\nS/NTKRoiCqIkChZLOm3git+A+UNJu2FxXdFz8c1hPyHoknMSw3ZB7FR9WmfKPgfA\njMT50NDSz/10i8GflassD7SOmiNRDzccDasuWnIDhAt0L5sAuOpgol0=\n-----END PRIVATE KEY-----\n",
-	// 	Certificate: "-----BEGIN CERTIFICATE-----\nMIICkDCCAhegAwIBAgIQS5YdYYa5x7vj9F7iq9BJrDAKBggqhkjOPQQDAzBJMUcw\nRQYDVQQKEz4vL2NhcHRhaW4uYXBpLm1vbmRvby5hcHAvc3BhY2VzL3Rlc3QtaW5m\nYWxsaWJsZS10YXVzc2lnLTc5NjU5NjAgFw0yMjExMzAxMzE0MTVaGA85OTk5MTIz\nMTIzNTk1OVowSTFHMEUGA1UEChM+Ly9jYXB0YWluLmFwaS5tb25kb28uYXBwL3Nw\nYWNlcy90ZXN0LWluZmFsbGlibGUtdGF1c3NpZy03OTY1OTYwdjAQBgcqhkjOPQIB\nBgUrgQQAIgNiAARyikEXFDN2S/NTKRoiCqIkChZLOm3git+A+UNJu2FxXdFz8c1h\nPyHoknMSw3ZB7FR9WmfKPgfAjMT50NDSz/10i8GflassD7SOmiNRDzccDasuWnID\nhAt0L5sAuOpgol2jgcEwgb4wDgYDVR0PAQH/BAQDAgWgMBMGA1UdJQQMMAoGCCsG\nAQUFBwMBMAwGA1UdEwEB/wQCMAAwdAYDVR0RBG0wa4JpLy9hZ2VudHMuYXBpLm1v\nbmRvby5hcHAvc3BhY2VzL3Rlc3QtaW5mYWxsaWJsZS10YXVzc2lnLTc5NjU5Ni9z\nZXJ2aWNlYWNjb3VudHMvMklHaHZCN2d6RlNxbzFFOFI1d2VQUjZQNW1WMBMGA1Ud\nJgQMDAp2ZXJzaW9uOnYyMAoGCCqGSM49BAMDA2cAMGQCMG5LJTJfgcBp5cO0nC9V\nGsCcTRRUheY5NJeVwVSOYOT0Gi+IIe7KEclggUthKA7h4gIwF39KfAHi0MQ4PeT4\nNs8jGggfH9Dqxe3iscPL1b6v9jHO6+gf6MPytrg1Ejy9T5bI\n-----END CERTIFICATE-----\n",
-	// 	ApiEndpoint: "http://127.0.0.1:8989",
-	// })
 
-	nexusClient, err := nexus.NewClient(&upstream.ServiceAccountCredentials{})
+	sa, err := utils.GetServiceAccount()
+	s.Require().NoError(err, "Service account not set")
+	nexusClient, err := nexus.NewClient(sa)
+
 	s.Require().NoError(err, "Failed to create Nexus client")
 	s.spaceClient = nexusClient.GetSpace()
 
@@ -115,9 +110,25 @@ func (s *E2eTestSuite) TestE2e_NodeScan() {
 
 	s.testMondooAuditConfigNodes(auditConfig)
 
-	assets, err := s.spaceClient.ListAssets(s.ctx)
+	nodes := &corev1.NodeList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodes))
+
+	nodeNames := make([]string, 0, len(nodes.Items))
+	for _, node := range nodes.Items {
+		nodeNames = append(nodeNames, node.Name)
+	}
+
+	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
 	s.NoError(err, "Failed to list assets")
-	s.Len(assets, 1, "Expected one asset")
+	assetNames := make([]string, 0, len(assets))
+	for _, asset := range assets {
+		assetNames = append(assetNames, asset.Asset.Name)
+	}
+
+	s.ElementsMatch(nodeNames, assetNames, "Node names do not match")
+	for _, asset := range assets {
+		s.NotEqual(uint32(policy.ScoreType_UNSCORED), asset.Score.Type, "Assets should not be unscored")
+	}
 }
 
 func (s *E2eTestSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
@@ -173,8 +184,8 @@ func (s *E2eTestSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAud
 		s.NoErrorf(err, "Couldn't find NodeScan Pod for node "+node.Name+" in Podlist of the MondooAuditConfig Status")
 	}
 
-	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
-	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+	// err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
+	// s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 }
 
 func TestE2eTestSuite(t *testing.T) {
