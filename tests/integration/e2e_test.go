@@ -46,7 +46,7 @@ func (s *E2eTestSuite) SetupSuite() {
 	s.Require().NoError(err, "Failed to create Nexus client")
 	s.spaceClient = nexusClient.GetSpace()
 
-	integration, err := s.spaceClient.K8s.CreateIntegration("test-integration").
+	integration, err := s.spaceClient.K8s.CreateIntegration("test-integration-" + s.testCluster.managedBy).
 		EnableNodesScan().
 		EnableWorkloadsScan().
 		Run(s.ctx)
