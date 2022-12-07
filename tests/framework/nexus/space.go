@@ -36,8 +36,13 @@ func NewSpace(spaceMrn string, assetStore policy.AssetStore, reportsStore policy
 	}
 }
 
-func (s *Space) ListAssetsWithScores(ctx context.Context) ([]AssetWithScore, error) {
-	assetsPage, err := s.AssetStore.ListAssets(ctx, &policy.AssetSearchFilter{SpaceMrn: s.spaceMrn})
+func (s *Space) ListAssetsWithScores(ctx context.Context, integrationMrn string) ([]AssetWithScore, error) {
+	filter := &policy.AssetSearchFilter{SpaceMrn: s.spaceMrn}
+	if integrationMrn != "" {
+		filter.QueryTerms = []string{"mondoo.com/integration-mrn" + integrationMrn}
+	}
+
+	assetsPage, err := s.AssetStore.ListAssets(ctx, filter)
 	if err != nil {
 		return nil, err
 	}

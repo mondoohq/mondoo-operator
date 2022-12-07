@@ -121,7 +121,7 @@ func (s *E2eTestSuite) TestE2e_NodeScan() {
 		nodeNames = append(nodeNames, node.Name)
 	}
 
-	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
+	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn())
 	s.NoError(err, "Failed to list assets")
 	assetNames := make([]string, 0, len(assets))
 	for _, asset := range assets {
