@@ -46,7 +46,14 @@ func (s *E2eTestSuite) SetupSuite() {
 	s.Require().NoError(err, "Failed to create Nexus client")
 	s.spaceClient = nexusClient.GetSpace()
 
-	integration, err := s.spaceClient.K8s.CreateIntegration("test-integration-" + s.testCluster.managedBy).
+	// TODO: this is only needed because the integration creation is not part of the MondooInstaller struct.
+	// That code will move there once all tests are migrated to use the E2E approach.
+	k8sHelper, err := utils.CreateK8sHelper()
+	s.Require().NoError(err, "Failed to create K8s helper")
+
+	ns := &corev1.Namespace{}
+	s.NoError(k8sHelper.Clientset.Get(s.ctx, client.ObjectKey{Name: "kube-system"}, ns))
+	integration, err := s.spaceClient.K8s.CreateIntegration("test-integration-" + string(ns.UID)).
 		EnableNodesScan().
 		EnableWorkloadsScan().
 		Run(s.ctx)
