@@ -24,9 +24,7 @@ jobs:
           cache: true
 
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1
-        with:
-          version: '3.x'
+        run: apt install -y protobuf-compiler
       
       - run: make test/ci
       - uses: actions/upload-artifact@v3  # upload test results

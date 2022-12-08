@@ -11,6 +11,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
@@ -145,9 +146,8 @@ func (s *E2eTestSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAud
 	cronJobs := &batchv1.CronJobList{}
 	cronJobLabels := nodes.CronJobLabels(auditConfig)
 
-	// Lits only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
+	// List only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
 	listOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(cronJobLabels)}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, cronJobs, listOpts))
 
 	nodeList := &corev1.NodeList{}
 	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodeList))
@@ -186,8 +186,8 @@ func (s *E2eTestSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAud
 		s.NoErrorf(err, "Couldn't find NodeScan Pod for node "+node.Name+" in Podlist of the MondooAuditConfig Status")
 	}
 
-	// err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
-	// s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
+	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 }
 
 func TestE2eTestSuite(t *testing.T) {

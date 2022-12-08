@@ -17,9 +17,7 @@ jobs:
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1
-        with:
-          version: '3.x'
+        run: apt install -y protobuf-compiler
       - uses: actions/setup-go@v3
         with:
           go-version: "${{ env.golang-version }}"

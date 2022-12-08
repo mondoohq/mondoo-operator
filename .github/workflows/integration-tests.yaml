@@ -61,9 +61,7 @@ jobs:
           go-version: "${{ env.golang-version }}"
 
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1
-        with:
-          version: '3.x'
+        run: apt install -y protobuf-compiler
 
       # Makes it easier to see what was the input for this workflow in case we need to debug.
       - name: Print workflow inputs
