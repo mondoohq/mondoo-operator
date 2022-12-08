@@ -52,7 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: ["1.22", "1.23", "1.24"]
+        k8s-version: ["1.22", "1.23", "1.24", "1.25"]
 
     steps:
       - uses: actions/checkout@v3
@@ -130,7 +130,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: ["1.22", "1.23"]
+        k8s-version: ["1.22", "1.23", "1.24"]
 
     env:
       TF_VAR_test_name: ${{ github.event.inputs.mondooOperatorImageTag }}
