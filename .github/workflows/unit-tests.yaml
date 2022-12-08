@@ -24,7 +24,7 @@ jobs:
           cache: true
 
       - name: Install Protoc
-        run: apt install -y protobuf-compiler
+        run: sudo apt install -y protobuf-compiler
       
       - run: make test/ci
       - uses: actions/upload-artifact@v3  # upload test results
