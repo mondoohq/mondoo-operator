@@ -60,7 +60,7 @@ func (s *E2eTestSuite) SetupSuite() {
 	s.Require().NoError(err, "Failed to create k8s integration")
 	s.integration = integration
 
-	token, err := s.integration.GetLongLivedToken(s.ctx)
+	token, err := s.integration.GetRegistrationToken(s.ctx)
 	s.Require().NoError(err, "Failed to get long lived integration token")
 	s.token = token
 

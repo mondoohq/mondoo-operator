@@ -7,6 +7,8 @@ VERSION ?= sha256-$(shell git rev-parse HEAD).sig
 
 COMMIT_SHA ?= $(shell git rev-parse HEAD)
 
+PROTO_VERSION ?= 21.7
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -398,3 +400,9 @@ prep/repos:
 prep/repos/update: prep/repos
 	cd cnquery; git checkout main && git pull; cd -;
 	cd cnspec; git checkout main && git pull; cd -;
+
+prep/ci/protoc:
+	curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v${PROTO_VERSION}/protoc-${PROTO_VERSION}-linux-x86_64.zip
+	mkdir tools
+	unzip protoc-${PROTO_VERSION}-linux-x86_64.zip -d ./tools
+	rm protoc-${PROTO_VERSION}-linux-x86_64.zip

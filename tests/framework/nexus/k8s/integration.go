@@ -74,7 +74,7 @@ func (i *Integration) Mrn() string {
 	return i.mrn
 }
 
-func (i *Integration) GetLongLivedToken(ctx context.Context) (string, error) {
+func (i *Integration) GetRegistrationToken(ctx context.Context) (string, error) {
 	resp, err := i.integrations.GetTokenForIntegration(
 		ctx, &integrations.GetTokenForIntegrationRequest{Mrn: i.mrn, LongLivedToken: false})
 	if err != nil {

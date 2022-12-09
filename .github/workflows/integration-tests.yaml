@@ -61,7 +61,10 @@ jobs:
           go-version: "${{ env.golang-version }}"
 
       - name: Install Protoc
-        run: sudo apt install -y protobuf-compiler
+        run: |
+          sudo apt install -y gcc
+          make prep/ci/protoc
+          echo "${{ github.workspace }}/tools/bin" >> $GITHUB_PATH
 
       # Makes it easier to see what was the input for this workflow in case we need to debug.
       - name: Print workflow inputs
