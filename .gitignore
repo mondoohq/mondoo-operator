@@ -44,3 +44,10 @@ tests/integration/_output
 .github/terraform/**/.terraform*
 .github/terraform/**/terraform.tfstate*
 .github/terraform/aws/kubeconfig
+
+/cnquery
+/cnspec
+
+tests/framework/**/*.actions.go
+tests/framework/**/*.pb.go
+tests/framework/**/*.ranger.go

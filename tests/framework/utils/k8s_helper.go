@@ -207,8 +207,8 @@ func (k8sh *K8sHelper) WaitUntilCronJobsSuccessful(labelSelector, namespace stri
 			return false, err
 		}
 		for _, c := range cronJobs.Items {
-			// Make sure the job has been scheduled
-			if c.Status.LastScheduleTime == nil {
+			// Make sure the job has been scheduled and is not active
+			if c.Status.LastScheduleTime == nil || len(c.Status.Active) > 0 {
 				return false, nil
 			}
 		}
