@@ -86,6 +86,12 @@ jobs:
           go-version: "${{ env.golang-version }}"
           cache: true
 
+      - name: Install Protoc
+        run: |
+          sudo apt install -y gcc
+          make prep/ci/protoc
+          echo "${{ github.workspace }}/tools/bin" >> $GITHUB_PATH
+
       - name: Store creds
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
@@ -169,6 +175,12 @@ jobs:
           go-version: "${{ env.golang-version }}"
           cache: true
 
+      - name: Install Protoc
+        run: |
+          sudo apt install -y gcc
+          make prep/ci/protoc
+          echo "${{ github.workspace }}/tools/bin" >> $GITHUB_PATH
+
       - name: Store creds
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
@@ -250,6 +262,12 @@ jobs:
         with:
           go-version: "${{ env.golang-version }}"
           cache: true
+
+      - name: Install Protoc
+        run: |
+          sudo apt install -y gcc
+          make prep/ci/protoc
+          echo "${{ github.workspace }}/tools/bin" >> $GITHUB_PATH
 
       - name: Store creds
         run: |
