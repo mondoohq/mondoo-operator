@@ -97,6 +97,12 @@ jobs:
             type=ref,event=tag
             type=ref,event=pr
 
+      - name: Install Protoc
+        run: |
+          sudo apt install -y gcc
+          make prep/ci/protoc
+          echo "${{ github.workspace }}/tools/bin" >> $GITHUB_PATH
+
       - name: Build binaries
         run: VERSION=${{ steps.meta_clean.outputs.version }} TARGET_OS=${{ matrix.os }} TARGET_ARCH=${{ matrix.arch }} make build
 
