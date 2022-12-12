@@ -144,6 +144,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 										"ALL",
 									},
 								},
+								Privileged: pointer.Bool(false),
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{

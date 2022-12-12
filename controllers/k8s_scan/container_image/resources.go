@@ -102,6 +102,7 @@ func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditCon
 											},
 										},
 										RunAsNonRoot: pointer.Bool(true),
+										Privileged:   pointer.Bool(false),
 									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
