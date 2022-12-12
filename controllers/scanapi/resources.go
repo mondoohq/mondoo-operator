@@ -133,6 +133,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 									"ALL",
 								},
 							},
+							Privileged: pointer.Bool(false),
 						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
