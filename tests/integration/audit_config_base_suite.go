@@ -171,6 +171,18 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+
+	// Verify the workloads have been sent upstream and have scores.
+	workloadNames, err := s.testCluster.K8sHelper.GetWorkloadNames(s.ctx)
+	s.NoError(err, "Failed to get workload names.")
+
+	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn(), "")
+	s.NoError(err, "Failed to list assets with scores.")
+
+	assetNames := utils.AssetNames(assets)
+	s.ElementsMatch(workloadNames, assetNames, "Workloads were not sent upstream.")
+
+	s.AssetsNotUnscored(assets)
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondoov2.MondooAuditConfig) {
@@ -208,6 +220,30 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+
+	// Verify the container images have been sent upstream and have scores.
+	pods := &corev1.PodList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, pods), "Failed to list pods")
+
+	containerImages, err := utils.ContainerImages(pods.Items, auditConfig)
+	s.NoError(err, "Failed to get container image names")
+
+	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn(), "container_image")
+	s.NoError(err, "Failed to list assets with scores")
+
+	// Filter out any non-container image assets.
+	// var containerAssets []nexus.AssetWithScore
+	// for i := range assets {
+	// 	a := assets[i]
+	// 	if a.Asset.AssetType == "container_image" {
+	// 		containerAssets = append(containerAssets, a)
+	// 	}
+	// }
+
+	assetNames := utils.AssetNames(assets)
+	s.ElementsMatch(containerImages, assetNames, "Container images were not sent upstream.")
+
+	s.AssetsNotUnscored(assets)
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
@@ -289,6 +325,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 
+	// Verify nodes are sent upstream and have scores.
 	nodes := &corev1.NodeList{}
 	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodes))
 
@@ -297,17 +334,12 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 		nodeNames = append(nodeNames, node.Name)
 	}
 
-	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn())
+	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn(), "")
 	s.NoError(err, "Failed to list assets")
-	assetNames := make([]string, 0, len(assets))
-	for _, asset := range assets {
-		assetNames = append(assetNames, asset.Asset.Name)
-	}
+	assetNames := utils.AssetNames(assets)
 
 	s.ElementsMatch(nodeNames, assetNames, "Node names do not match")
-	for _, asset := range assets {
-		s.NotEqual(uint32(policy.ScoreType_UNSCORED), asset.Score.Type, "Assets should not be unscored")
-	}
+	s.AssetsNotUnscored(assets)
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
@@ -936,4 +968,13 @@ func (s *AuditConfigBaseSuite) createPortForwardCmd(webhookService *corev1.Servi
 	}
 
 	return exec.Command("kubectl", kubectlArgs...)
+}
+
+func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []nexus.AssetWithScore) {
+	for _, asset := range assets {
+		// We don't score scratch containers at the moment so they are always unscored.
+		if asset.Asset.PlatformName != "scratch" {
+			s.NotEqualf(uint32(policy.ScoreType_UNSCORED), asset.Score.Type, "Asset %s should not be unscored", asset.Asset.Name)
+		}
+	}
 }

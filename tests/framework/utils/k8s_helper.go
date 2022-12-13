@@ -22,10 +22,13 @@ import (
 	"strings"
 	"time"
 
+	"go.mondoo.com/cnquery/motor/providers/local"
+	"go.mondoo.com/cnquery/resources/packs/os/kubectl"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	api "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.uber.org/zap"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -39,9 +42,10 @@ import (
 )
 
 const (
-	cmd           = "kubectl"
-	RetryInterval = 2
-	RetryLoop     = 75
+	cmd                    = "kubectl"
+	RetryInterval          = 2
+	RetryLoop              = 75
+	SkipVersionCheckEnvVar = "SKIP_VERSION_CHECK"
 )
 
 var (
@@ -600,6 +604,12 @@ func (k8sh *K8sHelper) CheckForPodInStatus(auditConfig *api.MondooAuditConfig, p
 
 // CheckForReconciledOperatorVersion Check whether the MondooAuditConfig Status contains the current operator Version after Reconcile.
 func (k8sh *K8sHelper) CheckForReconciledOperatorVersion(auditConfig *api.MondooAuditConfig, version string) error {
+	val, ok := os.LookupEnv(SkipVersionCheckEnvVar)
+	if ok && val == "true" {
+		zap.S().Warnf("Skipping version check for MondooAuditConfig reconciliation because %s env var is set", SkipVersionCheckEnvVar)
+		return nil
+	}
+
 	err := k8sh.ExecuteWithRetries(func() (bool, error) {
 		// Condition of MondooAuditConfig should be updated
 		foundMondooAuditConfig, err := k8sh.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
@@ -614,4 +624,88 @@ func (k8sh *K8sHelper) CheckForReconciledOperatorVersion(auditConfig *api.Mondoo
 	})
 
 	return err
+}
+
+func (k8sh *K8sHelper) GetWorkloadNames(ctx context.Context) ([]string, error) {
+	var names []string
+
+	// cluster
+	localProvider, err := local.New()
+	k8sctlConfig, err := kubectl.LoadKubeConfig(localProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	names = append(names, fmt.Sprintf("K8s Cluster %s", k8sctlConfig.CurrentClusterName()))
+
+	// pods
+	pods := &v1.PodList{}
+	if err := k8sh.Clientset.List(ctx, pods); err != nil {
+		return nil, err
+	}
+
+	for _, w := range pods.Items {
+		names = append(names, fmt.Sprintf("%s/%s", w.GetNamespace(), w.GetName()))
+	}
+
+	jobs := &batchv1.JobList{}
+	if err := k8sh.Clientset.List(ctx, jobs); err != nil {
+		return nil, err
+	}
+
+	for _, w := range jobs.Items {
+		names = append(names, fmt.Sprintf("%s/%s", w.Namespace, w.Name))
+	}
+
+	// cronjobs
+	cronjobs := &batchv1.CronJobList{}
+	if err := k8sh.Clientset.List(ctx, cronjobs); err != nil {
+		return nil, err
+	}
+
+	for _, w := range cronjobs.Items {
+		names = append(names, fmt.Sprintf("%s/%s", w.Namespace, w.Name))
+	}
+
+	// statefulsets
+	statefulsets := &appsv1.StatefulSetList{}
+	if err := k8sh.Clientset.List(ctx, statefulsets); err != nil {
+		return nil, err
+	}
+
+	for _, w := range statefulsets.Items {
+		names = append(names, fmt.Sprintf("%s/%s", w.Namespace, w.Name))
+	}
+
+	// deployments
+	deployments := &appsv1.DeploymentList{}
+	if err := k8sh.Clientset.List(ctx, deployments); err != nil {
+		return nil, err
+	}
+
+	for _, w := range deployments.Items {
+		names = append(names, fmt.Sprintf("%s/%s", w.Namespace, w.Name))
+	}
+
+	// daemonsets
+	daemonsets := &appsv1.DaemonSetList{}
+	if err := k8sh.Clientset.List(ctx, daemonsets); err != nil {
+		return nil, err
+	}
+
+	for _, w := range daemonsets.Items {
+		names = append(names, fmt.Sprintf("%s/%s", w.Namespace, w.Name))
+	}
+
+	// replicasets
+	replicasets := &appsv1.ReplicaSetList{}
+	if err := k8sh.Clientset.List(ctx, replicasets); err != nil {
+		return nil, err
+	}
+
+	for _, w := range replicasets.Items {
+		names = append(names, fmt.Sprintf("%s/%s", w.Namespace, w.Name))
+	}
+
+	return names, nil
 }
