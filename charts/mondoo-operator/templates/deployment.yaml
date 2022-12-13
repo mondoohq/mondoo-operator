@@ -79,6 +79,7 @@ spec:
           capabilities:
             drop:
             - ALL
+          privileged: false
           readOnlyRootFilesystem: true
       securityContext:
         runAsNonRoot: true
