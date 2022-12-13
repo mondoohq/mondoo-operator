@@ -103,6 +103,8 @@ jobs:
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
       - name: Run integration tests
+        env:
+          MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE}}
         run: VERSION=${{ env.OPERATOR_VERSION }} K8S_DISTRO=aks make test/integration/ci
 
       - name: Clean up AKS terraform
@@ -192,6 +194,8 @@ jobs:
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
       - name: Run integration tests
+        env:
+          MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE}}
         run: VERSION=${{ env.OPERATOR_VERSION }} K8S_DISTRO=eks make test/integration/ci
 
       - name: Clean up EKS terraform
@@ -280,6 +284,8 @@ jobs:
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
       - name: Run integration tests
+        env:
+          MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE}}
         run: VERSION=${{ env.OPERATOR_VERSION }} K8S_DISTRO=gke make test/integration/ci
 
       - name: Clean up GKE terraform
