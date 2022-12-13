@@ -40,7 +40,7 @@ func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes, admissio
 			Namespace: ns,
 		},
 		Spec: mondoov2.MondooAuditConfigSpec{
-			ConsoleIntegration:   mondoov2.ConsoleIntegration{Enable: consoleIntegration},
+			ConsoleIntegration:   mondoov2.ConsoleIntegration{Enable: true},
 			MondooCredsSecretRef: corev1.LocalObjectReference{Name: MondooClientSecret},
 			MondooTokenSecretRef: corev1.LocalObjectReference{Name: MondooTokenSecret},
 			KubernetesResources:  mondoov2.KubernetesResources{Enable: workloads},
