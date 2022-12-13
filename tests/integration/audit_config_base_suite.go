@@ -35,6 +35,9 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
+	"go.mondoo.com/mondoo-operator/tests/framework/nexus"
+	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
+	nexusK8s "go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -49,6 +52,8 @@ const (
 type AuditConfigBaseSuite struct {
 	suite.Suite
 	ctx            context.Context
+	spaceClient    *nexus.Space
+	integration    *nexusK8s.Integration
 	testCluster    *TestCluster
 	auditConfig    mondoov2.MondooAuditConfig
 	installRelease bool
@@ -56,7 +61,32 @@ type AuditConfigBaseSuite struct {
 
 func (s *AuditConfigBaseSuite) SetupSuite() {
 	s.ctx = context.Background()
-	settings := installer.NewDefaultSettings()
+
+	sa, err := utils.GetServiceAccount()
+	s.Require().NoError(err, "Service account not set")
+	nexusClient, err := nexus.NewClient(sa)
+
+	s.Require().NoError(err, "Failed to create Nexus client")
+	s.spaceClient = nexusClient.GetSpace()
+
+	// TODO: this is only needed because the integration creation is not part of the MondooInstaller struct.
+	// That code will move there once all tests are migrated to use the E2E approach.
+	k8sHelper, err := utils.CreateK8sHelper()
+	s.Require().NoError(err, "Failed to create K8s helper")
+
+	ns := &corev1.Namespace{}
+	s.NoError(k8sHelper.Clientset.Get(s.ctx, client.ObjectKey{Name: "kube-system"}, ns))
+	integration, err := s.spaceClient.K8s.CreateIntegration("test-integration-" + string(ns.UID)).
+		EnableNodesScan().
+		EnableWorkloadsScan().
+		Run(s.ctx)
+	s.Require().NoError(err, "Failed to create k8s integration")
+	s.integration = integration
+
+	token, err := s.integration.GetRegistrationToken(s.ctx)
+	s.Require().NoError(err, "Failed to get long lived integration token")
+
+	settings := installer.NewDefaultSettings().SetToken(token)
 	if s.installRelease {
 		settings = installer.NewReleaseSettings()
 	}
@@ -66,6 +96,7 @@ func (s *AuditConfigBaseSuite) SetupSuite() {
 
 func (s *AuditConfigBaseSuite) TearDownSuite() {
 	s.NoError(s.testCluster.UninstallOperator())
+	s.NoError(s.integration.Delete(s.ctx))
 }
 
 func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
@@ -97,6 +128,8 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 
 		// not sure why the above list does not work. It returns zero deployments. So, first a plain sleep to stabilize the test.
 		zap.S().Info("Cleanup done. Cluster should be good to go for the next test.")
+
+		s.Require().NoError(s.spaceClient.DeleteAssetsManagedBy(s.ctx, s.testCluster.ManagedBy()), "Failed to delete assets for integration")
 	}
 }
 
@@ -255,6 +288,26 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+
+	nodes := &corev1.NodeList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodes))
+
+	nodeNames := make([]string, 0, len(nodes.Items))
+	for _, node := range nodes.Items {
+		nodeNames = append(nodeNames, node.Name)
+	}
+
+	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn())
+	s.NoError(err, "Failed to list assets")
+	assetNames := make([]string, 0, len(assets))
+	for _, asset := range assets {
+		assetNames = append(assetNames, asset.Asset.Name)
+	}
+
+	s.ElementsMatch(nodeNames, assetNames, "Node names do not match")
+	for _, asset := range assets {
+		s.NotEqual(uint32(policy.ScoreType_UNSCORED), asset.Score.Type, "Assets should not be unscored")
+	}
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
