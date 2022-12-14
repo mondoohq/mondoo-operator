@@ -147,6 +147,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
 
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
+
 	// Verify scan API deployment and service
 	s.validateScanApiDeployment(auditConfig)
 
@@ -250,6 +252,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
+
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
 
 	zap.S().Info("Verify the nodes scanning cron jobs are created.")
 
@@ -358,6 +362,8 @@ func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.Mondo
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
 
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
+
 	// Wait for Ready Pod
 	zap.S().Info("Waiting for webhook Pod to become ready.")
 	webhookLabelsString := s.getWebhookLabelsString()
@@ -465,6 +471,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
 
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
+
 	// Pod should not start, because of missing service account
 
 	// do not wait until IsPodReady timeout, pod will not be present
@@ -558,6 +566,8 @@ func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mo
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
+
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
 
 	// Verify scan API deployment and service
 	s.validateScanApiDeployment(auditConfig)

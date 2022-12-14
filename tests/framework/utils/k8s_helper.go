@@ -31,10 +31,12 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -192,6 +194,21 @@ func (k8sh *K8sHelper) EnsureNoPodsPresent(listOpts *client.ListOptions) error {
 		}
 		return false, nil
 	})
+}
+
+func (k8sh *K8sHelper) WaitUntilMondooClientSecretExists(ctx context.Context, ns string) bool {
+	// Wait until token has been exchanged for a Mondoo service account
+	err := k8sh.ExecuteWithRetries(func() (bool, error) {
+		secret := &v1.Secret{}
+		if err := k8sh.Clientset.Get(ctx, types.NamespacedName{Namespace: ns, Name: MondooClientSecret}, secret); err != nil {
+			if k8sErrors.IsNotFound(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	})
+	return err == nil
 }
 
 // WaitUntilCronJobsSuccessful waits for the CronJobs with the specified selector to have at least
