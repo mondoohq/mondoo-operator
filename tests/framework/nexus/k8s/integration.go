@@ -5,14 +5,18 @@ package k8s
 
 import (
 	"context"
+	"fmt"
 
+	cnspec "go.mondoo.com/cnspec/policy"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/integrations"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
+	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
 )
 
 type IntegrationBuilder struct {
-	integrations integrations.IntegrationsManager
-	assetStore   policy.AssetStore
+	integrations   integrations.IntegrationsManager
+	assetStore     policy.AssetStore
+	policyResolver cnspec.PolicyResolver
 
 	spaceMrn            string
 	name                string
@@ -62,17 +66,19 @@ func (b *IntegrationBuilder) Run(ctx context.Context) (*Integration, error) {
 		return nil, err
 	}
 	return &Integration{
-		integrations: b.integrations,
-		assetStore:   b.assetStore,
-		name:         b.name,
-		mrn:          resp.Integration.Mrn,
-		spaceMrn:     b.spaceMrn,
+		integrations:   b.integrations,
+		assetStore:     b.assetStore,
+		policyResolver: b.policyResolver,
+		name:           b.name,
+		mrn:            resp.Integration.Mrn,
+		spaceMrn:       b.spaceMrn,
 	}, nil
 }
 
 type Integration struct {
-	integrations integrations.IntegrationsManager
-	assetStore   policy.AssetStore
+	integrations   integrations.IntegrationsManager
+	assetStore     policy.AssetStore
+	policyResolver cnspec.PolicyResolver
 
 	name     string
 	mrn      string
@@ -98,16 +104,40 @@ func (i *Integration) Delete(ctx context.Context) error {
 }
 
 func (i *Integration) DeleteCiCdProjectIfExists(ctx context.Context) error {
+	p, err := i.GetCiCdProject(ctx)
+	if err != nil {
+		return nil
+	}
+	_, err = i.assetStore.DeleteCicdProjects(ctx, &policy.DeleteCicdProjectsRequest{Mrns: []string{p.mrn}})
+	return err
+}
+
+func (i *Integration) GetCiCdProject(ctx context.Context) (*CiCdProject, error) {
 	resp, err := i.assetStore.ListCicdProjects(ctx, &policy.ListCicdProjectsRequest{SpaceMrn: i.spaceMrn})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, p := range resp.List {
 		if p.Labels["mondoo.com/integration-mrn"] == i.mrn {
-			_, err := i.assetStore.DeleteCicdProjects(ctx, &policy.DeleteCicdProjectsRequest{Mrns: []string{p.Mrn}})
-			return err
+			return &CiCdProject{assetStore: i.assetStore, policyResolver: i.policyResolver, mrn: p.Mrn, spaceMrn: i.spaceMrn}, nil
 		}
 	}
-	return nil
+	return nil, fmt.Errorf("cannot find CI/CD project for integration %s", i.mrn)
+}
+
+type CiCdProject struct {
+	assetStore     policy.AssetStore
+	policyResolver cnspec.PolicyResolver
+	mrn            string
+	spaceMrn       string
+}
+
+func (p *CiCdProject) Delete(ctx context.Context) error {
+	_, err := p.assetStore.DeleteCicdProjects(ctx, &policy.DeleteCicdProjectsRequest{Mrns: []string{p.mrn}})
+	return err
+}
+
+func (p *CiCdProject) ListAssets(ctx context.Context, assetType string) ([]assets.AssetWithScore, error) {
+	return assets.ListAssetsWithScores(ctx, p.spaceMrn, "", p.mrn, assetType, p.assetStore, p.policyResolver)
 }

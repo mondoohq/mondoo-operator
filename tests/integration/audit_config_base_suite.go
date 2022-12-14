@@ -37,6 +37,7 @@ import (
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
+	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
 	nexusK8s "go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -231,15 +232,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn(), "container_image")
 	s.NoError(err, "Failed to list assets with scores")
-
-	// Filter out any non-container image assets.
-	// var containerAssets []nexus.AssetWithScore
-	// for i := range assets {
-	// 	a := assets[i]
-	// 	if a.Asset.AssetType == "container_image" {
-	// 		containerAssets = append(containerAssets, a)
-	// 	}
-	// }
 
 	assetNames := utils.AssetNames(assets)
 	s.ElementsMatch(containerImages, assetNames, "Container images were not sent upstream.")
@@ -747,6 +739,17 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	}
 	s.NoErrorf(err, "Failed to create Deployment which should pass.")
 
+	// TODO: validate passing deployment in nexus
+	cicdProject, err := s.integration.GetCiCdProject(s.ctx)
+	s.Require().NoError(err, "Failed to get CICD project")
+
+	assets, err := cicdProject.ListAssets(s.ctx, "")
+	s.Require().NoError(err, "Failed to list CICD assets")
+
+	s.Len(assets, 1, "Expected exactly one asset in CICD project")
+	s.Equal(fmt.Sprintf("%s/%s", passingDeployment.Namespace, passingDeployment.Name), assets[0].Asset.Name)
+	s.AssetsNotUnscored(assets)
+
 	zap.S().Info("Create a Deployment which should be denied in enforcing mode.")
 	err = s.testCluster.K8sHelper.Clientset.Create(s.ctx, failingDeployment)
 
@@ -755,6 +758,13 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	} else {
 		s.NoErrorf(err, "Failed creating a Deployment in permissive mode.")
 	}
+
+	assets, err = cicdProject.ListAssets(s.ctx, "")
+	s.Require().NoError(err, "Failed to list CICD assets")
+
+	s.Len(assets, 2, "Expected exactly two assets in CICD project")
+	s.Equal(fmt.Sprintf("%s/%s", failingDeployment.Namespace, failingDeployment.Name), assets[1].Asset.Name)
+	s.AssetsNotUnscored(assets)
 
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(passingDeployment), "Failed to delete passingDeployment")
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(failingDeployment), "Failed to delete failingDeployment")
@@ -971,7 +981,7 @@ func (s *AuditConfigBaseSuite) createPortForwardCmd(webhookService *corev1.Servi
 	return exec.Command("kubectl", kubectlArgs...)
 }
 
-func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []nexus.AssetWithScore) {
+func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []assets.AssetWithScore) {
 	for _, asset := range assets {
 		// We don't score scratch containers at the moment so they are always unscored.
 		if asset.Asset.PlatformName != "scratch" {

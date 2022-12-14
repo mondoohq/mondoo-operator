@@ -10,6 +10,7 @@ import (
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/captain"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/integrations"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
+	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
 )
 
@@ -24,11 +25,6 @@ type Space struct {
 	K8s *k8s.Client
 }
 
-type AssetWithScore struct {
-	Asset *policy.Asset
-	Score *cnspec.Score
-}
-
 func NewSpace(spaceMrn string, assetStore policy.AssetStore, policyResolver cnspec.PolicyResolver, captain captain.Captain, integrations integrations.IntegrationsManager) *Space {
 	return &Space{
 		spaceMrn:       spaceMrn,
@@ -36,43 +32,12 @@ func NewSpace(spaceMrn string, assetStore policy.AssetStore, policyResolver cnsp
 		PolicyResolver: policyResolver,
 		Captain:        captain,
 		Integrations:   integrations,
-		K8s:            k8s.NewClient(spaceMrn, integrations, assetStore),
+		K8s:            k8s.NewClient(spaceMrn, integrations, assetStore, policyResolver),
 	}
 }
 
-func (s *Space) ListAssetsWithScores(ctx context.Context, integrationMrn, assetType string) ([]AssetWithScore, error) {
-	filter := &policy.AssetSearchFilter{SpaceMrn: s.spaceMrn}
-	if integrationMrn != "" {
-		filter.QueryTerms = []string{"{ \"mondoo.com/integration-mrn\": \"" + integrationMrn + "\" }"}
-	}
-
-	if assetType != "" {
-		filter.AssetTypes = []string{assetType}
-	}
-
-	assetsPage, err := s.AssetStore.ListAssets(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-
-	mrns := make([]string, len(assetsPage.List))
-	for i := range assetsPage.List {
-		mrns[i] = assetsPage.List[i].Mrn
-	}
-
-	assetScores := make([]AssetWithScore, len(assetsPage.List))
-	for i := range assetsPage.List {
-		asset := assetsPage.List[i]
-
-		// TODO: replace this call with GetScore(ctx, &cnspec.EntityScoreReq{EntityMrn: asset.Mrn, ScoreMrn: asset.Mrn}) once nexus is released
-		score, err := s.PolicyResolver.GetReport(ctx, &cnspec.EntityScoreReq{EntityMrn: asset.Mrn})
-		if err != nil {
-			return nil, err
-		}
-		assetScores[i] = AssetWithScore{Asset: asset, Score: score.Scores[asset.Mrn]}
-	}
-
-	return assetScores, nil
+func (s *Space) ListAssetsWithScores(ctx context.Context, integrationMrn, assetType string) ([]assets.AssetWithScore, error) {
+	return assets.ListAssetsWithScores(ctx, s.spaceMrn, integrationMrn, "", assetType, s.AssetStore, s.PolicyResolver)
 }
 
 func (s *Space) DeleteAssetsManagedBy(ctx context.Context, managedBy string) error {

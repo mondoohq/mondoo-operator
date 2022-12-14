@@ -6,11 +6,11 @@ import (
 	"go.mondoo.com/cnquery/motor/discovery/k8s"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus"
+	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
 	v1 "k8s.io/api/core/v1"
 )
 
-func AssetNames(assets []nexus.AssetWithScore) []string {
+func AssetNames(assets []assets.AssetWithScore) []string {
 	assetNames := make([]string, 0, len(assets))
 	for _, asset := range assets {
 		assetNames = append(assetNames, asset.Asset.Name)

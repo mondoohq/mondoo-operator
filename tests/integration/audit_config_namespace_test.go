@@ -79,13 +79,14 @@ func (s *AuditConfigCustomNamespaceSuite) TearDownSuite() {
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_KubernetesResources() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, true, false, false, false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, true, false, false, false)
+	auditConfig.Spec.KubernetesResources.ContainerImageScanning = true
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigKubernetesResources(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Containers() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, true, false, false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, true, false, false)
 
 	// The mondoo-operator namespace is using local images which cnspec won't be able to download
 	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{s.ns.Name}
@@ -95,20 +96,20 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Containers() {
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true, false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true, false)
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigNodes(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Admission() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, false, true, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, false, true)
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	auditConfig.Spec.Admission.ServiceAccountName = s.webhookServiceAccount.Name
 	s.testMondooAuditConfigAdmission(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_AdmissionMissingSA() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, false, true, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, false, true)
 	auditConfig.Spec.Scanner.ServiceAccountName = "missing-serviceaccount"
 	auditConfig.Spec.Admission.ServiceAccountName = s.webhookServiceAccount.Name
 	s.testMondooAuditConfigAdmissionMissingSA(auditConfig)

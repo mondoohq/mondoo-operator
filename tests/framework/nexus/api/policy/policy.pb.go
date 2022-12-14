@@ -1050,6 +1050,329 @@ func (x *DeleteAssetsConfirmation) GetErrors() map[string]string {
 	return nil
 }
 
+type ListCicdProjectsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Page       *api.PageRequest `protobuf:"bytes,1,opt,name=page,proto3" json:"page,omitempty"`
+	SpaceMrn   string           `protobuf:"bytes,2,opt,name=space_mrn,json=spaceMrn,proto3" json:"space_mrn,omitempty"`
+	TypeFilter string           `protobuf:"bytes,3,opt,name=type_filter,json=typeFilter,proto3" json:"type_filter,omitempty"`
+}
+
+func (x *ListCicdProjectsRequest) Reset() {
+	*x = ListCicdProjectsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_policy_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ListCicdProjectsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCicdProjectsRequest) ProtoMessage() {}
+
+func (x *ListCicdProjectsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_policy_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCicdProjectsRequest.ProtoReflect.Descriptor instead.
+func (*ListCicdProjectsRequest) Descriptor() ([]byte, []int) {
+	return file_policy_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListCicdProjectsRequest) GetPage() *api.PageRequest {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+func (x *ListCicdProjectsRequest) GetSpaceMrn() string {
+	if x != nil {
+		return x.SpaceMrn
+	}
+	return ""
+}
+
+func (x *ListCicdProjectsRequest) GetTypeFilter() string {
+	if x != nil {
+		return x.TypeFilter
+	}
+	return ""
+}
+
+type CicdProject struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Mrn        string            `protobuf:"bytes,2,opt,name=mrn,proto3" json:"mrn,omitempty"`
+	SpaceMrn   string            `protobuf:"bytes,3,opt,name=space_mrn,json=spaceMrn,proto3" json:"space_mrn,omitempty"`
+	Name       string            `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	Type       string            `protobuf:"bytes,5,opt,name=type,proto3" json:"type,omitempty"`
+	ProjectUrl string            `protobuf:"bytes,6,opt,name=project_url,json=projectUrl,proto3" json:"project_url,omitempty"`
+	Ref        string            `protobuf:"bytes,7,opt,name=ref,proto3" json:"ref,omitempty"`
+	Labels     map[string]string `protobuf:"bytes,8,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	CreateTime string            `protobuf:"bytes,9,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"` // RFC3339
+	RunsCount  int32             `protobuf:"varint,10,opt,name=runs_count,json=runsCount,proto3" json:"runs_count,omitempty"`
+}
+
+func (x *CicdProject) Reset() {
+	*x = CicdProject{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_policy_proto_msgTypes[10]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CicdProject) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CicdProject) ProtoMessage() {}
+
+func (x *CicdProject) ProtoReflect() protoreflect.Message {
+	mi := &file_policy_proto_msgTypes[10]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CicdProject.ProtoReflect.Descriptor instead.
+func (*CicdProject) Descriptor() ([]byte, []int) {
+	return file_policy_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *CicdProject) GetMrn() string {
+	if x != nil {
+		return x.Mrn
+	}
+	return ""
+}
+
+func (x *CicdProject) GetSpaceMrn() string {
+	if x != nil {
+		return x.SpaceMrn
+	}
+	return ""
+}
+
+func (x *CicdProject) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CicdProject) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *CicdProject) GetProjectUrl() string {
+	if x != nil {
+		return x.ProjectUrl
+	}
+	return ""
+}
+
+func (x *CicdProject) GetRef() string {
+	if x != nil {
+		return x.Ref
+	}
+	return ""
+}
+
+func (x *CicdProject) GetLabels() map[string]string {
+	if x != nil {
+		return x.Labels
+	}
+	return nil
+}
+
+func (x *CicdProject) GetCreateTime() string {
+	if x != nil {
+		return x.CreateTime
+	}
+	return ""
+}
+
+func (x *CicdProject) GetRunsCount() int32 {
+	if x != nil {
+		return x.RunsCount
+	}
+	return 0
+}
+
+type CicdProjectsPage struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Page *api.PageInfo  `protobuf:"bytes,1,opt,name=page,proto3" json:"page,omitempty"`
+	List []*CicdProject `protobuf:"bytes,2,rep,name=list,proto3" json:"list,omitempty"`
+}
+
+func (x *CicdProjectsPage) Reset() {
+	*x = CicdProjectsPage{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_policy_proto_msgTypes[11]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CicdProjectsPage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CicdProjectsPage) ProtoMessage() {}
+
+func (x *CicdProjectsPage) ProtoReflect() protoreflect.Message {
+	mi := &file_policy_proto_msgTypes[11]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CicdProjectsPage.ProtoReflect.Descriptor instead.
+func (*CicdProjectsPage) Descriptor() ([]byte, []int) {
+	return file_policy_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *CicdProjectsPage) GetPage() *api.PageInfo {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+func (x *CicdProjectsPage) GetList() []*CicdProject {
+	if x != nil {
+		return x.List
+	}
+	return nil
+}
+
+type DeleteCicdProjectsConfirmation struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Mrns []string `protobuf:"bytes,1,rep,name=mrns,proto3" json:"mrns,omitempty"`
+}
+
+func (x *DeleteCicdProjectsConfirmation) Reset() {
+	*x = DeleteCicdProjectsConfirmation{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_policy_proto_msgTypes[12]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DeleteCicdProjectsConfirmation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteCicdProjectsConfirmation) ProtoMessage() {}
+
+func (x *DeleteCicdProjectsConfirmation) ProtoReflect() protoreflect.Message {
+	mi := &file_policy_proto_msgTypes[12]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteCicdProjectsConfirmation.ProtoReflect.Descriptor instead.
+func (*DeleteCicdProjectsConfirmation) Descriptor() ([]byte, []int) {
+	return file_policy_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *DeleteCicdProjectsConfirmation) GetMrns() []string {
+	if x != nil {
+		return x.Mrns
+	}
+	return nil
+}
+
+type DeleteCicdProjectsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Mrns []string `protobuf:"bytes,1,rep,name=mrns,proto3" json:"mrns,omitempty"`
+}
+
+func (x *DeleteCicdProjectsRequest) Reset() {
+	*x = DeleteCicdProjectsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_policy_proto_msgTypes[13]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DeleteCicdProjectsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteCicdProjectsRequest) ProtoMessage() {}
+
+func (x *DeleteCicdProjectsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_policy_proto_msgTypes[13]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteCicdProjectsRequest.ProtoReflect.Descriptor instead.
+func (*DeleteCicdProjectsRequest) Descriptor() ([]byte, []int) {
+	return file_policy_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *DeleteCicdProjectsRequest) GetMrns() []string {
+	if x != nil {
+		return x.Mrns
+	}
+	return nil
+}
+
 var File_policy_proto protoreflect.FileDescriptor
 
 var file_policy_proto_rawDesc = []byte{
@@ -1260,7 +1583,7 @@ func file_policy_proto_rawDescGZIP() []byte {
 }
 
 var file_policy_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_policy_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_policy_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_policy_proto_goTypes = []interface{}{
 	(ScoreType)(0),                   // 0: mondoo.policy.ScoreType
 	(AssetOrderField)(0),             // 1: mondoo.policy.AssetOrderField
@@ -1285,14 +1608,14 @@ var file_policy_proto_goTypes = []interface{}{
 	(inventory.AssetCategory)(0),     // 20: cnquery.providers.v1.AssetCategory
 }
 var file_policy_proto_depIdxs = []int32{
-	16, // 0: mondoo.policy.AssetSearchFilter.page:type_name -> mondoo.captain.v1.PageRequest
+	22, // 0: mondoo.policy.AssetSearchFilter.page:type_name -> mondoo.captain.v1.PageRequest
 	7,  // 1: mondoo.policy.AssetSearchFilter.order_by:type_name -> mondoo.policy.AssetOrder
 	6,  // 2: mondoo.policy.AssetSearchFilter.score_range:type_name -> mondoo.policy.ScoreRange
 	0,  // 3: mondoo.policy.AssetSearchFilter.score_type:type_name -> mondoo.policy.ScoreType
 	5,  // 4: mondoo.policy.AssetSearchFilter.groups:type_name -> mondoo.policy.GroupFilter
-	17, // 5: mondoo.policy.AssetOrder.direction:type_name -> mondoo.captain.v1.OrderDirection
+	23, // 5: mondoo.policy.AssetOrder.direction:type_name -> mondoo.captain.v1.OrderDirection
 	1,  // 6: mondoo.policy.AssetOrder.field:type_name -> mondoo.policy.AssetOrderField
-	18, // 7: mondoo.policy.AssetsPage.page:type_name -> mondoo.captain.v1.PageInfo
+	24, // 7: mondoo.policy.AssetsPage.page:type_name -> mondoo.captain.v1.PageInfo
 	9,  // 8: mondoo.policy.AssetsPage.list:type_name -> mondoo.policy.Asset
 	13, // 9: mondoo.policy.Asset.labels:type_name -> mondoo.policy.Asset.LabelsEntry
 	19, // 10: mondoo.policy.Asset.state:type_name -> cnquery.providers.v1.State
@@ -1427,6 +1750,66 @@ func file_policy_proto_init() {
 				return nil
 			}
 		}
+		file_policy_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ListCicdProjectsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_policy_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CicdProject); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_policy_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CicdProjectsPage); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_policy_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DeleteCicdProjectsConfirmation); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_policy_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DeleteCicdProjectsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1434,7 +1817,7 @@ func file_policy_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_policy_proto_rawDesc,
 			NumEnums:      4,
-			NumMessages:   12,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

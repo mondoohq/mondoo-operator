@@ -21,6 +21,8 @@ import (
 type AssetStore interface {
 	ListAssets(context.Context, *AssetSearchFilter) (*AssetsPage, error)
 	DeleteAssets(context.Context, *DeleteAssetsRequest) (*DeleteAssetsConfirmation, error)
+	ListCicdProjects(context.Context, *ListCicdProjectsRequest) (*CicdProjectsPage, error)
+	DeleteCicdProjects(context.Context, *DeleteCicdProjectsRequest) (*DeleteCicdProjectsConfirmation, error)
 }
 
 // client implementation
@@ -59,6 +61,16 @@ func (c *AssetStoreClient) DeleteAssets(ctx context.Context, in *DeleteAssetsReq
 	err := c.DoClientRequest(ctx, c.httpclient, strings.Join([]string{c.prefix, "/DeleteAssets"}, ""), in, out)
 	return out, err
 }
+func (c *AssetStoreClient) ListCicdProjects(ctx context.Context, in *ListCicdProjectsRequest) (*CicdProjectsPage, error) {
+	out := new(CicdProjectsPage)
+	err := c.DoClientRequest(ctx, c.httpclient, strings.Join([]string{c.prefix, "/ListCicdProjects"}, ""), in, out)
+	return out, err
+}
+func (c *AssetStoreClient) DeleteCicdProjects(ctx context.Context, in *DeleteCicdProjectsRequest) (*DeleteCicdProjectsConfirmation, error) {
+	out := new(DeleteCicdProjectsConfirmation)
+	err := c.DoClientRequest(ctx, c.httpclient, strings.Join([]string{c.prefix, "/DeleteCicdProjects"}, ""), in, out)
+	return out, err
+}
 
 // server implementation
 
@@ -82,8 +94,10 @@ func NewAssetStoreServer(handler AssetStore, opts ...AssetStoreServerOption) htt
 	service := ranger.Service{
 		Name: "AssetStore",
 		Methods: map[string]ranger.Method{
-			"ListAssets":   srv.ListAssets,
-			"DeleteAssets": srv.DeleteAssets,
+			"ListAssets":         srv.ListAssets,
+			"DeleteAssets":       srv.DeleteAssets,
+			"ListCicdProjects":   srv.ListCicdProjects,
+			"DeleteCicdProjects": srv.DeleteCicdProjects,
 		},
 	}
 	return ranger.NewRPCServer(&service)
@@ -141,4 +155,52 @@ func (p *AssetStoreServer) DeleteAssets(ctx context.Context, reqBytes *[]byte) (
 		return nil, err
 	}
 	return p.handler.DeleteAssets(ctx, &req)
+}
+func (p *AssetStoreServer) ListCicdProjects(ctx context.Context, reqBytes *[]byte) (pb.Message, error) {
+	var req ListCicdProjectsRequest
+	var err error
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not access header")
+	}
+
+	switch md.First("Content-Type") {
+	case "application/protobuf", "application/octet-stream", "application/grpc+proto":
+		err = pb.Unmarshal(*reqBytes, &req)
+	default:
+		// handle case of empty object
+		if len(*reqBytes) > 0 {
+			err = jsonpb.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(*reqBytes, &req)
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	return p.handler.ListCicdProjects(ctx, &req)
+}
+func (p *AssetStoreServer) DeleteCicdProjects(ctx context.Context, reqBytes *[]byte) (pb.Message, error) {
+	var req DeleteCicdProjectsRequest
+	var err error
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not access header")
+	}
+
+	switch md.First("Content-Type") {
+	case "application/protobuf", "application/octet-stream", "application/grpc+proto":
+		err = pb.Unmarshal(*reqBytes, &req)
+	default:
+		// handle case of empty object
+		if len(*reqBytes) > 0 {
+			err = jsonpb.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(*reqBytes, &req)
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	return p.handler.DeleteCicdProjects(ctx, &req)
 }
