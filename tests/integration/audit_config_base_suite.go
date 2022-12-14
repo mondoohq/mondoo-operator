@@ -88,7 +88,7 @@ func (s *AuditConfigBaseSuite) SetupSuite() {
 
 	settings := installer.NewDefaultSettings().SetToken(token)
 	if s.installRelease {
-		settings = installer.NewReleaseSettings()
+		settings = installer.NewReleaseSettings().SetToken(token)
 	}
 
 	s.testCluster = StartTestCluster(s.ctx, settings, s.T)
