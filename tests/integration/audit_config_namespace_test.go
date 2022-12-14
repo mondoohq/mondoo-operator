@@ -90,6 +90,7 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Containers() {
 	// The mondoo-operator namespace is using local images which cnspec won't be able to download
 	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{s.ns.Name}
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
+	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{s.testCluster.Settings.Namespace}
 	s.testMondooAuditConfigContainers(auditConfig)
 }
 

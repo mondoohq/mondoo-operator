@@ -130,6 +130,7 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		zap.S().Info("Cleanup done. Cluster should be good to go for the next test.")
 
 		s.Require().NoError(s.spaceClient.DeleteAssetsManagedBy(s.ctx, s.testCluster.ManagedBy()), "Failed to delete assets for integration")
+		s.Require().NoError(s.integration.DeleteCiCdProjectIfExists(s.ctx), "Failed to delete CICD project for integration")
 	}
 }
 

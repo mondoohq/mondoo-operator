@@ -631,6 +631,9 @@ func (k8sh *K8sHelper) GetWorkloadNames(ctx context.Context) ([]string, error) {
 
 	// cluster
 	localProvider, err := local.New()
+	if err != nil {
+		return names, err
+	}
 	k8sctlConfig, err := kubectl.LoadKubeConfig(localProvider)
 	if err != nil {
 		return nil, err

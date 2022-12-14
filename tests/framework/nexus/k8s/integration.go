@@ -63,14 +63,20 @@ func (b *IntegrationBuilder) Run(ctx context.Context) (*Integration, error) {
 	}
 	return &Integration{
 		integrations: b.integrations,
+		assetStore:   b.assetStore,
+		name:         b.name,
 		mrn:          resp.Integration.Mrn,
+		spaceMrn:     b.spaceMrn,
 	}, nil
 }
 
 type Integration struct {
 	integrations integrations.IntegrationsManager
+	assetStore   policy.AssetStore
 
-	mrn string
+	name     string
+	mrn      string
+	spaceMrn string
 }
 
 func (i *Integration) Mrn() string {
@@ -89,4 +95,19 @@ func (i *Integration) GetRegistrationToken(ctx context.Context) (string, error) 
 func (i *Integration) Delete(ctx context.Context) error {
 	_, err := i.integrations.Delete(ctx, &integrations.DeleteIntegrationRequest{Mrn: i.mrn})
 	return err
+}
+
+func (i *Integration) DeleteCiCdProjectIfExists(ctx context.Context) error {
+	resp, err := i.assetStore.ListCicdProjects(ctx, &policy.ListCicdProjectsRequest{SpaceMrn: i.spaceMrn})
+	if err != nil {
+		return err
+	}
+
+	for _, p := range resp.List {
+		if p.Labels["mondoo.com/integration-mrn"] == i.mrn {
+			_, err := i.assetStore.DeleteCicdProjects(ctx, &policy.DeleteCicdProjectsRequest{Mrns: []string{p.Mrn}})
+			return err
+		}
+	}
+	return nil
 }

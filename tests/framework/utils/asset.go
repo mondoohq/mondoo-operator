@@ -42,6 +42,9 @@ func ContainerImages(pods []v1.Pod, auditConfig v1alpha2.MondooAuditConfig) ([]s
 		}
 
 		a, err := ccresolver.GetImage(ref, nil)
+		if err != nil {
+			return images, err
+		}
 		images = append(images, a.Name)
 	}
 

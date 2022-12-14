@@ -12,6 +12,9 @@ import "providers-sdk/v1/inventory/inventory.proto";
 service AssetStore {
   rpc ListAssets(AssetSearchFilter) returns (AssetsPage);
   rpc DeleteAssets(DeleteAssetsRequest) returns (DeleteAssetsConfirmation) {};
+
+  rpc ListCicdProjects(ListCicdProjectsRequest) returns (CicdProjectsPage) {};
+  rpc DeleteCicdProjects(DeleteCicdProjectsRequest) returns (DeleteCicdProjectsConfirmation);
 }
 
 message AssetSearchFilter {
@@ -159,4 +162,36 @@ enum DateFilterField {
 message DeleteAssetsConfirmation {
   repeated string asset_mrns = 1;
   map<string, string> errors = 2;
+}
+
+message ListCicdProjectsRequest {
+  mondoo.captain.v1.PageRequest page = 1;
+  string space_mrn = 2;
+  string type_filter = 3;
+}
+
+message CicdProject {
+  reserved 1;
+  string mrn = 2;
+  string space_mrn = 3;
+  string name = 4;
+  string type = 5;
+  string project_url = 6;
+  string ref = 7;
+  map<string, string> labels = 8;
+  string create_time = 9; // RFC3339
+  int32 runs_count = 10;
+}
+
+message CicdProjectsPage {
+  mondoo.captain.v1.PageInfo page = 1;
+  repeated CicdProject list = 2;
+}
+
+message DeleteCicdProjectsConfirmation {
+  repeated string mrns = 1;
+}
+
+message DeleteCicdProjectsRequest {
+  repeated string mrns = 1;
 }
