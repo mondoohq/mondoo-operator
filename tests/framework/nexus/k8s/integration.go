@@ -108,8 +108,8 @@ func (i *Integration) DeleteCiCdProjectIfExists(ctx context.Context) error {
 	if err != nil {
 		return nil
 	}
-	_, err = i.assetStore.DeleteCicdProjects(ctx, &policy.DeleteCicdProjectsRequest{Mrns: []string{p.mrn}})
-	return err
+
+	return p.Delete(ctx)
 }
 
 func (i *Integration) GetCiCdProject(ctx context.Context) (*CiCdProject, error) {
