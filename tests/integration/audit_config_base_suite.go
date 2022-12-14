@@ -746,8 +746,8 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	assets, err := cicdProject.ListAssets(s.ctx, "")
 	s.Require().NoError(err, "Failed to list CICD assets")
 
-	s.Len(assets, 1, "Expected exactly one asset in CICD project")
-	s.Equal(fmt.Sprintf("%s/%s", passingDeployment.Namespace, passingDeployment.Name), assets[0].Asset.Name)
+	assetNames := utils.AssetNames(assets)
+	s.Contains(assetNames, fmt.Sprintf("%s/%s", passingDeployment.Namespace, passingDeployment.Name))
 	s.AssetsNotUnscored(assets)
 
 	zap.S().Info("Create a Deployment which should be denied in enforcing mode.")
@@ -762,8 +762,8 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	assets, err = cicdProject.ListAssets(s.ctx, "")
 	s.Require().NoError(err, "Failed to list CICD assets")
 
-	s.Len(assets, 2, "Expected exactly two assets in CICD project")
-	s.Equal(fmt.Sprintf("%s/%s", failingDeployment.Namespace, failingDeployment.Name), assets[1].Asset.Name)
+	assetNames = utils.AssetNames(assets)
+	s.Contains(assetNames, fmt.Sprintf("%s/%s", failingDeployment.Namespace, failingDeployment.Name))
 	s.AssetsNotUnscored(assets)
 
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(passingDeployment), "Failed to delete passingDeployment")
