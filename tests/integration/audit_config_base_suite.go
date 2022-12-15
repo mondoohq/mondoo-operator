@@ -135,6 +135,10 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(containerScanListOpts)
 		s.NoErrorf(err, "Failed to wait for container scan pods to be gone")
 
+		nodeScanListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(nodes.CronJobLabels(s.auditConfig))}
+		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(nodeScanListOpts)
+		s.NoErrorf(err, "Failed to wait for node scan pods to be gone")
+
 		// not sure why the above list does not work. It returns zero deployments. So, first a plain sleep to stabilize the test.
 		zap.S().Info("Cleanup done. Cluster should be good to go for the next test.")
 
