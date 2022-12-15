@@ -22,8 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"go.mondoo.com/cnquery/motor/providers/local"
-	"go.mondoo.com/cnquery/resources/packs/os/kubectl"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	api "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -647,16 +645,16 @@ func (k8sh *K8sHelper) GetWorkloadNames(ctx context.Context) ([]string, error) {
 	var names []string
 
 	// cluster
-	localProvider, err := local.New()
-	if err != nil {
-		return names, err
-	}
-	k8sctlConfig, err := kubectl.LoadKubeConfig(localProvider)
-	if err != nil {
-		return nil, err
-	}
+	// localProvider, err := local.New()
+	// if err != nil {
+	// 	return names, err
+	// }
+	// k8sctlConfig, err := kubectl.LoadKubeConfig(localProvider)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	names = append(names, fmt.Sprintf("K8s Cluster %s", k8sctlConfig.CurrentClusterName()))
+	// names = append(names, fmt.Sprintf("K8s Cluster %s", k8sctlConfig.CurrentClusterName()))
 
 	// pods
 	pods := &v1.PodList{}

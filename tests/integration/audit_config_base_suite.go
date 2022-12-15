@@ -183,7 +183,11 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn(), "")
 	s.NoError(err, "Failed to list assets with scores.")
 
-	assetNames := utils.AssetNames(assets)
+	// TODO: the cluster name is non-deterministic currenctly so we cannot test for it
+	assetsExceptCluster := utils.ExcludeClusterAsset(assets)
+	s.Equal(len(assets)-1, len(assetsExceptCluster), "Cluster asset was sent upstream.")
+
+	assetNames := utils.AssetNames(assetsExceptCluster)
 	s.ElementsMatch(workloadNames, assetNames, "Workloads were not sent upstream.")
 
 	s.AssetsNotUnscored(assets)

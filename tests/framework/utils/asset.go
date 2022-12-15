@@ -10,6 +10,16 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+func ExcludeClusterAsset(as []assets.AssetWithScore) []assets.AssetWithScore {
+	var newAssets []assets.AssetWithScore
+	for _, asset := range as {
+		if asset.Asset.AssetType != "k8s.cluster" {
+			newAssets = append(newAssets, asset)
+		}
+	}
+	return newAssets
+}
+
 func AssetNames(assets []assets.AssetWithScore) []string {
 	assetNames := make([]string, 0, len(assets))
 	for _, asset := range assets {
