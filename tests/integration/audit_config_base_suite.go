@@ -520,6 +520,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 		if err != nil {
 			return false, err
 		}
+		zap.S().Infof("Condition message: %s", condition.Message)
 		if strings.Contains(condition.Message, "error looking up service account") {
 			return true, nil
 		}
