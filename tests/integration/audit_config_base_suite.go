@@ -514,10 +514,12 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 		// Condition of MondooAuditConfig should be updated
 		foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
 		if err != nil {
+			zap.S().Errorf("Failed to get mondoo audit config: %s", err.Error())
 			return false, err
 		}
 		condition, err := s.testCluster.K8sHelper.GetMondooAuditConfigConditionByType(foundMondooAuditConfig, mondoov2.ScanAPIDegraded)
 		if err != nil {
+			zap.S().Errorf("Failed to get condition: %s", err.Error())
 			return false, err
 		}
 		zap.S().Infof("Condition message: %s", condition.Message)
