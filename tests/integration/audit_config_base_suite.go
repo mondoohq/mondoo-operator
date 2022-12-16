@@ -520,7 +520,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 		condition, err := s.testCluster.K8sHelper.GetMondooAuditConfigConditionByType(foundMondooAuditConfig, mondoov2.ScanAPIDegraded)
 		if err != nil {
 			zap.S().Errorf("Failed to get condition: %s", err.Error())
-			return false, err
+			return false, nil // The condition might not exist yet. This doesn't mean we should stop trying.
 		}
 		zap.S().Infof("Condition message: %s", condition.Message)
 		if strings.Contains(condition.Message, "error looking up service account") {
