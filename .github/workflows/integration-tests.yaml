@@ -80,10 +80,14 @@ jobs:
       - name: Wait a bit for the runner to become more stable
         run: for i in 1 2 3 4 5; do kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=180s && break || sleep 10; done
 
+      - name: Wait for storage provisioner
+        if: matrix.k8s-distro == 'minikube'
+        run: kubectl -n kube-system wait --for=condition=Ready pods storage-provisioner --timeout=180s
+
       - name: Run integration tests
         env:
           MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE}}
-        run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration
+        run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration/ci
 
       - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
         if: success() || failure()
