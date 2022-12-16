@@ -80,9 +80,12 @@ jobs:
       - name: Wait a bit for the runner to become more stable
         run: for i in 1 2 3 4 5; do kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=180s && break || sleep 10; done
 
-      - name: Wait for storage provisioner
+      - name: Wait for minikube pods that take a while to start
         if: matrix.k8s-distro == 'minikube'
-        run: kubectl -n kube-system wait --for=condition=Ready pods storage-provisioner --timeout=180s
+        run: |
+          kubectl -n kube-system wait --for=condition=Ready pods storage-provisioner --timeout=180s
+          kubectl -n kube-system wait --for=condition=Ready pods etcd-minikube --timeout=180s
+          kubectl -n kube-system wait --for=condition=Available deployments coredns --timeout=180s
 
       - name: Run integration tests
         env:
