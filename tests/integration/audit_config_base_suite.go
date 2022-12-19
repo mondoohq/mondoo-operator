@@ -217,6 +217,10 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
 
+	// Get the available container images at the time the cronjob is created.
+	pods := &corev1.PodList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, pods), "Failed to list pods")
+
 	// K8s container image scan
 	zap.S().Info("Make sure the Mondoo k8s container image scan CronJob is created.")
 	cronJob := &batchv1.CronJob{
@@ -229,10 +233,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 		return true, nil
 	})
 	s.NoError(err, "Kubernetes container image scanning CronJob was not created.")
-
-	// Get the avialbe container images at the time the cronjob is created.
-	pods := &corev1.PodList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, pods), "Failed to list pods")
 
 	containerImages, err := utils.ContainerImages(pods.Items, auditConfig)
 	s.NoError(err, "Failed to get container image names")
