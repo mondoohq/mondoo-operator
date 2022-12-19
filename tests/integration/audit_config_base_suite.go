@@ -505,11 +505,16 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 	s.NoErrorf(err, "Couldn't list scan API pod.")
 	s.Equalf(0, len(podList.Items), "No ScanAPI Pod should be present")
 
-	// Check for the ScanAPI Deployment to be present.
-	deployments := &appsv1.DeploymentList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		// Check for the ScanAPI Deployment to be present.
+		deployments := &appsv1.DeploymentList{}
+		if err := s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts); err != nil {
+			return false, nil
+		}
 
-	s.Equalf(1, len(deployments.Items), "Deployments count for ScanAPI should be precisely one")
+		return len(deployments.Items) == 1, nil
+	})
+	s.NoErrorf(err, "Deployments count for ScanAPI should be precisely one")
 
 	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
 		// Condition of MondooAuditConfig should be updated
