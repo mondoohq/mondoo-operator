@@ -74,8 +74,8 @@ jobs:
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
-      - name: Wait for 40s
-        run: sleep 40
+      - name: Wait for 60s
+        run: sleep 60
 
       # Now that dependencies are cached the tests start almost immediately after minikube has started
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
