@@ -80,6 +80,11 @@ jobs:
       - name: Wait a bit for the runner to become more stable
         run: for i in 1 2 3 4 5; do kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=180s && break || sleep 10; done
 
+      # There are connection timeouts set to 30s in the k8s components. This means that they might seem like
+      # they are working but in fact they are just waiting on a connection.
+      - name: Wait for 40s
+        run: sleep 40
+
       - name: Wait for minikube pods that take a while to start
         if: matrix.k8s-distro == 'minikube'
         run: |
