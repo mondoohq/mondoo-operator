@@ -230,6 +230,13 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 	})
 	s.NoError(err, "Kubernetes container image scanning CronJob was not created.")
 
+	// Get the avialbe container images at the time the cronjob is created.
+	pods := &corev1.PodList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, pods), "Failed to list pods")
+
+	containerImages, err := utils.ContainerImages(pods.Items, auditConfig)
+	s.NoError(err, "Failed to get container image names")
+
 	cronJobLabels := container_image.CronJobLabels(auditConfig)
 	s.True(
 		s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(utils.LabelsToLabelSelector(cronJobLabels), auditConfig.Namespace),
@@ -242,12 +249,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 
 	// Verify the container images have been sent upstream and have scores.
-	pods := &corev1.PodList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, pods), "Failed to list pods")
-
-	containerImages, err := utils.ContainerImages(pods.Items, auditConfig)
-	s.NoError(err, "Failed to get container image names")
-
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn(), "container_image")
 	s.NoError(err, "Failed to list assets with scores")
 
