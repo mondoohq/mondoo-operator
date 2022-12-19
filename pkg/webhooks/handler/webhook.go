@@ -265,7 +265,7 @@ func (a *webhookValidator) objFromRaw(rawObj runtime.RawExtension) (runtime.Obje
 func (a *webhookValidator) skipNamespace(obj runtime.Object) (bool, error) {
 	objmeta, err := meta.Accessor(obj)
 	if err != nil {
-		handlerlog.Error(err, "error getting metadata from object")
+		handlerlog.Error(err, "error getting metadata from object", "type", reflect.TypeOf(obj))
 		return false, nil
 	}
 
