@@ -209,9 +209,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, reconcileError
 	}
 
-	// TODO: check if waiting a bit after the SA is created fixes the permission denied issues.
-	time.Sleep(10 * time.Second)
-
 	scanapi := scanapi.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
