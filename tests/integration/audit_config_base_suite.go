@@ -248,7 +248,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(15 * time.Second)
 
 	// Verify the container images have been sent upstream and have scores.
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn(), "container_image")
