@@ -255,8 +255,16 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 	s.NoError(err, "Failed to list assets with scores")
 
 	logAssets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn(), "")
+	s.NoError(err)
 	for _, a := range logAssets {
 		zap.S().Infof("Asset: %s; Type: %s", a.Asset.Name, a.Asset.AssetType)
+	}
+
+	zap.S().Info("RAW ASSETS")
+	rawAssets, err := s.spaceClient.AssetStore.ListAssets(s.ctx, &policy.AssetSearchFilter{SpaceMrn: s.spaceClient.Mrn()})
+	s.NoError(err)
+	for _, a := range rawAssets.List {
+		zap.S().Infof("Asset: %s; Type: %s; Labels: %v", a.Name, a.AssetType, a.Labels)
 	}
 
 	assetNames := utils.AssetNames(assets)

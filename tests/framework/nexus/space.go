@@ -36,6 +36,10 @@ func NewSpace(spaceMrn string, assetStore policy.AssetStore, policyResolver cnsp
 	}
 }
 
+func (s *Space) Mrn() string {
+	return s.spaceMrn
+}
+
 func (s *Space) ListAssetsWithScores(ctx context.Context, integrationMrn, assetType string) ([]assets.AssetWithScore, error) {
 	return assets.ListAssetsWithScores(ctx, s.spaceMrn, integrationMrn, "", assetType, s.AssetStore, s.PolicyResolver)
 }
