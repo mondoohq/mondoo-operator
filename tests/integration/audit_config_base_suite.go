@@ -254,6 +254,11 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn(), "container_image")
 	s.NoError(err, "Failed to list assets with scores")
 
+	logAssets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn(), "")
+	for _, a := range logAssets {
+		zap.S().Infof("Asset: %s; Type: %s", a.Asset.Name, a.Asset.AssetType)
+	}
+
 	assetNames := utils.AssetNames(assets)
 	s.ElementsMatch(containerImages, assetNames, "Container images were not sent upstream.")
 
