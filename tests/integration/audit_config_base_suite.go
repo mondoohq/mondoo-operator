@@ -200,7 +200,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	s.Equal(len(assets)-1, len(assetsExceptCluster), "Cluster asset was sent upstream.")
 
 	assetNames := utils.AssetNames(assetsExceptCluster)
-	s.Subset(assetNames, workloadNames, "Workloads were not sent upstream.")
+	s.ElementsMatch(workloadNames, assetNames, "Workloads were not sent upstream.")
 
 	s.AssetsNotUnscored(assets)
 }
@@ -268,7 +268,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 	}
 
 	assetNames := utils.AssetNames(assets)
-	s.Subset(assetNames, containerImages, "Container images were not sent upstream.")
+	s.ElementsMatch(assetNames, containerImages, "Container images were not sent upstream.")
 
 	s.AssetsNotUnscored(assets)
 }
@@ -367,7 +367,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	s.NoError(err, "Failed to list assets")
 	assetNames := utils.AssetNames(assets)
 
-	s.Subset(assetNames, nodeNames, "Node names do not match")
+	s.ElementsMatch(assetNames, nodeNames, "Node names do not match")
 	s.AssetsNotUnscored(assets)
 }
 
