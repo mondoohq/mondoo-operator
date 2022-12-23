@@ -102,6 +102,7 @@ func (s *AuditConfigBaseSuite) TearDownSuite() {
 
 func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 	if s.testCluster != nil {
+		zap.S().Warnf("Managed by: %s", s.testCluster.managedBy)
 		s.testCluster.GatherAllMondooLogs(testName, installer.MondooNamespace)
 		s.NoError(s.testCluster.CleanupAuditConfigs())
 		secret := &corev1.Secret{}
