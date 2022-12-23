@@ -12,6 +12,7 @@ import (
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
+	"go.uber.org/zap"
 )
 
 type Space struct {
@@ -45,6 +46,7 @@ func (s *Space) ListAssetsWithScores(ctx context.Context, integrationMrn, assetT
 }
 
 func (s *Space) DeleteAssetsManagedBy(ctx context.Context, managedBy string) error {
-	_, err := s.AssetStore.DeleteAssets(ctx, &policy.DeleteAssetsRequest{SpaceMrn: s.spaceMrn, ManagedBy: managedBy})
+	res, err := s.AssetStore.DeleteAssets(ctx, &policy.DeleteAssetsRequest{SpaceMrn: s.spaceMrn, ManagedBy: managedBy})
+	zap.S().Info("deleted assets %v", res)
 	return err
 }

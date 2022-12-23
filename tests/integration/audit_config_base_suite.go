@@ -102,7 +102,6 @@ func (s *AuditConfigBaseSuite) TearDownSuite() {
 
 func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 	if s.testCluster != nil {
-		zap.S().Warnf("Managed by: %s", s.testCluster.managedBy)
 		s.testCluster.GatherAllMondooLogs(testName, installer.MondooNamespace)
 		s.NoError(s.testCluster.CleanupAuditConfigs())
 		secret := &corev1.Secret{}
@@ -143,7 +142,7 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		// not sure why the above list does not work. It returns zero deployments. So, first a plain sleep to stabilize the test.
 		zap.S().Info("Cleanup done. Cluster should be good to go for the next test.")
 
-		// s.Require().NoError(s.spaceClient.DeleteAssetsManagedBy(s.ctx, s.testCluster.ManagedBy()), "Failed to delete assets for integration")
+		s.Require().NoError(s.spaceClient.DeleteAssetsManagedBy(s.ctx, s.testCluster.ManagedBy()), "Failed to delete assets for integration")
 		// s.Require().NoError(s.integration.DeleteCiCdProjectIfExists(s.ctx), "Failed to delete CICD project for integration")
 	}
 }
