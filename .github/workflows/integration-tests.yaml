@@ -98,7 +98,7 @@ jobs:
       - name: Run integration tests
         env:
           MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE}}
-        run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration
+        run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration/ci
 
       - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
         if: success() || failure()

@@ -143,8 +143,8 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		// not sure why the above list does not work. It returns zero deployments. So, first a plain sleep to stabilize the test.
 		zap.S().Info("Cleanup done. Cluster should be good to go for the next test.")
 
-		s.Require().NoError(s.spaceClient.DeleteAssetsManagedBy(s.ctx, s.testCluster.ManagedBy()), "Failed to delete assets for integration")
-		s.Require().NoError(s.integration.DeleteCiCdProjectIfExists(s.ctx), "Failed to delete CICD project for integration")
+		// s.Require().NoError(s.spaceClient.DeleteAssetsManagedBy(s.ctx, s.testCluster.ManagedBy()), "Failed to delete assets for integration")
+		// s.Require().NoError(s.integration.DeleteCiCdProjectIfExists(s.ctx), "Failed to delete CICD project for integration")
 	}
 }
 
@@ -201,7 +201,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	s.Equal(len(assets)-1, len(assetsExceptCluster), "Cluster asset was sent upstream.")
 
 	assetNames := utils.AssetNames(assetsExceptCluster)
-	s.ElementsMatch(workloadNames, assetNames, "Workloads were not sent upstream.")
+	s.Subset(assetNames, workloadNames, "Workloads were not sent upstream.")
 
 	s.AssetsNotUnscored(assets)
 }
@@ -269,7 +269,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 	}
 
 	assetNames := utils.AssetNames(assets)
-	s.ElementsMatch(containerImages, assetNames, "Container images were not sent upstream.")
+	s.Subset(assetNames, containerImages, "Container images were not sent upstream.")
 
 	s.AssetsNotUnscored(assets)
 }
@@ -368,7 +368,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	s.NoError(err, "Failed to list assets")
 	assetNames := utils.AssetNames(assets)
 
-	s.ElementsMatch(nodeNames, assetNames, "Node names do not match")
+	s.Subset(assetNames, nodeNames, "Node names do not match")
 	s.AssetsNotUnscored(assets)
 }
 
