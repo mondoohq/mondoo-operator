@@ -48,8 +48,13 @@ func DefaultAuditConfigMinimal(ns string, workloads, nodes, admission, enableCns
 
 	// cnspec doesn't get edge releases at the moment, so we cannot test that
 	if mondooClientImageTag != "" {
-		auditConfig.Spec.Scanner.Image.Tag = mondooClientImageTag
-		zap.S().Infof("Using image %s:%s for mondoo-client", mondoo.MondooClientImage, mondooClientImageTag)
+		tag := mondooClientImageTag
+		auditConfig.Spec.Scanner.Image.Tag = tag
+		if enableCnspec {
+			// Right now the tags are coming from the Mondoo repo. We need to trigger the edge tests from the cnspec repo to fix that
+			tag = "edge-latest-rootless"
+		}
+		zap.S().Infof("Using image %s:%s for mondoo-client", mondoo.MondooClientImage, tag)
 	}
 
 	return auditConfig
