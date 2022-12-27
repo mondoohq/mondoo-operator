@@ -12,16 +12,6 @@ type Settings struct {
 	Namespace      string
 	token          string
 	installRelease bool
-	enableCnspec   bool
-}
-
-func (s Settings) EnableCnspec() Settings {
-	s.enableCnspec = true
-	return s
-}
-
-func (s Settings) GetEnableCnspec() bool {
-	return s.enableCnspec
 }
 
 func (s Settings) SetToken(token string) Settings {

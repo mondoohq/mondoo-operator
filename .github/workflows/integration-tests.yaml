@@ -2,7 +2,7 @@ name: Integration tests
 on:
   workflow_call:
     inputs:
-      mondooClientImageTag:
+      cnspecImageTag:
         required: true
         type: string
       useEdge:
@@ -16,7 +16,7 @@ on:
         required: true
 
 env:
-  MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag }}
+  CNSPEC_IMAGE_TAG: ${{ github.event.inputs.cnspecImageTag }}
 
 # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
 permissions:
