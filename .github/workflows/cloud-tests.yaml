@@ -5,11 +5,11 @@ on:
     - cron: '0 23 * * 0'
   workflow_dispatch:
     inputs:
-      mondooClientImageTag:
+      cnspecImageTag:
         required: true
         type: string
         default: edge-latest-rootless
-        description: The image tag to use for the mondoo client image
+        description: The image tag to use for the cnspec image
       mondooOperatorImageTag:
         required: true
         type: string
@@ -35,7 +35,7 @@ on:
 
 env:
   MONDOO_OPERATOR_IMAGE_TAG: ${{ github.event.inputs.mondooOperatorImageTag || 'main' }}
-  MONDOO_CLIENT_IMAGE_TAG: ${{ github.event.inputs.mondooClientImageTag || 'edge-latest-rootless' }}
+  CNSPEC_IMAGE_TAG: ${{ github.event.inputs.cnspecImageTag || 'edge-latest-rootless' }}
 
 jobs:
   aks-integration-test:

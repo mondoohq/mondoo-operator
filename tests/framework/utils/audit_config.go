@@ -12,17 +12,17 @@ import (
 )
 
 const (
-	MondooClientSecret         = "mondoo-client"
-	MondooTokenSecret          = "mondoo-token"
-	MondooClientImageTagEnvVar = "MONDOO_CLIENT_IMAGE_TAG"
+	MondooClientSecret   = "mondoo-client"
+	MondooTokenSecret    = "mondoo-token"
+	CnspecImageTagEnvVar = "CNSPEC_IMAGE_TAG"
 )
 
-var mondooClientImageTag = ""
+var cnspecImageTag = ""
 
 func init() {
-	imageTag, ok := os.LookupEnv(MondooClientImageTagEnvVar)
+	imageTag, ok := os.LookupEnv(CnspecImageTagEnvVar)
 	if ok {
-		mondooClientImageTag = imageTag
+		cnspecImageTag = imageTag
 	}
 }
 
@@ -30,7 +30,7 @@ func init() {
 // make sure a test passes (e.g. setting the correct secret name). Values which have defaults are not set.
 // This means that using this function in unit tests might result in strange behavior. For unit tests use
 // DefaultAuditConfig instead.
-func DefaultAuditConfigMinimal(ns string, workloads, nodes, admission, enableCnspec, consoleIntegration bool) mondoov2.MondooAuditConfig {
+func DefaultAuditConfigMinimal(ns string, workloads, nodes, admission, consoleIntegration bool) mondoov2.MondooAuditConfig {
 	auditConfig := mondoov2.MondooAuditConfig{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "mondoo-client",
@@ -47,9 +47,9 @@ func DefaultAuditConfigMinimal(ns string, workloads, nodes, admission, enableCns
 	}
 
 	// cnspec doesn't get edge releases at the moment, so we cannot test that
-	if mondooClientImageTag != "" && !enableCnspec {
-		auditConfig.Spec.Scanner.Image.Tag = mondooClientImageTag
-		zap.S().Infof("Using image %s:%s for mondoo-client", mondoo.MondooClientImage, mondooClientImageTag)
+	if cnspecImageTag != "" {
+		auditConfig.Spec.Scanner.Image.Tag = cnspecImageTag
+		zap.S().Infof("Using image %s:%s for mondoo-client", mondoo.MondooClientImage, cnspecImageTag)
 	}
 
 	return auditConfig
