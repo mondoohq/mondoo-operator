@@ -50,6 +50,8 @@ spec:
         env:
         - name: FEATURE_ENABLE_GARBAGE_COLLECTION
           value: "1"
+        - name: FEATURE_ENABLE_CNSPEC
+          value: "1"
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ .Values.kubernetesClusterDomain }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
