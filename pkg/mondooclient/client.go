@@ -259,7 +259,7 @@ const ScanKubernetesResourcesEndpoint = "/Scan/Run"
 
 func (s *mondooClient) ScanKubernetesResources(ctx context.Context, scanOpts *ScanKubernetesResourcesOpts) (*ScanResult, error) {
 	url := s.ApiEndpoint + ScanKubernetesResourcesEndpoint
-	scanJob := ScanJob{
+	scanJob := &ScanJob{
 		ReportType: ReportType_ERROR,
 		Inventory: v1.Inventory{
 			Spec: &v1.InventorySpec{
@@ -284,7 +284,7 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, scanOpts *Sc
 		},
 	}
 
-	setIntegrationMrn(scanOpts.IntegrationMrn, &scanJob)
+	setIntegrationMrn(scanOpts.IntegrationMrn, scanJob)
 
 	if scanOpts.ScanContainerImages {
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets, "container-images")
@@ -314,7 +314,7 @@ const ScheduleKubernetesResourceScanEndpoint = "/Scan/Schedule"
 
 func (s *mondooClient) ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey, managedBy string) (*Empty, error) {
 	url := s.ApiEndpoint + ScheduleKubernetesResourceScanEndpoint
-	scanJob := ScanJob{
+	scanJob := &ScanJob{
 		ReportType: ReportType_ERROR,
 		Inventory: v1.Inventory{
 			Spec: &v1.InventorySpec{
@@ -341,7 +341,7 @@ func (s *mondooClient) ScheduleKubernetesResourceScan(ctx context.Context, integ
 		scanJob.Inventory.Spec.Assets[0].ManagedBy = managedBy
 	}
 
-	setIntegrationMrn(integrationMrn, &scanJob)
+	setIntegrationMrn(integrationMrn, scanJob)
 
 	reqBodyBytes, err := json.Marshal(scanJob)
 	if err != nil {

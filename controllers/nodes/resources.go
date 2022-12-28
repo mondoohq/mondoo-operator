@@ -225,7 +225,7 @@ func ConfigMapName(prefix, nodeName string) string {
 }
 
 func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
-	inv := v1.Inventory{
+	inv := &v1.Inventory{
 		Metadata: &v1.ObjectMeta{
 			Name: "mondoo-node-inventory",
 			Labels: map[string]string{
