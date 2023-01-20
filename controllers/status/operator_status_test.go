@@ -46,6 +46,15 @@ func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Node scanning is disabled"},
 		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Admission controller is disabled"},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Scan API is disabled"},
+		{
+			Identifier: NamespaceFilteringIdentifier,
+			Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+			Message:    "Namespace filtering status",
+			Extra: map[string][]string{
+				"allowList": nil,
+				"denyList":  nil,
+			},
+		},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }
@@ -91,6 +100,15 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[2].Message},
 		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[3].Message},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[4].Message},
+		{
+			Identifier: NamespaceFilteringIdentifier,
+			Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+			Message:    "Namespace filtering status",
+			Extra: map[string][]string{
+				"allowList": nil,
+				"denyList":  nil,
+			},
+		},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }
@@ -136,6 +154,15 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[2].Message},
 		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[3].Message},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[4].Message},
+		{
+			Identifier: NamespaceFilteringIdentifier,
+			Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+			Message:    "Namespace filtering status",
+			Extra: map[string][]string{
+				"allowList": nil,
+				"denyList":  nil,
+			},
+		},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }

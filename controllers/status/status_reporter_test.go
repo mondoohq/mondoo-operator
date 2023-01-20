@@ -115,6 +115,15 @@ func (s *StatusReporterSuite) TestReport() {
 					Identifier: ScanApiIdentifier,
 					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 				},
+				{
+					Identifier: NamespaceFilteringIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+					Message:    "Namespace filtering status",
+					Extra: map[string][]string{
+						"allowList": nil,
+						"denyList":  nil,
+					},
+				},
 			},
 		},
 		LastState: OperatorCustomState{
@@ -183,6 +192,15 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 					Message:    "Scan API is disabled",
 					Identifier: ScanApiIdentifier,
 					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+				},
+				{
+					Identifier: NamespaceFilteringIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+					Message:    "Namespace filtering status",
+					Extra: map[string][]string{
+						"allowList": nil,
+						"denyList":  nil,
+					},
 				},
 			},
 		},
