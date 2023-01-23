@@ -36,6 +36,7 @@ type OperatorCustomState struct {
 	ContainerImageScanning bool
 	NodeScanning           bool
 	AdmissionController    bool
+	FilteringConfig        v1alpha2.Filtering
 }
 
 type MondooAuditConfig struct {
@@ -51,7 +52,7 @@ func ReportStatusRequestFromAuditConfig(
 		nodeNames[i] = nodes[i].Name
 	}
 
-	messages := make([]mondooclient.IntegrationMessage, 6)
+	messages := make([]mondooclient.IntegrationMessage, 5)
 
 	// Kubernetes resources scanning status
 	messages[0].Identifier = K8sResourcesScanningIdentifier
@@ -152,15 +153,6 @@ func ReportStatusRequestFromAuditConfig(
 		messages[4].Message = "Scan API is disabled"
 	}
 
-	// Namespace filtering status
-	messages[5].Identifier = NamespaceFilteringIdentifier
-	messages[5].Status = mondooclient.MessageStatus_MESSAGE_INFO
-	messages[5].Message = "Namespace filtering status"
-	messages[5].Extra = map[string][]string{
-		"allowList": m.Spec.Filtering.Namespaces.Include,
-		"denyList":  m.Spec.Filtering.Namespaces.Exclude,
-	}
-
 	// If there were any error messages, the overall status is error
 	status := mondooclient.Status_ACTIVE
 	for _, m := range messages {
@@ -182,6 +174,7 @@ func ReportStatusRequestFromAuditConfig(
 			ContainerImageScanning: m.Spec.KubernetesResources.ContainerImageScanning,
 			NodeScanning:           m.Spec.Nodes.Enable,
 			AdmissionController:    m.Spec.Admission.Enable,
+			FilteringConfig:        m.Spec.Filtering,
 		},
 		Messages: mondooclient.Messages{Messages: messages},
 	}

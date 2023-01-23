@@ -263,15 +263,6 @@ func TestTokenRegistration(t *testing.T) {
 								Identifier: status.ScanApiIdentifier,
 								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 							},
-							{
-								Message:    "Namespace filtering status",
-								Identifier: status.NamespaceFilteringIdentifier,
-								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-								Extra: map[string][]string{
-									"allowList": nil,
-									"denyList":  nil,
-								},
-							},
 						},
 					},
 					LastState: status.OperatorCustomState{

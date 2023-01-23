@@ -39,6 +39,7 @@ func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
 		KubernetesVersion: v.GitVersion,
 		MondooAuditConfig: MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
 		OperatorVersion:   version.Version,
+		FilteringConfig:   v1alpha2.Filtering{},
 	}, reportStatus.LastState)
 	messages := []mondooclient.IntegrationMessage{
 		{Identifier: K8sResourcesScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Kubernetes resources scanning is disabled"},
@@ -46,15 +47,6 @@ func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Node scanning is disabled"},
 		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Admission controller is disabled"},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Scan API is disabled"},
-		{
-			Identifier: NamespaceFilteringIdentifier,
-			Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-			Message:    "Namespace filtering status",
-			Extra: map[string][]string{
-				"allowList": nil,
-				"denyList":  nil,
-			},
-		},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }
@@ -72,6 +64,10 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 	m.Spec.KubernetesResources.ContainerImageScanning = true
 	m.Spec.Nodes.Enable = true
 	m.Spec.Admission.Enable = true
+	m.Spec.Filtering.Namespaces = v1alpha2.FilteringSpec{
+		Include: []string{"includeA", "includeB"},
+		Exclude: []string{"excludeX", "excludeY"},
+	}
 
 	m.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{
 		{Message: "Kubernetes Resources Scanning is Available", Status: v1.ConditionFalse, Type: v1alpha2.K8sResourcesScanningDegraded},
@@ -93,6 +89,12 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		ContainerImageScanning: m.Spec.KubernetesResources.ContainerImageScanning,
 		NodeScanning:           m.Spec.Nodes.Enable,
 		AdmissionController:    m.Spec.Admission.Enable,
+		FilteringConfig: v1alpha2.Filtering{
+			Namespaces: v1alpha2.FilteringSpec{
+				Include: []string{"includeA", "includeB"},
+				Exclude: []string{"excludeX", "excludeY"},
+			},
+		},
 	}, reportStatus.LastState)
 	messages := []mondooclient.IntegrationMessage{
 		{Identifier: K8sResourcesScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[0].Message},
@@ -100,15 +102,6 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[2].Message},
 		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[3].Message},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[4].Message},
-		{
-			Identifier: NamespaceFilteringIdentifier,
-			Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-			Message:    "Namespace filtering status",
-			Extra: map[string][]string{
-				"allowList": nil,
-				"denyList":  nil,
-			},
-		},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }
@@ -147,6 +140,7 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		ContainerImageScanning: m.Spec.KubernetesResources.ContainerImageScanning,
 		NodeScanning:           m.Spec.Nodes.Enable,
 		AdmissionController:    m.Spec.Admission.Enable,
+		FilteringConfig:        v1alpha2.Filtering{},
 	}, reportStatus.LastState)
 	messages := []mondooclient.IntegrationMessage{
 		{Identifier: K8sResourcesScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[0].Message},
@@ -154,15 +148,6 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[2].Message},
 		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[3].Message},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[4].Message},
-		{
-			Identifier: NamespaceFilteringIdentifier,
-			Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-			Message:    "Namespace filtering status",
-			Extra: map[string][]string{
-				"allowList": nil,
-				"denyList":  nil,
-			},
-		},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }
