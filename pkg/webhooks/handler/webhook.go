@@ -19,10 +19,10 @@ import (
 
 	serializerYaml "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 
+	"go.mondoo.com/cnquery/motor/providers"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
-	"go.mondoo.com/mondoo-operator/pkg/inventory"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils"
 	wutils "go.mondoo.com/mondoo-operator/pkg/webhooks/utils"
@@ -185,7 +185,7 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		ReportType: mondooclient.ReportType_ERROR,
 	}
 
-	scanJob.Discovery = &inventory.Discovery{}
+	scanJob.Discovery = &providers.Discovery{}
 	scanJob.Options = map[string]string{"all-namespaces": "true"}
 	// do not use auto discovery here, because we do not want to scan the cluster
 	scanJob.Discovery.Targets = []string{"pods", "deployments", "daemonsets", "statefulsets", "replicasets", "jobs", "cronjobs"}

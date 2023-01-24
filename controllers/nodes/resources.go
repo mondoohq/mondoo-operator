@@ -20,10 +20,12 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 
+	"go.mondoo.com/cnquery/motor/asset"
+	v1 "go.mondoo.com/cnquery/motor/inventory/v1"
+	"go.mondoo.com/cnquery/motor/providers"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
-	"go.mondoo.com/mondoo-operator/pkg/inventory"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
@@ -223,22 +225,22 @@ func ConfigMapName(prefix, nodeName string) string {
 }
 
 func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
-	inv := inventory.MondooInventory{
-		ObjectMeta: metav1.ObjectMeta{
+	inv := &v1.Inventory{
+		Metadata: &v1.ObjectMeta{
 			Name: "mondoo-node-inventory",
 			Labels: map[string]string{
 				"environment": "production",
 			},
 		},
-		Spec: inventory.MondooInventorySpec{
-			Assets: []inventory.Asset{
+		Spec: &v1.InventorySpec{
+			Assets: []*asset.Asset{
 				{
 					Id:   "host",
 					Name: node.Name,
-					Connections: []inventory.TransportConfig{
+					Connections: []*providers.Config{
 						{
 							Host:       "/mnt/host",
-							Backend:    inventory.TransportBackend_CONNECTION_FS,
+							Backend:    providers.ProviderType_FS,
 							PlatformId: fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/%s", clusterUID, node.UID),
 						},
 					},

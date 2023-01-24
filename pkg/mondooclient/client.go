@@ -19,9 +19,11 @@ import (
 	"strings"
 	"time"
 
+	"go.mondoo.com/cnquery/motor/asset"
+	v1 "go.mondoo.com/cnquery/motor/inventory/v1"
+	"go.mondoo.com/cnquery/motor/providers"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/garbagecollection"
-	"go.mondoo.com/mondoo-operator/pkg/inventory"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -222,7 +224,7 @@ type AdmissionReviewJob struct {
 	// Additional options for the manifest job
 	Options map[string]string `json:"options,omitempty"`
 	// Additional discovery settings for the manifest job
-	Discovery *inventory.Discovery `json:"discovery,omitempty"`
+	Discovery *providers.Discovery `json:"discovery,omitempty"`
 }
 
 type File struct {
@@ -257,20 +259,20 @@ const ScanKubernetesResourcesEndpoint = "/Scan/Run"
 
 func (s *mondooClient) ScanKubernetesResources(ctx context.Context, scanOpts *ScanKubernetesResourcesOpts) (*ScanResult, error) {
 	url := s.ApiEndpoint + ScanKubernetesResourcesEndpoint
-	scanJob := ScanJob{
+	scanJob := &ScanJob{
 		ReportType: ReportType_ERROR,
-		Inventory: inventory.MondooInventory{
-			Spec: inventory.MondooInventorySpec{
-				Assets: []inventory.Asset{
+		Inventory: v1.Inventory{
+			Spec: &v1.InventorySpec{
+				Assets: []*asset.Asset{
 					{
-						Connections: []inventory.TransportConfig{
+						Connections: []*providers.Config{
 							{
-								Backend: inventory.TransportBackend_CONNECTION_K8S,
+								Backend: providers.ProviderType_K8S,
 								Options: map[string]string{
 									"namespaces":         strings.Join(scanOpts.IncludeNamespaces, ","),
 									"namespaces-exclude": strings.Join(scanOpts.ExcludeNamespaces, ","),
 								},
-								Discover: inventory.Discovery{
+								Discover: &providers.Discovery{
 									Targets: []string{"auto"},
 								},
 							},
@@ -282,7 +284,7 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, scanOpts *Sc
 		},
 	}
 
-	setIntegrationMrn(scanOpts.IntegrationMrn, &scanJob)
+	setIntegrationMrn(scanOpts.IntegrationMrn, scanJob)
 
 	if scanOpts.ScanContainerImages {
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets, "container-images")
@@ -312,19 +314,19 @@ const ScheduleKubernetesResourceScanEndpoint = "/Scan/Schedule"
 
 func (s *mondooClient) ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey, managedBy string) (*Empty, error) {
 	url := s.ApiEndpoint + ScheduleKubernetesResourceScanEndpoint
-	scanJob := ScanJob{
+	scanJob := &ScanJob{
 		ReportType: ReportType_ERROR,
-		Inventory: inventory.MondooInventory{
-			Spec: inventory.MondooInventorySpec{
-				Assets: []inventory.Asset{
+		Inventory: v1.Inventory{
+			Spec: &v1.InventorySpec{
+				Assets: []*asset.Asset{
 					{
-						Connections: []inventory.TransportConfig{
+						Connections: []*providers.Config{
 							{
-								Backend: inventory.TransportBackend_CONNECTION_K8S,
+								Backend: providers.ProviderType_K8S,
 								Options: map[string]string{
 									"k8s-resources": resourceKey,
 								},
-								Discover: inventory.Discovery{
+								Discover: &providers.Discovery{
 									Targets: []string{"auto"},
 								},
 							},
@@ -339,7 +341,7 @@ func (s *mondooClient) ScheduleKubernetesResourceScan(ctx context.Context, integ
 		scanJob.Inventory.Spec.Assets[0].ManagedBy = managedBy
 	}
 
-	setIntegrationMrn(integrationMrn, &scanJob)
+	setIntegrationMrn(integrationMrn, scanJob)
 
 	reqBodyBytes, err := json.Marshal(scanJob)
 	if err != nil {
@@ -368,8 +370,8 @@ const (
 )
 
 type ScanJob struct {
-	Inventory  inventory.MondooInventory `json:"inventory"`
-	ReportType ReportType                `protobuf:"varint,22,opt,name=report_type,json=reportType,proto3,enum=mondoo.policy.scan.ReportType" json:"report_type,omitempty"`
+	Inventory  v1.Inventory `json:"inventory"`
+	ReportType ReportType   `protobuf:"varint,22,opt,name=report_type,json=reportType,proto3,enum=mondoo.policy.scan.ReportType" json:"report_type,omitempty"`
 }
 
 func NewClient(opts ClientOptions) Client {
