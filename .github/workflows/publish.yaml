@@ -394,6 +394,9 @@ jobs:
       - push-virtual-tag
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+
     strategy:
       fail-fast: false
       matrix:
@@ -421,6 +424,8 @@ jobs:
 
       - name: Install Helm
         uses: azure/setup-helm@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
         id: install
 
       - name: Store creds
@@ -472,6 +477,9 @@ jobs:
     - run-helm-tests
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -485,6 +493,8 @@ jobs:
 
       - name: Install Helm
         uses: azure/setup-helm@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
         id: install
 
       - name: Run chart-releaser
