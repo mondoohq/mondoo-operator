@@ -23,6 +23,7 @@ const (
 	NodeScanningIdentifier           = "node-scanning"
 	AdmissionControllerIdentifier    = "admission-controller"
 	ScanApiIdentifier                = "scan-api"
+	NamespaceFilteringIdentifier     = "namespace-filtering"
 	noStatusMessage                  = "No status reported yet"
 )
 
@@ -35,6 +36,7 @@ type OperatorCustomState struct {
 	ContainerImageScanning bool
 	NodeScanning           bool
 	AdmissionController    bool
+	FilteringConfig        v1alpha2.Filtering
 }
 
 type MondooAuditConfig struct {
@@ -172,6 +174,7 @@ func ReportStatusRequestFromAuditConfig(
 			ContainerImageScanning: m.Spec.KubernetesResources.ContainerImageScanning,
 			NodeScanning:           m.Spec.Nodes.Enable,
 			AdmissionController:    m.Spec.Admission.Enable,
+			FilteringConfig:        m.Spec.Filtering,
 		},
 		Messages: mondooclient.Messages{Messages: messages},
 	}
