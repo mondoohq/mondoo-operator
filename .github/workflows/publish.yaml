@@ -110,7 +110,7 @@ jobs:
       # https://github.com/docker/build-push-action
       - name: Build and push operator image
         id: build-and-push-operator
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           context: .
           platforms: ${{ matrix.os }}/${{ matrix.arch }}
@@ -252,7 +252,7 @@ jobs:
       # Build and push Docker image bundle with Buildx
       - name: Build and push bundle image
         id: build-and-push-bundle
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           context: .
           file: bundle.Dockerfile
