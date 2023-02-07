@@ -9,6 +9,6 @@ variable "resource_group_location" {
 }
 
 variable "k8s_version" {
-  default = "1.22"
+  default = "1.25"
   description = "Kubernetes version to use for the cluster."
 }
