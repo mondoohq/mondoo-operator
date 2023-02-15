@@ -396,6 +396,8 @@ jobs:
 
     permissions:
       contents: read
+      checks: write
+      statuses: write
 
     strategy:
       fail-fast: false
@@ -478,7 +480,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout
