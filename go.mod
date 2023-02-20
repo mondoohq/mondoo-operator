@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/gobwas/glob v0.2.3
-	github.com/golang-jwt/jwt/v4 v4.4.3
+	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang/mock v1.6.0
 	github.com/jetstack/cert-manager v1.7.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.62.0
