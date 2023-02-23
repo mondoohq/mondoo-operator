@@ -25,7 +25,6 @@ import (
 	"go.mondoo.com/cnquery/motor/providers"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
-	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
@@ -47,21 +46,12 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
 	unsetHostPath := corev1.HostPathUnset
 
-	name := "mondoo-client"
+	name := "cnspec"
 	cmd := []string{
-		"mondoo", "scan",
+		"cnspec", "scan", "local",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
 		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
 		"--score-threshold", "0",
-	}
-	if feature_flags.GetEnableCnspec() {
-		name = "cnspec"
-		cmd = []string{
-			"cnspec", "scan", "local",
-			"--config", "/etc/opt/mondoo/mondoo.yml",
-			"--inventory-file", "/etc/opt/mondoo/inventory.yml",
-			"--score-threshold", "0",
-		}
 	}
 
 	return &batchv1.CronJob{

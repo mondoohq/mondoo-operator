@@ -20,7 +20,6 @@ import (
 	"k8s.io/utils/pointer"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
@@ -49,23 +48,13 @@ func ScanApiSecret(mondoo v1alpha2.MondooAuditConfig) *corev1.Secret {
 func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateImageScanningSecretName string, deployOnOpenShift bool) *appsv1.Deployment {
 	labels := DeploymentLabels(m)
 
-	name := "mondoo-client"
+	name := "cnspec"
 	cmd := []string{
-		"mondoo", "serve",
-		"--api",
+		"cnspec", "serve-api",
+		"--address", "0.0.0.0",
 		"--config", "/etc/opt/mondoo/config/mondoo.yml",
-		"--token-file-path", "/etc/opt/mondoo/token/token",
 	}
-	healthcheckEndpoint := "/Health/Check"
-	if feature_flags.GetEnableCnspec() {
-		name = "cnspec"
-		cmd = []string{
-			"cnspec", "serve-api",
-			"--address", "0.0.0.0",
-			"--config", "/etc/opt/mondoo/config/mondoo.yml",
-		}
-		healthcheckEndpoint = "/Scan/HealthCheck"
-	}
+	healthcheckEndpoint := "/Scan/HealthCheck"
 
 	scanApiDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{

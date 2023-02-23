@@ -49,7 +49,7 @@ func DefaultAuditConfigMinimal(ns string, workloads, nodes, admission, consoleIn
 	// cnspec doesn't get edge releases at the moment, so we cannot test that
 	if cnspecImageTag != "" {
 		auditConfig.Spec.Scanner.Image.Tag = cnspecImageTag
-		zap.S().Infof("Using image %s:%s for mondoo-client", mondoo.MondooClientImage, cnspecImageTag)
+		zap.S().Infof("Using image %s:%s for mondoo-client", mondoo.CnspecImage, cnspecImageTag)
 	}
 
 	return auditConfig
