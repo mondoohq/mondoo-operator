@@ -12,7 +12,6 @@ const FeatureFlagPrefix = "FEATURE_"
 var (
 	enableGarbageCollection        bool
 	enableAdmissionReviewDiscovery bool
-	enableCnspec                   bool
 	allFeatureFlags                = make(map[string]string)
 )
 
@@ -48,17 +47,11 @@ func GetAdmissionReviewDiscovery() bool {
 	return enableAdmissionReviewDiscovery
 }
 
-func GetEnableCnspec() bool {
-	return enableCnspec
-}
-
 func setGlobalFlags(k, v string) {
 	switch k {
 	case "FEATURE_ENABLE_GARBAGE_COLLECTION":
 		enableGarbageCollection = true
 	case "FEATURE_ENABLE_ADMISSION_REVIEW_DISCOVERY":
 		enableAdmissionReviewDiscovery = true
-	case "FEATURE_ENABLE_CNSPEC":
-		enableCnspec = true
 	}
 }

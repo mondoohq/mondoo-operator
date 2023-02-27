@@ -49,7 +49,7 @@ func (s *ContainerImageResolverSuite) BeforeTest(suiteName, testName string) {
 func (s *ContainerImageResolverSuite) TestNewContainerImageResolver() {
 	resolver := NewContainerImageResolver(false)
 
-	ref, err := name.ParseReference(fmt.Sprintf("%s:%s", MondooClientImage, MondooClientTag))
+	ref, err := name.ParseReference(fmt.Sprintf("%s:%s", CnspecImage, CnspecTag))
 	s.NoError(err)
 	desc, err := remote.Get(ref)
 
@@ -62,7 +62,7 @@ func (s *ContainerImageResolverSuite) TestNewContainerImageResolver() {
 	s.NoError(err)
 	expected := fmt.Sprintf("%s@%s", ref.Context().Name(), desc.Digest.String())
 
-	imageWithDigest, err := resolver.MondooClientImage(MondooClientImage, MondooClientTag, false)
+	imageWithDigest, err := resolver.MondooClientImage(CnspecImage, CnspecTag, false)
 	s.NoError(err)
 	s.Equal(expected, imageWithDigest)
 }
@@ -80,7 +80,7 @@ func (s *ContainerImageResolverSuite) TestMondooClientImage_Defaults() {
 	res, err := s.resolver.MondooClientImage("", "", true)
 	s.NoError(err)
 
-	s.Equal(fmt.Sprintf("%s:%s", MondooClientImage, MondooClientTag), res)
+	s.Equal(fmt.Sprintf("%s:%s", CnspecImage, CnspecTag), res)
 	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
 }
 
@@ -101,7 +101,7 @@ func (s *ContainerImageResolverSuite) TestMondooClientImage_OpenShift() {
 	res, err := s.resolver.MondooClientImage("", "", true)
 	s.NoError(err)
 
-	s.Equal(fmt.Sprintf("%s:%s", MondooClientImage, OpenShiftMondooClientTag), res)
+	s.Equal(fmt.Sprintf("%s:%s", CnspecImage, OpenShiftMondooClientTag), res)
 	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
 }
 
