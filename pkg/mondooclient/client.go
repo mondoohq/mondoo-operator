@@ -248,7 +248,8 @@ type Score struct {
 }
 
 type ScanKubernetesResourcesOpts struct {
-	IntegrationMrn      string
+	IntegrationMrn string
+	// If set to true, the scan will discover only container images and not Kubernetes resources
 	ScanContainerImages bool
 	ManagedBy           string
 	IncludeNamespaces   []string
@@ -287,7 +288,7 @@ func (s *mondooClient) ScanKubernetesResources(ctx context.Context, scanOpts *Sc
 	setIntegrationMrn(scanOpts.IntegrationMrn, scanJob)
 
 	if scanOpts.ScanContainerImages {
-		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = append(scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets, "container-images")
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Discover.Targets = []string{"container-images"}
 	}
 
 	reqBodyBytes, err := json.Marshal(scanJob)
