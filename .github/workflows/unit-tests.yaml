@@ -22,12 +22,6 @@ jobs:
         with:
           go-version: "${{ env.golang-version }}"
           cache: true
-
-      - name: Install Protoc
-        run: |
-          sudo apt install -y gcc
-          make prep/ci/protoc
-          echo "${{ github.workspace }}/tools/bin" >> $GITHUB_PATH
       
       - run: make test/ci
       - uses: actions/upload-artifact@v3  # upload test results

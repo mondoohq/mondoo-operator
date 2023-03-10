@@ -97,12 +97,6 @@ jobs:
             type=ref,event=tag
             type=ref,event=pr
 
-      - name: Install Protoc
-        run: |
-          sudo apt install -y gcc
-          make prep/ci/protoc
-          echo "${{ github.workspace }}/tools/bin" >> $GITHUB_PATH
-
       - name: Build binaries
         run: VERSION=${{ steps.meta_clean.outputs.version }} TARGET_OS=${{ matrix.os }} TARGET_ARCH=${{ matrix.arch }} make build
 
@@ -347,12 +341,6 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      - name: Install Protoc
-        run: |
-          sudo apt install -y gcc
-          make prep/ci/protoc
-          echo "${{ github.workspace }}/tools/bin" >> $GITHUB_PATH
-
       - name: Run integration tests
         env:
           MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE }}
@@ -447,12 +435,6 @@ jobs:
       # before the test execution starts.
       - name: Wait a bit for the runner to become more stable
         run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
-
-      - name: Install Protoc
-        run: |
-          sudo apt install -y gcc
-          make prep/ci/protoc
-          echo "${{ github.workspace }}/tools/bin" >> $GITHUB_PATH
 
       - name: Run integration tests
         env:
