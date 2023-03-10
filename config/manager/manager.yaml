@@ -43,8 +43,6 @@ spec:
         env:
         - name: FEATURE_ENABLE_GARBAGE_COLLECTION
           value: "1"
-        - name: FEATURE_ENABLE_CNSPEC
-          value: "1"
         image: controller:latest
         imagePullPolicy: IfNotPresent
         name: manager
