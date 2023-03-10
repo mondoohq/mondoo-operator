@@ -53,15 +53,11 @@ func (s *Space) ListAssetsWithScores(ctx context.Context, integrationMrn string)
 		mrns[i] = assetsPage.List[i].Mrn
 	}
 
-	// scores, err := s.PolicyResolver.ListAssetScores(ctx, &policy.ListAssetScoresReq{AssetMrns: mrns})
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	assetScores := make([]AssetWithScore, len(assetsPage.List))
 	for i := range assetsPage.List {
 		asset := assetsPage.List[i]
 
+		// TODO: replace this call with GetScore(ctx, &cnspec.EntityScoreReq{EntityMrn: asset.Mrn, ScoreMrn: asset.Mrn}) once nexus is released
 		score, err := s.PolicyResolver.GetReport(ctx, &cnspec.EntityScoreReq{EntityMrn: asset.Mrn})
 		if err != nil {
 			return nil, err
@@ -69,11 +65,6 @@ func (s *Space) ListAssetsWithScores(ctx context.Context, integrationMrn string)
 		assetScores[i] = AssetWithScore{Asset: asset, Score: score.Scores[asset.Mrn]}
 	}
 
-	// assetScores := make([]AssetWithScore, len(assetsPage.List))
-	// for i := range assetsPage.List {
-	// 	asset := assetsPage.List[i]
-	// 	assetScores[i] = AssetWithScore{Asset: asset, Score: scores.Scores[asset.Mrn]}
-	// }
 	return assetScores, nil
 }
 
