@@ -8,34 +8,6 @@ import "motor/asset/asset.proto";
 import "motor/platform/platform.proto";
 import "motor/providers/provider.proto";
 
-service ReportsStore {
-  rpc ListAssetScores(ListAssetScoresReq) returns (ListAssetScoresRes) {}
-}
-
-message ListAssetScoresReq {
-  repeated string asset_mrns = 1;
-}
-
-message ListAssetScoresRes {
-  map<string, Score> scores = 1;
-}
-
-message Score {
-  string qr_id = 2;
-  uint32 type = 3;
-  uint32 value = 4;
-  uint32 weight = 7;
-  uint32 score_completion = 5;
-  uint32 data_total = 9;
-  uint32 data_completion = 6;
-  string message = 8;
-  // captures the timestamp when the score value was last modified
-  int64 value_modified_time = 10;
-  // captures when the score first failed (non-100 value)
-  // a value of 0 indicates that this field is not set
-  int64 failure_time = 11;
-}
-
 service AssetStore {
   rpc ListAssets(AssetSearchFilter) returns (AssetsPage);
   rpc DeleteAssets(DeleteAssetsRequest) returns (DeleteAssetsConfirmation) {};

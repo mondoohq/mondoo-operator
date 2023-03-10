@@ -2,6 +2,7 @@ package nexus
 
 import (
 	"go.mondoo.com/cnquery/upstream"
+	cnspec "go.mondoo.com/cnspec/policy"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/captain"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/integrations"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
@@ -11,10 +12,10 @@ import (
 type Client struct {
 	spaceMrn string
 
-	AssetStore   policy.AssetStore
-	ReportsSTore policy.ReportsStore
-	Captain      captain.Captain
-	Integrations integrations.IntegrationsManager
+	AssetStore     policy.AssetStore
+	PolicyResolver cnspec.PolicyResolver
+	Captain        captain.Captain
+	Integrations   integrations.IntegrationsManager
 }
 
 func NewClient(serviceAccount *upstream.ServiceAccountCredentials) (*Client, error) {
@@ -28,7 +29,7 @@ func NewClient(serviceAccount *upstream.ServiceAccountCredentials) (*Client, err
 		return nil, err
 	}
 
-	reportsStore, err := policy.NewReportsStoreClient(serviceAccount.ApiEndpoint, ranger.DefaultHttpClient(), plugin)
+	policyResolver, err := cnspec.NewPolicyResolverClient(serviceAccount.ApiEndpoint, ranger.DefaultHttpClient(), plugin)
 	if err != nil {
 		return nil, err
 	}
@@ -44,15 +45,15 @@ func NewClient(serviceAccount *upstream.ServiceAccountCredentials) (*Client, err
 	}
 
 	return &Client{
-		spaceMrn:     serviceAccount.ParentMrn,
-		AssetStore:   assetStore,
-		ReportsSTore: reportsStore,
-		Captain:      captain,
-		Integrations: integrations,
+		spaceMrn:       serviceAccount.ParentMrn,
+		AssetStore:     assetStore,
+		PolicyResolver: policyResolver,
+		Captain:        captain,
+		Integrations:   integrations,
 	}, nil
 }
 
 // TODO: when we support creating spaces this will actually create a space
 func (c *Client) GetSpace() *Space {
-	return NewSpace(c.spaceMrn, c.AssetStore, c.ReportsSTore, c.Captain, c.Integrations)
+	return NewSpace(c.spaceMrn, c.AssetStore, c.PolicyResolver, c.Captain, c.Integrations)
 }
