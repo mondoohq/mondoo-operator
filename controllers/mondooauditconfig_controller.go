@@ -190,10 +190,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			podListNames := getPodNames(podList.Items)
 
 			// Update status.Pods list if needed
-			statusPodNames := sets.NewString(mondooAuditConfig.Status.Pods...)
+			statusPodNames := sets.New(mondooAuditConfig.Status.Pods...)
 
 			if !statusPodNames.Equal(podListNames) {
-				mondooAuditConfig.Status.Pods = podListNames.List()
+				mondooAuditConfig.Status.Pods = podListNames.UnsortedList()
 			}
 		}
 
@@ -370,10 +370,10 @@ func labelsForMondoo(name string) map[string]string {
 }
 
 // getPodNames returns a Set of the pod names of the array of pods passed in
-func getPodNames(pods []corev1.Pod) sets.String {
+func getPodNames(pods []corev1.Pod) sets.Set[string] {
 	var podNames []string
 	for _, pod := range pods {
 		podNames = append(podNames, pod.Name)
 	}
-	return sets.NewString(podNames...)
+	return sets.New(podNames...)
 }

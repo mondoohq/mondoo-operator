@@ -130,7 +130,7 @@ func (s *E2eTestSuite) TestE2e_NodeScan() {
 
 	s.ElementsMatch(nodeNames, assetNames, "Node names do not match")
 	for _, asset := range assets {
-		s.NotEqual(uint32(policy.ScoreType_UNSCORED), asset.Score.Type, "Assets should not be unscored")
+		s.Equal(uint32(policy.ScoreType_RESULT), asset.Score.Type, "Assets should be scored")
 	}
 }
 

@@ -3,6 +3,7 @@ package nexus
 import (
 	"context"
 
+	cnspec "go.mondoo.com/cnspec/policy"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/captain"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/integrations"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
@@ -12,27 +13,27 @@ import (
 type Space struct {
 	spaceMrn string
 
-	AssetStore   policy.AssetStore
-	ReportsStore policy.ReportsStore
-	Captain      captain.Captain
-	Integrations integrations.IntegrationsManager
+	AssetStore     policy.AssetStore
+	PolicyResolver cnspec.PolicyResolver
+	Captain        captain.Captain
+	Integrations   integrations.IntegrationsManager
 
 	K8s *k8s.Client
 }
 
 type AssetWithScore struct {
 	Asset *policy.Asset
-	Score *policy.Score
+	Score *cnspec.Score
 }
 
-func NewSpace(spaceMrn string, assetStore policy.AssetStore, reportsStore policy.ReportsStore, captain captain.Captain, integrations integrations.IntegrationsManager) *Space {
+func NewSpace(spaceMrn string, assetStore policy.AssetStore, policyResolver cnspec.PolicyResolver, captain captain.Captain, integrations integrations.IntegrationsManager) *Space {
 	return &Space{
-		spaceMrn:     spaceMrn,
-		AssetStore:   assetStore,
-		ReportsStore: reportsStore,
-		Captain:      captain,
-		Integrations: integrations,
-		K8s:          k8s.NewClient(spaceMrn, integrations, assetStore),
+		spaceMrn:       spaceMrn,
+		AssetStore:     assetStore,
+		PolicyResolver: policyResolver,
+		Captain:        captain,
+		Integrations:   integrations,
+		K8s:            k8s.NewClient(spaceMrn, integrations, assetStore),
 	}
 }
 
@@ -52,16 +53,18 @@ func (s *Space) ListAssetsWithScores(ctx context.Context, integrationMrn string)
 		mrns[i] = assetsPage.List[i].Mrn
 	}
 
-	scores, err := s.ReportsStore.ListAssetScores(ctx, &policy.ListAssetScoresReq{AssetMrns: mrns})
-	if err != nil {
-		return nil, err
-	}
-
 	assetScores := make([]AssetWithScore, len(assetsPage.List))
 	for i := range assetsPage.List {
 		asset := assetsPage.List[i]
-		assetScores[i] = AssetWithScore{Asset: asset, Score: scores.Scores[asset.Mrn]}
+
+		// TODO: replace this call with GetScore(ctx, &cnspec.EntityScoreReq{EntityMrn: asset.Mrn, ScoreMrn: asset.Mrn}) once nexus is released
+		score, err := s.PolicyResolver.GetReport(ctx, &cnspec.EntityScoreReq{EntityMrn: asset.Mrn})
+		if err != nil {
+			return nil, err
+		}
+		assetScores[i] = AssetWithScore{Asset: asset, Score: score.Scores[asset.Mrn]}
 	}
+
 	return assetScores, nil
 }
 
