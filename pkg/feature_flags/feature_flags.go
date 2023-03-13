@@ -48,6 +48,9 @@ func GetAdmissionReviewDiscovery() bool {
 }
 
 func setGlobalFlags(k, v string) {
+	if v != "true" && v != "1" {
+		return
+	}
 	switch k {
 	case "FEATURE_ENABLE_GARBAGE_COLLECTION":
 		enableGarbageCollection = true
