@@ -7,7 +7,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang/mock v1.6.0
 	github.com/jetstack/cert-manager v1.7.1
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.62.0
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.63.0
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.2
 	go.mondoo.com/cnquery v0.0.0-20230310083103-a4ce8039521e
@@ -391,7 +391,7 @@ require (
 	mvdan.cc/interfacer v0.0.0-20180901003855-c20040233aed // indirect
 	mvdan.cc/lint v0.0.0-20170908181259-adc824a0674b // indirect
 	mvdan.cc/unparam v0.0.0-20230125043941-70a0ce6e7b95 // indirect
-	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
+	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 )
 
 require (
@@ -438,9 +438,9 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.26.2 // indirect
 	k8s.io/component-base v0.26.2 // indirect
-	k8s.io/klog/v2 v2.80.1 // indirect
+	k8s.io/klog/v2 v2.90.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
-	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
+	k8s.io/utils v0.0.0-20230202215443-34013725500c
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0
 )
