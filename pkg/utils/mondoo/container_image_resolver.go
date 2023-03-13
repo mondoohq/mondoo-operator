@@ -21,8 +21,8 @@ import (
 
 const (
 	CnspecImage              = "docker.io/mondoo/cnspec"
-	CnspecTag                = "7-rootless"
-	OpenShiftMondooClientTag = "7-ubi-rootless"
+	CnspecTag                = "8-rootless"
+	OpenShiftMondooClientTag = "8-ubi-rootless"
 	MondooOperatorImage      = "ghcr.io/mondoohq/mondoo-operator"
 )
 
