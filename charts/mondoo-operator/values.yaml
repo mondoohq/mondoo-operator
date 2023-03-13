@@ -1,8 +1,11 @@
 controllerManager:
   manager:
+    env:
+      featureEnableGarbageCollection: "1"
     image:
       repository: ghcr.io/mondoohq/mondoo-operator
-      tag: v1.11.1
+      tag: v1.12.0
+    imagePullPolicy: IfNotPresent
     resources:
       limits:
         cpu: 200m
