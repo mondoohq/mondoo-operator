@@ -49,10 +49,10 @@ spec:
         - /mondoo-operator
         env:
         - name: FEATURE_ENABLE_GARBAGE_COLLECTION
-          value: {{ .Values.controllerManager.manager.env.featureEnableGarbageCollection
+          value: {{ quote .Values.controllerManager.manager.env.featureEnableGarbageCollection
             }}
         - name: KUBERNETES_CLUSTER_DOMAIN
-          value: {{ .Values.kubernetesClusterDomain }}
+          value: {{ quote .Values.kubernetesClusterDomain }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.controllerManager.manager.imagePullPolicy }}
@@ -75,13 +75,8 @@ spec:
           periodSeconds: 10
         resources: {{- toYaml .Values.controllerManager.manager.resources | nindent 10
           }}
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          privileged: false
-          readOnlyRootFilesystem: true
+        securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
+          | nindent 8 }}
       securityContext:
         runAsNonRoot: true
       serviceAccountName: {{ include "mondoo-operator.fullname" . }}-controller-manager
