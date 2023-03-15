@@ -10,15 +10,11 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
+	"go.mondoo.com/cnquery/motor/providers"
 	"go.mondoo.com/mondoo-operator/pkg/garbagecollection"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-)
-
-const (
-	RUNTIME_KUBERNETES_CLUSTER = "k8s-cluster"
-	RUNTIME_DOCKER_REGISTRY    = "docker-registry"
 )
 
 var Cmd = &cobra.Command{
@@ -96,7 +92,7 @@ func GarbageCollectCmd(ctx context.Context, client mondooclient.Client, platform
 
 	if platformRuntime != "" {
 		switch platformRuntime {
-		case RUNTIME_KUBERNETES_CLUSTER, RUNTIME_DOCKER_REGISTRY:
+		case providers.RUNTIME_KUBERNETES_CLUSTER, providers.RUNTIME_DOCKER_IMAGE:
 			gcOpts.PlatformRuntime = platformRuntime
 		default:
 			return fmt.Errorf("no matching platform runtime found for (%s)", platformRuntime)
