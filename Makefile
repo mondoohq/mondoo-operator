@@ -354,7 +354,7 @@ catalog-push: ## Push a catalog image.
 
 HELMIFY = $(LOCALBIN)/helmify
 helmify: $(LOCALBIN) ## Download helmify locally if necessary.
-	GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@latest
+	GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@v0.3.23
 
 helm: manifests kustomize helmify
 	$(KUSTOMIZE) build config/default | $(HELMIFY) $(CHART_NAME)
