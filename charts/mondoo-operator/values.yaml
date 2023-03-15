@@ -1,7 +1,14 @@
 controllerManager:
   manager:
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      privileged: false
+      readOnlyRootFilesystem: true
     env:
-      featureEnableGarbageCollection: "1"
+      featureEnableGarbageCollection: "true"
     image:
       repository: ghcr.io/mondoohq/mondoo-operator
       tag: v1.12.0
