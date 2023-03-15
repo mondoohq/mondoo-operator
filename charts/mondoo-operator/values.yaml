@@ -1,18 +1,8 @@
 controllerManager:
   manager:
-    containerSecurityContext:
-      allowPrivilegeEscalation: false
-      capabilities:
-        drop:
-        - ALL
-      privileged: false
-      readOnlyRootFilesystem: true
-    env:
-      featureEnableGarbageCollection: "true"
     image:
       repository: ghcr.io/mondoohq/mondoo-operator
-      tag: v1.12.1
-    imagePullPolicy: IfNotPresent
+      tag: v1.12.2
     resources:
       limits:
         cpu: 200m
