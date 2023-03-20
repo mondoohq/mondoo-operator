@@ -47,6 +47,6 @@ func (s *Space) ListAssetsWithScores(ctx context.Context, integrationMrn, assetT
 
 func (s *Space) DeleteAssetsManagedBy(ctx context.Context, managedBy string) error {
 	res, err := s.AssetStore.DeleteAssets(ctx, &policy.DeleteAssetsRequest{SpaceMrn: s.spaceMrn, ManagedBy: managedBy})
-	zap.S().Info("deleted assets %v", res)
+	zap.S().Infof("deleted assets %v", res)
 	return err
 }
