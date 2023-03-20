@@ -26,6 +26,10 @@ func ListAssetsWithScores(
 		filter.QueryTerms = []string{"{ \"mondoo.com/integration-mrn\": \"" + integrationMrn + "\" }"}
 	}
 
+	if ciCdProjectMrn != "" {
+		filter.CicdProjectMrn = ciCdProjectMrn
+	}
+
 	if assetType != "" {
 		filter.AssetTypes = []string{assetType}
 	}
