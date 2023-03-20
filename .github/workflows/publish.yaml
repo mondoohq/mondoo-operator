@@ -50,7 +50,7 @@ jobs:
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: "${{ env.golang-version }}"
           cache: true
@@ -192,7 +192,7 @@ jobs:
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: "${{ env.golang-version }}"
 
@@ -288,7 +288,7 @@ jobs:
         run: cat ".github/env" >> $GITHUB_ENV
 
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: "${{ env.golang-version }}"
       - name: Start minikube
@@ -402,7 +402,7 @@ jobs:
         run: cat ".github/env" >> $GITHUB_ENV
 
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: "${{ env.golang-version }}"
 
