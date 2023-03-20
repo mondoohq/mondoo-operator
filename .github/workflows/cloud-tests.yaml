@@ -81,7 +81,7 @@ jobs:
           TF_VAR_k8s_version: ${{ matrix.k8s-version }}
         working-directory: .github/terraform/aks
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: "${{ env.golang-version }}"
           cache: true
@@ -166,7 +166,7 @@ jobs:
           TF_VAR_kubernetes_version: ${{ matrix.k8s-version }}
         working-directory: .github/terraform/aws
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: "${{ env.golang-version }}"
           cache: true
@@ -250,7 +250,7 @@ jobs:
           TF_VAR_k8s_version: ${{ matrix.k8s-version }}
         working-directory: .github/terraform/gke
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: "${{ env.golang-version }}"
           cache: true
