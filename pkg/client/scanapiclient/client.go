@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mondoo.com/cnquery/providers-sdk/v1/inventory"
-	"go.mondoo.com/cnspec/policy/scan"
+	"go.mondoo.com/cnquery/v9/providers-sdk/v1/inventory"
+	"go.mondoo.com/cnspec/v9/policy/scan"
 	"go.mondoo.com/mondoo-operator/pkg/client/common"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"

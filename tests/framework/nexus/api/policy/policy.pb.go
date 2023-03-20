@@ -10,7 +10,7 @@
 package policy
 
 import (
-	inventory "go.mondoo.com/cnquery/providers-sdk/v1/inventory"
+	inventory "go.mondoo.com/cnquery/v9/providers-sdk/v1/inventory"
 	api "go.mondoo.com/mondoo-operator/tests/framework/nexus/api"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"

@@ -2,8 +2,7 @@ package utils
 
 import (
 	"github.com/google/go-containerregistry/pkg/name"
-	"go.mondoo.com/cnquery/motor/discovery/container_registry"
-	"go.mondoo.com/cnquery/motor/discovery/k8s"
+	"go.mondoo.com/cnquery/v9/providers/os/resources/discovery/container_registry"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
@@ -37,7 +36,7 @@ func ContainerImages(pods []v1.Pod, auditConfig v1alpha2.MondooAuditConfig) ([]s
 			return nil, err
 		}
 		if scan {
-			for i := range k8s.UniqueImagesForPod(p, nil) {
+			for i := range UniqueImagesForPod(p, nil) {
 				runningImages[i] = struct{}{}
 			}
 		}

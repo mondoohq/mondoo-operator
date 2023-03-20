@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	cnspec "go.mondoo.com/cnspec/policy"
+	cnspec "go.mondoo.com/cnspec/v9/policy"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/integrations"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"

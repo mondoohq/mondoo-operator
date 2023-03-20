@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"os"
 
-	"go.mondoo.com/cnquery/cli/config"
-	"go.mondoo.com/cnquery/providers-sdk/v1/upstream"
+	"go.mondoo.com/cnquery/v9/cli/config"
+	"go.mondoo.com/cnquery/v9/providers-sdk/v1/upstream"
 )
 
 const ServiceAccountEnv = "MONDOO_SERVICE_ACCOUNT_EDGE"

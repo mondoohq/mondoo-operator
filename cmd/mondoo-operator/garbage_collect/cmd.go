@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
-	"go.mondoo.com/cnspec/policy/scan"
+	"go.mondoo.com/cnspec/v9/policy/scan"
 	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"k8s.io/utils/ptr"
