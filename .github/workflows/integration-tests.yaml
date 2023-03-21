@@ -74,9 +74,6 @@ jobs:
         run: |
           echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
 
-      - name: Wait for 40s
-        run: sleep 40
-
       # Now that dependencies are cached the tests start almost immediately after minikube has started
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
       # before the test execution starts.
@@ -87,13 +84,6 @@ jobs:
       # they are working but in fact they are just waiting on a connection.
       - name: Wait for 40s
         run: sleep 40
-
-      - name: Wait for minikube pods that take a while to start
-        if: matrix.k8s-distro == 'minikube'
-        run: |
-          kubectl -n kube-system wait --for=condition=Ready pods storage-provisioner --timeout=180s
-          kubectl -n kube-system wait --for=condition=Ready pods etcd-minikube --timeout=180s
-          kubectl -n kube-system wait --for=condition=Available deployments coredns --timeout=180s
 
       - name: Run integration tests
         env:

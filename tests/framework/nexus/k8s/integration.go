@@ -71,6 +71,7 @@ func (b *IntegrationBuilder) Run(ctx context.Context) (*Integration, error) {
 		policyResolver: b.policyResolver,
 		name:           b.name,
 		mrn:            resp.Integration.Mrn,
+		token:          resp.Integration.Token,
 		spaceMrn:       b.spaceMrn,
 	}, nil
 }
@@ -83,20 +84,25 @@ type Integration struct {
 	name     string
 	mrn      string
 	spaceMrn string
+	token    string
 }
 
 func (i *Integration) Mrn() string {
 	return i.mrn
 }
 
-func (i *Integration) GetRegistrationToken(ctx context.Context) (string, error) {
-	resp, err := i.integrations.GetTokenForIntegration(
-		ctx, &integrations.GetTokenForIntegrationRequest{Mrn: i.mrn, LongLivedToken: false})
-	if err != nil {
-		return "", err
-	}
-	return resp.Token, nil
+func (i *Integration) Token() string {
+	return i.token
 }
+
+// func (i *Integration) GetRegistrationToken(ctx context.Context) (string, error) {
+// 	resp, err := i.integrations.GetTokenForIntegration(
+// 		ctx, &integrations.GetTokenForIntegrationRequest{Mrn: i.mrn, LongLivedToken: false})
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	return resp.Token, nil
+// }
 
 func (i *Integration) Delete(ctx context.Context) error {
 	_, err := i.integrations.Delete(ctx, &integrations.DeleteIntegrationRequest{Mrn: i.mrn})
