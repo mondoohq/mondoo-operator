@@ -23,7 +23,7 @@ func (s *AuditConfigSuite) TestReconcile_AllDisabled() {
 }
 
 func (s *AuditConfigSuite) TestReconcile_KubernetesResources() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false,false, false)
 	s.testMondooAuditConfigKubernetesResources(auditConfig)
 }
 

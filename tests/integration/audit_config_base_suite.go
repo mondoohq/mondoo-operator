@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -61,6 +62,7 @@ type AuditConfigBaseSuite struct {
 }
 
 func (s *AuditConfigBaseSuite) SetupSuite() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	s.ctx = context.Background()
 
 	sa, err := utils.GetServiceAccount()
@@ -1036,6 +1038,9 @@ func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []assets.AssetWithScore)
 	for _, asset := range assets {
 		// We don't score scratch containers at the moment so they are always unscored.
 		if asset.Asset.PlatformName != "scratch" {
+			if asset.Score == nil {
+				zap.S().Infof("Asset %s has no score %v", asset.Asset.Name, asset.Asset)
+			}
 			s.NotEqualf(uint32(policy.ScoreType_UNSCORED), asset.Score.Type, "Asset %s should not be unscored", asset.Asset.Name)
 		}
 	}
