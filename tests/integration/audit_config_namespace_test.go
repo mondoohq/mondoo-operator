@@ -87,10 +87,8 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_KubernetesResources() {
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Containers() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, true, false, false)
 
-	// The mondoo-operator namespace is using local images which cnspec won't be able to download
-	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{s.ns.Name}
-	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
-	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{s.testCluster.Settings.Namespace}
+	// Ignore the operator namespace and the scanner namespace because we cannot scan a local image
+	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{s.ns.Name, s.testCluster.Settings.Namespace, "kube-system"}
 	s.testMondooAuditConfigContainers(auditConfig)
 }
 

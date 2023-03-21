@@ -146,6 +146,9 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 
 		s.Require().NoError(s.spaceClient.DeleteAssetsManagedBy(s.ctx, s.testCluster.ManagedBy()), "Failed to delete assets for integration")
 		s.Require().NoError(s.integration.DeleteCiCdProjectIfExists(s.ctx), "Failed to delete CICD project for integration")
+
+		_, err = s.testCluster.K8sHelper.Kubectl("delete", "pods", "-n", "default", "--all", "--wait")
+		s.Require().NoError(err, "Failed to delete all pods")
 	}
 }
 
@@ -208,6 +211,11 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondoov2.MondooAuditConfig) {
+	_, err := s.testCluster.K8sHelper.Kubectl("run", "-n", "default", "nginx", "--image", "nginx")
+	s.Require().NoError(err, "Failed to create nginx pod.")
+	_, err = s.testCluster.K8sHelper.Kubectl("run", "-n", "default", "redis", "--image", "redis")
+	s.Require().NoError(err, "Failed to create redis pod.")
+	time.Sleep(20 * time.Second)
 	s.auditConfig = auditConfig
 
 	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
@@ -228,7 +236,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{Name: container_image.CronJobName(auditConfig.Name), Namespace: auditConfig.Namespace},
 	}
-	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
 		if err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(cronJob), cronJob); err != nil {
 			return false, nil
 		}

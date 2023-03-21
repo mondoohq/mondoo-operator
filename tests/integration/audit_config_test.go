@@ -23,15 +23,15 @@ func (s *AuditConfigSuite) TestReconcile_AllDisabled() {
 }
 
 func (s *AuditConfigSuite) TestReconcile_KubernetesResources() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false,false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false, false)
 	s.testMondooAuditConfigKubernetesResources(auditConfig)
 }
 
 func (s *AuditConfigSuite) TestReconcile_Containers() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, true, false, false)
 
-	// The mondoo-operator namespace is using local images which cnspec won't be able to download
-	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{"mondoo-operator"}
+	// Ignore the operator namespace because we cannot scan a local image
+	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{s.testCluster.Settings.Namespace, "kube-system"}
 	s.testMondooAuditConfigContainers(auditConfig)
 }
 
