@@ -86,9 +86,6 @@ func (s *AuditConfigBaseSuite) SetupSuite() {
 	s.Require().NoError(err, "Failed to create k8s integration")
 	s.integration = integration
 
-	// token, err := s.integration.GetRegistrationToken(s.ctx)
-	// s.Require().NoError(err, "Failed to get long lived integration token")
-
 	settings := installer.NewDefaultSettings().SetToken(integration.Token())
 	if s.installRelease {
 		settings = installer.NewReleaseSettings().SetToken(integration.Token())
