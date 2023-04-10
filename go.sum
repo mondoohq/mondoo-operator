@@ -1223,8 +1223,8 @@ go.mondoo.com/cnquery v0.0.0-20230310083103-a4ce8039521e h1:RAK7ER5ifx2OAbN6wmPO
 go.mondoo.com/cnquery v0.0.0-20230310083103-a4ce8039521e/go.mod h1:iI/TeZcXvyQioi2LPjx5PJ6kUUn/ILZA1fi9YB8J5hw=
 go.mondoo.com/cnspec v0.0.0-20230310120719-f285d4252c94 h1:G+XnIt0Du6vUz3ae1SLiL7uM7paeoO97sNZgYbqoq44=
 go.mondoo.com/cnspec v0.0.0-20230310120719-f285d4252c94/go.mod h1:AAXX8mPjWcig+b+MWYzpRU38iJ4AaHrmWp7FBdYKEQU=
-go.mondoo.com/ranger-rpc v0.5.1-0.20220923135836-9e7732899d34 h1:mtPZ1J+nRI/ivV+n41bjIwY6Rfxb2Jf49svZSQMGHIA=
-go.mondoo.com/ranger-rpc v0.5.1-0.20220923135836-9e7732899d34/go.mod h1:3YKcqFrlPgaB4FZ4EoLgdmRtwMQdO7RoAkZYFn+F1eY=
+go.mondoo.com/ranger-rpc v0.5.1 h1:OaVQntDJWDRgbc9nXBP4wOCR9h9Bij8LgHHs86IguGk=
+go.mondoo.com/ranger-rpc v0.5.1/go.mod h1:3YKcqFrlPgaB4FZ4EoLgdmRtwMQdO7RoAkZYFn+F1eY=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
