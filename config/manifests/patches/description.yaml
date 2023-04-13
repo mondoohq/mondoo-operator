@@ -9,7 +9,7 @@
     - Continuous validation of Kubernetes nodes **without** priviledged access
     - Admission Controller 
 
-    It is backed by Mondoo's powerful [Policy-as-Code](https://mondoo.com/docs/getstarted/policy-as-code) engine and [MQL](https://mondoo.com/docs/getstarted/policy-as-code#introducing-the-mondoo-query-language-mql). Mondoo ships out-of-the-box security polices for:
+    It is backed by Mondoo's powerful [Policy-as-Code](https://mondoo.com/docs/getstarted/policy-as-code) engine and [MQL](https://mondoo.com/docs/mql/resources/). Mondoo ships out-of-the-box security policies for:
 
     - CIS Kubernetes Benchmark
     - Kubernetes Application Benchmark
