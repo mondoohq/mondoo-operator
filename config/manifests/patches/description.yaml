@@ -7,15 +7,14 @@
 
     - Continuous validation of deployed workloads
     - Continuous validation of Kubernetes nodes **without** priviledged access
-    - Admission Controller (coming soon)
+    - Admission Controller 
 
     It is backed by Mondoo's powerful [Policy-as-Code](https://mondoo.com/docs/getstarted/policy-as-code) engine and [MQL](https://mondoo.com/docs/getstarted/policy-as-code#introducing-the-mondoo-query-language-mql). Mondoo ships out-of-the-box security polices for:
 
     - CIS Kubernetes Benchmark
     - Kubernetes Application Benchmark
 
-    Further information is available at [service-account-doc](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual-olm.md).
-    ```
+    Further information is available at [User manual](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual.md).
 
     1. Install the operator
 
@@ -40,10 +39,8 @@
     spec:
       kubernetesResources:
         enable: true
-        serviceAccountName: mondoo-operator-k8s-resources-scanning
       nodes:
         enable: true
-      mondooCredsSecretRef: mondoo-client
     ```
 
     Apply the configuration via:
