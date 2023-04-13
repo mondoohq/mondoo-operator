@@ -17,10 +17,13 @@ The Mondoo Operator provides the following features:
 - Continuous validation of Kubernetes nodes **without** privileged access
 - Admission Controller
 
-It is backed by Mondoo's powerful Policy-as-Code the Mondoo Query Language (MQL). Mondoo ships out-of-the-box security policies for Kubernetes:
+It is backed by Mondoo's powerful Policy-as-Code engine [cnspec](https://mondoo.com/docs/cnspec/cnspec-about/) and [MQL](https://mondoo.com/docs/mql/resources/). Mondoo ships out-of-the-box security policies for:
 
-- CIS Kubernetes Benchmark
-- Kubernetes Application Benchmark
+- CIS Kubernetes Benchmarks
+- CIS AKS/EKS/GKE/OpenShift Benchmarks 
+- NSA/CISA Kubernetes Hardening Guide
+- Kubernetes Cluster and Workload Security
+- Kubernetes Best Practices
 
 ![Architecture](docs/img/architecture.svg)
 

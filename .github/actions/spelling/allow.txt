@@ -1,4 +1,0 @@
-hashicorp
-redhat
-terraform
-Terraform
