@@ -32,6 +32,6 @@ for tag in ${TAGS}; do
     # against the sigstore community Fulcio instance.
 
     # Remove the tag from the image and append the digest instead.
-    cosign sign "${tag%:*}@$DIGEST"
+    cosign sign -y "${tag%:*}@$DIGEST"
     echo "Digest $DIGEST signed"
 done
