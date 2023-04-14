@@ -113,7 +113,7 @@ spec:
                       include:
                         description: Include is the list of resources to watch/scan.
                           Setting Include overrides anything in the Exclude list as
-                          specifying an Include list is effectively excluding everying
+                          specifying an Include list is effectively excluding everything
                           except for what is on the Include list.
                         items:
                           type: string
