@@ -40,7 +40,7 @@ const (
 	ignoreAnnotationValue = "ignore"
 )
 
-func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpenshift bool) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
@@ -95,7 +95,7 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 									Command:   cmd,
 									Resources: k8s.NodeScanningResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources),
 									SecurityContext: &corev1.SecurityContext{
-										AllowPrivilegeEscalation: pointer.Bool(false),
+										AllowPrivilegeEscalation: pointer.Bool(isOpenshift),
 										ReadOnlyRootFilesystem:   pointer.Bool(true),
 										RunAsNonRoot:             pointer.Bool(false),
 										RunAsUser:                pointer.Int64(0),
@@ -104,7 +104,9 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig) *batc
 												"ALL",
 											},
 										},
-										Privileged: pointer.Bool(false),
+										// RHCOS requires to run as privileged to properly do node scanning. If the container
+										// is not privileged, then we have no access to /proc.
+										Privileged: pointer.Bool(isOpenshift),
 									},
 									VolumeMounts: []corev1.VolumeMount{
 										{

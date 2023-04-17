@@ -30,6 +30,7 @@ type DeploymentHandler struct {
 	Mondoo                 *v1alpha2.MondooAuditConfig
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
+	IsOpenshift            bool
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
@@ -74,7 +75,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		}
 
 		existing := &batchv1.CronJob{}
-		desired := CronJob(mondooClientImage, node, *n.Mondoo)
+		desired := CronJob(mondooClientImage, node, *n.Mondoo, n.IsOpenshift)
 		if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 			logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 			return err
