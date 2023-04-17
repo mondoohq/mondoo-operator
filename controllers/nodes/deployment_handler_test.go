@@ -236,7 +236,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	s.NoError(err)
 
 	for _, n := range nodes.Items {
-		expected := CronJob(image, n, s.auditConfig)
+		expected := CronJob(image, n, s.auditConfig, false)
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 		// Set some fields that the kube client sets
@@ -266,7 +266,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	s.NoError(err)
 
 	// Make sure a cron job exists for one of the nodes
-	cronJob := CronJob(image, nodes.Items[1], s.auditConfig)
+	cronJob := CronJob(image, nodes.Items[1], s.auditConfig, false)
 	cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, cronJob))
 
@@ -275,7 +275,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	s.True(result.IsZero())
 
 	for i, n := range nodes.Items {
-		expected := CronJob(image, n, s.auditConfig)
+		expected := CronJob(image, n, s.auditConfig, false)
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 		// Set some fields that the kube client sets
@@ -324,7 +324,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 
 	s.Equal(1, len(cronJobs.Items))
 
-	expected := CronJob(image, nodes.Items[0], s.auditConfig)
+	expected := CronJob(image, nodes.Items[0], s.auditConfig, false)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets

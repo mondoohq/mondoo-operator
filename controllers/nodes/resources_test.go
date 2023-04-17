@@ -152,10 +152,38 @@ func TestResources(t *testing.T) {
 				},
 			}
 			mac := *test.mondooauditconfig()
-			cronJobSepc := CronJob("test123", *testNode, mac)
+			cronJobSepc := CronJob("test123", *testNode, mac, false)
 			assert.Equal(t, test.expectedResources, cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Resources)
 		})
 	}
+}
+
+func TestCronJob_PrivilegedOpenshift(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+
+	testNode := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node-name",
+		},
+	}
+	mac := testMondooAuditConfig()
+	cronJobSepc := CronJob("test123", *testNode, *mac, true)
+	assert.True(t, *cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.Privileged)
+	assert.True(t, *cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
+}
+
+func TestCronJob_Privileged(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+
+	testNode := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node-name",
+		},
+	}
+	mac := testMondooAuditConfig()
+	cronJobSepc := CronJob("test123", *testNode, *mac, false)
+	assert.False(t, *cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.Privileged)
+	assert.False(t, *cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
 }
 
 func TestInventory(t *testing.T) {
