@@ -115,7 +115,7 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *mondoov1alpha2.MondooOperato
 
 func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	found, err := k8s.VerifyAPI(monitoringv1.SchemeGroupVersion.Group, monitoringv1.SchemeGroupVersion.Version, log)
+	found, err := k8s.VerifyAPI(monitoringv1.SchemeGroupVersion.Group, monitoringv1.SchemeGroupVersion.Version)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
