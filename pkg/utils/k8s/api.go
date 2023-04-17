@@ -9,7 +9,6 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 package k8s
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -26,16 +25,14 @@ const (
 
 // VerifyAPI will query the underlying k8s cluster for the existence
 // of the provided group/version.
-func VerifyAPI(group, version string, log logr.Logger) (bool, error) {
+func VerifyAPI(group, version string) (bool, error) {
 	cfg, err := config.GetConfig()
 	if err != nil {
-		log.Error(err, "unable to get k8s config")
 		return false, err
 	}
 
 	k8s, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		log.Error(err, "unable to create k8s client")
 		return false, err
 	}
 
@@ -52,8 +49,6 @@ func VerifyAPI(group, version string, log logr.Logger) (bool, error) {
 		}
 		return false, err
 	}
-
-	log.Info(fmt.Sprintf("%s/%s API verified", group, version))
 	return true, nil
 }
 
