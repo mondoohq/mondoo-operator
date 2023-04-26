@@ -236,7 +236,9 @@ func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.M
 							PlatformId: fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/%s", clusterUID, node.UID),
 						},
 					},
-					Labels:    map[string]string{},
+					Labels: map[string]string{
+						"k8s.mondoo.com/kind": "node",
+					},
 					ManagedBy: "mondoo-operator-" + clusterUID,
 				},
 			},
