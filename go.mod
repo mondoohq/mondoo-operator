@@ -12,7 +12,7 @@ require (
 	github.com/stretchr/testify v1.8.2
 	go.mondoo.com/cnquery v0.0.0-20230310083103-a4ce8039521e
 	go.mondoo.com/cnspec v0.0.0-20230310120719-f285d4252c94
-	go.mondoo.com/ranger-rpc v0.5.1-0.20220923135836-9e7732899d34
+	go.mondoo.com/ranger-rpc v0.5.1
 	k8s.io/api v0.26.2
 	k8s.io/apimachinery v0.26.2
 	k8s.io/client-go v0.26.2
