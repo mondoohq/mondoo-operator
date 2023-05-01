@@ -16,6 +16,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
@@ -24,16 +25,16 @@ import (
 	v1 "go.mondoo.com/cnquery/motor/inventory/v1"
 	"go.mondoo.com/cnquery/motor/providers"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
 const (
-	CronJobNameBase        = "-node-"
-	InventoryConfigMapBase = "-node-inventory-"
-
-	// Execute hourly
-	CronTab = "0 * * * *"
+	CronJobNameBase               = "-node-"
+	GarbageCollectCronJobNameBase = "-node-gc"
+	InventoryConfigMapBase        = "-node-inventory-"
 
 	ignoreQueryAnnotationPrefix = "policies.k8s.mondoo.com/"
 
@@ -188,6 +189,110 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 	}
 }
 
+func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+	ls := CronJobLabels(m)
+
+	cronTab := fmt.Sprintf("%d */2 * * *", time.Now().Add(1*time.Minute).Minute())
+	scanApiUrl := scanapi.ScanApiServiceUrl(m)
+	containerArgs := []string{
+		"garbage-collect",
+		"--scan-api-url", scanApiUrl,
+		"--token-file-path", "/etc/scanapi/token",
+
+		// The job runs hourly and we need to make sure that the previous one is killed before the new one is started so we don't stack them.
+		"--timeout", "55",
+		// Cleanup any resources more than 2 hours old
+		"--filter-older-than", "2h",
+		"--labels", "k8s.mondoo.com/kind=node",
+	}
+
+	if clusterUid != "" {
+		scannedAssetsManagedBy := "mondoo-operator-" + clusterUid
+		containerArgs = append(containerArgs, []string{"--filter-managed-by", scannedAssetsManagedBy}...)
+	}
+
+	return &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      GarbageCollectCronJobName(m.Name),
+			Namespace: m.Namespace,
+			Labels:    GarbageCollectCronJobLabels(m),
+		},
+		Spec: batchv1.CronJobSpec{
+			Schedule:          cronTab,
+			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			JobTemplate: batchv1.JobTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: ls,
+				},
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: ls,
+						},
+						Spec: corev1.PodSpec{
+							RestartPolicy: corev1.RestartPolicyOnFailure,
+							// The node scanning does not use the Kubernetes API at all, therefore the service account token
+							// should not be mounted at all.
+							AutomountServiceAccountToken: pointer.Bool(false),
+							Containers: []corev1.Container{
+								{
+									Image:           image,
+									ImagePullPolicy: corev1.PullIfNotPresent,
+									Name:            "gc",
+									Command:         []string{"/mondoo-operator"},
+									Args:            containerArgs,
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("30Mi"),
+										},
+										Requests: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("50m"),
+											corev1.ResourceMemory: resource.MustParse("20Mi"),
+										},
+									},
+									SecurityContext: &corev1.SecurityContext{
+										AllowPrivilegeEscalation: pointer.Bool(false),
+										ReadOnlyRootFilesystem:   pointer.Bool(true),
+										RunAsNonRoot:             pointer.Bool(true),
+										Capabilities: &corev1.Capabilities{
+											Drop: []corev1.Capability{
+												"ALL",
+											},
+										},
+										Privileged: pointer.Bool(false),
+									},
+									VolumeMounts: []corev1.VolumeMount{
+										{
+											Name:      "token",
+											MountPath: "/etc/scanapi",
+											ReadOnly:  true,
+										},
+									},
+									Env: feature_flags.AllFeatureFlagsAsEnv(),
+								},
+							},
+							Volumes: []corev1.Volume{
+								{
+									Name: "token",
+									VolumeSource: corev1.VolumeSource{
+										Secret: &corev1.SecretVolumeSource{
+											DefaultMode: pointer.Int32(0o444),
+											SecretName:  scanapi.TokenSecretName(m.Name),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			SuccessfulJobsHistoryLimit: pointer.Int32(1),
+			FailedJobsHistoryLimit:     pointer.Int32(1),
+		},
+	}
+}
+
 func ConfigMap(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (*corev1.ConfigMap, error) {
 	inv, err := Inventory(node, integrationMRN, clusterUID, m)
 	if err != nil {
@@ -209,6 +314,10 @@ func CronJobName(prefix, suffix string) string {
 	// manager Kubernetes services such as EKS or GKE the node names can be very long.
 	base := fmt.Sprintf("%s%s", prefix, CronJobNameBase)
 	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), suffix))
+}
+
+func GarbageCollectCronJobName(prefix string) string {
+	return fmt.Sprintf("%s%s", prefix, GarbageCollectCronJobNameBase)
 }
 
 func ConfigMapName(prefix, nodeName string) string {
@@ -263,6 +372,14 @@ func CronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 	return map[string]string{
 		"app":       "mondoo",
 		"scan":      "nodes",
+		"mondoo_cr": m.Name,
+	}
+}
+
+func GarbageCollectCronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {
+	return map[string]string{
+		"app":       "mondoo",
+		"gc":        "nodes",
 		"mondoo_cr": m.Name,
 	}
 }

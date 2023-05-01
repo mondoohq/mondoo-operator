@@ -95,7 +95,7 @@ func init() {
 				platformRuntime = providers.RUNTIME_DOCKER_IMAGE
 			}
 
-			err = garbage_collect.GarbageCollectCmd(ctx, client, platformRuntime, *cleanupOlderThan, *setManagedBy, logger)
+			err = garbage_collect.GarbageCollectCmd(ctx, client, platformRuntime, *cleanupOlderThan, *setManagedBy, make(map[string]string), logger)
 			if err != nil {
 				logger.Error(err, "error while garbage collecting assets; will attempt on next scan")
 			}

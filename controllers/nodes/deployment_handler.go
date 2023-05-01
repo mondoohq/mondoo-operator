@@ -13,6 +13,7 @@ import (
 	"reflect"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	batchv1 "k8s.io/api/batch/v1"
@@ -52,6 +53,19 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
+	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(
+		"", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	if err != nil {
+		logger.Error(err, "Failed to resolve mondoo-operator container image")
+		return err
+	}
+
+	clusterUid, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
+	if err != nil {
+		logger.Error(err, "Failed to get cluster's UID")
+		return err
+	}
+
 	nodes := &corev1.NodeList{}
 	if err := n.KubeClient.List(ctx, nodes); err != nil {
 		logger.Error(err, "Failed to list cluster nodes")
@@ -60,7 +74,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 
 	// Create/update CronJobs for nodes
 	for _, node := range nodes.Items {
-		updated, err := n.syncConfigMap(ctx, node)
+		updated, err := n.syncConfigMap(ctx, node, clusterUid)
 		if err != nil {
 			return err
 		}
@@ -76,6 +90,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 
 		existing := &batchv1.CronJob{}
 		desired := CronJob(mondooClientImage, node, *n.Mondoo, n.IsOpenshift)
+
 		if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 			logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 			return err
@@ -103,6 +118,12 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		}
 	}
 
+	if feature_flags.GetEnableNodeGC() {
+		if err := n.syncGCCronjob(ctx, mondooOperatorImage, clusterUid); err != nil {
+			return err
+		}
+	}
+
 	// Delete dangling CronJobs for nodes that have been deleted from the cluster.
 	if err := n.cleanupCronJobsForDeletedNodes(ctx, *nodes); err != nil {
 		return err
@@ -121,13 +142,8 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 // syncConfigMap syncs the inventory ConfigMap. Returns a boolean indicating whether the ConfigMap has been updated. It
 // can only be "true", if the ConfigMap existed before this reconcile cycle and the inventory was different from the
 // desired state.
-func (n *DeploymentHandler) syncConfigMap(ctx context.Context, node corev1.Node) (bool, error) {
+func (n *DeploymentHandler) syncConfigMap(ctx context.Context, node corev1.Node, clusterUid string) (bool, error) {
 	existing := &corev1.ConfigMap{}
-
-	clusterUID, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
-	if err != nil {
-		return false, err
-	}
 
 	integrationMrn, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
 	if err != nil {
@@ -135,7 +151,7 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, node corev1.Node)
 		return false, err
 	}
 
-	desired, err := ConfigMap(node, integrationMrn, clusterUID, *n.Mondoo)
+	desired, err := ConfigMap(node, integrationMrn, clusterUid, *n.Mondoo)
 	if err != nil {
 		logger.Error(err, "failed to generate desired ConfigMap with inventory")
 		return false, err
@@ -212,6 +228,38 @@ func (n *DeploymentHandler) cleanupCronJobsForDeletedNodes(ctx context.Context, 
 	return nil
 }
 
+func (n *DeploymentHandler) syncGCCronjob(ctx context.Context, mondooOperatorImage, clusterUid string) error {
+	existing := &batchv1.CronJob{}
+	desired := GarbageCollectCronJob(mondooOperatorImage, clusterUid, *n.Mondoo)
+
+	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
+		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
+		return err
+	}
+
+	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
+	if err != nil {
+		logger.Error(err, "Failed to create garbage collect CronJob", "namespace", desired.Namespace, "name", desired.Name)
+		return err
+	}
+
+	if created {
+		logger.Info("Created garbage collect CronJob", "namespace", desired.Namespace, "name", desired.Name)
+		return nil
+	}
+
+	if !k8s.AreCronJobsEqual(*existing, *desired) {
+		existing.Spec.JobTemplate = desired.Spec.JobTemplate
+		existing.SetOwnerReferences(desired.GetOwnerReferences())
+
+		if err := n.KubeClient.Update(ctx, existing); err != nil {
+			logger.Error(err, "Failed to update garbage collect CronJob", "namespace", existing.Namespace, "name", existing.Name)
+			return err
+		}
+	}
+	return nil
+}
+
 func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]batchv1.CronJob, error) {
 	cronJobs := &batchv1.CronJobList{}
 	cronJobLabels := CronJobLabels(*n.Mondoo)
@@ -248,6 +296,14 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 			logger.Error(err, "Failed to clean up inventory ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
 			return err
 		}
+	}
+
+	gcCronJob := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
+	}
+	if err := k8s.DeleteIfExists(ctx, n.KubeClient, gcCronJob); err != nil {
+		logger.Error(err, "Failed to clean up node garbage collect CronJob", "namespace", gcCronJob.Namespace, "name", gcCronJob.Name)
+		return err
 	}
 
 	// Update any remnant conditions

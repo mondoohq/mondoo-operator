@@ -65,6 +65,13 @@ func TestCronJobName(t *testing.T) {
 	}
 }
 
+func TestGarbageCollectCronJobName(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	prefix := "mondoo-client"
+
+	assert.Equal(t, fmt.Sprintf("%s%s", prefix, GarbageCollectCronJobNameBase), GarbageCollectCronJobName(prefix))
+}
+
 func TestConfigMapName(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	prefix := "mondoo-client"

@@ -11,6 +11,7 @@ const FeatureFlagPrefix = "FEATURE_"
 
 var (
 	enableGarbageCollection        bool
+	enableNodeGC                   bool
 	enableAdmissionReviewDiscovery bool
 	allFeatureFlags                = make(map[string]string)
 )
@@ -43,6 +44,10 @@ func GetEnableGarbageCollection() bool {
 	return enableGarbageCollection
 }
 
+func GetEnableNodeGC() bool {
+	return enableNodeGC
+}
+
 func GetAdmissionReviewDiscovery() bool {
 	return enableAdmissionReviewDiscovery
 }
@@ -54,6 +59,8 @@ func setGlobalFlags(k, v string) {
 	switch k {
 	case "FEATURE_ENABLE_GARBAGE_COLLECTION":
 		enableGarbageCollection = true
+	case "FEATURE_ENABLE_NODE_GC":
+		enableNodeGC = true
 	case "FEATURE_ENABLE_ADMISSION_REVIEW_DISCOVERY":
 		enableAdmissionReviewDiscovery = true
 	}

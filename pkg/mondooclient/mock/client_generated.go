@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	garbagecollection "go.mondoo.com/mondoo-operator/pkg/garbagecollection"
+	scan "go.mondoo.com/cnspec/policy/scan"
 	mondooclient "go.mondoo.com/mondoo-operator/pkg/mondooclient"
 )
 
@@ -52,7 +52,7 @@ func (mr *MockClientMockRecorder) ExchangeRegistrationToken(arg0, arg1 interface
 }
 
 // GarbageCollectAssets mocks base method.
-func (m *MockClient) GarbageCollectAssets(arg0 context.Context, arg1 *garbagecollection.GarbageCollectOptions) error {
+func (m *MockClient) GarbageCollectAssets(arg0 context.Context, arg1 *scan.GarbageCollectOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GarbageCollectAssets", arg0, arg1)
 	ret0, _ := ret[0].(error)

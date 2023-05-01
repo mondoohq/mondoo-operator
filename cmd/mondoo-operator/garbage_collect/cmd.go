@@ -11,7 +11,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"go.mondoo.com/cnquery/motor/providers"
-	"go.mondoo.com/mondoo-operator/pkg/garbagecollection"
+	"go.mondoo.com/cnspec/policy/scan"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -30,7 +30,7 @@ func init() {
 	filterPlatformRuntime := Cmd.Flags().String("filter-platform-runtime", "", "Cleanup assets by an asset's PlatformRuntime.")
 	filterManagedBy := Cmd.Flags().String("filter-managed-by", "", "Cleanup assets with matching ManagedBy field")
 	filterOlderThan := Cmd.Flags().String("filter-older-than", "", "Cleanup assets which have not been updated in over the time provided (eg 12m or 48h or anything time.ParseDuration() accepts)")
-
+	labelsInput := Cmd.Flags().StringSlice("labels", []string{}, "Cleanup assets with matching labels (eg --labels key1=value1,key2=value2)")
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(logger.NewLogger())
 		logger := log.Log.WithName("garbage-collect")
@@ -46,6 +46,15 @@ func init() {
 		}
 		if *timeout <= 0 {
 			return fmt.Errorf("--timeout must be greater than 0")
+		}
+
+		labels := make(map[string]string)
+		for _, l := range *labelsInput {
+			split := strings.Split(l, "=")
+			if len(split) != 2 {
+				return fmt.Errorf("invalid label provided %s. Labels should be in the form of key=value", l)
+			}
+			labels[split[0]] = split[1]
 		}
 
 		token := *tokenInput
@@ -71,13 +80,14 @@ func init() {
 			return fmt.Errorf("no filters provided to garbage collect by")
 		}
 
-		return GarbageCollectCmd(ctx, client, *filterPlatformRuntime, *filterOlderThan, *filterManagedBy, logger)
+		return GarbageCollectCmd(ctx, client, *filterPlatformRuntime, *filterOlderThan, *filterManagedBy, labels, logger)
 	}
 }
 
-func GarbageCollectCmd(ctx context.Context, client mondooclient.Client, platformRuntime, olderThan, managedBy string, logger logr.Logger) error {
-	gcOpts := &garbagecollection.GarbageCollectOptions{
+func GarbageCollectCmd(ctx context.Context, client mondooclient.Client, platformRuntime, olderThan, managedBy string, labels map[string]string, logger logr.Logger) error {
+	gcOpts := &scan.GarbageCollectOptions{
 		ManagedBy: managedBy,
+		Labels:    labels,
 	}
 
 	if olderThan != "" {
