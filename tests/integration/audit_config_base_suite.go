@@ -160,6 +160,11 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
 	s.auditConfig = auditConfig
+
+	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
+
 	zap.S().Info("Create an audit config that enables only nodes scanning.")
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
