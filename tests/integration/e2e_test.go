@@ -136,6 +136,11 @@ func (s *E2eTestSuite) TestE2e_NodeScan() {
 
 func (s *E2eTestSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
 	s.auditConfig = auditConfig
+
+	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
+
 	zap.S().Info("Create an audit config that enables only nodes scanning.")
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
@@ -188,6 +193,30 @@ func (s *E2eTestSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAud
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+}
+
+// disableContainerImageResolution Creates a MondooOperatorConfig that disables container image resolution. This is needed
+// in order to be able to execute the integration tests with local images. A function is returned that will cleanup the
+// operator config that was created. It is advised to call it with defer such that the operator config is always deleted
+// regardless of the test outcome.
+func (s *E2eTestSuite) disableContainerImageResolution() func() {
+	operatorConfig := &mondoov2.MondooOperatorConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: mondoov2.MondooOperatorConfigName,
+		},
+		Spec: mondoov2.MondooOperatorConfigSpec{
+			SkipContainerResolution: true,
+		},
+	}
+	s.Require().NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, operatorConfig), "Failed to create MondooOperatorConfig")
+
+	return func() {
+		// Bring back the default image resolution behavior
+		s.NoErrorf(
+			s.testCluster.K8sHelper.Clientset.Delete(s.ctx, operatorConfig),
+			"Failed to restore container resolution in MondooOperatorConfig")
+	}
 }
 
 func TestE2eTestSuite(t *testing.T) {

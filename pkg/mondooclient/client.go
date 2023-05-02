@@ -22,8 +22,8 @@ import (
 	"go.mondoo.com/cnquery/motor/asset"
 	v1 "go.mondoo.com/cnquery/motor/inventory/v1"
 	"go.mondoo.com/cnquery/motor/providers"
+	"go.mondoo.com/cnspec/policy/scan"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
-	"go.mondoo.com/mondoo-operator/pkg/garbagecollection"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -44,7 +44,7 @@ type Client interface {
 	RunAdmissionReview(context.Context, *AdmissionReviewJob) (*ScanResult, error)
 	ScanKubernetesResources(ctx context.Context, scanOpts *ScanKubernetesResourcesOpts) (*ScanResult, error)
 	ScheduleKubernetesResourceScan(ctx context.Context, integrationMrn, resourceKey, managedBy string) (*Empty, error)
-	GarbageCollectAssets(context.Context, *garbagecollection.GarbageCollectOptions) error
+	GarbageCollectAssets(context.Context, *scan.GarbageCollectOptions) error
 
 	IntegrationRegister(context.Context, *IntegrationRegisterInput) (*IntegrationRegisterOutput, error)
 	IntegrationCheckIn(context.Context, *IntegrationCheckInInput) (*IntegrationCheckInOutput, error)
@@ -544,7 +544,7 @@ func setIntegrationMrn(integrationMrn string, scanJob *ScanJob) {
 
 const GarbageCollectAssetsEndpoint = "/Scan/GarbageCollectAssets"
 
-func (s *mondooClient) GarbageCollectAssets(ctx context.Context, in *garbagecollection.GarbageCollectOptions) error {
+func (s *mondooClient) GarbageCollectAssets(ctx context.Context, in *scan.GarbageCollectOptions) error {
 	url := s.ApiEndpoint + GarbageCollectAssetsEndpoint
 
 	reqBodyBytes, err := json.Marshal(in)

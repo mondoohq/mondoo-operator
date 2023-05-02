@@ -73,10 +73,10 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 
 func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	// TODO: think about overriding these images
-	mondooClientImage, err := n.ContainerImageResolver.MondooOperatorImage(
+	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(
 		"", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
-		logger.Error(err, "Failed to resolve mondoo-client container image")
+		logger.Error(err, "Failed to resolve mondoo-operator container image")
 		return err
 	}
 
@@ -94,7 +94,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	existing := &batchv1.CronJob{}
-	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, *n.Mondoo)
+	desired := CronJob(mondooOperatorImage, integrationMrn, clusterUid, *n.Mondoo)
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 		return err

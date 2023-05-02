@@ -160,7 +160,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 docker-build: TARGET_OS=linux
 docker-build: build ## Build docker image with the manager.
-	docker build --platform=$(TARGET_ARCH) -t ${IMG} .
+	docker build --platform=linux/$(TARGET_ARCH) -t ${IMG} .
 
 load-minikube: docker-build ## Build docker image with the manager and load it into minikube.
 	minikube image load ${IMG}
