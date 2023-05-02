@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.mondoo.com/cnquery/motor/providers"
 	"go.mondoo.com/mondoo-operator/cmd/mondoo-operator/garbage_collect"
-	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -89,7 +88,7 @@ func init() {
 		}
 
 		// If scanning successful, now attempt some cleanup of older assets
-		if feature_flags.GetEnableGarbageCollection() && *setManagedBy != "" && *cleanupOlderThan != "" {
+		if *setManagedBy != "" && *cleanupOlderThan != "" {
 			platformRuntime := providers.RUNTIME_KUBERNETES_CLUSTER
 			if *scanContainerImages {
 				platformRuntime = providers.RUNTIME_DOCKER_IMAGE
