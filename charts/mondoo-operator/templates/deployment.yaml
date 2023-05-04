@@ -48,8 +48,6 @@ spec:
         command:
         - /mondoo-operator
         env:
-        - name: FEATURE_ENABLE_GARBAGE_COLLECTION
-          value: "true"
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ .Values.kubernetesClusterDomain }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag

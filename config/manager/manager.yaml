@@ -40,9 +40,6 @@ spec:
         args:
         - operator
         - --leader-elect
-        env:
-        - name: FEATURE_ENABLE_GARBAGE_COLLECTION
-          value: "true"
         image: controller:latest
         imagePullPolicy: IfNotPresent
         name: manager
