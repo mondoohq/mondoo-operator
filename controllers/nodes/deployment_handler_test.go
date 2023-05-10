@@ -25,6 +25,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -252,6 +253,26 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 
 		s.Equal(expected, created)
 	}
+
+	operatorImage, err := s.containerImageResolver.MondooOperatorImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	// Verify node garbage collection cronjob
+	expected := GarbageCollectCronJob(operatorImage, "abcdefg", s.auditConfig)
+	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+
+	// Set some fields that the kube client sets
+	gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
+	s.NoError(err)
+	expected.SetGroupVersionKind(gvk)
+	expected.ResourceVersion = "1"
+
+	created := &batchv1.CronJob{}
+	created.Name = expected.Name
+	created.Namespace = expected.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+	s.Equal(expected, created)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
@@ -319,8 +340,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
+	listOpts := &client.ListOptions{
+		Namespace:     s.auditConfig.Namespace,
+		LabelSelector: labels.SelectorFromSet(CronJobLabels(s.auditConfig)),
+	}
 	cronJobs := &batchv1.CronJobList{}
-	s.NoError(d.KubeClient.List(s.ctx, cronJobs))
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
 
 	s.Equal(1, len(cronJobs.Items))
 
@@ -357,8 +382,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningStatus() {
 	s.Equal("NodeScanningAvailable", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
 
+	listOpts := &client.ListOptions{
+		Namespace:     s.auditConfig.Namespace,
+		LabelSelector: labels.SelectorFromSet(CronJobLabels(s.auditConfig)),
+	}
 	cronJobs := &batchv1.CronJobList{}
-	s.NoError(d.KubeClient.List(s.ctx, cronJobs))
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
 
 	now := time.Now()
 	metaNow := metav1.NewTime(now)
