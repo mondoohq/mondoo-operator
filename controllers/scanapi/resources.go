@@ -53,6 +53,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 		"cnspec", "serve-api",
 		"--address", "0.0.0.0",
 		"--config", "/etc/opt/mondoo/config/mondoo.yml",
+		"--http-timeout", "1800",
 	}
 	healthcheckEndpoint := "/Scan/HealthCheck"
 
