@@ -13,7 +13,6 @@ import (
 	"reflect"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	batchv1 "k8s.io/api/batch/v1"
@@ -118,10 +117,8 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		}
 	}
 
-	if feature_flags.GetEnableNodeGC() {
-		if err := n.syncGCCronjob(ctx, mondooOperatorImage, clusterUid); err != nil {
-			return err
-		}
+	if err := n.syncGCCronjob(ctx, mondooOperatorImage, clusterUid); err != nil {
+		return err
 	}
 
 	// Delete dangling CronJobs for nodes that have been deleted from the cluster.

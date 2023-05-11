@@ -175,7 +175,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	cronJobs := &batchv1.CronJobList{}
 	cronJobLabels := nodes.CronJobLabels(auditConfig)
 
-	// Lits only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
+	// List only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
 	listOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(cronJobLabels)}
 
 	nodeList := &corev1.NodeList{}
@@ -214,6 +214,25 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 		err := s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-node-"+nodeIdentifier)
 		s.NoErrorf(err, "Couldn't find NodeScan Pod for node "+node.Name+" in Podlist of the MondooAuditConfig Status")
 	}
+
+	// Verify the garbage collect cron job
+	gcCronJobs := &batchv1.CronJobList{}
+	gcCronJobLabels := nodes.GarbageCollectCronJobLabels(auditConfig)
+
+	// List only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
+	gcListOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(gcCronJobLabels)}
+
+	// Verify the amount of CronJobs created is 1
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, gcCronJobs, gcListOpts))
+		if 1 == len(cronJobs.Items) {
+			return true, nil
+		}
+		return false, nil
+	})
+	s.NoErrorf(
+		err,
+		"The amount of garbage collect CronJobs is not 1 expected: 1; actual: %d", len(cronJobs.Items))
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")

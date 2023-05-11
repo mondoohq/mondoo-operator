@@ -10,7 +10,6 @@ import (
 const FeatureFlagPrefix = "FEATURE_"
 
 var (
-	enableNodeGC                   bool
 	enableAdmissionReviewDiscovery bool
 	allFeatureFlags                = make(map[string]string)
 )
@@ -39,10 +38,6 @@ func AllFeatureFlagsAsEnv() []corev1.EnvVar {
 	return env
 }
 
-func GetEnableNodeGC() bool {
-	return enableNodeGC
-}
-
 func GetAdmissionReviewDiscovery() bool {
 	return enableAdmissionReviewDiscovery
 }
@@ -52,8 +47,6 @@ func setGlobalFlags(k, v string) {
 		return
 	}
 	switch k {
-	case "FEATURE_ENABLE_NODE_GC":
-		enableNodeGC = true
 	case "FEATURE_ENABLE_ADMISSION_REVIEW_DISCOVERY":
 		enableAdmissionReviewDiscovery = true
 	}
