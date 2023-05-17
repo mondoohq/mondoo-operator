@@ -504,7 +504,7 @@ In some cases the node scanning may require more memory than what we have initia
 kubectl get pods -n mondoo-operator
 ```
 
-Look for pods in the form of <mondooauditconfig-name>-node-<nodename>-hash. For example, if your `MondooAuditConfig` is called `mondoo-client` and you have a node called `node01`, you should be able to find a pod `mondoo-client-node-node01-<hash>`. If the pods is crashing and restarting it is most probably running out of memory and getting killed. You can verify that by looking into the pod's status `kubectl get pods -n mondoo-operator mondoo-client-node-node01-<hash> -o yaml`.
+Look for pods in the form of <mondooauditconfig-name>-node-<node-name>-hash. For example, if your `MondooAuditConfig` is called `mondoo-client` and you have a node called `node01`, you should be able to find a pod `mondoo-client-node-node01-<hash>`. If the pods is crashing and restarting it is most probably running out of memory and getting killed. You can verify that by looking into the pod's status `kubectl get pods -n mondoo-operator mondoo-client-node-node01-<hash> -o yaml`.
 
 In case you need to increase the resource limits for node scanning you can alter your `MondooAuditConfig`:
 ```bash
@@ -531,9 +531,9 @@ The operator will run a full cluster scan and node scans hourly. In case you nee
     ```
     2. Create a new job from the existing cronjob. If we want to trigger a new cluster scan, the command will be:
     ```bash
-    kubectl create job -n mondoo-operator myjob --from=cronjob/mondoo-client-k8s-scan
+    kubectl create job -n mondoo-operator my-job --from=cronjob/mondoo-client-k8s-scan
     ```
-    3. The scan will be started immediately by a job called `myjob`
+    3. The scan will be started immediately by a job called `my-job`
 2. Turn scanning off and then on again
     1. Edit the `MondooAuditConfig`
     ```bash
@@ -547,7 +547,7 @@ The operator will run a full cluster scan and node scans hourly. In case you nee
       nodes:
         enable: false
     ```
-    3. Make sure the scan cronjobs are deleted before procceeding:
+    3. Make sure the scan cronjobs are deleted before proceeding:
     ```bash
     kubectl get cronjobs -n mondoo-operator
     ```
