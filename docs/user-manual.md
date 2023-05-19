@@ -551,7 +551,7 @@ The operator will run a full cluster scan and node scans hourly. In case you nee
     ```bash
     kubectl get cronjobs -n mondoo-operator
     ```
-    4. Edit the `MondooAuditConfig` again and turn re-enable scanning:
+    4. Edit the `MondooAuditConfig` again and re-enable scanning:
     ```yaml
     spec:
       kubernetesResources:
