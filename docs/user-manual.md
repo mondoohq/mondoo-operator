@@ -375,7 +375,7 @@ To do so, follow these steps:
 kubectl create namespace 2nd-namespace
 ```
 4. Create a Kubernetes Service Account in this namespace:
-```
+```yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -383,7 +383,7 @@ metadata:
   namespace: 2nd-namespace
 ```
 5. Bind this Service Account to a Cluster Role which was created during the installation of the operator:
-```
+```yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -510,6 +510,7 @@ If the pod is crashing and restarting, it's most probably running out of memory 
 
 ```bash
 kubectl get pods -n mondoo-operator mondoo-client-node-node01-<hash> -o yaml
+```
 
 If you need to increase the resource limits for node scanning, change your `MondooAuditConfig`:
 ```bash
@@ -529,42 +530,44 @@ spec:
 
 ### How can I trigger a new scan?
 The operator runs a full cluster scan and node scans hourly. If you need to manually trigger those scans there are two options:
+
 Option A: Create a job from the existing cron job
-    1. Locate the cron job you want to trigger:
-    ```bash
-    kubectl get cronjobs -n mondoo-operator
-    ```
-    2. Create a new job from the existing cron job. To trigger a new cluster scan, the command is:
-    ```bash
-    kubectl create job -n mondoo-operator my-job --from=cronjob/mondoo-client-k8s-scan
-    ```
-    3. A job called `my-job` starts the scan immediately.
+  1. Locate the cron job you want to trigger:
+  ```bash
+  kubectl get cronjobs -n mondoo-operator
+  ```
+  2. Create a new job from the existing cron job. To trigger a new cluster scan, the command is:
+  ```bash
+  kubectl create job -n mondoo-operator my-job --from=cronjob/mondoo-client-k8s-scan
+  ```
+  3. A job called `my-job` starts the scan immediately.
+
 Option B: Turn scanning off and then on again
-    1. Edit the `MondooAuditConfig`:
-    ```bash
-    kubectl edit -n mondoo-operator mondooauditconfig mondoo-client
-    ```
-    2. Disable scanning by changing `enable: true` to `enable: false`:
-    ```yaml
-    spec:
-      kubernetesResources:
-        enable: false
-      nodes:
-        enable: false
-    ```
-    3. Make sure the scan cron jobs are deleted before proceeding:
-    ```bash
-    kubectl get cronjobs -n mondoo-operator
-    ```
-    4. Edit the `MondooAuditConfig` again and re-enable scanning:
-    ```yaml
-    spec:
-      kubernetesResources:
-        enable: true
-      nodes:
-        enable: true
-    ```
-    5. The scan cron jobs will be re-created and their initial run will occur within the next minute.
+  1. Edit the `MondooAuditConfig`:
+  ```bash
+  kubectl edit -n mondoo-operator mondooauditconfig mondoo-client
+  ```
+  2. Disable scanning by changing `enable: true` to `enable: false`:
+  ```yaml
+  spec:
+    kubernetesResources:
+      enable: false
+    nodes:
+      enable: false
+  ```
+  3. Make sure the scan cron jobs are deleted before proceeding:
+  ```bash
+  kubectl get cronjobs -n mondoo-operator
+  ```
+  4. Edit the `MondooAuditConfig` again and re-enable scanning:
+  ```yaml
+  spec:
+    kubernetesResources:
+      enable: true
+    nodes:
+      enable: true
+  ```
+  5. The scan cron jobs will be re-created and their initial run will occur within the next minute.
 
 ### I had a `MondooAuditConfig` in my cluster with version `v1alpha1` and now I can no longer access it. What should I do?
 Mondoo recently upgraded our CRDs version to `v1alpha2`. You need to manually migrate to the new version. You can list the CRDs with the old version by running:
