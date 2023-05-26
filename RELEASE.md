@@ -3,6 +3,7 @@
 This document describes the release process for the operator
 
 ## Versioning
+
 Always consider what is the suitable version number to be released based on the [Operator upgrade manual](docs/operator-upgrades.md).
 
 ## Release script

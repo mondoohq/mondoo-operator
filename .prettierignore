@@ -1,0 +1,6 @@
+.github/**
+.vscode/**
+config/**
+tests/**
+charts/**
+controllers/**
