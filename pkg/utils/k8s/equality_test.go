@@ -48,7 +48,7 @@ func TestAreDeploymentsEqual(t *testing.T) {
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--api", "--config", "/etc/opt/mondoo/mondoo.yml"},
 						Args:      []string{"argA", "argB", "argC"},
-						Resources: DefaultMondooClientResources,
+						Resources: DefaultCnspecResources,
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{
@@ -390,7 +390,7 @@ func TestAreCronJobsEqual(t *testing.T) {
 										"--inventory-file", "/etc/opt/mondoo/inventory.yml",
 										"--exit-0-on-success",
 									},
-									Resources: DefaultMondooClientResources,
+									Resources: DefaultCnspecResources,
 									VolumeMounts: []corev1.VolumeMount{
 										{
 											Name:      "root",

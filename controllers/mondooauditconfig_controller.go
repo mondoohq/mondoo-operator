@@ -32,6 +32,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/admission"
+	"go.mondoo.com/mondoo-operator/controllers/container_image"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
@@ -240,6 +241,21 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	result, reconcileError = nodes.Reconcile(ctx)
 	if reconcileError != nil {
 		log.Error(reconcileError, "Failed to set up nodes scanning")
+	}
+	if reconcileError != nil || result.Requeue {
+		return result, reconcileError
+	}
+
+	containers := container_image.DeploymentHandler{
+		Mondoo:                 mondooAuditConfig,
+		KubeClient:             r.Client,
+		ContainerImageResolver: r.ContainerImageResolver,
+		MondooOperatorConfig:   config,
+	}
+
+	result, reconcileError = containers.Reconcile(ctx)
+	if reconcileError != nil {
+		log.Error(reconcileError, "Failed to set up container scanning")
 	}
 	if reconcileError != nil || result.Requeue {
 		return result, reconcileError

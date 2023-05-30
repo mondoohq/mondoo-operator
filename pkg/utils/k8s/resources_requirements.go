@@ -13,31 +13,33 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-// DefaultMondooClientResources for Mondoo Client container
-var DefaultMondooClientResources corev1.ResourceRequirements = corev1.ResourceRequirements{
+// DefaultCnspecResources for cnspec container
+var DefaultCnspecResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("400M"),
+		corev1.ResourceMemory: resource.MustParse("200M"),
+		corev1.ResourceCPU:    resource.MustParse("600m"),
+	},
+
+	Requests: corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("150M"),
+		corev1.ResourceCPU:    resource.MustParse("300m"),
+	},
+}
+
+// DefaultContainerScanningResources for cnspec container
+var DefaultContainerScanningResources corev1.ResourceRequirements = corev1.ResourceRequirements{
+	Limits: corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("300M"),
 		corev1.ResourceCPU:    resource.MustParse("1"),
 	},
 
 	Requests: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("180M"),
+		corev1.ResourceMemory: resource.MustParse("150M"),
 		corev1.ResourceCPU:    resource.MustParse("400m"),
 	},
 }
 
-// ResourcesRequirementsWithDefaults will return the resource requirements from the parameter if such
-// are specified. If not requirements are specified, default values will be returned.
-func ResourcesRequirementsWithDefaults(m corev1.ResourceRequirements) corev1.ResourceRequirements {
-	if m.Size() != 0 {
-		return m
-	}
-
-	// Default values for Mondoo resources requirements.
-	return DefaultMondooClientResources
-}
-
-// DefaultNodeScanningResources for Mondoo Client container when scanning nodes
+// DefaultNodeScanningResources for cnspec container when scanning nodes
 var DefaultNodeScanningResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
 		corev1.ResourceMemory: resource.MustParse("160M"),
@@ -50,13 +52,11 @@ var DefaultNodeScanningResources corev1.ResourceRequirements = corev1.ResourceRe
 	},
 }
 
-// NodeScanningResourcesRequirementsWithDefaults will return the resource requirements from the parameter if such
+// ResourcesRequirementsWithDefaults will return the resource requirements from the parameter if such
 // are specified. If not requirements are specified, default values will be returned.
-func NodeScanningResourcesRequirementsWithDefaults(m corev1.ResourceRequirements) corev1.ResourceRequirements {
+func ResourcesRequirementsWithDefaults(m corev1.ResourceRequirements, defaults corev1.ResourceRequirements) corev1.ResourceRequirements {
 	if m.Size() != 0 {
 		return m
 	}
-
-	// Default values for Mondoo resources requirements.
-	return DefaultNodeScanningResources
+	return defaults
 }

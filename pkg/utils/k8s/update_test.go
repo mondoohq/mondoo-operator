@@ -145,7 +145,7 @@ func TestUpdateDeployment(t *testing.T) {
 						Image:     "test-image:latest",
 						Name:      "mondoo-client",
 						Command:   []string{"mondoo", "serve", "--api", "--config", "/etc/opt/mondoo/mondoo.yml"},
-						Resources: DefaultMondooClientResources,
+						Resources: DefaultCnspecResources,
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{

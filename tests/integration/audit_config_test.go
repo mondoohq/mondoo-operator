@@ -21,8 +21,14 @@ func (s *AuditConfigSuite) TestReconcile_AllDisabled() {
 
 func (s *AuditConfigSuite) TestReconcile_KubernetesResources() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false, false)
-	auditConfig.Spec.KubernetesResources.ContainerImageScanning = true
 	s.testMondooAuditConfigKubernetesResources(auditConfig)
+}
+
+func (s *AuditConfigSuite) TestReconcile_Containers() {
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, false)
+	auditConfig.Spec.KubernetesResources.ContainerImageScanning = true
+	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{"mondoo-operator"}
+	s.testMondooAuditConfigContainers(auditConfig)
 }
 
 func (s *AuditConfigSuite) TestReconcile_Nodes() {

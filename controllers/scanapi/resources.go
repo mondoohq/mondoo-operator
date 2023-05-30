@@ -77,7 +77,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 						Image:     image,
 						Name:      name,
 						Command:   cmd,
-						Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources),
+						Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources, k8s.DefaultCnspecResources),
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{
