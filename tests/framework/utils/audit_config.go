@@ -30,7 +30,7 @@ func init() {
 // make sure a test passes (e.g. setting the correct secret name). Values which have defaults are not set.
 // This means that using this function in unit tests might result in strange behavior. For unit tests use
 // DefaultAuditConfig instead.
-func DefaultAuditConfigMinimal(ns string, workloads, nodes, admission, consoleIntegration bool) mondoov2.MondooAuditConfig {
+func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes, admission, consoleIntegration bool) mondoov2.MondooAuditConfig {
 	auditConfig := mondoov2.MondooAuditConfig{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "mondoo-client",
@@ -41,6 +41,7 @@ func DefaultAuditConfigMinimal(ns string, workloads, nodes, admission, consoleIn
 			MondooCredsSecretRef: corev1.LocalObjectReference{Name: MondooClientSecret},
 			MondooTokenSecretRef: corev1.LocalObjectReference{Name: MondooTokenSecret},
 			KubernetesResources:  mondoov2.KubernetesResources{Enable: workloads},
+			Containers:           mondoov2.Containers{Enable: containers},
 			Nodes:                mondoov2.Nodes{Enable: nodes},
 			Admission:            mondoov2.Admission{Enable: admission},
 		},
@@ -57,7 +58,7 @@ func DefaultAuditConfigMinimal(ns string, workloads, nodes, admission, consoleIn
 
 // DefaultAuditConfig returns a new Mondoo audit config with some default settings to
 // make sure a tests passes (e.g. setting the correct secret name).
-func DefaultAuditConfig(ns string, workloads, nodes, admission bool) mondoov2.MondooAuditConfig {
+func DefaultAuditConfig(ns string, workloads, containers, nodes, admission bool) mondoov2.MondooAuditConfig {
 	return mondoov2.MondooAuditConfig{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "mondoo-client",
@@ -66,6 +67,7 @@ func DefaultAuditConfig(ns string, workloads, nodes, admission bool) mondoov2.Mo
 		Spec: mondoov2.MondooAuditConfigSpec{
 			MondooCredsSecretRef: corev1.LocalObjectReference{Name: MondooClientSecret},
 			KubernetesResources:  mondoov2.KubernetesResources{Enable: workloads},
+			Containers:           mondoov2.Containers{Enable: containers},
 			Nodes:                mondoov2.Nodes{Enable: nodes},
 			Admission:            mondoov2.Admission{Enable: admission},
 			Scanner: mondoov2.Scanner{

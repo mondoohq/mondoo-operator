@@ -33,9 +33,9 @@ const (
 var MondooOperatorTag = version.Version
 
 type ContainerImageResolver interface {
-	// MondooClientImage return the Mondoo client image. If skipResolveImage is false, then the image tag is replaced
+	// CnspecImage return the cnspec image. If skipResolveImage is false, then the image tag is replaced
 	// by a digest. If userImage or userTag are empty strings, default values are used.
-	MondooClientImage(userImage, userTag string, skipImageResolution bool) (string, error)
+	CnspecImage(userImage, userTag string, skipImageResolution bool) (string, error)
 
 	// MondooOperatorImage return the Mondoo operator image. If skipResolveImage is false, then the image tag is replaced
 	// by a digest. If userImage or userTag are empty strings, default values are used.
@@ -56,7 +56,7 @@ func NewContainerImageResolver(isOpenShift bool) ContainerImageResolver {
 	}
 }
 
-func (c *containerImageResolver) MondooClientImage(userImage, userTag string, skipImageResolution bool) (string, error) {
+func (c *containerImageResolver) CnspecImage(userImage, userTag string, skipImageResolution bool) (string, error) {
 	defaultTag := CnspecTag
 
 	if c.resolveForOpenShift {

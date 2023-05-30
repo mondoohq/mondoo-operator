@@ -109,7 +109,7 @@ func (s *E2eTestSuite) AfterTest(suiteName, testName string) {
 }
 
 func (s *E2eTestSuite) TestE2e_NodeScan() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, true, false, true)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true, false, true)
 
 	s.testMondooAuditConfigNodes(auditConfig)
 

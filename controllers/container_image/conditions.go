@@ -19,7 +19,7 @@ func updateImageScanningConditions(config *v1alpha2.MondooAuditConfig, degradedS
 	reason := "KubernetesContainerImageScanningAvailable"
 	status := corev1.ConditionFalse
 	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
-	if !config.Spec.KubernetesResources.ContainerImageScanning {
+	if !config.Spec.KubernetesResources.ContainerImageScanning && !config.Spec.Containers.Enable {
 		msg = "Kubernetes Container Image Scanning is disabled"
 		reason = "KubernetesContainerImageScanningDisabled"
 		status = corev1.ConditionFalse

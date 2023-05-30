@@ -20,7 +20,7 @@ func NewNoOpContainerImageResolver() mondoo.ContainerImageResolver {
 	return &noOpContainerImageResolver{}
 }
 
-func (c *noOpContainerImageResolver) MondooClientImage(userImage, userTag string, skipResolveImage bool) (string, error) {
+func (c *noOpContainerImageResolver) CnspecImage(userImage, userTag string, skipResolveImage bool) (string, error) {
 	return fmt.Sprintf("%s:%s", mondoo.CnspecImage, mondoo.CnspecTag), nil
 }
 

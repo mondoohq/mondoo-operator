@@ -76,7 +76,7 @@ func ReportStatusRequestFromAuditConfig(
 
 	// Container image scanning status
 	messages[1].Identifier = ContainerImageScanningIdentifier
-	if m.Spec.KubernetesResources.ContainerImageScanning {
+	if m.Spec.KubernetesResources.ContainerImageScanning || m.Spec.Containers.Enable {
 		k8sResourcesScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.K8sContainerImageScanningDegraded)
 		if k8sResourcesScanning != nil {
 			if k8sResourcesScanning.Status == v1.ConditionTrue {
