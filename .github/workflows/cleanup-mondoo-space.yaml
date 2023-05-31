@@ -1,7 +1,5 @@
 name: "Cleanup Mondoo space"
 on:
-  schedule:
-  - cron: "11 3 * * *" # 3:11am UTC
   workflow_dispatch:
     secrets:
       MONDOO_CLIENT_EDITOR:
