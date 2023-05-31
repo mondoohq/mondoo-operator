@@ -33,6 +33,17 @@ type DeploymentHandler struct {
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
+	// TODO: remove in next version
+	// Delete the old container scanning cronjob if it exists
+	if err := k8s.DeleteIfExists(ctx,
+		n.KubeClient,
+		&batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{
+			Name:      OldCronJobName(n.Mondoo.Name),
+			Namespace: n.Mondoo.Namespace,
+		}}); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// TODO: KubernetesResources.ContainerImageScanning is a deprecated setting
 	if !n.Mondoo.Spec.KubernetesResources.ContainerImageScanning && !n.Mondoo.Spec.Containers.Enable {
 		return ctrl.Result{}, n.down(ctx)

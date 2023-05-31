@@ -28,7 +28,10 @@ import (
 )
 
 const (
-	CronJobNameSuffix      = "-k8s-images-scan"
+	// TODO: remove in next version
+	OldCronJobNameSuffix = "-k8s-images-scan"
+
+	CronJobNameSuffix      = "-containers-scan"
 	InventoryConfigMapBase = "-containers-inventory"
 )
 
@@ -54,7 +57,9 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: ls},
 						Spec: corev1.PodSpec{
-							RestartPolicy: corev1.RestartPolicyOnFailure,
+							// The scan can fail when an asset has an error. However, re-scanning won't result in the error
+							// being fixed. Therefore, we don't want to restart the job.
+							RestartPolicy: corev1.RestartPolicyNever,
 							Containers: []corev1.Container{
 								{
 									Image:           image,
@@ -184,10 +189,15 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 
 func CronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 	return map[string]string{
-		"app":       "mondoo-k8s-images-scan",
+		"app":       "mondoo-container-scan",
 		"scan":      "k8s",
 		"mondoo_cr": m.Name,
 	}
+}
+
+// TODO: remove in next version
+func OldCronJobName(prefix string) string {
+	return fmt.Sprintf("%s%s", prefix, OldCronJobNameSuffix)
 }
 
 func CronJobName(prefix string) string {
