@@ -96,12 +96,12 @@ func (n *DeploymentHandler) syncSecret(ctx context.Context) error {
 }
 
 func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
-	mondooClientImage, err := n.ContainerImageResolver.MondooClientImage(n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	cnspecImage, err := n.ContainerImageResolver.CnspecImage(n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		return err
 	}
-	logger.V(7).Info("Mondoo client image: ", "image", mondooClientImage)
-	logger.V(7).Info("Mondoo skip resolve: ", "SkipContainerResolution", n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	logger.V(7).Info("Cnspec client image: ", "image", cnspecImage)
+	logger.V(7).Info("Cnspec skip resolve: ", "SkipContainerResolution", n.MondooOperatorConfig.Spec.SkipContainerResolution)
 
 	// check whether we have private registry pull secrets
 	privateRegistriesSecretName := "mondoo-private-registries-secrets"
@@ -126,7 +126,7 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		privateRegistriesSecretName = ""
 	}
 
-	deployment := ScanApiDeployment(n.Mondoo.Namespace, mondooClientImage, *n.Mondoo, privateRegistriesSecretName, n.DeployOnOpenShift)
+	deployment := ScanApiDeployment(n.Mondoo.Namespace, cnspecImage, *n.Mondoo, privateRegistriesSecretName, n.DeployOnOpenShift)
 	if err := ctrl.SetControllerReference(n.Mondoo, deployment, n.KubeClient.Scheme()); err != nil {
 		return err
 	}

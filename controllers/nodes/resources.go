@@ -94,7 +94,7 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 									Image:     image,
 									Name:      name,
 									Command:   cmd,
-									Resources: k8s.NodeScanningResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources),
+									Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources),
 									SecurityContext: &corev1.SecurityContext{
 										AllowPrivilegeEscalation: pointer.Bool(isOpenshift),
 										ReadOnlyRootFilesystem:   pointer.Bool(true),

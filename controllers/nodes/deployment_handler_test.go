@@ -54,7 +54,7 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 }
 
 func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
-	s.auditConfig = utils.DefaultAuditConfig(testNamespace, false, true, false)
+	s.auditConfig = utils.DefaultAuditConfig(testNamespace, false, false, true, false)
 	s.fakeClientBuilder = fake.NewClientBuilder()
 	s.seedKubeSystemNamespace()
 }
@@ -232,7 +232,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	nodes := &corev1.NodeList{}
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-	image, err := s.containerImageResolver.MondooClientImage(
+	image, err := s.containerImageResolver.CnspecImage(
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
@@ -282,7 +282,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	nodes := &corev1.NodeList{}
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-	image, err := s.containerImageResolver.MondooClientImage(
+	image, err := s.containerImageResolver.CnspecImage(
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
@@ -336,7 +336,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	image, err := s.containerImageResolver.MondooClientImage(
+	image, err := s.containerImageResolver.CnspecImage(
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 

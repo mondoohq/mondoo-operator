@@ -62,43 +62,43 @@ func (s *ContainerImageResolverSuite) TestNewContainerImageResolver() {
 	s.NoError(err)
 	expected := fmt.Sprintf("%s@%s", ref.Context().Name(), desc.Digest.String())
 
-	imageWithDigest, err := resolver.MondooClientImage(CnspecImage, CnspecTag, false)
+	imageWithDigest, err := resolver.CnspecImage(CnspecImage, CnspecTag, false)
 	s.NoError(err)
 	s.Equal(expected, imageWithDigest)
 }
 
-func (s *ContainerImageResolverSuite) TestMondooClientImage() {
+func (s *ContainerImageResolverSuite) TestCnspecImage() {
 	image := "ghcr.io/mondoo/testimage"
-	res, err := s.resolver.MondooClientImage(image, "testtag", false)
+	res, err := s.resolver.CnspecImage(image, "testtag", false)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s@sha256:%s", image, s.testHex), res)
 	s.Equalf(1, s.remoteCallsCount, "remote call has not been performed")
 }
 
-func (s *ContainerImageResolverSuite) TestMondooClientImage_Defaults() {
-	res, err := s.resolver.MondooClientImage("", "", true)
+func (s *ContainerImageResolverSuite) TestCnspecImage_Defaults() {
+	res, err := s.resolver.CnspecImage("", "", true)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s:%s", CnspecImage, CnspecTag), res)
 	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
 }
 
-func (s *ContainerImageResolverSuite) TestMondooClientImage_SkipImageResolution() {
+func (s *ContainerImageResolverSuite) TestCnspecImage_SkipImageResolution() {
 	image := "ghcr.io/mondoo/testimage"
 	tag := "testtag"
 
-	res, err := s.resolver.MondooClientImage(image, tag, true)
+	res, err := s.resolver.CnspecImage(image, tag, true)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s:%s", image, tag), res)
 	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
 }
 
-func (s *ContainerImageResolverSuite) TestMondooClientImage_OpenShift() {
+func (s *ContainerImageResolverSuite) TestCnspecImage_OpenShift() {
 	s.resolver.resolveForOpenShift = true
 
-	res, err := s.resolver.MondooClientImage("", "", true)
+	res, err := s.resolver.CnspecImage("", "", true)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s:%s", CnspecImage, OpenShiftMondooClientTag), res)

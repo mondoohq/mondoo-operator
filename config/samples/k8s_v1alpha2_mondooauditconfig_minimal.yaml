@@ -8,7 +8,8 @@ spec:
     name: mondoo-client
   kubernetesResources:
     enable: true
-    containerImageScanning: true
+  containers:
+    enable: true
   nodes:
     enable: false
   admission:

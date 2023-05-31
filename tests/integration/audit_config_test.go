@@ -15,34 +15,41 @@ type AuditConfigSuite struct {
 }
 
 func (s *AuditConfigSuite) TestReconcile_AllDisabled() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, false, false)
 	s.testMondooAuditConfigAllDisabled(auditConfig)
 }
 
 func (s *AuditConfigSuite) TestReconcile_KubernetesResources() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false, false)
-	auditConfig.Spec.KubernetesResources.ContainerImageScanning = true
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false, false, false)
 	s.testMondooAuditConfigKubernetesResources(auditConfig)
 }
 
+func (s *AuditConfigSuite) TestReconcile_Containers() {
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, true, false, false, false)
+
+	// The mondoo-operator namespace is using local images which cnspec won't be able to download
+	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{"mondoo-operator"}
+	s.testMondooAuditConfigContainers(auditConfig)
+}
+
 func (s *AuditConfigSuite) TestReconcile_Nodes() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, true, false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true, false, false)
 	s.testMondooAuditConfigNodes(auditConfig)
 }
 
 func (s *AuditConfigSuite) TestReconcile_AdmissionPermissive() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, true, false)
 	s.testMondooAuditConfigAdmission(auditConfig)
 }
 
 func (s *AuditConfigSuite) TestReconcile_AdmissionEnforcing() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, true, false)
 	auditConfig.Spec.Admission.Mode = v1alpha2.Enforcing
 	s.testMondooAuditConfigAdmission(auditConfig)
 }
 
 func (s *AuditConfigSuite) TestReconcile_AdmissionEnforcingScaleDownScanApi() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, true, false)
 	auditConfig.Spec.Admission.Mode = v1alpha2.Enforcing
 	auditConfig.Spec.Admission.Replicas = pointer.Int32(1)
 	auditConfig.Spec.Scanner.Replicas = pointer.Int32(1)

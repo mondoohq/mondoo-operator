@@ -25,8 +25,8 @@ import (
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	mondooadmission "go.mondoo.com/mondoo-operator/controllers/admission"
+	"go.mondoo.com/mondoo-operator/controllers/container_image"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
-	"go.mondoo.com/mondoo-operator/controllers/k8s_scan/container_image"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -133,12 +133,28 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	err = s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-k8s-scan")
 	s.NoErrorf(err, "Couldn't find k8s scan pod in Podlist of the MondooAuditConfig Status")
 
+	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
+	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+}
+
+func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondoov2.MondooAuditConfig) {
+	s.auditConfig = auditConfig
+
+	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
+
+	zap.S().Info("Create an audit config that enables only workloads scanning.")
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
+		"Failed to create Mondoo audit config.")
+
 	// K8s container image scan
 	zap.S().Info("Make sure the Mondoo k8s container image scan CronJob is created.")
-	cronJob = &batchv1.CronJob{
+	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{Name: container_image.CronJobName(auditConfig.Name), Namespace: auditConfig.Namespace},
 	}
-	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
 		if err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(cronJob), cronJob); err != nil {
 			return false, nil
 		}
@@ -146,12 +162,12 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	})
 	s.NoError(err, "Kubernetes container image scanning CronJob was not created.")
 
-	cronJobLabels = container_image.CronJobLabels(auditConfig)
+	cronJobLabels := container_image.CronJobLabels(auditConfig)
 	s.True(
 		s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(utils.LabelsToLabelSelector(cronJobLabels), auditConfig.Namespace),
 		"Kubernetes container image scan CronJob did not run successfully.")
 
-	err = s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-k8s-images-scan")
+	err = s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-containers-scan")
 	s.NoErrorf(err, "Couldn't find container image scan pod in Podlist of the MondooAuditConfig Status")
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)

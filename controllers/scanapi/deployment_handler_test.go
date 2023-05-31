@@ -49,7 +49,7 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 }
 
 func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
-	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", true, false, false)
+	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", true, false, false, false)
 	s.fakeClientBuilder = fake.NewClientBuilder()
 }
 
@@ -75,7 +75,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_CustomEnvVars() {
 	s.NoError(d.KubeClient.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
-	image, err := s.containerImageResolver.MondooClientImage(
+	image, err := s.containerImageResolver.CnspecImage(
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
@@ -115,7 +115,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_KubernetesResources() {
 	s.NoError(d.KubeClient.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
-	image, err := s.containerImageResolver.MondooClientImage(
+	image, err := s.containerImageResolver.CnspecImage(
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
@@ -158,7 +158,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() 
 	s.NoError(d.KubeClient.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
-	image, err := s.containerImageResolver.MondooClientImage(
+	image, err := s.containerImageResolver.CnspecImage(
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
@@ -190,7 +190,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretNot
 	s.NoError(d.KubeClient.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
-	image, err := s.containerImageResolver.MondooClientImage(
+	image, err := s.containerImageResolver.CnspecImage(
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
@@ -222,7 +222,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretWro
 	s.NoError(d.KubeClient.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
-	image, err := s.containerImageResolver.MondooClientImage(
+	image, err := s.containerImageResolver.CnspecImage(
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
@@ -233,7 +233,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretWro
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
-	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", false, false, true)
+	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", false, false, false, true)
 
 	d := s.createDeploymentHandler()
 	result, err := d.Reconcile(s.ctx)
@@ -255,7 +255,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
 	s.NoError(d.KubeClient.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
-	image, err := s.containerImageResolver.MondooClientImage(
+	image, err := s.containerImageResolver.CnspecImage(
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
@@ -276,10 +276,10 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
 
 func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
 	ns := "test-ns"
-	s.auditConfig = utils.DefaultAuditConfig(ns, false, false, true)
+	s.auditConfig = utils.DefaultAuditConfig(ns, false, false, false, true)
 	s.auditConfig.Spec.Scanner.ServiceAccountName = "missing-serviceaccount"
 
-	image, err := s.containerImageResolver.MondooClientImage(
+	image, err := s.containerImageResolver.CnspecImage(
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
@@ -317,7 +317,7 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Update() {
-	image, err := s.containerImageResolver.MondooClientImage(
+	image, err := s.containerImageResolver.CnspecImage(
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
@@ -357,9 +357,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 
 func (s *DeploymentHandlerSuite) TestReconcile_Cleanup_NoScanning() {
 	// Disable all scanning
-	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", false, false, false)
+	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", false, false, false, false)
 
-	image, err := s.containerImageResolver.MondooClientImage(
+	image, err := s.containerImageResolver.CnspecImage(
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
@@ -390,7 +390,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Cleanup_AuditConfigDeletion() {
 	now := metav1.Now()
 	s.auditConfig.SetDeletionTimestamp(&now)
 
-	image, err := s.containerImageResolver.MondooClientImage(
+	image, err := s.containerImageResolver.CnspecImage(
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 

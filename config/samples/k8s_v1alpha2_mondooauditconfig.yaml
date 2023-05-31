@@ -18,6 +18,8 @@ spec:
       limits:
   kubernetesResources:
     enable: true
+  containers:
+    enable: true
   nodes:
     enable: true
   admission:

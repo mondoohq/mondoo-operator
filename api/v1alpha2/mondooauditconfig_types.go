@@ -33,6 +33,7 @@ type MondooAuditConfigSpec struct {
 	Admission           Admission           `json:"admission,omitempty"`
 	ConsoleIntegration  ConsoleIntegration  `json:"consoleIntegration,omitempty"`
 	Filtering           Filtering           `json:"filtering,omitempty"`
+	Containers          Containers          `json:"containers,omitempty"`
 }
 
 type Filtering struct {
@@ -87,7 +88,7 @@ type Scanner struct {
 type KubernetesResources struct {
 	Enable bool `json:"enable,omitempty"`
 
-	// ContainerImageScanning determines whether container images are being scanned. The current implementation
+	// DEPRECATED: ContainerImageScanning determines whether container images are being scanned. The current implementation
 	// runs a separate job once every 24h that scans the container images running in the cluster.
 	ContainerImageScanning bool `json:"containerImageScanning,omitempty"`
 }
@@ -117,6 +118,11 @@ type Admission struct {
 	// during its operation.
 	// +kubebuilder:default=mondoo-operator-webhook
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+}
+
+type Containers struct {
+	Enable    bool                        `json:"enable,omitempty"`
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type Image struct {

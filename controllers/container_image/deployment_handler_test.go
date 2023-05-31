@@ -52,8 +52,7 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 }
 
 func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
-	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", true, false, false)
-	s.auditConfig.Spec.KubernetesResources.ContainerImageScanning = true
+	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", false, true, false, false)
 
 	s.fakeClientBuilder = fake.NewClientBuilder().WithObjects(test.TestKubeSystemNamespace())
 }
@@ -68,10 +67,53 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	nodes := &corev1.NodeList{}
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-	image, err := s.containerImageResolver.MondooOperatorImage("", "", false)
+	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig)
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", s.auditConfig)
+	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+
+	// Set some fields that the kube client sets
+	gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
+	s.NoError(err)
+	expected.SetGroupVersionKind(gvk)
+	expected.ResourceVersion = "1"
+
+	created := &batchv1.CronJob{}
+	created.Name = expected.Name
+	created.Namespace = expected.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+
+	s.Equal(expected, created)
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() {
+	d := s.createDeploymentHandler()
+
+	s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRef.Name = "my-pull-secrets"
+
+	privateRegistriesSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRef.Name,
+		},
+		StringData: map[string]string{
+			".dockerconfigjson": "{	\"auths\": { \"https://registry.example.com/v1/\": { \"auth\": \"c3R...zE2\" } } }",
+		},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, privateRegistriesSecret), "Error creating the private registries secret")
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
+
+	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	s.NoError(err)
+
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRef.Name, s.auditConfig)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -110,10 +152,10 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 	nodes := &corev1.NodeList{}
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-	image, err := s.containerImageResolver.MondooOperatorImage("", "", false)
+	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, integrationMrn, test.KubeSystemNamespaceUid, s.auditConfig)
+	expected := CronJob(image, integrationMrn, test.KubeSystemNamespaceUid, "", s.auditConfig)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -133,11 +175,11 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	d := s.createDeploymentHandler()
 
-	image, err := s.containerImageResolver.MondooOperatorImage("", "", false)
+	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
 	// Make sure a cron job exists with different container command
-	cronJob := CronJob(image, "", "", s.auditConfig)
+	cronJob := CronJob(image, "", "", "", s.auditConfig)
 	cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, cronJob))
 
@@ -145,7 +187,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig)
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", s.auditConfig)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -217,7 +259,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sContainerImageScanningStatus()
 	s.Equal("KubernetesContainerImageScanningAvailable", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
 
-	d.Mondoo.Spec.KubernetesResources.ContainerImageScanning = false
+	d.Mondoo.Spec.Containers.Enable = false
 
 	// Reconcile to update the audit config status
 	result, err = d.Reconcile(s.ctx)
@@ -231,25 +273,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sContainerImageScanningStatus()
 	s.Equal(corev1.ConditionFalse, condition.Status)
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_DisableKubernetesResources() {
-	d := s.createDeploymentHandler()
-
-	// Reconcile to create all resources
-	result, err := d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
-
-	// Reconcile again to delete the resources
-	d.Mondoo.Spec.KubernetesResources.Enable = false
-	result, err = d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
-
-	cronJobs := &batchv1.CronJobList{}
-	s.NoError(d.KubeClient.List(s.ctx, cronJobs))
-	s.Equal(0, len(cronJobs.Items))
-}
-
 func (s *DeploymentHandlerSuite) TestReconcile_DisableContainerImageScanning() {
 	d := s.createDeploymentHandler()
 
@@ -259,7 +282,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_DisableContainerImageScanning() {
 	s.True(result.IsZero())
 
 	// Reconcile again to delete the resources
-	d.Mondoo.Spec.KubernetesResources.ContainerImageScanning = false
+	d.Mondoo.Spec.Containers.Enable = false
 	result, err = d.Reconcile(s.ctx)
 	s.NoError(err)
 	s.True(result.IsZero())

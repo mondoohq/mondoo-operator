@@ -49,7 +49,7 @@ func (s *StatusReporterSuite) SetupSuite() {
 }
 
 func (s *StatusReporterSuite) BeforeTest(suiteName, testName string) {
-	s.auditConfig = utils.DefaultAuditConfig(testNamespace, false, false, false)
+	s.auditConfig = utils.DefaultAuditConfig(testNamespace, false, false, false, false)
 	s.auditConfig.Spec.ConsoleIntegration.Enable = true
 
 	key := credentials.MondooServiceAccount(s.T())

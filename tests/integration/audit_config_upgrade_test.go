@@ -24,7 +24,7 @@ func (s *AuditConfigUpgradeSuite) TearDownSuite() {
 }
 
 func (s *AuditConfigUpgradeSuite) TestUpgradePreviousReleaseToLatest() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, true, true, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, true, true, false)
 	s.testUpgradePreviousReleaseToLatest(auditConfig)
 }
 
