@@ -3,7 +3,7 @@ kind: CustomResourceDefinition
 metadata:
   name: mondoooperatorconfigs.k8s.mondoo.com
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.0
+    controller-gen.kubebuilder.io/version: v0.10.0
   labels:
   {{- include "mondoo-operator.labels" . | nindent 4 }}
 spec:
