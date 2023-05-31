@@ -167,7 +167,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 		s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(utils.LabelsToLabelSelector(cronJobLabels), auditConfig.Namespace),
 		"Kubernetes container image scan CronJob did not run successfully.")
 
-	err = s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-k8s-images-scan")
+	err = s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-containers-scan")
 	s.NoErrorf(err, "Couldn't find container image scan pod in Podlist of the MondooAuditConfig Status")
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
