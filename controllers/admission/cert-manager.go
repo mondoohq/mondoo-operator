@@ -19,8 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
-	certmanagerrefv1 "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	certmanagerrefv1 "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 )
 
 var certManagerLog = ctrl.Log.WithName("cert-manager")
