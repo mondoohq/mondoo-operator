@@ -9,7 +9,7 @@ require (
 	github.com/jetstack/cert-manager v1.7.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.64.1
 	github.com/spf13/cobra v1.7.0
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 	go.mondoo.com/cnquery v0.0.0-20230501155430-899d68601b24
 	go.mondoo.com/cnspec v0.0.0-20230501160344-e018b6fa4873
 	go.mondoo.com/ranger-rpc v0.5.1
