@@ -354,10 +354,15 @@ catalog-push: ## Push a catalog image.
 
 HELMIFY = $(LOCALBIN)/helmify
 helmify: $(LOCALBIN) ## Download helmify locally if necessary.
-	GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@v0.3.23
+	GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@v0.4.3
 
 helm: manifests kustomize helmify
 	$(KUSTOMIZE) build config/default | $(HELMIFY) $(CHART_NAME)
+	# The above command creates a helm chart, which has duplicate labels after templating
+	# We can remove the static doublicate labels here
+	sed -i -z 's#\(\n[[:blank:]]*selector:\)\n[[:blank:]]*app.kubernetes.io/name: mondoo-operator#\1#' charts/mondoo-operator/templates/metrics-service.yaml
+	sed -i -z 's#\([[:blank:]]*selector:\n[[:blank:]]*matchLabels:\)\n[[:blank:]]*app.kubernetes.io/name: mondoo-operator#\1#' charts/mondoo-operator/templates/deployment.yaml
+	sed -i -z 's#\([[:blank:]]*template:\n[[:blank:]]*metadata:\n[[:blank:]]*labels:\)\n[[:blank:]]*app.kubernetes.io/name: mondoo-operator#\1#' charts/mondoo-operator/templates/deployment.yaml
 
 # Install prettier gloablly via
 # yarn global add prettier --prefix /usr/local
