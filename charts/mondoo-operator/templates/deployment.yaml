@@ -29,30 +29,24 @@ spec:
   replicas: {{ .Values.controllerManager.replicas }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: mondoo-operator
     {{- include "mondoo-operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: mondoo-operator
       {{- include "mondoo-operator.selectorLabels" . | nindent 8 }}
       annotations:
         kubectl.kubernetes.io/default-container: manager
     spec:
       containers:
-      - args:
-        - operator
-        - --health-probe-bind-address=:8081
-        - --metrics-bind-address=:8080
-        - --leader-elect
+      - args: {{- toYaml .Values.controllerManager.manager.args | nindent 8 }}
         command:
         - /mondoo-operator
         env:
         - name: KUBERNETES_CLUSTER_DOMAIN
-          value: {{ .Values.kubernetesClusterDomain }}
+          value: {{ quote .Values.kubernetesClusterDomain }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: {{ .Values.controllerManager.manager.imagePullPolicy }}
         livenessProbe:
           httpGet:
             path: /healthz
@@ -72,13 +66,8 @@ spec:
           periodSeconds: 10
         resources: {{- toYaml .Values.controllerManager.manager.resources | nindent 10
           }}
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          privileged: false
-          readOnlyRootFilesystem: true
+        securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
+          | nindent 10 }}
       securityContext:
         runAsNonRoot: true
       serviceAccountName: {{ include "mondoo-operator.fullname" . }}-controller-manager
