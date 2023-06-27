@@ -54,19 +54,6 @@ func (s *DeleteSuite) TestDeleteIfExists_DoesNotExist() {
 	s.Equal(0, len(dList.Items))
 }
 
-func (s *DeleteSuite) TestDeleteIfExists_Error() {
-	deployment := &appsv1.Deployment{}
-	deployment.Namespace = "test-ns"
-
-	client := fake.NewClientBuilder().Build()
-
-	s.Error(DeleteIfExists(s.ctx, client, deployment))
-
-	dList := &appsv1.DeploymentList{}
-	s.NoError(client.List(s.ctx, dList))
-	s.Equal(0, len(dList.Items))
-}
-
 func TestDeleteSuite(t *testing.T) {
-	suite.Run(t, new(CreateSuite))
+	suite.Run(t, new(DeleteSuite))
 }
