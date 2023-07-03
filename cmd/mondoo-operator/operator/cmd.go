@@ -26,6 +26,7 @@ import (
 	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers"
 	"go.mondoo.com/mondoo-operator/controllers/integration"
+	"go.mondoo.com/mondoo-operator/controllers/metrics"
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor"
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
 	"go.mondoo.com/mondoo-operator/controllers/status"
@@ -132,6 +133,11 @@ func init() {
 
 		if err = integration.Add(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Integration")
+			return err
+		}
+
+		if err = metrics.Add(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Metrics")
 			return err
 		}
 
