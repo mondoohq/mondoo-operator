@@ -274,7 +274,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: [v1.23.14, v1.24.8, v1.25.4]
+        k8s-version: [v1.24.12, v1.25.8, v1.26.3, v1.27.1]
 
     steps:
       - uses: actions/checkout@v3
@@ -386,7 +386,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: [v1.23.14, v1.24.8, v1.25.4]
+        k8s-version: [v1.24.12, v1.25.8, v1.26.3, v1.27.1]
 
     steps:
       - name: Checkout
