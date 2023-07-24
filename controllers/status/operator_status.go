@@ -171,7 +171,7 @@ func ReportStatusRequestFromAuditConfig(
 			MondooAuditConfig:      MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
 			OperatorVersion:        version.Version,
 			K8sResourcesScanning:   m.Spec.KubernetesResources.Enable,
-			ContainerImageScanning: m.Spec.KubernetesResources.ContainerImageScanning,
+			ContainerImageScanning: m.Spec.Containers.Enable || m.Spec.KubernetesResources.ContainerImageScanning,
 			NodeScanning:           m.Spec.Nodes.Enable,
 			AdmissionController:    m.Spec.Admission.Enable,
 			FilteringConfig:        m.Spec.Filtering,
