@@ -405,10 +405,13 @@ prep/tools/ranger:
 
 prep/repos:
 	test -x cnquery || git clone https://github.com/mondoohq/cnquery.git
+# workaround for now. Needs to be removed as we move to v9
+	cd cnquery && git fetch && git checkout v8
 	test -x cnspec || git clone https://github.com/mondoohq/cnspec.git
 
 prep/repos/update: prep/repos
-	cd cnquery; git checkout main && git pull; cd -;
+# workaround for now. Needs to be removed as we move to v9
+	cd cnquery; git fetch; git checkout v8 && git pull; cd -;
 	cd cnspec; git checkout main && git pull; cd -;
 
 prep/ci/protoc:
