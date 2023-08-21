@@ -35,7 +35,7 @@ type DeploymentHandler struct {
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	// If neither KubernetesResources, nor Admission is enabled, the scan API is not needed.
-	if (!n.Mondoo.Spec.KubernetesResources.Enable && !n.Mondoo.Spec.Admission.Enable) ||
+	if (!n.Mondoo.Spec.KubernetesResources.Enable && !n.Mondoo.Spec.Admission.Enable && !n.Mondoo.Spec.Nodes.Enable) ||
 		!n.Mondoo.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, n.down(ctx)
 	}
