@@ -293,7 +293,7 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 	operator-sdk generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	cd config/webhook && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
+	$(KUSTOMIZE) build config/manifests | operator-sdk generate --channels "stable-v1" bundle $(BUNDLE_GEN_FLAGS)
 	sed -i -e 's|containerImage: .*|containerImage: $(IMG)|' bundle/manifests/*.clusterserviceversion.yaml
 	# TODO: find a portable way to in-place sed edit a file between Linux/MacOS
 	# MacOS sed requires a '-i""' to avoid making backup files when doing in-place edits, but that
