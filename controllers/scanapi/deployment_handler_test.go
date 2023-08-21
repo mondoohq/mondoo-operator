@@ -274,6 +274,48 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
 	s.Equal(*service, ss.Items[0])
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_Create_NodeScanning() {
+	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", false, false, true, false)
+
+	d := s.createDeploymentHandler()
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	tokenSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      TokenSecretName(s.auditConfig.Name),
+		},
+	}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret), "Error checking for token secret")
+	// This really should be checking tokenSecret.Data, but the fake kubeClient just takes and stores the objects given to it
+	// and our code populates the Secret through Secret.StringData["token"]
+	s.Contains(tokenSecret.StringData, "token")
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, ds))
+	s.Equal(1, len(ds.Items))
+
+	image, err := s.containerImageResolver.CnspecImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, "", false)
+	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
+	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
+	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
+
+	ss := &corev1.ServiceList{}
+	s.NoError(d.KubeClient.List(s.ctx, ss))
+	s.Equal(1, len(ss.Items))
+
+	service := ScanApiService(d.Mondoo.Namespace, s.auditConfig)
+	service.ResourceVersion = "1" // Needed because the fake client sets it.
+	s.NoError(ctrl.SetControllerReference(&s.auditConfig, service, s.scheme))
+	s.Equal(*service, ss.Items[0])
+}
+
 func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
 	ns := "test-ns"
 	s.auditConfig = utils.DefaultAuditConfig(ns, false, false, false, true)
