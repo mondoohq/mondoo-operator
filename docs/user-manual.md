@@ -46,6 +46,13 @@ Preconditions:
    helm install mondoo-operator mondoo/mondoo-operator --namespace mondoo-operator --create-namespace
    ```
 
+#### Customization
+
+In case you set the Chart name to a different name, this will break parts of the operator, unless you also set:
+```
+fullnameOverride=mondoo-operator
+```
+
 ### Installing with Operator Lifecycle Manager (OLM)
 
 Follow these steps to set up the Mondoo Operator using [Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/):

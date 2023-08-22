@@ -8,6 +8,14 @@ You can skip Mondoo Operator patch and minor versions.
 
 As of version 1.0, the Mondoo Operator can be upgraded from major version to major version as long as each major version is visited during the upgrade. For example, if you are on version 1.3.2 and wanted to upgrade to version 3.0.5, you should first upgrade to a 2.y.z release to ensure any migrations that need to take place from 1.x to 2.x are completed before upgrading to 3.x. Jumping from any 1.x to any 2.x is a safe operation.
 
+### Updating an operator deployed with Helm
+
+Two update your operator installed with Helm, you have two options:
+
+- Upgrade the Helm chart to the [latest release](https://github.com/mondoohq/mondoo-operator/releases/latest)
+- Update the [values](https://github.com/mondoohq/mondoo-operator/blob/main/charts/mondoo-operator/values.yaml#L17) for the Helm chart to the latest image tag which matched the latest Helm chart release.
+  You can also find it [here](https://github.com/mondoohq/mondoo-operator/pkgs/container/mondoo-operator/versions?filters%5Bversion_type%5D=tagged)
+
 ## Pre 1.0
 
 For pre-1.0 releases, we don't recommend skipping minor versions. For example, if you upgrade from `v0.2.0` directly to `v0.4.0`, the Mondoo Operator may not behave as expected, and you may leave behind unused resources in the cluster. Skipping a minor version may require manual actions to ensure the Mondoo Operator is fully functional.
