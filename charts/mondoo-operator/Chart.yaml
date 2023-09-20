@@ -1,3 +1,6 @@
+# Copyright (c) Mondoo, Inc.
+# SPDX-License-Identifier: BUSL-1.1
+
 apiVersion: v2
 name: mondoo-operator
 description: A Helm chart for installing mondoo-operator on Kubernetes

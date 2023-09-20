@@ -1,3 +1,6 @@
+# Copyright (c) Mondoo, Inc.
+# SPDX-License-Identifier: BUSL-1.1
+
 # This patch exposes the metrics port for direct scraping by Prometheus, and it
 # binds the metrics port to :8080 (instead of 127.0.0.1:8080).
 apiVersion: apps/v1
