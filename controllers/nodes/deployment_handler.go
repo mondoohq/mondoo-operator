@@ -227,7 +227,7 @@ func (n *DeploymentHandler) cleanupCronJobsForDeletedNodes(ctx context.Context, 
 
 func (n *DeploymentHandler) syncGCCronjob(ctx context.Context, mondooOperatorImage, clusterUid string) error {
 	existing := &batchv1.CronJob{}
-	desired := GarbageCollectCronJob(mondooOperatorImage, clusterUid, *n.Mondoo)
+	desired := GarbageCollectCronJob(mondooOperatorImage, clusterUid, *n.Mondoo, *n.MondooOperatorConfig)
 
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)

@@ -114,7 +114,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	existing := &batchv1.CronJob{}
-	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, privateRegistriesSecretName, *n.Mondoo)
+	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, privateRegistriesSecretName, *n.Mondoo, *n.MondooOperatorConfig)
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 		return err

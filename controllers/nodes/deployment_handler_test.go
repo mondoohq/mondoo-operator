@@ -259,7 +259,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	s.NoError(err)
 
 	// Verify node garbage collection cronjob
-	expected := GarbageCollectCronJob(operatorImage, "abcdefg", s.auditConfig)
+	expected := GarbageCollectCronJob(operatorImage, "abcdefg", s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets

@@ -119,8 +119,9 @@ func (s *IntegrationCheckInSuite) TestCheckIn() {
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()
 
 	r := &IntegrationReconciler{
-		Client:              fakeClient,
-		MondooClientBuilder: testMondooClientBuilder,
+		Client:               fakeClient,
+		MondooClientBuilder:  testMondooClientBuilder,
+		MondooOperatorConfig: &v1alpha2.MondooOperatorConfig{},
 	}
 
 	// Act
@@ -164,8 +165,9 @@ func (s *IntegrationCheckInSuite) TestClearPreviousCondition() {
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()
 
 	r := &IntegrationReconciler{
-		Client:              fakeClient,
-		MondooClientBuilder: testMondooClientBuilder,
+		Client:               fakeClient,
+		MondooClientBuilder:  testMondooClientBuilder,
+		MondooOperatorConfig: &v1alpha2.MondooOperatorConfig{},
 	}
 
 	// Act
@@ -278,8 +280,9 @@ func (s *IntegrationCheckInSuite) TestFailedCheckIn() {
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()
 
 	r := &IntegrationReconciler{
-		Client:              fakeClient,
-		MondooClientBuilder: testMondooClientBuilder,
+		Client:               fakeClient,
+		MondooClientBuilder:  testMondooClientBuilder,
+		MondooOperatorConfig: &v1alpha2.MondooOperatorConfig{},
 	}
 
 	// Act

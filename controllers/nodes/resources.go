@@ -189,7 +189,7 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 	}
 }
 
-func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
 	cronTab := fmt.Sprintf("%d */2 * * *", time.Now().Add(1*time.Minute).Minute())
@@ -211,8 +211,8 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 		containerArgs = append(containerArgs, []string{"--filter-managed-by", scannedAssetsManagedBy}...)
 	}
 
-	if m.Spec.HttpProxy != nil {
-		containerArgs = append(containerArgs, []string{"--api-proxy", *m.Spec.HttpProxy}...)
+	if cfg.Spec.HttpProxy != nil {
+		containerArgs = append(containerArgs, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
 	return &batchv1.CronJob{

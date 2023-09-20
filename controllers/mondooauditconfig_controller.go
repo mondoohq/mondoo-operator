@@ -210,7 +210,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// If spec.MondooTokenSecretRef != "" and the Secret referenced in spec.MondooCredsSecretRef
 	// does not exist, then attempt to trade the token for a Mondoo service account and save it
 	// in the Secret referenced in .spec.MondooCredsSecretRef
-	if reconcileError = r.exchangeTokenForServiceAccount(ctx, mondooAuditConfig, log); reconcileError != nil {
+	if reconcileError = r.exchangeTokenForServiceAccount(ctx, mondooAuditConfig, config, log); reconcileError != nil {
 		log.Error(reconcileError, "errors while checking if Mondoo service account needs creating")
 		return ctrl.Result{}, reconcileError
 	}
@@ -321,7 +321,7 @@ func (r *MondooAuditConfigReconciler) nodeEventsRequestMapper(o client.Object) [
 	return requests
 }
 
-func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context.Context, auditConfig *v1alpha2.MondooAuditConfig, log logr.Logger) error {
+func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context.Context, auditConfig *v1alpha2.MondooAuditConfig, cfg *v1alpha2.MondooOperatorConfig, log logr.Logger) error {
 	if auditConfig.Spec.MondooCredsSecretRef.Name == "" {
 		log.Info("MondooAuditConfig without .spec.mondooCredsSecretRef defined")
 		return nil
@@ -371,7 +371,7 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 		auditConfig.Spec.ConsoleIntegration.Enable,
 		client.ObjectKeyFromObject(mondooCredsSecret),
 		tokenData,
-		auditConfig.Spec.HttpProxy,
+		cfg.Spec.HttpProxy,
 		log)
 }
 

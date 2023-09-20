@@ -59,9 +59,10 @@ type IntegrationReconciler struct {
 	Client client.Client
 
 	// Interval is the length of time we sleep between runs
-	Interval            time.Duration
-	MondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
-	ctx                 context.Context
+	Interval             time.Duration
+	MondooClientBuilder  func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
+	MondooOperatorConfig *v1alpha2.MondooOperatorConfig
+	ctx                  context.Context
 }
 
 // Start begins the integration status loop.
@@ -119,7 +120,7 @@ func (r *IntegrationReconciler) processMondooAuditConfig(m v1alpha2.MondooAuditC
 		return err
 	}
 
-	if err = mondoo.IntegrationCheckIn(r.ctx, integrationMrn, *serviceAccount, r.MondooClientBuilder, m.Spec.HttpProxy, logger); err != nil {
+	if err = mondoo.IntegrationCheckIn(r.ctx, integrationMrn, *serviceAccount, r.MondooClientBuilder, r.MondooOperatorConfig.Spec.HttpProxy, logger); err != nil {
 		logger.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
 		return err
 	}

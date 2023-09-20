@@ -57,7 +57,7 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		logger.Error(err, "failed to clean up scan API token Secret resource")
 		return err
 	}
-	scanApiDeployment := ScanApiDeployment(n.Mondoo.Namespace, "", *n.Mondoo, "", n.DeployOnOpenShift) // Image and private image scanning secret are not relevant when deleting.
+	scanApiDeployment := ScanApiDeployment(n.Mondoo.Namespace, "", *n.Mondoo, *n.MondooOperatorConfig, "", n.DeployOnOpenShift) // Image and private image scanning secret are not relevant when deleting.
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, scanApiDeployment); err != nil {
 		logger.Error(err, "failed to clean up scan API Deployment resource")
 		return err
@@ -126,7 +126,7 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		privateRegistriesSecretName = ""
 	}
 
-	deployment := ScanApiDeployment(n.Mondoo.Namespace, cnspecImage, *n.Mondoo, privateRegistriesSecretName, n.DeployOnOpenShift)
+	deployment := ScanApiDeployment(n.Mondoo.Namespace, cnspecImage, *n.Mondoo, *n.MondooOperatorConfig, privateRegistriesSecretName, n.DeployOnOpenShift)
 	if err := ctrl.SetControllerReference(n.Mondoo, deployment, n.KubeClient.Scheme()); err != nil {
 		return err
 	}

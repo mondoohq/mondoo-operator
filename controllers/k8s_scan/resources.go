@@ -25,7 +25,7 @@ import (
 
 const CronJobNameSuffix = "-k8s-scan"
 
-func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
@@ -57,8 +57,8 @@ func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditCon
 		containerArgs = append(containerArgs, []string{"--set-managed-by", scannedAssetsManagedBy}...)
 	}
 
-	if m.Spec.HttpProxy != nil {
-		containerArgs = append(containerArgs, []string{"--api-proxy", *m.Spec.HttpProxy}...)
+	if cfg.Spec.HttpProxy != nil {
+		containerArgs = append(containerArgs, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
 	return &batchv1.CronJob{

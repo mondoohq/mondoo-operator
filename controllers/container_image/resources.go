@@ -35,7 +35,7 @@ const (
 	InventoryConfigMapBase = "-containers-inventory"
 )
 
-func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
 	cmd := []string{
@@ -45,8 +45,8 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 		"--score-threshold", "0",
 	}
 
-	if m.Spec.HttpProxy != nil {
-		cmd = append(cmd, []string{"--api-proxy", *m.Spec.HttpProxy}...)
+	if cfg.Spec.HttpProxy != nil {
+		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
 	// We want to start the cron job one minute after it was enabled.
