@@ -31,9 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
+	mockmondoo "go.mondoo.com/mondoo-operator/pkg/client/mondooclient/mock"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
-	mockmondoo "go.mondoo.com/mondoo-operator/pkg/mondooclient/mock"
 	"go.mondoo.com/mondoo-operator/tests/credentials"
 )
 
@@ -105,15 +105,15 @@ func (s *IntegrationCheckInSuite) TestCheckIn() {
 
 	mockCtrl := gomock.NewController(s.T())
 
-	mClient := mockmondoo.NewMockClient(mockCtrl)
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 	mClient.EXPECT().IntegrationCheckIn(gomock.Any(), &mondooclient.IntegrationCheckInInput{
 		Mrn: testIntegrationMRN, // make sure MRN in the CheckIn() in what is required for the real Mondoo API
 	}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{
 		Mrn: testIntegrationMRN,
 	}, nil)
 
-	testMondooClientBuilder := func(mondooclient.ClientOptions) mondooclient.Client {
-		return mClient
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
 	}
 
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()
@@ -150,15 +150,15 @@ func (s *IntegrationCheckInSuite) TestClearPreviousCondition() {
 
 	mockCtrl := gomock.NewController(s.T())
 
-	mClient := mockmondoo.NewMockClient(mockCtrl)
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 	mClient.EXPECT().IntegrationCheckIn(gomock.Any(), &mondooclient.IntegrationCheckInInput{
 		Mrn: testIntegrationMRN, // make sure MRN in the CheckIn() in what is required for the real Mondoo API
 	}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{
 		Mrn: testIntegrationMRN,
 	}, nil)
 
-	testMondooClientBuilder := func(mondooclient.ClientOptions) mondooclient.Client {
-		return mClient
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
 	}
 
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()
@@ -192,11 +192,11 @@ func (s *IntegrationCheckInSuite) TestMissingIntegrationMRN() {
 
 	mockCtrl := gomock.NewController(s.T())
 
-	mClient := mockmondoo.NewMockClient(mockCtrl)
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 	// EXPECT no call because of the missing integration MRN data
 
-	testMondooClientBuilder := func(mondooclient.ClientOptions) mondooclient.Client {
-		return mClient
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
 	}
 
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()
@@ -230,11 +230,11 @@ func (s *IntegrationCheckInSuite) TestBadServiceAccountData() {
 
 	mockCtrl := gomock.NewController(s.T())
 
-	mClient := mockmondoo.NewMockClient(mockCtrl)
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 	// EXPECT no call because of the bad service account data
 
-	testMondooClientBuilder := func(mondooclient.ClientOptions) mondooclient.Client {
-		return mClient
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
 	}
 
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()
@@ -266,13 +266,13 @@ func (s *IntegrationCheckInSuite) TestFailedCheckIn() {
 
 	mockCtrl := gomock.NewController(s.T())
 
-	mClient := mockmondoo.NewMockClient(mockCtrl)
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 	mClient.EXPECT().IntegrationCheckIn(gomock.Any(), gomock.Any()).Times(1).Return(
 		nil, fmt.Errorf(`http status 401: {"code":16,"message":"request permission unauthenticated"}`),
 	)
 
-	testMondooClientBuilder := func(mondooclient.ClientOptions) mondooclient.Client {
-		return mClient
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
 	}
 
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()

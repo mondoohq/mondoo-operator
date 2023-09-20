@@ -34,6 +34,9 @@ type MondooAuditConfigSpec struct {
 	ConsoleIntegration  ConsoleIntegration  `json:"consoleIntegration,omitempty"`
 	Filtering           Filtering           `json:"filtering,omitempty"`
 	Containers          Containers          `json:"containers,omitempty"`
+
+	// HttpProxy specifies a proxy to use for HTTP requests to the Mondoo platform.
+	HttpProxy *string `json:"httpProxy,omitempty"`
 }
 
 type Filtering struct {

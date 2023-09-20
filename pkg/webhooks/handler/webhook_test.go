@@ -27,9 +27,9 @@ import (
 	"sigs.k8s.io/yaml"
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
+	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient/fakeserver"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient/fakeserver"
 )
 
 const (
@@ -166,12 +166,15 @@ func TestWebhookValidate(t *testing.T) {
 			}
 
 			testserver := fakeserver.FakeServer()
+			clnt, err := scanapiclient.NewClient(scanapiclient.ScanApiClientOptions{
+				ApiEndpoint: testserver.URL,
+			})
+			require.NoError(t, err)
+
 			validator := &webhookValidator{
-				decoder: decoder,
-				mode:    test.mode,
-				scanner: mondooclient.NewClient(mondooclient.ClientOptions{
-					ApiEndpoint: testserver.URL,
-				}),
+				decoder:    decoder,
+				mode:       test.mode,
+				scanner:    clnt,
 				uniDecoder: serializer.NewCodecFactory(clientgoscheme.Scheme).UniversalDeserializer(),
 			}
 
@@ -298,15 +301,18 @@ func TestWebhookNamespaceFiltering(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			testserver := fakeserver.FakeServer()
+			clnt, err := scanapiclient.NewClient(scanapiclient.ScanApiClientOptions{
+				ApiEndpoint: testserver.URL,
+			})
+			require.NoError(t, err)
+
 			validator := &webhookValidator{
 				excludeNamespaces: test.excludeList,
 				includeNamespaces: test.includeList,
 				decoder:           decoder,
 				mode:              mondoov1alpha2.Permissive,
-				scanner: mondooclient.NewClient(mondooclient.ClientOptions{
-					ApiEndpoint: testserver.URL,
-				}),
-				uniDecoder: serializer.NewCodecFactory(clientgoscheme.Scheme).UniversalDeserializer(),
+				scanner:           clnt,
+				uniDecoder:        serializer.NewCodecFactory(clientgoscheme.Scheme).UniversalDeserializer(),
 			}
 
 			request := admission.Request{

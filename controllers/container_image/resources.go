@@ -38,6 +38,17 @@ const (
 func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
+	cmd := []string{
+		"cnspec", "scan", "k8s",
+		"--config", "/etc/opt/mondoo/mondoo.yml",
+		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
+		"--score-threshold", "0",
+	}
+
+	if m.Spec.HttpProxy != nil {
+		cmd = append(cmd, []string{"--api-proxy", *m.Spec.HttpProxy}...)
+	}
+
 	// We want to start the cron job one minute after it was enabled.
 	cronStart := time.Now().Add(1 * time.Minute)
 	cronTab := fmt.Sprintf("%d %d * * *", cronStart.Minute(), cronStart.Hour())
@@ -65,13 +76,8 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 									Image:           image,
 									ImagePullPolicy: corev1.PullIfNotPresent,
 									Name:            "mondoo-containers-scan",
-									Command: []string{
-										"cnspec", "scan", "k8s",
-										"--config", "/etc/opt/mondoo/mondoo.yml",
-										"--inventory-file", "/etc/opt/mondoo/inventory.yml",
-										"--score-threshold", "0",
-									},
-									Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Containers.Resources, k8s.DefaultContainerScanningResources),
+									Command:         cmd,
+									Resources:       k8s.ResourcesRequirementsWithDefaults(m.Spec.Containers.Resources, k8s.DefaultContainerScanningResources),
 									SecurityContext: &corev1.SecurityContext{
 										AllowPrivilegeEscalation: pointer.Bool(false),
 										ReadOnlyRootFilesystem:   pointer.Bool(true),

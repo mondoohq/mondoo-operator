@@ -13,7 +13,7 @@ import (
 	"reflect"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	v1 "k8s.io/api/core/v1"
@@ -27,11 +27,11 @@ var logger = ctrl.Log.WithName("status-reporter")
 type StatusReporter struct {
 	kubeClient          client.Client
 	k8sVersion          *version.Info
-	mondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
+	mondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
 	lastReportedStatus  mondooclient.ReportStatusRequest
 }
 
-func NewStatusReporter(kubeClient client.Client, mondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client, k8sVersion *version.Info) *StatusReporter {
+func NewStatusReporter(kubeClient client.Client, mondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error), k8sVersion *version.Info) *StatusReporter {
 	return &StatusReporter{
 		kubeClient:          kubeClient,
 		k8sVersion:          k8sVersion,
@@ -74,10 +74,13 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 		return err
 	}
 
-	mondooClient := r.mondooClientBuilder(mondooclient.ClientOptions{
+	mondooClient, err := r.mondooClientBuilder(mondooclient.MondooClientOptions{
 		ApiEndpoint: serviceAccount.ApiEndpoint,
 		Token:       token,
 	})
+	if err != nil {
+		return err
+	}
 
 	if err := mondooClient.IntegrationReportStatus(ctx, &operatorStatus); err != nil {
 		return err

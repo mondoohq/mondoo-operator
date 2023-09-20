@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.mondoo.com/cnquery/motor/providers"
 	"go.mondoo.com/mondoo-operator/cmd/mondoo-operator/garbage_collect"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -56,15 +56,18 @@ func init() {
 		}
 		token := strings.TrimSuffix(string(tokenBytes), "\n")
 
-		client := mondooclient.NewClient(mondooclient.ClientOptions{
+		client, err := scanapiclient.NewClient(scanapiclient.ScanApiClientOptions{
 			ApiEndpoint: *scanApiUrl,
 			Token:       token,
 		})
+		if err != nil {
+			return err
+		}
 
 		logger.Info("triggering Kubernetes resources scan")
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration((*timeout))*time.Minute)
 		defer cancel()
-		scanOpts := &mondooclient.ScanKubernetesResourcesOpts{
+		scanOpts := &scanapiclient.ScanKubernetesResourcesOpts{
 			IntegrationMrn:      *integrationMrn,
 			ScanContainerImages: *scanContainerImages,
 			ManagedBy:           *setManagedBy,

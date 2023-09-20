@@ -211,6 +211,10 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 		containerArgs = append(containerArgs, []string{"--filter-managed-by", scannedAssetsManagedBy}...)
 	}
 
+	if m.Spec.HttpProxy != nil {
+		containerArgs = append(containerArgs, []string{"--api-proxy", *m.Spec.HttpProxy}...)
+	}
+
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      GarbageCollectCronJobName(m.Name),

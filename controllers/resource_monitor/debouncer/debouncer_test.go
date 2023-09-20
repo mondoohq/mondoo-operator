@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
 	scanapistoremock "go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store/mock"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient/mock"
+	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient/mock"
 )
 
 type DebouncerSuite struct {
@@ -25,7 +25,7 @@ type DebouncerSuite struct {
 	ctx              context.Context
 	ctxCancel        context.CancelFunc
 	mockCtrl         *gomock.Controller
-	mockMondooClient *mock.MockClient
+	mockMondooClient *mock.MockScanApiClient
 	scanApiStore     *scanapistoremock.MockScanApiStore
 	debouncer        *debouncer
 }
@@ -33,7 +33,7 @@ type DebouncerSuite struct {
 func (s *DebouncerSuite) BeforeTest(suiteName, testName string) {
 	s.ctx, s.ctxCancel = context.WithCancel(context.Background())
 	s.mockCtrl = gomock.NewController(s.T())
-	s.mockMondooClient = mock.NewMockClient(s.mockCtrl)
+	s.mockMondooClient = mock.NewMockScanApiClient(s.mockCtrl)
 	s.scanApiStore = scanapistoremock.NewMockScanApiStore(s.mockCtrl)
 	s.debouncer = NewDebouncer(s.scanApiStore).(*debouncer)
 	s.debouncer.flushTimeout = 1 * time.Second
@@ -147,7 +147,7 @@ func (s *DebouncerSuite) TestStart_MultipleScanApiClients() {
 		}
 	}
 
-	mockMondooClient2 := mock.NewMockClient(s.mockCtrl)
+	mockMondooClient2 := mock.NewMockScanApiClient(s.mockCtrl)
 
 	integrationMrn := "integration-mrn"
 	s.scanApiStore.EXPECT().GetAll().Times(1).Return([]scan_api_store.ClientConfiguration{

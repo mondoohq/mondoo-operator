@@ -17,8 +17,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"

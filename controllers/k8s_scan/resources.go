@@ -57,6 +57,10 @@ func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditCon
 		containerArgs = append(containerArgs, []string{"--set-managed-by", scannedAssetsManagedBy}...)
 	}
 
+	if m.Spec.HttpProxy != nil {
+		containerArgs = append(containerArgs, []string{"--api-proxy", *m.Spec.HttpProxy}...)
+	}
+
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CronJobName(m.Name),

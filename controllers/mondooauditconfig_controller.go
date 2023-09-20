@@ -38,8 +38,8 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/controllers/status"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
@@ -50,7 +50,7 @@ const finalizerString = "k8s.mondoo.com/delete"
 // MondooAuditConfigReconciler reconciles a MondooAuditConfig object
 type MondooAuditConfigReconciler struct {
 	client.Client
-	MondooClientBuilder    func(mondooclient.ClientOptions) mondooclient.Client
+	MondooClientBuilder    func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
 	ContainerImageResolver mondoo.ContainerImageResolver
 	StatusReporter         *status.StatusReporter
 	RunningOnOpenShift     bool
@@ -364,7 +364,15 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 
 	log.Info("Creating Mondoo service account from token")
 	tokenData := string(mondooTokenSecret.Data[constants.MondooTokenSecretKey])
-	return mondoo.CreateServiceAccountFromToken(ctx, r.Client, r.MondooClientBuilder, auditConfig.Spec.ConsoleIntegration.Enable, client.ObjectKeyFromObject(mondooCredsSecret), tokenData, log)
+	return mondoo.CreateServiceAccountFromToken(
+		ctx,
+		r.Client,
+		r.MondooClientBuilder,
+		auditConfig.Spec.ConsoleIntegration.Enable,
+		client.ObjectKeyFromObject(mondooCredsSecret),
+		tokenData,
+		auditConfig.Spec.HttpProxy,
+		log)
 }
 
 // SetupWithManager sets up the controller with the Manager.

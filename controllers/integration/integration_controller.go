@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
@@ -60,7 +60,7 @@ type IntegrationReconciler struct {
 
 	// Interval is the length of time we sleep between runs
 	Interval            time.Duration
-	MondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
+	MondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
 	ctx                 context.Context
 }
 
@@ -119,7 +119,7 @@ func (r *IntegrationReconciler) processMondooAuditConfig(m v1alpha2.MondooAuditC
 		return err
 	}
 
-	if err = mondoo.IntegrationCheckIn(r.ctx, integrationMrn, *serviceAccount, r.MondooClientBuilder, logger); err != nil {
+	if err = mondoo.IntegrationCheckIn(r.ctx, integrationMrn, *serviceAccount, r.MondooClientBuilder, m.Spec.HttpProxy, logger); err != nil {
 		logger.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
 		return err
 	}

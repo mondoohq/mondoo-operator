@@ -55,6 +55,11 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 		"--config", "/etc/opt/mondoo/config/mondoo.yml",
 		"--http-timeout", "1800",
 	}
+
+	if m.Spec.HttpProxy != nil {
+		cmd = append(cmd, []string{"--api-proxy", *m.Spec.HttpProxy}...)
+	}
+
 	healthcheckEndpoint := "/Scan/HealthCheck"
 
 	scanApiDeployment := &appsv1.Deployment{

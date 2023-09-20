@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-logr/logr"
 	jwt "github.com/golang-jwt/jwt/v4"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 )
 
 // must be set to "mondoo/ams" when making Mondoo API calls
