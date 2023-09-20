@@ -52,6 +52,7 @@ func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client
 	opts := mondooclient.MondooClientOptions{
 		ApiEndpoint: fmt.Sprintf("%v", apiEndpoint),
 		Token:       jwtString,
+		HttpProxy:   httpProxy,
 	}
 
 	mClient, err := mondooClientBuilder(opts)

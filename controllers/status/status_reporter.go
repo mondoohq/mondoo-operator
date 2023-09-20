@@ -39,7 +39,7 @@ func NewStatusReporter(kubeClient client.Client, mondooClientBuilder func(mondoo
 	}
 }
 
-func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfig) error {
+func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) error {
 	if !m.Spec.ConsoleIntegration.Enable {
 		return nil // If ConsoleIntegration is not enabled, we cannot report status
 	}
@@ -77,6 +77,7 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 	mondooClient, err := r.mondooClientBuilder(mondooclient.MondooClientOptions{
 		ApiEndpoint: serviceAccount.ApiEndpoint,
 		Token:       token,
+		HttpProxy:   cfg.Spec.HttpProxy,
 	})
 	if err != nil {
 		return err

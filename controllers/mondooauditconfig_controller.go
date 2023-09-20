@@ -123,7 +123,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	defer func() {
-		reportErr := r.StatusReporter.Report(ctx, *mondooAuditConfig)
+		reportErr := r.StatusReporter.Report(ctx, *mondooAuditConfig, *config)
 
 		// If the err from the reconcile func is nil, the all steps were executed it successfully
 		// If there was an error, we do not override the existing error with the status report error

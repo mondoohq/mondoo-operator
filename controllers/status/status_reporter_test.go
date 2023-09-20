@@ -129,10 +129,10 @@ func (s *StatusReporterSuite) TestReport() {
 		},
 	}).Times(1).Return(nil)
 
-	s.NoError(statusReport.Report(s.ctx, s.auditConfig))
+	s.NoError(statusReport.Report(s.ctx, s.auditConfig, v1alpha2.MondooOperatorConfig{}))
 
 	// We call Report another time to make sure IntegrationReportStatus is only called whenever the status actually changes.
-	s.NoError(statusReport.Report(s.ctx, s.auditConfig))
+	s.NoError(statusReport.Report(s.ctx, s.auditConfig, v1alpha2.MondooOperatorConfig{}))
 }
 
 func (s *StatusReporterSuite) TestReport_StatusChange() {
@@ -190,7 +190,7 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 	}
 	s.mockMondooClient.EXPECT().IntegrationReportStatus(gomock.Any(), expected).Times(1).Return(nil)
 
-	s.NoError(statusReport.Report(s.ctx, s.auditConfig))
+	s.NoError(statusReport.Report(s.ctx, s.auditConfig, v1alpha2.MondooOperatorConfig{}))
 
 	s.auditConfig.Spec.Nodes.Enable = true
 	s.auditConfig.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{
@@ -205,7 +205,7 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 	s.mockMondooClient.EXPECT().IntegrationReportStatus(gomock.Any(), expected).Times(1).Return(nil)
 
 	// We call Report another time to make sure IntegrationReportStatus is only called whenever the status actually changes.
-	s.NoError(statusReport.Report(s.ctx, s.auditConfig))
+	s.NoError(statusReport.Report(s.ctx, s.auditConfig, v1alpha2.MondooOperatorConfig{}))
 }
 
 func TestStatusReporterSuite(t *testing.T) {
