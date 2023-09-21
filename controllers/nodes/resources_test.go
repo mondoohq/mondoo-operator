@@ -11,9 +11,7 @@ package nodes
 import (
 	"crypto/sha256"
 	"fmt"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -31,7 +29,6 @@ const (
 )
 
 func TestCronJobName(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
 	prefix := "mondoo-client"
 	tests := []struct {
 		name string
@@ -66,14 +63,12 @@ func TestCronJobName(t *testing.T) {
 }
 
 func TestGarbageCollectCronJobName(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
 	prefix := "mondoo-client"
 
 	assert.Equal(t, fmt.Sprintf("%s%s", prefix, GarbageCollectCronJobNameBase), GarbageCollectCronJobName(prefix))
 }
 
 func TestConfigMapName(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
 	prefix := "mondoo-client"
 	tests := []struct {
 		name string
@@ -108,7 +103,6 @@ func TestConfigMapName(t *testing.T) {
 }
 
 func TestResources(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
 	tests := []struct {
 		name              string
 		mondooauditconfig func() *v1alpha2.MondooAuditConfig
@@ -166,8 +160,6 @@ func TestResources(t *testing.T) {
 }
 
 func TestCronJob_PrivilegedOpenshift(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-
 	testNode := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node-name",
@@ -180,8 +172,6 @@ func TestCronJob_PrivilegedOpenshift(t *testing.T) {
 }
 
 func TestCronJob_Privileged(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-
 	testNode := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node-name",
