@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright (c) Mondoo, Inc.
+# SPDX-License-Identifier: BUSL-1.1
+
 # This script updates all the versions to do a release:
 # ./release.sh 0.0.13 0.1.6
 

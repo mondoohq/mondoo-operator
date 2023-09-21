@@ -1,3 +1,6 @@
+# Copyright (c) Mondoo, Inc.
+# SPDX-License-Identifier: BUSL-1.1
+
 # This configuration is for teaching kustomize how to update name ref and var substitution 
 nameReference:
 - kind: Issuer

@@ -420,3 +420,12 @@ prep/ci/protoc:
 	mkdir tools
 	unzip protoc-${PROTO_VERSION}-linux-x86_64.zip -d ./tools
 	rm protoc-${PROTO_VERSION}-linux-x86_64.zip
+
+# Copywrite Check Tool: https://github.com/hashicorp/copywrite
+license: license/headers/check
+
+license/headers/check:
+	copywrite headers --plan
+
+license/headers/apply:
+	copywrite headers

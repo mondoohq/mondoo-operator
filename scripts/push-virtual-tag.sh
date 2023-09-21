@@ -1,3 +1,6 @@
+# Copyright (c) Mondoo, Inc.
+# SPDX-License-Identifier: BUSL-1.1
+
 # exit immediately when a command fails
 set -e
 # only exit with zero if all commands of the pipeline exit successfully
