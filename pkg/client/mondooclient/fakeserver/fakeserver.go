@@ -24,43 +24,5 @@ func FakeServer() *httptest.Server {
 			return
 		}
 	})
-
-	// mux.HandleFunc(mondooclient.RunAdmissionReviewEndpoint, func(w http.ResponseWriter, r *http.Request) {
-	// 	result := &mondooclient.ScanResult{
-	// 		Ok: true,
-	// 		WorstScore: &mondooclient.Score{
-	// 			Type:  mondooclient.ValidScanResult,
-	// 			Value: 100,
-	// 		},
-	// 	}
-	// 	data, err := json.Marshal(result)
-	// 	if err != nil {
-	// 		http.Error(w, err.Error(), 500)
-	// 		return
-	// 	}
-	// 	if _, err = w.Write(data); err != nil {
-	// 		http.Error(w, err.Error(), 500)
-	// 		return
-	// 	}
-	// })
-
-	// mux.HandleFunc(mondooclient.ScanKubernetesResourcesEndpoint, func(w http.ResponseWriter, r *http.Request) {
-	// 	result := &mondooclient.ScanResult{
-	// 		Ok: true,
-	// 		WorstScore: &mondooclient.Score{
-	// 			Type:  mondooclient.ValidScanResult,
-	// 			Value: 100,
-	// 		},
-	// 	}
-	// 	data, err := json.Marshal(result)
-	// 	if err != nil {
-	// 		http.Error(w, err.Error(), 500)
-	// 		return
-	// 	}
-	// 	if _, err = w.Write(data); err != nil {
-	// 		http.Error(w, err.Error(), 500)
-	// 		return
-	// 	}
-	// })
 	return httptest.NewServer(mux)
 }
