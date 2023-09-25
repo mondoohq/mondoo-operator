@@ -24,3 +24,15 @@ jobs:
         with:
           version: v1.54
           args: --timeout=20m0s
+
+  license-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Copywrite
+        uses: hashicorp/setup-copywrite@v1.1.2
+
+      - name: Check Header Compliance
+        run: copywrite headers --plan
