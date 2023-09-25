@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -42,14 +42,14 @@ type DeploymentHandlerSuite struct {
 	scheme                 *runtime.Scheme
 	containerImageResolver mondoo.ContainerImageResolver
 
-	auditConfig       mondoov1alpha2.MondooAuditConfig
+	auditConfig       v1alpha2.MondooAuditConfig
 	fakeClientBuilder *fake.ClientBuilder
 }
 
 func (s *DeploymentHandlerSuite) SetupSuite() {
 	s.ctx = context.Background()
 	s.scheme = clientgoscheme.Scheme
-	s.Require().NoError(mondoov1alpha2.AddToScheme(s.scheme))
+	s.Require().NoError(v1alpha2.AddToScheme(s.scheme))
 	s.containerImageResolver = fakeMondoo.NewNoOpContainerImageResolver()
 }
 
@@ -237,7 +237,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	s.NoError(err)
 
 	for _, n := range nodes.Items {
-		expected := CronJob(image, n, s.auditConfig, false)
+		expected := CronJob(image, n, s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 		// Set some fields that the kube client sets
@@ -259,7 +259,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	s.NoError(err)
 
 	// Verify node garbage collection cronjob
-	expected := GarbageCollectCronJob(operatorImage, "abcdefg", s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := GarbageCollectCronJob(operatorImage, "abcdefg", s.auditConfig)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -287,7 +287,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	s.NoError(err)
 
 	// Make sure a cron job exists for one of the nodes
-	cronJob := CronJob(image, nodes.Items[1], s.auditConfig, false)
+	cronJob := CronJob(image, nodes.Items[1], s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 	cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, cronJob))
 
@@ -296,7 +296,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	s.True(result.IsZero())
 
 	for i, n := range nodes.Items {
-		expected := CronJob(image, n, s.auditConfig, false)
+		expected := CronJob(image, n, s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 		// Set some fields that the kube client sets
@@ -349,7 +349,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 
 	s.Equal(1, len(cronJobs.Items))
 
-	expected := CronJob(image, nodes.Items[0], s.auditConfig, false)
+	expected := CronJob(image, nodes.Items[0], s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -467,7 +467,7 @@ func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {
 		KubeClient:             s.fakeClientBuilder.Build(),
 		Mondoo:                 &s.auditConfig,
 		ContainerImageResolver: s.containerImageResolver,
-		MondooOperatorConfig:   &mondoov1alpha2.MondooOperatorConfig{},
+		MondooOperatorConfig:   &v1alpha2.MondooOperatorConfig{},
 	}
 }
 
