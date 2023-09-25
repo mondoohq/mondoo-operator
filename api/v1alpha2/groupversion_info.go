@@ -1,10 +1,5 @@
-/*
-Copyright 2022 Mondoo, Inc.
-
-This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0. If a copy of the MPL was not distributed with this
-file, You can obtain one at https://mozilla.org/MPL/2.0/.
-*/
+// Copyright (c) Mondoo, Inc.
+// SPDX-License-Identifier: BUSL-1.1
 
 // Package v1alpha2 contains API Schema definitions for the k8s v1alpha2 API group
 // +kubebuilder:object:generate=true
