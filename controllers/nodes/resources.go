@@ -41,7 +41,7 @@ const (
 	ignoreAnnotationValue = "ignore"
 )
 
-func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpenshift bool) *batchv1.CronJob {
+func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
@@ -53,6 +53,10 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 		"--config", "/etc/opt/mondoo/mondoo.yml",
 		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
 		"--score-threshold", "0",
+	}
+
+	if cfg.Spec.HttpProxy != nil {
+		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
 	return &batchv1.CronJob{

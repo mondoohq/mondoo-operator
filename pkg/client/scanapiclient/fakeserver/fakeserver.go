@@ -8,13 +8,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/client/common"
+	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 )
 
 func FakeServer() *httptest.Server {
 	mux := http.NewServeMux()
-	mux.HandleFunc(mondooclient.HealthCheckEndpoint, func(w http.ResponseWriter, r *http.Request) {
-		result := &mondooclient.HealthCheckResponse{
+	mux.HandleFunc(common.HealthCheckEndpoint, func(w http.ResponseWriter, r *http.Request) {
+		result := &common.HealthCheckResponse{
 			Status: "SERVING",
 		}
 		data, err := json.Marshal(result)
@@ -28,11 +29,11 @@ func FakeServer() *httptest.Server {
 		}
 	})
 
-	mux.HandleFunc(mondooclient.RunAdmissionReviewEndpoint, func(w http.ResponseWriter, r *http.Request) {
-		result := &mondooclient.ScanResult{
+	mux.HandleFunc(scanapiclient.RunAdmissionReviewEndpoint, func(w http.ResponseWriter, r *http.Request) {
+		result := &scanapiclient.ScanResult{
 			Ok: true,
-			WorstScore: &mondooclient.Score{
-				Type:  mondooclient.ValidScanResult,
+			WorstScore: &scanapiclient.Score{
+				Type:  scanapiclient.ValidScanResult,
 				Value: 100,
 			},
 		}
@@ -47,11 +48,11 @@ func FakeServer() *httptest.Server {
 		}
 	})
 
-	mux.HandleFunc(mondooclient.ScanKubernetesResourcesEndpoint, func(w http.ResponseWriter, r *http.Request) {
-		result := &mondooclient.ScanResult{
+	mux.HandleFunc(scanapiclient.ScanKubernetesResourcesEndpoint, func(w http.ResponseWriter, r *http.Request) {
+		result := &scanapiclient.ScanResult{
 			Ok: true,
-			WorstScore: &mondooclient.Score{
-				Type:  mondooclient.ValidScanResult,
+			WorstScore: &scanapiclient.Score{
+				Type:  scanapiclient.ValidScanResult,
 				Value: 100,
 			},
 		}

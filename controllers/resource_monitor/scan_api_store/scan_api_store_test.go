@@ -14,24 +14,24 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient/mock"
+	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
+	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient/mock"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 )
 
 type ScanApiStoreSuite struct {
 	suite.Suite
-	ctx              context.Context
-	ctxCancel        context.CancelFunc
-	mockCtrl         *gomock.Controller
-	mockMondooClient *mock.MockClient
-	scanApiStore     *scanApiStore
+	ctx               context.Context
+	ctxCancel         context.CancelFunc
+	mockCtrl          *gomock.Controller
+	mockScanApiClient *mock.MockScanApiClient
+	scanApiStore      *scanApiStore
 }
 
 func (s *ScanApiStoreSuite) BeforeTest(suiteName, testName string) {
 	s.ctx, s.ctxCancel = context.WithCancel(context.Background())
 	s.mockCtrl = gomock.NewController(s.T())
-	s.mockMondooClient = mock.NewMockClient(s.mockCtrl)
+	s.mockScanApiClient = mock.NewMockScanApiClient(s.mockCtrl)
 	s.scanApiStore = NewScanApiStore(s.ctx).(*scanApiStore)
 }
 
@@ -46,10 +46,10 @@ func (s *ScanApiStoreSuite) TestAdd() {
 	url := utils.RandString(10)
 	token := utils.RandString(10)
 	integrationMrn := utils.RandString(10)
-	s.scanApiStore.mondooClientBuilder = func(opts mondooclient.ClientOptions) mondooclient.Client {
+	s.scanApiStore.scanApiClientBuilder = func(opts scanapiclient.ScanApiClientOptions) (scanapiclient.ScanApiClient, error) {
 		s.Equal(url, opts.ApiEndpoint)
 		s.Equal(token, opts.Token)
-		return s.mockMondooClient
+		return s.mockScanApiClient, nil
 	}
 
 	s.scanApiStore.Add(&ScanApiStoreAddOpts{
@@ -69,10 +69,10 @@ func (s *ScanApiStoreSuite) TestAdd_Idempotence() {
 	url := utils.RandString(10)
 	token := utils.RandString(10)
 	integrationMrn := utils.RandString(10)
-	s.scanApiStore.mondooClientBuilder = func(opts mondooclient.ClientOptions) mondooclient.Client {
+	s.scanApiStore.scanApiClientBuilder = func(opts scanapiclient.ScanApiClientOptions) (scanapiclient.ScanApiClient, error) {
 		s.Equal(url, opts.ApiEndpoint)
 		s.Equal(token, opts.Token)
-		return s.mockMondooClient
+		return s.mockScanApiClient, nil
 	}
 
 	for i := 0; i < 100; i++ {
@@ -94,10 +94,10 @@ func (s *ScanApiStoreSuite) TestDelete() {
 	url := utils.RandString(10)
 	token := utils.RandString(10)
 	integrationMrn := utils.RandString(10)
-	s.scanApiStore.mondooClientBuilder = func(opts mondooclient.ClientOptions) mondooclient.Client {
+	s.scanApiStore.scanApiClientBuilder = func(opts scanapiclient.ScanApiClientOptions) (scanapiclient.ScanApiClient, error) {
 		s.Equal(url, opts.ApiEndpoint)
 		s.Equal(token, opts.Token)
-		return s.mockMondooClient
+		return s.mockScanApiClient, nil
 	}
 
 	s.scanApiStore.Add(&ScanApiStoreAddOpts{
@@ -108,10 +108,10 @@ func (s *ScanApiStoreSuite) TestDelete() {
 
 	url2 := url + "2"
 	integrationMrn2 := integrationMrn + "2"
-	s.scanApiStore.mondooClientBuilder = func(opts mondooclient.ClientOptions) mondooclient.Client {
+	s.scanApiStore.scanApiClientBuilder = func(opts scanapiclient.ScanApiClientOptions) (scanapiclient.ScanApiClient, error) {
 		s.Equal(url2, opts.ApiEndpoint)
 		s.Equal(token, opts.Token)
-		return s.mockMondooClient
+		return s.mockScanApiClient, nil
 	}
 	s.scanApiStore.Add(&ScanApiStoreAddOpts{
 		Url:            url2,

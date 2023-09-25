@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.mondoo.com/cnquery/motor/providers"
 	"go.mondoo.com/cnspec/policy/scan"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -70,10 +70,13 @@ func init() {
 			token = strings.TrimSuffix(string(tokenBytes), "\n")
 		}
 
-		client := mondooclient.NewClient(mondooclient.ClientOptions{
+		client, err := scanapiclient.NewClient(scanapiclient.ScanApiClientOptions{
 			ApiEndpoint: *scanApiUrl,
 			Token:       token,
 		})
+		if err != nil {
+			return err
+		}
 
 		logger.Info("triggering garbage collection")
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration((*timeout))*time.Minute)
@@ -87,7 +90,7 @@ func init() {
 	}
 }
 
-func GarbageCollectCmd(ctx context.Context, client mondooclient.Client, platformRuntime, olderThan, managedBy string, labels map[string]string, logger logr.Logger) error {
+func GarbageCollectCmd(ctx context.Context, client scanapiclient.ScanApiClient, platformRuntime, olderThan, managedBy string, labels map[string]string, logger logr.Logger) error {
 	gcOpts := &scan.GarbageCollectOptions{
 		ManagedBy: managedBy,
 		Labels:    labels,

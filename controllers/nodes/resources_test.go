@@ -153,7 +153,7 @@ func TestResources(t *testing.T) {
 				},
 			}
 			mac := *test.mondooauditconfig()
-			cronJobSepc := CronJob("test123", *testNode, mac, false)
+			cronJobSepc := CronJob("test123", *testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 			assert.Equal(t, test.expectedResources, cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Resources)
 		})
 	}
@@ -166,7 +166,7 @@ func TestCronJob_PrivilegedOpenshift(t *testing.T) {
 		},
 	}
 	mac := testMondooAuditConfig()
-	cronJobSepc := CronJob("test123", *testNode, *mac, true)
+	cronJobSepc := CronJob("test123", *testNode, *mac, true, v1alpha2.MondooOperatorConfig{})
 	assert.True(t, *cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.Privileged)
 	assert.True(t, *cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
 }
@@ -178,7 +178,7 @@ func TestCronJob_Privileged(t *testing.T) {
 		},
 	}
 	mac := testMondooAuditConfig()
-	cronJobSepc := CronJob("test123", *testNode, *mac, false)
+	cronJobSepc := CronJob("test123", *testNode, *mac, false, v1alpha2.MondooOperatorConfig{})
 	assert.False(t, *cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.Privileged)
 	assert.False(t, *cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
 }

@@ -24,9 +24,9 @@ import (
 
 	"go.mondoo.com/cnquery/motor/providers"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils"
 	wutils "go.mondoo.com/mondoo-operator/pkg/webhooks/utils"
 )
@@ -66,7 +66,7 @@ type webhookValidator struct {
 	client            client.Client
 	decoder           *admission.Decoder
 	mode              mondoov1alpha2.AdmissionMode
-	scanner           mondooclient.Client
+	scanner           scanapiclient.ScanApiClient
 	integrationMRN    string
 	clusterID         string
 	uniDecoder        runtime.Decoder
@@ -93,13 +93,18 @@ func NewWebhookValidator(opts *NewWebhookValidatorOpts) (admission.Handler, erro
 		return nil, err
 	}
 
+	clnt, err := scanapiclient.NewClient(scanapiclient.ScanApiClientOptions{
+		ApiEndpoint: opts.ScanUrl,
+		Token:       opts.Token,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	return &webhookValidator{
-		client: opts.Client,
-		mode:   webhookMode,
-		scanner: mondooclient.NewClient(mondooclient.ClientOptions{
-			ApiEndpoint: opts.ScanUrl,
-			Token:       opts.Token,
-		}),
+		client:            opts.Client,
+		mode:              webhookMode,
+		scanner:           clnt,
 		integrationMRN:    opts.IntegrationMrn,
 		clusterID:         opts.ClusterId,
 		uniDecoder:        serializer.NewCodecFactory(opts.Client.Scheme()).UniversalDeserializer(),
@@ -182,10 +187,10 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		handlerlog.Error(err, "failed to create proto struct from admission request")
 		return
 	}
-	scanJob := &mondooclient.AdmissionReviewJob{
+	scanJob := &scanapiclient.AdmissionReviewJob{
 		Data:       data,
 		Labels:     k8sLabels,
-		ReportType: mondooclient.ReportType_ERROR,
+		ReportType: scanapiclient.ReportType_ERROR,
 	}
 
 	scanJob.Discovery = &providers.Discovery{}
@@ -204,7 +209,7 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 	}
 
 	passed := false
-	if result.WorstScore != nil && result.WorstScore.Type == mondooclient.ValidScanResult && result.WorstScore.Value == 100 {
+	if result.WorstScore != nil && result.WorstScore.Type == scanapiclient.ValidScanResult && result.WorstScore.Value == 100 {
 		passed = true
 	}
 

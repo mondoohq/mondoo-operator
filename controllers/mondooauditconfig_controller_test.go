@@ -34,8 +34,8 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
 	"go.mondoo.com/mondoo-operator/controllers/status"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
-	mockmondoo "go.mondoo.com/mondoo-operator/pkg/mondooclient/mock"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
+	mockmondoo "go.mondoo.com/mondoo-operator/pkg/client/mondooclient/mock"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/credentials"
 	k8sversion "k8s.io/apimachinery/pkg/version"
@@ -88,7 +88,7 @@ func TestTokenRegistration(t *testing.T) {
 	tests := []struct {
 		name             string
 		existingObjects  []runtime.Object
-		mockMondooClient func(*gomock.Controller) *mockmondoo.MockClient
+		mockMondooClient func(*gomock.Controller) *mockmondoo.MockMondooClient
 		verify           func(*testing.T, client.Client)
 		expectError      bool
 	}{
@@ -98,8 +98,8 @@ func TestTokenRegistration(t *testing.T) {
 				testTokenSecret(),
 				testMondooAuditConfig(),
 			},
-			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockClient {
-				mClient := mockmondoo.NewMockClient(mockCtrl)
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 
 				mClient.EXPECT().ExchangeRegistrationToken(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.ExchangeRegistrationTokenOutput{
 					ServiceAccount: testServiceAccountData,
@@ -127,8 +127,8 @@ func TestTokenRegistration(t *testing.T) {
 			existingObjects: []runtime.Object{
 				testMondooAuditConfig(),
 			},
-			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockClient {
-				mClient := mockmondoo.NewMockClient(mockCtrl)
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 
 				return mClient
 			},
@@ -161,8 +161,8 @@ func TestTokenRegistration(t *testing.T) {
 
 				return objs
 			}(),
-			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockClient {
-				mClient := mockmondoo.NewMockClient(mockCtrl)
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 
 				return mClient
 			},
@@ -186,8 +186,8 @@ func TestTokenRegistration(t *testing.T) {
 				testTokenSecret(),
 				testMondooAuditConfig(),
 			},
-			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockClient {
-				mClient := mockmondoo.NewMockClient(mockCtrl)
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 
 				mClient.EXPECT().ExchangeRegistrationToken(gomock.Any(), gomock.Any()).Times(1).Return(nil, fmt.Errorf("an error occurred"))
 
@@ -204,8 +204,8 @@ func TestTokenRegistration(t *testing.T) {
 				objs = append(objs, sec)
 				return objs
 			}(),
-			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockClient {
-				mClient := mockmondoo.NewMockClient(mockCtrl)
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 
 				return mClient
 			},
@@ -217,8 +217,8 @@ func TestTokenRegistration(t *testing.T) {
 				testIntegrationTokenSecret(),
 				testMondooAuditConfigWithIntegration(),
 			},
-			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockClient {
-				mClient := mockmondoo.NewMockClient(mockCtrl)
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 
 				mClient.EXPECT().IntegrationRegister(gomock.Any(), &mondooclient.IntegrationRegisterInput{
 					Mrn:   testIntegrationMRN,       // verify we are getting the expected integration MRN
@@ -295,8 +295,8 @@ func TestTokenRegistration(t *testing.T) {
 				testTokenSecret(),
 				testMondooAuditConfigWithIntegration(),
 			},
-			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockClient {
-				mClient := mockmondoo.NewMockClient(mockCtrl)
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 
 				return mClient
 			},
@@ -312,8 +312,8 @@ func TestTokenRegistration(t *testing.T) {
 
 			mClient := test.mockMondooClient(mockCtrl)
 
-			testMondooClientBuilder := func(mondooclient.ClientOptions) mondooclient.Client {
-				return mClient
+			testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+				return mClient, nil
 			}
 
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjects...).Build()
@@ -358,13 +358,13 @@ func TestMondooAuditConfigStatus(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	mClient := mockmondoo.NewMockClient(mockCtrl)
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 	mClient.EXPECT().ExchangeRegistrationToken(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.ExchangeRegistrationTokenOutput{
 		ServiceAccount: testServiceAccountData,
 	}, nil)
 
-	testMondooClientBuilder := func(mondooclient.ClientOptions) mondooclient.Client {
-		return mClient
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
 	}
 
 	mondooAuditConfig := testMondooAuditConfig()

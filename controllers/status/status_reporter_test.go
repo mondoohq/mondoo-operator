@@ -16,9 +16,9 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient/mock"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient/mock"
 	operatorVersion "go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/credentials"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
@@ -41,7 +41,7 @@ type StatusReporterSuite struct {
 	auditConfig       v1alpha2.MondooAuditConfig
 	fakeClientBuilder *fake.ClientBuilder
 	mockCtrl          *gomock.Controller
-	mockMondooClient  *mock.MockClient
+	mockMondooClient  *mock.MockMondooClient
 }
 
 func (s *StatusReporterSuite) SetupSuite() {
@@ -69,7 +69,7 @@ func (s *StatusReporterSuite) BeforeTest(suiteName, testName string) {
 
 	s.fakeClientBuilder = fake.NewClientBuilder().WithObjects(secret)
 	s.mockCtrl = gomock.NewController(s.T())
-	s.mockMondooClient = mock.NewMockClient(s.mockCtrl)
+	s.mockMondooClient = mock.NewMockMondooClient(s.mockCtrl)
 }
 
 func (s *StatusReporterSuite) AfterTest(suiteName, testName string) {
@@ -129,10 +129,10 @@ func (s *StatusReporterSuite) TestReport() {
 		},
 	}).Times(1).Return(nil)
 
-	s.NoError(statusReport.Report(s.ctx, s.auditConfig))
+	s.NoError(statusReport.Report(s.ctx, s.auditConfig, v1alpha2.MondooOperatorConfig{}))
 
 	// We call Report another time to make sure IntegrationReportStatus is only called whenever the status actually changes.
-	s.NoError(statusReport.Report(s.ctx, s.auditConfig))
+	s.NoError(statusReport.Report(s.ctx, s.auditConfig, v1alpha2.MondooOperatorConfig{}))
 }
 
 func (s *StatusReporterSuite) TestReport_StatusChange() {
@@ -190,7 +190,7 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 	}
 	s.mockMondooClient.EXPECT().IntegrationReportStatus(gomock.Any(), expected).Times(1).Return(nil)
 
-	s.NoError(statusReport.Report(s.ctx, s.auditConfig))
+	s.NoError(statusReport.Report(s.ctx, s.auditConfig, v1alpha2.MondooOperatorConfig{}))
 
 	s.auditConfig.Spec.Nodes.Enable = true
 	s.auditConfig.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{
@@ -205,7 +205,7 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 	s.mockMondooClient.EXPECT().IntegrationReportStatus(gomock.Any(), expected).Times(1).Return(nil)
 
 	// We call Report another time to make sure IntegrationReportStatus is only called whenever the status actually changes.
-	s.NoError(statusReport.Report(s.ctx, s.auditConfig))
+	s.NoError(statusReport.Report(s.ctx, s.auditConfig, v1alpha2.MondooOperatorConfig{}))
 }
 
 func TestStatusReporterSuite(t *testing.T) {
@@ -223,8 +223,10 @@ func (s *StatusReporterSuite) seedNodes() []client.Object {
 
 func (s *StatusReporterSuite) createStatusReporter() StatusReporter {
 	return StatusReporter{
-		kubeClient:          s.fakeClientBuilder.Build(),
-		k8sVersion:          &version.Info{GitVersion: "v1.24.0"},
-		mondooClientBuilder: func(opts mondooclient.ClientOptions) mondooclient.Client { return s.mockMondooClient },
+		kubeClient: s.fakeClientBuilder.Build(),
+		k8sVersion: &version.Info{GitVersion: "v1.24.0"},
+		mondooClientBuilder: func(opts mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+			return s.mockMondooClient, nil
+		},
 	}
 }

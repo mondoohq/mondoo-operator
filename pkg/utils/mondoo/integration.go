@@ -13,14 +13,15 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 )
 
 func IntegrationCheckIn(
 	ctx context.Context,
 	integrationMrn string,
 	sa mondooclient.ServiceAccountCredentials,
-	mondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client,
+	mondooClientBuilder MondooClientBuilder,
+	httpProxy *string,
 	logger logr.Logger,
 ) error {
 	token, err := GenerateTokenFromServiceAccount(sa, logger)
@@ -28,10 +29,14 @@ func IntegrationCheckIn(
 		msg := "unable to generate token from service account"
 		return fmt.Errorf("%s: %s", msg, err)
 	}
-	mondooClient := mondooClientBuilder(mondooclient.ClientOptions{
+	mondooClient, err := mondooClientBuilder(mondooclient.MondooClientOptions{
 		ApiEndpoint: sa.ApiEndpoint,
 		Token:       token,
+		HttpProxy:   httpProxy,
 	})
+	if err != nil {
+		return err
+	}
 
 	// Do the actual check-in
 	if _, err := mondooClient.IntegrationCheckIn(ctx, &mondooclient.IntegrationCheckInInput{

@@ -45,7 +45,7 @@ func ScanApiSecret(mondoo v1alpha2.MondooAuditConfig) *corev1.Secret {
 	}
 }
 
-func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateImageScanningSecretName string, deployOnOpenShift bool) *appsv1.Deployment {
+func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig, privateImageScanningSecretName string, deployOnOpenShift bool) *appsv1.Deployment {
 	labels := DeploymentLabels(m)
 
 	name := "cnspec"
@@ -55,6 +55,11 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, privateIm
 		"--config", "/etc/opt/mondoo/config/mondoo.yml",
 		"--http-timeout", "1800",
 	}
+
+	if cfg.Spec.HttpProxy != nil {
+		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
+	}
+
 	healthcheckEndpoint := "/Scan/HealthCheck"
 
 	scanApiDeployment := &appsv1.Deployment{

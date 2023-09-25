@@ -11,7 +11,7 @@ package scan_api_store
 import (
 	"context"
 
-	"go.mondoo.com/mondoo-operator/pkg/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -30,7 +30,7 @@ type ScanApiStore interface {
 }
 
 type ClientConfiguration struct {
-	Client            mondooclient.Client
+	Client            scanapiclient.ScanApiClient
 	IntegrationMrn    string
 	IncludeNamespaces []string
 	ExcludeNamespaces []string
@@ -62,19 +62,19 @@ type scanApiStore struct {
 	getChan chan struct{}
 
 	// outChan is used to return all scan api urls
-	outChan             chan []ClientConfiguration
-	scanClients         map[string]ClientConfiguration
-	mondooClientBuilder func(mondooclient.ClientOptions) mondooclient.Client
+	outChan              chan []ClientConfiguration
+	scanClients          map[string]ClientConfiguration
+	scanApiClientBuilder func(scanapiclient.ScanApiClientOptions) (scanapiclient.ScanApiClient, error)
 }
 
 func NewScanApiStore(ctx context.Context) ScanApiStore {
 	return &scanApiStore{
-		ctx:                 ctx,
-		urlReqChan:          make(chan urlRequest),
-		getChan:             make(chan struct{}),
-		outChan:             make(chan []ClientConfiguration),
-		scanClients:         make(map[string]ClientConfiguration),
-		mondooClientBuilder: mondooclient.NewClient,
+		ctx:                  ctx,
+		urlReqChan:           make(chan urlRequest),
+		getChan:              make(chan struct{}),
+		outChan:              make(chan []ClientConfiguration),
+		scanClients:          make(map[string]ClientConfiguration),
+		scanApiClientBuilder: scanapiclient.NewClient,
 	}
 }
 
@@ -86,9 +86,14 @@ func (s *scanApiStore) Start() {
 		case req := <-s.urlReqChan:
 			switch req.requestType {
 			case AddRequest:
+				client, err := s.scanApiClientBuilder(
+					scanapiclient.ScanApiClientOptions{ApiEndpoint: req.url, Token: req.token})
+				if err != nil {
+					logger.Error(err, "Failed to create scan api client", "url", req.url)
+					continue
+				}
 				s.scanClients[req.url] = ClientConfiguration{
-					Client: s.mondooClientBuilder(
-						mondooclient.ClientOptions{ApiEndpoint: req.url, Token: req.token}),
+					Client:            client,
 					IntegrationMrn:    req.integrationMrn,
 					IncludeNamespaces: req.includeNamespaces,
 					ExcludeNamespaces: req.excludeNamespaces,
