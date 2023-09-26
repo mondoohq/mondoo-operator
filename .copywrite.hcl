@@ -14,5 +14,6 @@ project {
     "**/*.pb.go",
     "**/*_string.go",
     "charts/mondoo-operator/**",
+    "config/**/*.yaml",
   ]
 }
