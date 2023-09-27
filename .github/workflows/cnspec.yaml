@@ -10,7 +10,7 @@ on:
         default: 'latest'
 
 env:
-  IMAGE: ghcr.io/mondoo-operator/cnspec
+  IMAGE: ghcr.io/mondoohq/mondoo-operator/cnspec
 
 jobs:
   build-cnspec:
