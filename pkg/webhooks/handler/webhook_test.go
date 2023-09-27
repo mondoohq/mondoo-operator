@@ -423,8 +423,7 @@ func testExampleDeployment() runtime.RawExtension {
 func setupDecoder(t *testing.T) *admission.Decoder {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(corev1.AddToScheme(scheme))
-	decoder, err := admission.NewDecoder(scheme)
-	require.NoError(t, err, "Failed to setup decoder for testing")
+	decoder := admission.NewDecoder(scheme)
 
 	return decoder
 }

@@ -16,9 +16,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 
-	"go.mondoo.com/cnquery/motor/asset"
-	v1 "go.mondoo.com/cnquery/motor/inventory/v1"
-	"go.mondoo.com/cnquery/motor/providers"
+	"go.mondoo.com/cnquery/providers-sdk/v1/inventory"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -210,6 +208,9 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 		containerArgs = append(containerArgs, []string{"--filter-managed-by", scannedAssetsManagedBy}...)
 	}
 
+	envVars := feature_flags.AllFeatureFlagsAsEnv()
+	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
+
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      GarbageCollectCronJobName(m.Name),
@@ -268,7 +269,7 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 											ReadOnly:  true,
 										},
 									},
-									Env: feature_flags.AllFeatureFlagsAsEnv(),
+									Env: envVars,
 								},
 							},
 							Volumes: []corev1.Volume{
@@ -325,22 +326,23 @@ func ConfigMapName(prefix, nodeName string) string {
 }
 
 func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
-	inv := &v1.Inventory{
-		Metadata: &v1.ObjectMeta{
+	inv := &inventory.Inventory{
+		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-node-inventory",
 			Labels: map[string]string{
 				"environment": "production",
 			},
 		},
-		Spec: &v1.InventorySpec{
-			Assets: []*asset.Asset{
+		Spec: &inventory.InventorySpec{
+			Assets: []*inventory.Asset{
 				{
 					Id:   "host",
 					Name: node.Name,
-					Connections: []*providers.Config{
+					Connections: []*inventory.Config{
 						{
-							Host:       "/mnt/host",
-							Backend:    providers.ProviderType_FS,
+							Host: "/mnt/host",
+							// TODO: replace by Type when v8 is dropped
+							Backend:    "fs",
 							PlatformId: fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/%s", clusterUID, node.UID),
 						},
 					},

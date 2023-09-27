@@ -23,7 +23,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/admission"
@@ -297,8 +296,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 // nodeEventsRequestMapper Maps node events to enqueue all MondooAuditConfigs that have node scanning enabled for
 // reconciliation.
-func (r *MondooAuditConfigReconciler) nodeEventsRequestMapper(o client.Object) []reconcile.Request {
-	ctx := context.Background()
+func (r *MondooAuditConfigReconciler) nodeEventsRequestMapper(ctx context.Context, o client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 	auditConfigs := &v1alpha2.MondooAuditConfigList{}
 	if err := r.Client.List(ctx, auditConfigs); err != nil {
@@ -377,7 +375,7 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.CronJob{}).
 		Owns(&appsv1.Deployment{}).
 		Watches(
-			&source.Kind{Type: &corev1.Node{}},
+			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.nodeEventsRequestMapper),
 			builder.WithPredicates(k8s.IgnoreGenericEventsPredicate{})).
 		Complete(r)

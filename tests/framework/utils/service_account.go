@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"os"
 
-	"go.mondoo.com/cnquery/apps/cnquery/cmd/config"
-	"go.mondoo.com/cnquery/upstream"
+	"go.mondoo.com/cnquery/cli/config"
+	"go.mondoo.com/cnquery/providers-sdk/v1/upstream"
 )
 
 const ServiceAccountEnv = "MONDOO_SERVICE_ACCOUNT_EDGE"
@@ -26,7 +26,7 @@ func GetServiceAccount() (*upstream.ServiceAccountCredentials, error) {
 		return nil, err
 	}
 
-	config := &config.CommonCliConfig{}
+	config := &config.CommonOpts{}
 	err = json.Unmarshal(saString, config)
 	if err != nil {
 		return nil, err

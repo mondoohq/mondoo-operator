@@ -8,9 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mondoo.com/cnquery/motor/asset"
-	v1 "go.mondoo.com/cnquery/motor/inventory/v1"
-	"go.mondoo.com/cnquery/motor/providers"
+	"go.mondoo.com/cnquery/providers-sdk/v1/inventory"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
@@ -43,6 +41,9 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 	if cfg.Spec.HttpProxy != nil {
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
+
+	envVars := feature_flags.AllFeatureFlagsAsEnv()
+	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 
 	// We want to start the cron job one minute after it was enabled.
 	cronStart := time.Now().Add(1 * time.Minute)
@@ -98,7 +99,7 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 											MountPath: "/tmp",
 										},
 									},
-									Env: feature_flags.AllFeatureFlagsAsEnv(),
+									Env: envVars,
 								},
 							},
 							ServiceAccountName: m.Spec.Scanner.ServiceAccountName,
@@ -225,21 +226,22 @@ func ConfigMapName(prefix string) string {
 }
 
 func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
-	inv := &v1.Inventory{
-		Metadata: &v1.ObjectMeta{
+	inv := &inventory.Inventory{
+		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-k8s-containers-inventory",
 		},
-		Spec: &v1.InventorySpec{
-			Assets: []*asset.Asset{
+		Spec: &inventory.InventorySpec{
+			Assets: []*inventory.Asset{
 				{
-					Connections: []*providers.Config{
+					Connections: []*inventory.Config{
 						{
-							Backend: providers.ProviderType_K8S,
+							// TODO: replace by type when v8 is dropped
+							Backend: "k8s",
 							Options: map[string]string{
 								"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
 								"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
 							},
-							Discover: &providers.Discovery{
+							Discover: &inventory.Discovery{
 								Targets: []string{"container-images"},
 							},
 						},

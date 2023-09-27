@@ -148,6 +148,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alp
 							{Name: "DEBUG", Value: "false"},
 							{Name: "MONDOO_PROCFS", Value: "on"},
 							{Name: "PORT", Value: fmt.Sprintf("%d", Port)},
+							{Name: "MONDOO_AUTO_UPDATE", Value: "false"},
 
 							// Required so the scan API knows it is running as a Kubernetes integration
 							{Name: "KUBERNETES_ADMISSION_CONTROLLER", Value: "true"},

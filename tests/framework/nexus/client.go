@@ -4,7 +4,7 @@
 package nexus
 
 import (
-	"go.mondoo.com/cnquery/upstream"
+	"go.mondoo.com/cnquery/providers-sdk/v1/upstream"
 	cnspec "go.mondoo.com/cnspec/policy"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/captain"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/integrations"

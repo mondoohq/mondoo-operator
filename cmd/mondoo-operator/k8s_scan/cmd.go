@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"go.mondoo.com/cnquery/motor/providers"
 	"go.mondoo.com/mondoo-operator/cmd/mondoo-operator/garbage_collect"
 	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
@@ -95,9 +94,9 @@ func init() {
 
 		// If scanning successful, now attempt some cleanup of older assets
 		if *setManagedBy != "" && *cleanupOlderThan != "" {
-			platformRuntime := providers.RUNTIME_KUBERNETES_CLUSTER
+			platformRuntime := "k8s"
 			if *scanContainerImages {
-				platformRuntime = providers.RUNTIME_DOCKER_IMAGE
+				platformRuntime = "docker-image"
 			}
 
 			err = garbage_collect.GarbageCollectCmd(ctx, client, platformRuntime, *cleanupOlderThan, *setManagedBy, make(map[string]string), logger)

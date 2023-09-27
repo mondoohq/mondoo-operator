@@ -7,9 +7,7 @@ package mondoo.policy;
 option go_package = "go.mondoo.com/mondoo/nexus/api/policy";
 
 import "pagination.proto";
-import "motor/asset/asset.proto";
-import "motor/platform/platform.proto";
-import "motor/providers/provider.proto";
+import "providers-sdk/v1/inventory/inventory.proto";
 
 service AssetStore {
   rpc ListAssets(AssetSearchFilter) returns (AssetsPage);
@@ -98,14 +96,12 @@ message Asset {
   string updatedAt = 21;
 
   // asset state
-  cnquery.motor.asset.v1.State state = 22;
+  cnquery.providers.v1.State state = 22;
   // asset platform
-  // FIXME: remove in v8.0 vv
-  cnquery.motor.platform.v1.Platform platform = 23;
   // annotations are user-added, editable
   map<string, string> annotations = 24;
 
-  cnquery.motor.asset.v1.AssetCategory category = 25;
+  cnquery.providers.v1.AssetCategory category = 25;
   int64 id = 27;
   string cicd_project_mrn = 26; // if the asset is a cicd asset the project is the owner
 
@@ -126,7 +122,7 @@ message Asset {
   // Platform version
   string version = 36;
   // Platform Kind
-  cnquery.motor.providers.v1.Kind kind = 37;
+  string kind = 37;
   // Platform Runtime
   string runtime = 38;
   // Asset FQDN, when present

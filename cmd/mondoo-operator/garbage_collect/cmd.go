@@ -13,7 +13,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
-	"go.mondoo.com/cnquery/motor/providers"
 	"go.mondoo.com/cnspec/policy/scan"
 	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
@@ -108,7 +107,7 @@ func GarbageCollectCmd(ctx context.Context, client scanapiclient.ScanApiClient, 
 
 	if platformRuntime != "" {
 		switch platformRuntime {
-		case providers.RUNTIME_KUBERNETES_CLUSTER, providers.RUNTIME_DOCKER_IMAGE:
+		case "k8s", "docker-image":
 			gcOpts.PlatformRuntime = platformRuntime
 		default:
 			return fmt.Errorf("no matching platform runtime found for (%s)", platformRuntime)

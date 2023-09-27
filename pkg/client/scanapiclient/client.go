@@ -10,9 +10,7 @@ import (
 	"net/http"
 	"strings"
 
-	"go.mondoo.com/cnquery/motor/asset"
-	v1 "go.mondoo.com/cnquery/motor/inventory/v1"
-	"go.mondoo.com/cnquery/motor/providers"
+	"go.mondoo.com/cnquery/providers-sdk/v1/inventory"
 	"go.mondoo.com/cnspec/policy/scan"
 	"go.mondoo.com/mondoo-operator/pkg/client/common"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -95,18 +93,18 @@ func (s *scanApiClient) ScanKubernetesResources(ctx context.Context, scanOpts *S
 	url := s.ApiEndpoint + ScanKubernetesResourcesEndpoint
 	scanJob := &ScanJob{
 		ReportType: ReportType_ERROR,
-		Inventory: v1.Inventory{
-			Spec: &v1.InventorySpec{
-				Assets: []*asset.Asset{
+		Inventory: inventory.Inventory{
+			Spec: &inventory.InventorySpec{
+				Assets: []*inventory.Asset{
 					{
-						Connections: []*providers.Config{
+						Connections: []*inventory.Config{
 							{
-								Backend: providers.ProviderType_K8S,
+								Backend: "k8s",
 								Options: map[string]string{
 									"namespaces":         strings.Join(scanOpts.IncludeNamespaces, ","),
 									"namespaces-exclude": strings.Join(scanOpts.ExcludeNamespaces, ","),
 								},
-								Discover: &providers.Discovery{
+								Discover: &inventory.Discovery{
 									Targets: []string{"auto"},
 								},
 							},
@@ -146,17 +144,17 @@ func (s *scanApiClient) ScheduleKubernetesResourceScan(ctx context.Context, inte
 	url := s.ApiEndpoint + ScheduleKubernetesResourceScanEndpoint
 	scanJob := &ScanJob{
 		ReportType: ReportType_ERROR,
-		Inventory: v1.Inventory{
-			Spec: &v1.InventorySpec{
-				Assets: []*asset.Asset{
+		Inventory: inventory.Inventory{
+			Spec: &inventory.InventorySpec{
+				Assets: []*inventory.Asset{
 					{
-						Connections: []*providers.Config{
+						Connections: []*inventory.Config{
 							{
-								Backend: providers.ProviderType_K8S,
+								Backend: "k8s",
 								Options: map[string]string{
 									"k8s-resources": resourceKey,
 								},
-								Discover: &providers.Discovery{
+								Discover: &inventory.Discovery{
 									Targets: []string{"auto"},
 								},
 							},

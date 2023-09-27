@@ -405,15 +405,13 @@ prep/tools/ranger:
 
 prep/repos:
 	test -x cnquery || git clone https://github.com/mondoohq/cnquery.git
-# workaround for now. Needs to be removed as we move to v9
-	cd cnquery && git fetch && git checkout v8
+	cd cnquery && git fetch && git checkout main
 	test -x cnspec || git clone https://github.com/mondoohq/cnspec.git
-	cd cnspec && git fetch && git checkout v8
+	cd cnspec && git fetch && git checkout main
 
 prep/repos/update: prep/repos
-# workaround for now. Needs to be removed as we move to v9
-	cd cnquery; git fetch; git checkout v8 && git pull; cd -;
-	cd cnspec; git checkout v8 && git pull; cd -;
+	cd cnquery; git fetch; git checkout main && git pull; cd -;
+	cd cnspec; git checkout main && git pull; cd -;
 
 prep/ci/protoc:
 	curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v${PROTO_VERSION}/protoc-${PROTO_VERSION}-linux-x86_64.zip

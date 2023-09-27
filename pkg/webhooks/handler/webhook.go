@@ -22,7 +22,7 @@ import (
 
 	serializerYaml "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 
-	"go.mondoo.com/cnquery/motor/providers"
+	"go.mondoo.com/cnquery/providers-sdk/v1/inventory"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -193,7 +193,7 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		ReportType: scanapiclient.ReportType_ERROR,
 	}
 
-	scanJob.Discovery = &providers.Discovery{}
+	scanJob.Discovery = &inventory.Discovery{}
 	scanJob.Options = map[string]string{"all-namespaces": "true"}
 	// do not use auto discovery here, because we do not want to scan the cluster
 	scanJob.Discovery.Targets = []string{"pods", "deployments", "daemonsets", "statefulsets", "replicasets", "jobs", "cronjobs"}
@@ -235,13 +235,6 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		handlerlog.Error(err, "unexpected runtime environment, allowing the resource through")
 	}
 	return
-}
-
-var _ admission.DecoderInjector = &webhookValidator{}
-
-func (a *webhookValidator) InjectDecoder(d *admission.Decoder) error {
-	a.decoder = d
-	return nil
 }
 
 func (a *webhookValidator) generateLabels(req admission.Request, obj runtime.Object) (map[string]string, error) {
