@@ -22,12 +22,11 @@ jobs:
 
     strategy:
       matrix:
-        os: [linux]
-        tag:
-          - ${{ github.event.inputs.version }}
-          - ${{ github.event.inputs.version }}-rootless
-          - ${{ github.event.inputs.version }}-ubi-rootless
-          - ${{ github.event.inputs.version }}-ubi
+        suffix:
+          - ""
+          - -rootless
+          - -ubi-rootless
+          - -ubi
 
     steps:
       - name: Checkout repository
@@ -44,6 +43,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ github.event.inputs.version }}
+            type=semver,pattern={{major}},value=${{ github.event.inputs.version }}
+            type=raw,value=latest
+          flavor: |
+            suffix=${{ matrix.suffix }},onlatest=true
+
       - name: Build and push cnspec image
         id: build-and-push-operator
         uses: docker/build-push-action@v4
@@ -54,4 +65,4 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm
           push: true
           labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ env.IMAGE }}:${{ matrix.tag }}
+          tags: ${{ steps.meta.outputs.tags }}
