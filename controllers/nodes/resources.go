@@ -45,7 +45,10 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 		"cnspec", "scan", "local",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
 		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
-		"--score-threshold", "0",
+	}
+
+	if !feature_flags.GetEnableV9() {
+		cmd = append(cmd, "--score-threshold", "0")
 	}
 
 	if cfg.Spec.HttpProxy != nil {
@@ -131,6 +134,10 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 											Name:  "MONDOO_PROCFS",
 											Value: "on",
 										},
+										{
+											Name:  "MONDOO_AUTO_UPDATE",
+											Value: "false",
+										},
 									},
 								},
 							},
@@ -208,9 +215,6 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 		containerArgs = append(containerArgs, []string{"--filter-managed-by", scannedAssetsManagedBy}...)
 	}
 
-	envVars := feature_flags.AllFeatureFlagsAsEnv()
-	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
-
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      GarbageCollectCronJobName(m.Name),
@@ -269,7 +273,7 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 											ReadOnly:  true,
 										},
 									},
-									Env: envVars,
+									Env: feature_flags.AllFeatureFlagsAsEnv(),
 								},
 							},
 							Volumes: []corev1.Volume{

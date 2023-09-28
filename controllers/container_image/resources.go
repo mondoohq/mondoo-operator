@@ -35,7 +35,10 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 		"cnspec", "scan", "k8s",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
 		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
-		"--score-threshold", "0",
+	}
+
+	if !feature_flags.GetEnableV9() {
+		cmd = append(cmd, "--score-threshold", "0")
 	}
 
 	if cfg.Spec.HttpProxy != nil {
@@ -235,8 +238,6 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 				{
 					Connections: []*inventory.Config{
 						{
-							// TODO: replace by type when v8 is dropped
-							Backend: "k8s",
 							Options: map[string]string{
 								"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
 								"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
@@ -253,6 +254,12 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 				},
 			},
 		},
+	}
+
+	if feature_flags.GetEnableV9() {
+		inv.Spec.Assets[0].Connections[0].Type = "k8s"
+	} else {
+		inv.Spec.Assets[0].Connections[0].Backend = "19"
 	}
 
 	if integrationMRN != "" {

@@ -14,6 +14,7 @@ import (
 	"go.mondoo.com/cnspec/policy/scan"
 	"go.mondoo.com/mondoo-operator/pkg/client/common"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 )
 
 const (
@@ -99,7 +100,6 @@ func (s *scanApiClient) ScanKubernetesResources(ctx context.Context, scanOpts *S
 					{
 						Connections: []*inventory.Config{
 							{
-								Backend: "k8s",
 								Options: map[string]string{
 									"namespaces":         strings.Join(scanOpts.IncludeNamespaces, ","),
 									"namespaces-exclude": strings.Join(scanOpts.ExcludeNamespaces, ","),
@@ -114,6 +114,12 @@ func (s *scanApiClient) ScanKubernetesResources(ctx context.Context, scanOpts *S
 				},
 			},
 		},
+	}
+
+	if feature_flags.GetEnableV9() {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Type = "k8s"
+	} else {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Backend = "19"
 	}
 
 	setIntegrationMrn(scanOpts.IntegrationMrn, scanJob)
@@ -150,7 +156,6 @@ func (s *scanApiClient) ScheduleKubernetesResourceScan(ctx context.Context, inte
 					{
 						Connections: []*inventory.Config{
 							{
-								Backend: "k8s",
 								Options: map[string]string{
 									"k8s-resources": resourceKey,
 								},
@@ -163,6 +168,12 @@ func (s *scanApiClient) ScheduleKubernetesResourceScan(ctx context.Context, inte
 				},
 			},
 		},
+	}
+
+	if feature_flags.GetEnableV9() {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Type = "k8s"
+	} else {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Backend = "19"
 	}
 
 	if len(managedBy) > 0 {
