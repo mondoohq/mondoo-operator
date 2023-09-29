@@ -200,7 +200,7 @@ jobs:
         uses: sigstore/cosign-installer@v3
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:latest
           platforms: amd64,arm
