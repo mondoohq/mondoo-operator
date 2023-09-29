@@ -1,5 +1,16 @@
-# Detect common combinations of valid words that are in fact invalid. 
+# Detect common combinations of valid words that are in fact invalid.
 # Useful for brand capitalizations
+
+#
+# Our Terms
+#
+
+# s.b. Mondoo Platform
+\sMondoo platform\b
+
+# s.b. Compliance Hub
+\scompliance hub\b
+\sCompliance hubplatform\b
 
 #
 # Industry Terms
@@ -35,6 +46,20 @@
 #
 # Product Names
 #
+
+# s.b. Jira
+\bJIRA\b
+
+# s.b. MariaDB
+\bMaria DB\b
+\bmariaDB\b
+# \bmariaDb\b causes failures in MQL queries
+
+# s.b. PostgreSQL
+\bPostgreSql\b
+
+# s.b. Firefox
+\bFireFox\b
 
 # s.b. CentOS
 \bCentos\b
@@ -76,6 +101,7 @@
 
 # s.b. Red Hat
 \bRedHat\b
+\bRedhat\b
 
 # s.b. AlmaLinux
 \bAlma Linux\b
@@ -88,10 +114,15 @@
 
 # s.b. CircleCI
 \bCircleCi\b
+\bCircle CI\b
 
 # s.b. AppArmor
 \bApparmor\b
 \bApp Armor\b
+
+# s.b. SELinux
+\bSeLinux\b
+\bSelinux\b
 
 # s.b. InSpec
 \b[Ii]nspec\b
@@ -133,7 +164,7 @@
 \bGroup Policy object\b
 
 #
-# VMware Product
+# VMware Products
 #
 
 # s.b. VMware
@@ -143,6 +174,10 @@
 # s.b. vCenter
 \bVcenter\b
 \bVCenter\b
+
+# s.b. vSphere
+\bVsphere\b
+\bVSphere\b
 
 # s.b. ESXi
 \bEsxi\b
@@ -177,10 +212,9 @@
 \bCloudsearch\b
 
 # s.b. CloudShell
+# we can't check for Cloud Shell since that's what Azure calls it
 \bCloudshell\b
-\bCloud Shell\b
-\bcloudshell\b
-\bcloud shell\b
+# cloudshell results in false positives
 
 # s.b. CloudTrail
 \bCloudtrail\b
@@ -364,6 +398,9 @@
 # Azure Products
 #
 
+# s.b. Azure Pipelines
+\bAzure DevOps Pipelines\b
+
 # s.b. Key Vault
 \bKey vault\b
 \bKeyVault\b
@@ -403,6 +440,8 @@
 
 # s.b. Cosmos DB
 \bCosmosDB\b
+\bCosmoDB\b
+\bCosmo DB\b
 
 # s.b. SignalR Service
 \bSignalR service\b

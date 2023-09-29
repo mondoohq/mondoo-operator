@@ -24,13 +24,13 @@ func TestFiltering(t *testing.T) {
 			expectedResult: true,
 		},
 		{
-			name:           "explictly excluded",
+			name:           "explicitly excluded",
 			input:          "test-namespace",
 			excludedList:   []string{"test-namespace"},
 			expectedResult: false,
 		},
 		{
-			name:           "explictly included",
+			name:           "explicitly included",
 			input:          "test-namespace",
 			includedList:   []string{"test-namespace"},
 			expectedResult: true,

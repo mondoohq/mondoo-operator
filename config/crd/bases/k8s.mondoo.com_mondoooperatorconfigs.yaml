@@ -41,7 +41,7 @@ spec:
             properties:
               httpProxy:
                 description: HttpProxy specifies a proxy to use for HTTP requests
-                  to the Mondoo platform.
+                  to the Mondoo Platform.
                 type: string
               metrics:
                 description: Metrics controls the enabling/disabling of metrics report

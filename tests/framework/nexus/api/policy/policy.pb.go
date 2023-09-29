@@ -649,7 +649,7 @@ type Asset struct {
 	Runtime string `protobuf:"bytes,38,opt,name=runtime,proto3" json:"runtime,omitempty"`
 	// Asset FQDN, when present
 	Fqdn string `protobuf:"bytes,39,opt,name=fqdn,proto3" json:"fqdn,omitempty"`
-	// ManagedBy for clients to "claim" responsbility for asset
+	// ManagedBy for clients to "claim" responsibility for asset
 	ManagedBy string `protobuf:"bytes,40,opt,name=managed_by,json=managedBy,proto3" json:"managed_by,omitempty"`
 }
 
