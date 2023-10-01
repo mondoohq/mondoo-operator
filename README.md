@@ -6,6 +6,8 @@
 
 > **Project Status**: This project is stable. Any API and CRD changes will be handled in way where previous versions are kept working or migrated.
 
+![mondoo operator illustration](.github/social/preview.jpg)
+
 ## Overview
 
 The **Mondoo Operator** provides a new [Kubernetes](https://kubernetes.io/) native way to do a security assessment of your whole Kubernetes Cluster. The purpose of this project is to simplify and automate the configuration for a Mondoo-based security assessment for Kubernetes clusters.
@@ -62,7 +64,3 @@ If you find a security vulnerability related to the Mondoo Operator, please do n
 ## Join the community!
 
 Join the [Mondoo Community GitHub Discussions](https://github.com/orgs/mondoohq/discussions) to collaborate on policy as code and security automation.
-
-## License
-
-[Mozilla Public License v2.0](https://github.com/mondoohq/mondoo-operator/blob/main/LICENSE)
