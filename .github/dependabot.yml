@@ -1,3 +1,4 @@
+---
 version: 2
 updates:
   - package-ecosystem: gomod
@@ -11,7 +12,7 @@ updates:
       - dependency-name: k8s.io/apimachinery
       - dependency-name: k8s.io/client-go
       - dependency-name: k8s.io/api
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly

@@ -131,7 +131,7 @@ message Asset {
   string runtime = 38;
   // Asset FQDN, when present
   string fqdn = 39;
-  // ManagedBy for clients to "claim" responsbility for asset
+  // ManagedBy for clients to "claim" responsibility for asset
   string managed_by = 40;
 }
 

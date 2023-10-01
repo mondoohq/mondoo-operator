@@ -38,7 +38,7 @@ func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		err := fmt.Errorf("failed to type asesrt claims from token")
+		err := fmt.Errorf("failed to type assert claims from token")
 		log.Error(err, "failed to extract claim")
 		return err
 	}

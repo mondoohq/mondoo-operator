@@ -26,7 +26,7 @@ type MondooOperatorConfigSpec struct {
 	Metrics Metrics `json:"metrics,omitempty"`
 	// Allows skipping Image resolution from upstream repository
 	SkipContainerResolution bool `json:"skipContainerResolution,omitempty"`
-	// HttpProxy specifies a proxy to use for HTTP requests to the Mondoo platform.
+	// HttpProxy specifies a proxy to use for HTTP requests to the Mondoo Platform.
 	HttpProxy *string `json:"httpProxy,omitempty"`
 }
 
