@@ -259,7 +259,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 		inv.Spec.Assets[0].Connections[0].Type = "k8s"
 	} else {
 		zap.S().Info("using v8 inventory")
-		inv.Spec.Assets[0].Connections[0].Backend = "19"
+		inv.Spec.Assets[0].Connections[0].Backend = inventory.ProviderType_K8S
 	}
 
 	if integrationMRN != "" {

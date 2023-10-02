@@ -124,7 +124,7 @@ func (s *scanApiClient) ScanKubernetesResources(ctx context.Context, scanOpts *S
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Type = "k8s"
 	} else {
 		zap.S().Info("using v8 inventory")
-		scanJob.Inventory.Spec.Assets[0].Connections[0].Backend = "19"
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Backend = inventory.ProviderType_K8S
 	}
 
 	setIntegrationMrn(scanOpts.IntegrationMrn, scanJob)
@@ -178,7 +178,7 @@ func (s *scanApiClient) ScheduleKubernetesResourceScan(ctx context.Context, inte
 	if feature_flags.GetEnableV9() {
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Type = "k8s"
 	} else {
-		scanJob.Inventory.Spec.Assets[0].Connections[0].Backend = "19"
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Backend = inventory.ProviderType_K8S
 	}
 
 	if len(managedBy) > 0 {
