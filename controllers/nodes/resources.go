@@ -45,10 +45,7 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 		"cnspec", "scan", "local",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
 		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
-	}
-
-	if !feature_flags.GetEnableV9() {
-		cmd = append(cmd, "--score-threshold", "0")
+		"--score-threshold", "0",
 	}
 
 	if cfg.Spec.HttpProxy != nil {
