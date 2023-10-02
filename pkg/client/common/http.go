@@ -22,7 +22,7 @@ const (
 	maxIdleConnections         = 100
 )
 
-func DefaultHttpClient(httpProxy *string) (http.Client, error) {
+func DefaultHttpClient(httpProxy *string, httpTimeout *time.Duration) (http.Client, error) {
 	tr := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
@@ -42,9 +42,13 @@ func DefaultHttpClient(httpProxy *string) (http.Client, error) {
 		}
 		tr.Proxy = http.ProxyURL(urlParsed)
 	}
+	timeout := defaultHttpTimeout
+	if httpTimeout != nil {
+		timeout = *httpTimeout
+	}
 	return http.Client{
 		Transport: tr,
-		Timeout:   defaultHttpTimeout,
+		Timeout:   timeout,
 	}, nil
 }
 

@@ -12,7 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -74,10 +74,11 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alp
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image:     image,
-						Name:      name,
-						Command:   cmd,
-						Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources, k8s.DefaultCnspecResources),
+						Image:           image,
+						ImagePullPolicy: corev1.PullAlways,
+						Name:            name,
+						Command:         cmd,
+						Resources:       k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources, k8s.DefaultCnspecResources),
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{
@@ -112,18 +113,18 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alp
 							TimeoutSeconds:      5,
 						},
 						SecurityContext: &corev1.SecurityContext{
-							AllowPrivilegeEscalation: pointer.Bool(false),
-							ReadOnlyRootFilesystem:   pointer.Bool(true),
-							RunAsNonRoot:             pointer.Bool(true),
+							AllowPrivilegeEscalation: ptr.To(false),
+							ReadOnlyRootFilesystem:   ptr.To(true),
+							RunAsNonRoot:             ptr.To(true),
 							// This is needed to prevent:
 							// Error: container has runAsNonRoot and image has non-numeric user (mondoo), cannot verify user is non-root ...
-							RunAsUser: pointer.Int64(101),
+							RunAsUser: ptr.To(int64(101)),
 							Capabilities: &corev1.Capabilities{
 								Drop: []corev1.Capability{
 									"ALL",
 								},
 							},
-							Privileged: pointer.Bool(false),
+							Privileged: ptr.To(false),
 						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
@@ -171,7 +172,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alp
 											},
 										},
 									},
-									DefaultMode: pointer.Int32(0o444),
+									DefaultMode: ptr.To(int32(0o444)),
 								},
 							},
 						},
@@ -194,7 +195,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alp
 											},
 										},
 									},
-									DefaultMode: pointer.Int32(0o444),
+									DefaultMode: ptr.To(int32(0o444)),
 								},
 							},
 						},
@@ -246,7 +247,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alp
 							},
 						},
 					},
-					DefaultMode: pointer.Int32(0o440),
+					DefaultMode: ptr.To(int32(0o440)),
 				},
 			},
 		})

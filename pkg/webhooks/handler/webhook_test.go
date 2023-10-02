@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -60,7 +60,7 @@ func TestWebhookValidate(t *testing.T) {
 					Kind:       "ReplicaSet",
 					Name:       "testReplicaSet",
 					UID:        types.UID("abcd-1234"),
-					Controller: pointer.Bool(true),
+					Controller: ptr.To(true),
 				})
 			}),
 		},
@@ -73,7 +73,7 @@ func TestWebhookValidate(t *testing.T) {
 					Kind:       "StatefulSet",
 					Name:       "testStatefulSet",
 					UID:        types.UID("abcd-1234"),
-					Controller: pointer.Bool(true),
+					Controller: ptr.To(true),
 				})
 			}),
 		},
@@ -86,7 +86,7 @@ func TestWebhookValidate(t *testing.T) {
 					Kind:       "DaemonSet",
 					Name:       "testDaemonSet",
 					UID:        types.UID("abcd-1234"),
-					Controller: pointer.Bool(true),
+					Controller: ptr.To(true),
 				})
 			}),
 		},
@@ -99,7 +99,7 @@ func TestWebhookValidate(t *testing.T) {
 					Kind:       "Job",
 					Name:       "testJob",
 					UID:        types.UID("abcd-1234"),
-					Controller: pointer.Bool(true),
+					Controller: ptr.To(true),
 				})
 			}),
 		},
@@ -118,7 +118,7 @@ func TestWebhookValidate(t *testing.T) {
 					Kind:       "CronJob",
 					Name:       "testCronJob",
 					UID:        types.UID("abcd-1234"),
-					Controller: pointer.Bool(true),
+					Controller: ptr.To(true),
 				})
 			}),
 		},

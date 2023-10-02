@@ -16,6 +16,7 @@ import (
 	"go.mondoo.com/cnspec/policy/scan"
 	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -72,6 +73,7 @@ func init() {
 		client, err := scanapiclient.NewClient(scanapiclient.ScanApiClientOptions{
 			ApiEndpoint: *scanApiUrl,
 			Token:       token,
+			HttpTimeout: ptr.To(time.Duration((*timeout)) * time.Minute),
 		})
 		if err != nil {
 			return err

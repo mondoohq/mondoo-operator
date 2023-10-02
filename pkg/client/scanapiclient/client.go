@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"go.mondoo.com/cnquery/providers-sdk/v1/inventory"
 	"go.mondoo.com/cnspec/policy/scan"
 	"go.mondoo.com/mondoo-operator/pkg/client/common"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
+	"go.uber.org/zap"
 )
 
 const (
@@ -27,6 +29,7 @@ const (
 type ScanApiClientOptions struct {
 	ApiEndpoint string
 	Token       string
+	HttpTimeout *time.Duration
 }
 
 type scanApiClient struct {
@@ -37,7 +40,7 @@ type scanApiClient struct {
 
 func NewClient(opts ScanApiClientOptions) (ScanApiClient, error) {
 	opts.ApiEndpoint = strings.TrimRight(opts.ApiEndpoint, "/")
-	client, err := common.DefaultHttpClient(nil)
+	client, err := common.DefaultHttpClient(nil, opts.HttpTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +120,10 @@ func (s *scanApiClient) ScanKubernetesResources(ctx context.Context, scanOpts *S
 	}
 
 	if feature_flags.GetEnableV9() {
+		zap.S().Info("using v9 inventory")
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Type = "k8s"
 	} else {
+		zap.S().Info("using v8 inventory")
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Backend = "19"
 	}
 
