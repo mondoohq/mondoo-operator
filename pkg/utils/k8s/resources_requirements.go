@@ -11,7 +11,7 @@ import (
 // DefaultCnspecResources for cnspec container
 var DefaultCnspecResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("200M"),
+		corev1.ResourceMemory: resource.MustParse("400M"),
 		corev1.ResourceCPU:    resource.MustParse("600m"),
 	},
 
