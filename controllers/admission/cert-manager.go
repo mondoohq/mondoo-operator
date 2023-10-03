@@ -6,16 +6,18 @@ package admission
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"reflect"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	certmanagerv1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 	certmanagerrefv1 "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
@@ -66,6 +68,11 @@ func (c *CertManagerHandler) Cleanup(ctx context.Context) error {
 	}
 
 	if err := k8s.DeleteIfExists(ctx, c.KubeClient, certificate); err != nil {
+		// If the resource discovery failed, we assume that cert-manager is not installed
+		var discoveryErr *apiutil.ErrResourceDiscoveryFailed
+		if errors.As(err, &discoveryErr) {
+			return nil
+		}
 		certManagerLog.Error(err, "Failed to clean up cert-manager Certificate resource")
 		return err
 	}
@@ -106,7 +113,7 @@ func (c *CertManagerHandler) syncCertManagerIssuer(ctx context.Context) error {
 	}
 
 	if err := c.KubeClient.Get(ctx, client.ObjectKeyFromObject(issuer), issuer); err != nil {
-		if errors.IsNotFound(err) {
+		if kerrors.IsNotFound(err) {
 			issuer.Spec = issuerSpec
 			if err := c.KubeClient.Create(ctx, issuer); err != nil {
 				webhookLog.Error(err, "Failed to create cert-manager Issuer resource")
@@ -158,7 +165,7 @@ func (c *CertManagerHandler) syncCertManagerCertificate(ctx context.Context) err
 	}
 
 	if err := c.KubeClient.Get(ctx, client.ObjectKeyFromObject(certificate), certificate); err != nil {
-		if errors.IsNotFound(err) {
+		if kerrors.IsNotFound(err) {
 			certificate.Spec = certificateSpec
 			if err := c.KubeClient.Create(ctx, certificate); err != nil {
 				webhookLog.Error(err, "Failed to create cert-manager Certificate resource")
