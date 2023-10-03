@@ -15,5 +15,6 @@ project {
     "**/*_string.go",
     "charts/mondoo-operator/**",
     "config/**/*.yaml",
+    "controllers/admission/webhook-manifests.yaml",
   ]
 }
