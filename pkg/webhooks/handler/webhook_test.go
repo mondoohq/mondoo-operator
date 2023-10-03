@@ -327,7 +327,7 @@ func TestWebhookNamespaceFiltering(t *testing.T) {
 			t.Logf("Handle() response: %+v", response)
 
 			// Assert
-			assert.Equal(t, test.expectReason, string(response.AdmissionResponse.Result.Reason))
+			assert.Equal(t, test.expectReason, string(response.AdmissionResponse.Result.Message))
 		})
 	}
 }
