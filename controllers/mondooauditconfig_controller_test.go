@@ -18,7 +18,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -82,14 +81,14 @@ func TestTokenRegistration(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		existingObjects  []runtime.Object
+		existingObjects  []client.Object
 		mockMondooClient func(*gomock.Controller) *mockmondoo.MockMondooClient
 		verify           func(*testing.T, client.Client)
 		expectError      bool
 	}{
 		{
 			name: "generate service account from token secret",
-			existingObjects: []runtime.Object{
+			existingObjects: []client.Object{
 				testTokenSecret(),
 				testMondooAuditConfig(),
 			},
@@ -119,7 +118,7 @@ func TestTokenRegistration(t *testing.T) {
 		},
 		{
 			name: "no token, no service account",
-			existingObjects: []runtime.Object{
+			existingObjects: []client.Object{
 				testMondooAuditConfig(),
 			},
 			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
@@ -141,8 +140,8 @@ func TestTokenRegistration(t *testing.T) {
 		},
 		{
 			name: "already a Mondoo creds secret",
-			existingObjects: func() []runtime.Object {
-				objs := []runtime.Object{testMondooAuditConfig()}
+			existingObjects: func() []client.Object {
+				objs := []client.Object{testMondooAuditConfig()}
 
 				objs = append(objs, &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -177,7 +176,7 @@ func TestTokenRegistration(t *testing.T) {
 		},
 		{
 			name: "mondoo API error",
-			existingObjects: []runtime.Object{
+			existingObjects: []client.Object{
 				testTokenSecret(),
 				testMondooAuditConfig(),
 			},
@@ -192,8 +191,8 @@ func TestTokenRegistration(t *testing.T) {
 		},
 		{
 			name: "malformed JWT",
-			existingObjects: func() []runtime.Object {
-				objs := []runtime.Object{testMondooAuditConfig()}
+			existingObjects: func() []client.Object {
+				objs := []client.Object{testMondooAuditConfig()}
 				sec := testTokenSecret()
 				sec.Data["token"] = []byte("NOT JWT DATA")
 				objs = append(objs, sec)
@@ -208,7 +207,7 @@ func TestTokenRegistration(t *testing.T) {
 		},
 		{
 			name: "generate service account via Integrations",
-			existingObjects: []runtime.Object{
+			existingObjects: []client.Object{
 				testIntegrationTokenSecret(),
 				testMondooAuditConfigWithIntegration(),
 			},
@@ -286,7 +285,7 @@ func TestTokenRegistration(t *testing.T) {
 		},
 		{
 			name: "missing owner claim error",
-			existingObjects: []runtime.Object{
+			existingObjects: []client.Object{
 				testTokenSecret(),
 				testMondooAuditConfigWithIntegration(),
 			},
@@ -311,7 +310,10 @@ func TestTokenRegistration(t *testing.T) {
 				return mClient, nil
 			}
 
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjects...).Build()
+			fakeClient := fake.NewClientBuilder().
+				WithStatusSubresource(test.existingObjects...).
+				WithObjects(test.existingObjects...).
+				Build()
 
 			scanApiStore := scan_api_store.NewScanApiStore(context.Background())
 			go scanApiStore.Start()
@@ -365,7 +367,10 @@ func TestMondooAuditConfigStatus(t *testing.T) {
 	mondooAuditConfig := testMondooAuditConfig()
 	testToken := testTokenSecret()
 
-	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(mondooAuditConfig, testToken).Build()
+	fakeClient := fake.NewClientBuilder().
+		WithStatusSubresource(mondooAuditConfig, testToken).
+		WithObjects(mondooAuditConfig, testToken).
+		Build()
 
 	scanApiStore := scan_api_store.NewScanApiStore(context.Background())
 	go scanApiStore.Start()

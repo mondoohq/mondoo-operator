@@ -158,7 +158,7 @@ func updateIntegrationCondition(config *v1alpha2.MondooAuditConfig, degradedStat
 		status = corev1.ConditionFalse
 	} else if degradedStatus {
 		msg = "Mondoo integration not working"
-		reason = "IntegrationUnvailable"
+		reason = "IntegrationUnavailable"
 		status = corev1.ConditionTrue
 	}
 

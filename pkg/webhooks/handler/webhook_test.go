@@ -193,7 +193,7 @@ func TestWebhookValidate(t *testing.T) {
 			assert.Equal(t, test.expectAllowed, response.AdmissionResponse.Allowed)
 
 			if test.expectReason != "" {
-				assert.Equal(t, test.expectReason, string(response.AdmissionResponse.Result.Reason))
+				assert.Equal(t, test.expectReason, string(response.AdmissionResponse.Result.Message))
 			}
 		})
 	}

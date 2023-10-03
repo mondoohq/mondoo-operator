@@ -138,7 +138,7 @@ func (s *IntegrationCheckInSuite) TestClearPreviousCondition() {
 		},
 	}
 
-	existingObjects := []runtime.Object{
+	existingObjects := []client.Object{
 		testMondooCredsSecret(),
 		mondooAuditConfig,
 	}
@@ -156,7 +156,10 @@ func (s *IntegrationCheckInSuite) TestClearPreviousCondition() {
 		return mClient, nil
 	}
 
-	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()
+	fakeClient := fake.NewClientBuilder().
+		WithStatusSubresource(existingObjects...).
+		WithObjects(existingObjects...).
+		Build()
 
 	r := &IntegrationReconciler{
 		Client:              fakeClient,
@@ -180,7 +183,7 @@ func (s *IntegrationCheckInSuite) TestMissingIntegrationMRN() {
 	credsSecret := testMondooCredsSecret()
 	delete(credsSecret.Data, constants.MondooCredsSecretIntegrationMRNKey)
 
-	existingObjects := []runtime.Object{
+	existingObjects := []client.Object{
 		credsSecret,
 		mondooAuditConfig,
 	}
@@ -194,7 +197,10 @@ func (s *IntegrationCheckInSuite) TestMissingIntegrationMRN() {
 		return mClient, nil
 	}
 
-	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()
+	fakeClient := fake.NewClientBuilder().
+		WithStatusSubresource(existingObjects...).
+		WithObjects(existingObjects...).
+		Build()
 
 	r := &IntegrationReconciler{
 		Client:              fakeClient,
@@ -218,7 +224,7 @@ func (s *IntegrationCheckInSuite) TestBadServiceAccountData() {
 	credsSecret := testMondooCredsSecret()
 	credsSecret.Data[constants.MondooCredsSecretServiceAccountKey] = []byte("NOT VALID JWT")
 
-	existingObjects := []runtime.Object{
+	existingObjects := []client.Object{
 		credsSecret,
 		mondooAuditConfig,
 	}
@@ -232,7 +238,7 @@ func (s *IntegrationCheckInSuite) TestBadServiceAccountData() {
 		return mClient, nil
 	}
 
-	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()
+	fakeClient := fake.NewClientBuilder().WithObjects(existingObjects...).WithStatusSubresource(existingObjects...).Build()
 
 	r := &IntegrationReconciler{
 		Client:              fakeClient,
@@ -254,7 +260,7 @@ func (s *IntegrationCheckInSuite) TestFailedCheckIn() {
 	mondooAuditConfig := testMondooAuditConfig()
 	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
 
-	existingObjects := []runtime.Object{
+	existingObjects := []client.Object{
 		testMondooCredsSecret(),
 		mondooAuditConfig,
 	}
@@ -270,7 +276,10 @@ func (s *IntegrationCheckInSuite) TestFailedCheckIn() {
 		return mClient, nil
 	}
 
-	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()
+	fakeClient := fake.NewClientBuilder().
+		WithStatusSubresource(existingObjects...).
+		WithObjects(existingObjects...).
+		Build()
 
 	r := &IntegrationReconciler{
 		Client:              fakeClient,

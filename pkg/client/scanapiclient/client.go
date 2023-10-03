@@ -16,7 +16,6 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/client/common"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
-	"go.uber.org/zap"
 )
 
 const (
@@ -120,10 +119,8 @@ func (s *scanApiClient) ScanKubernetesResources(ctx context.Context, scanOpts *S
 	}
 
 	if feature_flags.GetEnableV9() {
-		zap.S().Info("using v9 inventory")
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Type = "k8s"
 	} else {
-		zap.S().Info("using v8 inventory")
 		scanJob.Inventory.Spec.Assets[0].Connections[0].Backend = inventory.ProviderType_K8S
 	}
 

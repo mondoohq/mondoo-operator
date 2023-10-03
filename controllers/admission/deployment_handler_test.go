@@ -316,7 +316,7 @@ func TestReconcile(t *testing.T) {
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Admission Deployment to exist")
 
-				assert.Equal(t, deployment.Spec.Replicas, int32((3)))
+				assert.Equal(t, ptr.To(int32(3)), deployment.Spec.Replicas)
 				assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, string(mondoov1alpha2.Permissive), "expected Webhook mode to be set to 'permissive'")
 			},
 		},
@@ -478,7 +478,10 @@ func TestReconcile(t *testing.T) {
 			if test.existingObjects != nil {
 				existingObj = append(existingObj, test.existingObjects(*auditConfig)...)
 			}
-			fakeClient := fake.NewClientBuilder().WithObjects(existingObj...).Build()
+			fakeClient := fake.NewClientBuilder().
+				WithStatusSubresource(existingObj...).
+				WithObjects(existingObj...).
+				Build()
 
 			webhooks := &DeploymentHandler{
 				Mondoo:                 auditConfig,
