@@ -13,12 +13,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 
-	"go.mondoo.com/cnquery/motor/asset"
-	v1 "go.mondoo.com/cnquery/motor/inventory/v1"
-	"go.mondoo.com/cnquery/motor/providers"
+	"go.mondoo.com/cnquery/providers-sdk/v1/inventory"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -87,7 +85,7 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 							Tolerations:   k8s.TaintsToTolerations(node.Spec.Taints),
 							// The node scanning does not use the Kubernetes API at all, therefore the service account token
 							// should not be mounted at all.
-							AutomountServiceAccountToken: pointer.Bool(false),
+							AutomountServiceAccountToken: ptr.To(false),
 							Containers: []corev1.Container{
 								{
 									Image:     image,
@@ -95,10 +93,10 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 									Command:   cmd,
 									Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources),
 									SecurityContext: &corev1.SecurityContext{
-										AllowPrivilegeEscalation: pointer.Bool(isOpenshift),
-										ReadOnlyRootFilesystem:   pointer.Bool(true),
-										RunAsNonRoot:             pointer.Bool(false),
-										RunAsUser:                pointer.Int64(0),
+										AllowPrivilegeEscalation: ptr.To(isOpenshift),
+										ReadOnlyRootFilesystem:   ptr.To(true),
+										RunAsNonRoot:             ptr.To(false),
+										RunAsUser:                ptr.To(int64(0)),
 										Capabilities: &corev1.Capabilities{
 											Drop: []corev1.Capability{
 												"ALL",
@@ -106,7 +104,7 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 										},
 										// RHCOS requires to run as privileged to properly do node scanning. If the container
 										// is not privileged, then we have no access to /proc.
-										Privileged: pointer.Bool(isOpenshift),
+										Privileged: ptr.To(isOpenshift),
 									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
@@ -133,6 +131,10 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 											Name:  "MONDOO_PROCFS",
 											Value: "on",
 										},
+										{
+											Name:  "MONDOO_AUTO_UPDATE",
+											Value: "false",
+										},
 									},
 								},
 							},
@@ -147,7 +149,7 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 									Name: "config",
 									VolumeSource: corev1.VolumeSource{
 										Projected: &corev1.ProjectedVolumeSource{
-											DefaultMode: pointer.Int32(corev1.ProjectedVolumeSourceDefaultMode),
+											DefaultMode: ptr.To(corev1.ProjectedVolumeSourceDefaultMode),
 											Sources: []corev1.VolumeProjection{
 												{
 													ConfigMap: &corev1.ConfigMapProjection{
@@ -182,8 +184,8 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 					},
 				},
 			},
-			SuccessfulJobsHistoryLimit: pointer.Int32(1),
-			FailedJobsHistoryLimit:     pointer.Int32(1),
+			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
+			FailedJobsHistoryLimit:     ptr.To(int32(1)),
 		},
 	}
 }
@@ -232,7 +234,7 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 							RestartPolicy: corev1.RestartPolicyOnFailure,
 							// The node scanning does not use the Kubernetes API at all, therefore the service account token
 							// should not be mounted at all.
-							AutomountServiceAccountToken: pointer.Bool(false),
+							AutomountServiceAccountToken: ptr.To(false),
 							Containers: []corev1.Container{
 								{
 									Image:           image,
@@ -251,15 +253,15 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 										},
 									},
 									SecurityContext: &corev1.SecurityContext{
-										AllowPrivilegeEscalation: pointer.Bool(false),
-										ReadOnlyRootFilesystem:   pointer.Bool(true),
-										RunAsNonRoot:             pointer.Bool(true),
+										AllowPrivilegeEscalation: ptr.To(false),
+										ReadOnlyRootFilesystem:   ptr.To(true),
+										RunAsNonRoot:             ptr.To(true),
 										Capabilities: &corev1.Capabilities{
 											Drop: []corev1.Capability{
 												"ALL",
 											},
 										},
-										Privileged: pointer.Bool(false),
+										Privileged: ptr.To(false),
 									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
@@ -276,7 +278,7 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 									Name: "token",
 									VolumeSource: corev1.VolumeSource{
 										Secret: &corev1.SecretVolumeSource{
-											DefaultMode: pointer.Int32(0o444),
+											DefaultMode: ptr.To(int32(0o444)),
 											SecretName:  scanapi.TokenSecretName(m.Name),
 										},
 									},
@@ -286,8 +288,8 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 					},
 				},
 			},
-			SuccessfulJobsHistoryLimit: pointer.Int32(1),
-			FailedJobsHistoryLimit:     pointer.Int32(1),
+			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
+			FailedJobsHistoryLimit:     ptr.To(int32(1)),
 		},
 	}
 }
@@ -325,22 +327,21 @@ func ConfigMapName(prefix, nodeName string) string {
 }
 
 func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
-	inv := &v1.Inventory{
-		Metadata: &v1.ObjectMeta{
+	inv := &inventory.Inventory{
+		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-node-inventory",
 			Labels: map[string]string{
 				"environment": "production",
 			},
 		},
-		Spec: &v1.InventorySpec{
-			Assets: []*asset.Asset{
+		Spec: &inventory.InventorySpec{
+			Assets: []*inventory.Asset{
 				{
 					Id:   "host",
 					Name: node.Name,
-					Connections: []*providers.Config{
+					Connections: []*inventory.Config{
 						{
 							Host:       "/mnt/host",
-							Backend:    providers.ProviderType_FS,
 							PlatformId: fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/%s", clusterUID, node.UID),
 						},
 					},
@@ -351,6 +352,12 @@ func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.M
 				},
 			},
 		},
+	}
+
+	if feature_flags.GetEnableV9() {
+		inv.Spec.Assets[0].Connections[0].Type = "fs"
+	} else {
+		inv.Spec.Assets[0].Connections[0].Backend = inventory.ProviderType_FS
 	}
 
 	if integrationMRN != "" {

@@ -15,7 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const CronJobNameSuffix = "-k8s-scan"
@@ -70,7 +70,7 @@ func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditCon
 							RestartPolicy: corev1.RestartPolicyOnFailure,
 							// Triggering the Kubernetes resources scan does not require any API access, therefore no service account
 							// is needed.
-							AutomountServiceAccountToken: pointer.Bool(false),
+							AutomountServiceAccountToken: ptr.To(false),
 							Containers: []corev1.Container{
 								{
 									Image:           image,
@@ -89,15 +89,15 @@ func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditCon
 										},
 									},
 									SecurityContext: &corev1.SecurityContext{
-										AllowPrivilegeEscalation: pointer.Bool(false),
-										ReadOnlyRootFilesystem:   pointer.Bool(true),
-										RunAsNonRoot:             pointer.Bool(true),
+										AllowPrivilegeEscalation: ptr.To(false),
+										ReadOnlyRootFilesystem:   ptr.To(true),
+										RunAsNonRoot:             ptr.To(true),
 										Capabilities: &corev1.Capabilities{
 											Drop: []corev1.Capability{
 												"ALL",
 											},
 										},
-										Privileged: pointer.Bool(false),
+										Privileged: ptr.To(false),
 									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
@@ -114,7 +114,7 @@ func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditCon
 									Name: "token",
 									VolumeSource: corev1.VolumeSource{
 										Secret: &corev1.SecretVolumeSource{
-											DefaultMode: pointer.Int32(0o444),
+											DefaultMode: ptr.To(int32(0o444)),
 											SecretName:  scanapi.TokenSecretName(m.Name),
 										},
 									},
@@ -124,8 +124,8 @@ func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditCon
 					},
 				},
 			},
-			SuccessfulJobsHistoryLimit: pointer.Int32(1),
-			FailedJobsHistoryLimit:     pointer.Int32(1),
+			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
+			FailedJobsHistoryLimit:     ptr.To(int32(1)),
 		},
 	}
 }

@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -63,7 +63,7 @@ func (n *DeploymentHandler) syncValidatingWebhookConfiguration(ctx context.Conte
 		vwc.Webhooks[i].ClientConfig.Service.Namespace = n.Mondoo.Namespace
 
 		if vwc.Webhooks[i].ClientConfig.Service.Port == nil {
-			vwc.Webhooks[i].ClientConfig.Service.Port = pointer.Int32(443)
+			vwc.Webhooks[i].ClientConfig.Service.Port = ptr.To(int32(443))
 		}
 	}
 

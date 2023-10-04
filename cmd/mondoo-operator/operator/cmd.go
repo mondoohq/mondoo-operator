@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -37,6 +38,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -67,15 +69,19 @@ func init() {
 
 		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 			Scheme:                 scheme,
-			MetricsBindAddress:     *metricsAddr,
-			Port:                   9443,
+			Metrics:                metricsserver.Options{BindAddress: *metricsAddr},
+			WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}),
 			HealthProbeBindAddress: *probeAddr,
 			LeaderElection:         *enableLeaderElection,
 			LeaderElectionID:       "60679458.mondoo.com",
-			ClientDisableCacheFor: []client.Object{
-				// Don't cache so we can do a Get() on a Secret without a background List()
-				// trying to cache things we don't have access to
-				&corev1.Secret{},
+			Client: client.Options{
+				Cache: &client.CacheOptions{
+					DisableFor: []client.Object{
+						// Don't cache so we can do a Get() on a Secret without a background List()
+						// trying to cache things we don't have access to
+						&corev1.Secret{},
+					},
+				},
 			},
 		})
 		if err != nil {

@@ -6,8 +6,7 @@ package scanapiclient
 import (
 	"context"
 
-	v1 "go.mondoo.com/cnquery/motor/inventory/v1"
-	"go.mondoo.com/cnquery/motor/providers"
+	"go.mondoo.com/cnquery/providers-sdk/v1/inventory"
 	"go.mondoo.com/cnspec/policy/scan"
 	"go.mondoo.com/mondoo-operator/pkg/client/common"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -31,7 +30,7 @@ type AdmissionReviewJob struct {
 	// Additional options for the manifest job
 	Options map[string]string `json:"options,omitempty"`
 	// Additional discovery settings for the manifest job
-	Discovery *providers.Discovery `json:"discovery,omitempty"`
+	Discovery *inventory.Discovery `json:"discovery,omitempty"`
 }
 
 type File struct {
@@ -66,8 +65,8 @@ const (
 )
 
 type ScanJob struct {
-	Inventory  v1.Inventory `json:"inventory"`
-	ReportType ReportType   `protobuf:"varint,22,opt,name=report_type,json=reportType,proto3,enum=mondoo.policy.scan.ReportType" json:"report_type,omitempty"`
+	Inventory  inventory.Inventory `json:"inventory"`
+	ReportType ReportType          `protobuf:"varint,22,opt,name=report_type,json=reportType,proto3,enum=mondoo.policy.scan.ReportType" json:"report_type,omitempty"`
 }
 
 type ScanKubernetesResourcesOpts struct {

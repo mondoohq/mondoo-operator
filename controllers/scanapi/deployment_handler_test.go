@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -359,7 +359,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.NoError(err)
 
 	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", false)
-	deployment.Spec.Replicas = pointer.Int32(3)
+	deployment.Spec.Replicas = ptr.To(int32(3))
 
 	service := ScanApiService(s.auditConfig.Namespace, s.auditConfig)
 	service.Spec.Ports[0].Port = 1234

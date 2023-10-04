@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,7 +32,7 @@ func TestAreDeploymentsEqual(t *testing.T) {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
-			Replicas: pointer.Int32(1),
+			Replicas: ptr.To(int32(1)),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
@@ -67,7 +67,7 @@ func TestAreDeploymentsEqual(t *testing.T) {
 							FailureThreshold:    5,
 						},
 						SecurityContext: &corev1.SecurityContext{
-							Privileged: pointer.Bool(false),
+							Privileged: ptr.To(false),
 							Capabilities: &corev1.Capabilities{
 								Add: []corev1.Capability{"NET_ADMIN"},
 							},
@@ -142,7 +142,7 @@ func TestAreDeploymentsEqual(t *testing.T) {
 			name: "should not be equal when replicas differ",
 			createB: func(a appsv1.Deployment) appsv1.Deployment {
 				b := *a.DeepCopy()
-				b.Spec.Replicas = pointer.Int32(3)
+				b.Spec.Replicas = ptr.To(int32(3))
 				return b
 			},
 			shouldBeEqual: false,
@@ -374,7 +374,7 @@ func TestAreCronJobsEqual(t *testing.T) {
 							}},
 							// The node scanning does not use the Kubernetes API at all, therefore the service account token
 							// should not be mounted at all.
-							AutomountServiceAccountToken: pointer.Bool(false),
+							AutomountServiceAccountToken: ptr.To(false),
 							Containers: []corev1.Container{
 								{
 									Image: "test-image:latest",
@@ -434,8 +434,8 @@ func TestAreCronJobsEqual(t *testing.T) {
 					},
 				},
 			},
-			SuccessfulJobsHistoryLimit: pointer.Int32(1),
-			FailedJobsHistoryLimit:     pointer.Int32(1),
+			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
+			FailedJobsHistoryLimit:     ptr.To(int32(1)),
 		},
 	}
 
@@ -564,7 +564,7 @@ func TestAreCronJobsEqual(t *testing.T) {
 			name: "should not be equal when successful jobs history limits differ",
 			createB: func(a batchv1.CronJob) batchv1.CronJob {
 				b := *a.DeepCopy()
-				b.Spec.SuccessfulJobsHistoryLimit = pointer.Int32(100)
+				b.Spec.SuccessfulJobsHistoryLimit = ptr.To(int32(100))
 				return b
 			},
 			shouldBeEqual: false,
@@ -573,7 +573,7 @@ func TestAreCronJobsEqual(t *testing.T) {
 			name: "should not be equal when failed jobs history limits differ",
 			createB: func(a batchv1.CronJob) batchv1.CronJob {
 				b := *a.DeepCopy()
-				b.Spec.FailedJobsHistoryLimit = pointer.Int32(100)
+				b.Spec.FailedJobsHistoryLimit = ptr.To(int32(100))
 				return b
 			},
 			shouldBeEqual: false,

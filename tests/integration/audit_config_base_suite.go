@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -579,7 +579,7 @@ func (s *AuditConfigBaseSuite) getPassingDeployment() *appsv1.Deployment {
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					AutomountServiceAccountToken: pointer.Bool(false),
+					AutomountServiceAccountToken: ptr.To(false),
 					Containers: []corev1.Container{
 						{
 							Name:            "ubuntu",
@@ -601,11 +601,11 @@ func (s *AuditConfigBaseSuite) getPassingDeployment() *appsv1.Deployment {
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"NET_RAW"},
 								},
-								RunAsNonRoot:             pointer.Bool(true),
-								RunAsUser:                pointer.Int64(1000),
-								ReadOnlyRootFilesystem:   pointer.Bool(true),
-								AllowPrivilegeEscalation: pointer.Bool(false),
-								Privileged:               pointer.Bool(false),
+								RunAsNonRoot:             ptr.To(true),
+								RunAsUser:                ptr.To(int64(1000)),
+								ReadOnlyRootFilesystem:   ptr.To(true),
+								AllowPrivilegeEscalation: ptr.To(false),
+								Privileged:               ptr.To(false),
 							},
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
@@ -637,7 +637,7 @@ func (s *AuditConfigBaseSuite) getFailingDeployment() *appsv1.Deployment {
 	deployment.ObjectMeta.Name = "failing-deployment"
 	deployment.ObjectMeta.Labels = labels
 	deployment.Spec.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
-		Privileged: pointer.Bool(true),
+		Privileged: ptr.To(true),
 	}
 	return deployment
 }

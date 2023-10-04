@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -132,14 +132,14 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 								},
 							},
 							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: pointer.Bool(false),
-								ReadOnlyRootFilesystem:   pointer.Bool(true),
+								AllowPrivilegeEscalation: ptr.To(false),
+								ReadOnlyRootFilesystem:   ptr.To(true),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{
 										"ALL",
 									},
 								},
-								Privileged: pointer.Bool(false),
+								Privileged: ptr.To(false),
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
@@ -159,18 +159,18 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 						},
 					},
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: pointer.Bool(true),
+						RunAsNonRoot: ptr.To(true),
 					},
 					// service account used during the initial bringup of the webhook
 					// by the supporting controller-runtime packages
 					ServiceAccountName:            m.Spec.Admission.ServiceAccountName,
-					TerminationGracePeriodSeconds: pointer.Int64(10),
+					TerminationGracePeriodSeconds: ptr.To(int64(10)),
 					Volumes: []corev1.Volume{
 						{
 							Name: "cert",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									DefaultMode: pointer.Int32(420),
+									DefaultMode: ptr.To(int32(420)),
 									SecretName:  GetTLSCertificatesSecretName(m.Name),
 								},
 							},
@@ -179,7 +179,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 							Name: "token",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									DefaultMode: pointer.Int32(0o444),
+									DefaultMode: ptr.To(int32(0o444)),
 									SecretName:  scanapi.TokenSecretName(m.Name),
 								},
 							},

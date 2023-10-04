@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
-	"go.mondoo.com/cnquery/motor/asset"
-	v1 "go.mondoo.com/cnquery/motor/inventory/v1"
-	"go.mondoo.com/cnquery/motor/providers"
+	"go.mondoo.com/cnquery/providers-sdk/v1/inventory"
 	"go.mondoo.com/cnspec/policy/scan"
 	"go.mondoo.com/mondoo-operator/pkg/client/common"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 )
 
 const (
@@ -28,6 +28,7 @@ const (
 type ScanApiClientOptions struct {
 	ApiEndpoint string
 	Token       string
+	HttpTimeout *time.Duration
 }
 
 type scanApiClient struct {
@@ -38,7 +39,7 @@ type scanApiClient struct {
 
 func NewClient(opts ScanApiClientOptions) (ScanApiClient, error) {
 	opts.ApiEndpoint = strings.TrimRight(opts.ApiEndpoint, "/")
-	client, err := common.DefaultHttpClient(nil)
+	client, err := common.DefaultHttpClient(nil, opts.HttpTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -95,18 +96,17 @@ func (s *scanApiClient) ScanKubernetesResources(ctx context.Context, scanOpts *S
 	url := s.ApiEndpoint + ScanKubernetesResourcesEndpoint
 	scanJob := &ScanJob{
 		ReportType: ReportType_ERROR,
-		Inventory: v1.Inventory{
-			Spec: &v1.InventorySpec{
-				Assets: []*asset.Asset{
+		Inventory: inventory.Inventory{
+			Spec: &inventory.InventorySpec{
+				Assets: []*inventory.Asset{
 					{
-						Connections: []*providers.Config{
+						Connections: []*inventory.Config{
 							{
-								Backend: providers.ProviderType_K8S,
 								Options: map[string]string{
 									"namespaces":         strings.Join(scanOpts.IncludeNamespaces, ","),
 									"namespaces-exclude": strings.Join(scanOpts.ExcludeNamespaces, ","),
 								},
-								Discover: &providers.Discovery{
+								Discover: &inventory.Discovery{
 									Targets: []string{"auto"},
 								},
 							},
@@ -116,6 +116,12 @@ func (s *scanApiClient) ScanKubernetesResources(ctx context.Context, scanOpts *S
 				},
 			},
 		},
+	}
+
+	if feature_flags.GetEnableV9() {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Type = "k8s"
+	} else {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Backend = inventory.ProviderType_K8S
 	}
 
 	setIntegrationMrn(scanOpts.IntegrationMrn, scanJob)
@@ -146,17 +152,16 @@ func (s *scanApiClient) ScheduleKubernetesResourceScan(ctx context.Context, inte
 	url := s.ApiEndpoint + ScheduleKubernetesResourceScanEndpoint
 	scanJob := &ScanJob{
 		ReportType: ReportType_ERROR,
-		Inventory: v1.Inventory{
-			Spec: &v1.InventorySpec{
-				Assets: []*asset.Asset{
+		Inventory: inventory.Inventory{
+			Spec: &inventory.InventorySpec{
+				Assets: []*inventory.Asset{
 					{
-						Connections: []*providers.Config{
+						Connections: []*inventory.Config{
 							{
-								Backend: providers.ProviderType_K8S,
 								Options: map[string]string{
 									"k8s-resources": resourceKey,
 								},
-								Discover: &providers.Discovery{
+								Discover: &inventory.Discovery{
 									Targets: []string{"auto"},
 								},
 							},
@@ -165,6 +170,12 @@ func (s *scanApiClient) ScheduleKubernetesResourceScan(ctx context.Context, inte
 				},
 			},
 		},
+	}
+
+	if feature_flags.GetEnableV9() {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Type = "k8s"
+	} else {
+		scanJob.Inventory.Spec.Assets[0].Connections[0].Backend = inventory.ProviderType_K8S
 	}
 
 	if len(managedBy) > 0 {

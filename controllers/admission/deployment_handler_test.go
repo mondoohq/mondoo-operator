@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -96,7 +96,7 @@ func TestReconcile(t *testing.T) {
 					Spec: mondoov1alpha2.MondooAuditConfigSpec{
 						Admission: mondoov1alpha2.Admission{
 							Mode:     mondoov1alpha2.Enforcing,
-							Replicas: pointer.Int32(1),
+							Replicas: ptr.To(int32(1)),
 						},
 					},
 				}
@@ -146,7 +146,7 @@ func TestReconcile(t *testing.T) {
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Admission Deployment to exist")
 
-				assert.Equal(t, deployment.Spec.Replicas, pointer.Int32(1))
+				assert.Equal(t, deployment.Spec.Replicas, ptr.To(int32(1)))
 				assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, string(mondoov1alpha2.Enforcing), "expected Webhook mode to be set to 'enforcing'")
 
 				vwcName, err := validatingWebhookName(&mondoov1alpha2.MondooAuditConfig{
@@ -173,7 +173,7 @@ func TestReconcile(t *testing.T) {
 			mondooAuditConfigSpec: func() mondoov1alpha2.MondooAuditConfigSpec {
 				mac := testMondooAuditConfigSpec(true, false)
 				mac.Admission.Mode = mondoov1alpha2.Enforcing
-				mac.Admission.Replicas = pointer.Int32(2)
+				mac.Admission.Replicas = ptr.To(int32(2))
 				return mac
 			}(),
 			validate: func(t *testing.T, kubeClient client.Client) {
@@ -182,7 +182,7 @@ func TestReconcile(t *testing.T) {
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Admission Deployment to exist")
 
-				assert.Equal(t, deployment.Spec.Replicas, pointer.Int32(2))
+				assert.Equal(t, deployment.Spec.Replicas, ptr.To(int32(2)))
 			},
 		},
 		{
@@ -298,7 +298,7 @@ func TestReconcile(t *testing.T) {
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Admission Deployment to exist")
 
-				assert.Equal(t, deployment.Spec.Replicas, pointer.Int32(1))
+				assert.Equal(t, deployment.Spec.Replicas, ptr.To(int32(1)))
 				assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, string(mondoov1alpha2.Permissive), "expected Webhook mode to be set to 'permissive'")
 			},
 		},
@@ -307,7 +307,7 @@ func TestReconcile(t *testing.T) {
 			mondooAuditConfigSpec: func() mondoov1alpha2.MondooAuditConfigSpec {
 				mac := testMondooAuditConfigSpec(true, false)
 				mac.Admission.Mode = mondoov1alpha2.Permissive
-				mac.Admission.Replicas = pointer.Int32(3)
+				mac.Admission.Replicas = ptr.To(int32(3))
 				return mac
 			}(),
 			validate: func(t *testing.T, kubeClient client.Client) {
@@ -316,7 +316,7 @@ func TestReconcile(t *testing.T) {
 				err := kubeClient.Get(context.TODO(), deploymentKey, deployment)
 				require.NoError(t, err, "expected Admission Deployment to exist")
 
-				assert.Equal(t, deployment.Spec.Replicas, pointer.Int32(3))
+				assert.Equal(t, ptr.To(int32(3)), deployment.Spec.Replicas)
 				assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Args, string(mondoov1alpha2.Permissive), "expected Webhook mode to be set to 'permissive'")
 			},
 		},
@@ -478,7 +478,10 @@ func TestReconcile(t *testing.T) {
 			if test.existingObjects != nil {
 				existingObj = append(existingObj, test.existingObjects(*auditConfig)...)
 			}
-			fakeClient := fake.NewClientBuilder().WithObjects(existingObj...).Build()
+			fakeClient := fake.NewClientBuilder().
+				WithStatusSubresource(existingObj...).
+				WithObjects(existingObj...).
+				Build()
 
 			webhooks := &DeploymentHandler{
 				Mondoo:                 auditConfig,
@@ -544,7 +547,7 @@ func testMondooAuditConfigSpec(admissionEnabled, integrationEnabled bool) mondoo
 	return mondoov1alpha2.MondooAuditConfigSpec{
 		Admission: mondoov1alpha2.Admission{
 			Enable:   admissionEnabled,
-			Replicas: pointer.Int32(1),
+			Replicas: ptr.To(int32(1)),
 		},
 		ConsoleIntegration: mondoov1alpha2.ConsoleIntegration{
 			Enable: integrationEnabled,

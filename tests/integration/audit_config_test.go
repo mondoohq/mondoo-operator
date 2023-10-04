@@ -10,7 +10,7 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type AuditConfigSuite struct {
@@ -54,8 +54,8 @@ func (s *AuditConfigSuite) TestReconcile_AdmissionEnforcing() {
 func (s *AuditConfigSuite) TestReconcile_AdmissionEnforcingScaleDownScanApi() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, true, false)
 	auditConfig.Spec.Admission.Mode = v1alpha2.Enforcing
-	auditConfig.Spec.Admission.Replicas = pointer.Int32(1)
-	auditConfig.Spec.Scanner.Replicas = pointer.Int32(1)
+	auditConfig.Spec.Admission.Replicas = ptr.To(int32(1))
+	auditConfig.Spec.Scanner.Replicas = ptr.To(int32(1))
 	s.testMondooAuditConfigAdmissionScaleDownScanApi(auditConfig)
 }
 

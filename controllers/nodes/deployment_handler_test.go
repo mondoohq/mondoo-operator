@@ -390,7 +390,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningStatus() {
 	cronJobs.Items[0].Status.LastScheduleTime = &metaNow
 	cronJobs.Items[0].Status.LastSuccessfulTime = &metaHourAgo
 
-	s.NoError(d.KubeClient.Update(s.ctx, &cronJobs.Items[0]))
+	s.NoError(d.KubeClient.Status().Update(s.ctx, &cronJobs.Items[0]))
 
 	// Reconcile to update the audit config status
 	result, err = d.Reconcile(s.ctx)
@@ -406,7 +406,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningStatus() {
 	// Make the jobs successful again
 	cronJobs.Items[0].Status.LastScheduleTime = nil
 	cronJobs.Items[0].Status.LastSuccessfulTime = nil
-	s.NoError(d.KubeClient.Update(s.ctx, &cronJobs.Items[0]))
+	s.NoError(d.KubeClient.Status().Update(s.ctx, &cronJobs.Items[0]))
 
 	// Reconcile to update the audit config status
 	result, err = d.Reconcile(s.ctx)

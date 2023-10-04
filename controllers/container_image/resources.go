@@ -8,18 +8,17 @@ import (
 	"strings"
 	"time"
 
-	"go.mondoo.com/cnquery/motor/asset"
-	v1 "go.mondoo.com/cnquery/motor/inventory/v1"
-	"go.mondoo.com/cnquery/motor/providers"
+	"go.mondoo.com/cnquery/providers-sdk/v1/inventory"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -43,6 +42,9 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 	if cfg.Spec.HttpProxy != nil {
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
+
+	envVars := feature_flags.AllFeatureFlagsAsEnv()
+	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 
 	// We want to start the cron job one minute after it was enabled.
 	cronStart := time.Now().Add(1 * time.Minute)
@@ -74,18 +76,18 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 									Command:         cmd,
 									Resources:       k8s.ResourcesRequirementsWithDefaults(m.Spec.Containers.Resources, k8s.DefaultContainerScanningResources),
 									SecurityContext: &corev1.SecurityContext{
-										AllowPrivilegeEscalation: pointer.Bool(false),
-										ReadOnlyRootFilesystem:   pointer.Bool(true),
+										AllowPrivilegeEscalation: ptr.To(false),
+										ReadOnlyRootFilesystem:   ptr.To(true),
 										Capabilities: &corev1.Capabilities{
 											Drop: []corev1.Capability{
 												"ALL",
 											},
 										},
-										RunAsNonRoot: pointer.Bool(true),
+										RunAsNonRoot: ptr.To(true),
 										// This is needed to prevent:
 										// Error: container has runAsNonRoot and image has non-numeric user (mondoo), cannot verify user is non-root ...
-										RunAsUser:  pointer.Int64(101),
-										Privileged: pointer.Bool(false),
+										RunAsUser:  ptr.To(int64(101)),
+										Privileged: ptr.To(false),
 									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
@@ -98,7 +100,7 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 											MountPath: "/tmp",
 										},
 									},
-									Env: feature_flags.AllFeatureFlagsAsEnv(),
+									Env: envVars,
 								},
 							},
 							ServiceAccountName: m.Spec.Scanner.ServiceAccountName,
@@ -113,7 +115,7 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 									Name: "config",
 									VolumeSource: corev1.VolumeSource{
 										Projected: &corev1.ProjectedVolumeSource{
-											DefaultMode: pointer.Int32(corev1.ProjectedVolumeSourceDefaultMode),
+											DefaultMode: ptr.To(int32(corev1.ProjectedVolumeSourceDefaultMode)),
 											Sources: []corev1.VolumeProjection{
 												{
 													ConfigMap: &corev1.ConfigMapProjection{
@@ -142,8 +144,8 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 					},
 				},
 			},
-			SuccessfulJobsHistoryLimit: pointer.Int32(1),
-			FailedJobsHistoryLimit:     pointer.Int32(1),
+			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
+			FailedJobsHistoryLimit:     ptr.To(int32(1)),
 		},
 	}
 
@@ -168,7 +170,7 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 							},
 						},
 					},
-					DefaultMode: pointer.Int32(0o440),
+					DefaultMode: ptr.To(int32(0o440)),
 				},
 			},
 		})
@@ -225,21 +227,20 @@ func ConfigMapName(prefix string) string {
 }
 
 func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
-	inv := &v1.Inventory{
-		Metadata: &v1.ObjectMeta{
+	inv := &inventory.Inventory{
+		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-k8s-containers-inventory",
 		},
-		Spec: &v1.InventorySpec{
-			Assets: []*asset.Asset{
+		Spec: &inventory.InventorySpec{
+			Assets: []*inventory.Asset{
 				{
-					Connections: []*providers.Config{
+					Connections: []*inventory.Config{
 						{
-							Backend: providers.ProviderType_K8S,
 							Options: map[string]string{
 								"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
 								"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
 							},
-							Discover: &providers.Discovery{
+							Discover: &inventory.Discovery{
 								Targets: []string{"container-images"},
 							},
 						},
@@ -251,6 +252,14 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 				},
 			},
 		},
+	}
+
+	if feature_flags.GetEnableV9() {
+		zap.S().Info("using v9 inventory")
+		inv.Spec.Assets[0].Connections[0].Type = "k8s"
+	} else {
+		zap.S().Info("using v8 inventory")
+		inv.Spec.Assets[0].Connections[0].Backend = inventory.ProviderType_K8S
 	}
 
 	if integrationMRN != "" {
