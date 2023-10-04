@@ -22,7 +22,19 @@
             "program": "${workspaceRoot}/cmd/mondoo-operator/main.go",
             "args": ["operator"],
             "env": {
-                "MONDOO_NAMESPACE_OVERRIDE": "mondoo-operator"
+                "MONDOO_NAMESPACE_OVERRIDE": "mondoo-operator",
+            }
+        },
+        {
+            "name": "operator v9",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceRoot}/cmd/mondoo-operator/main.go",
+            "args": ["operator"],
+            "env": {
+                "MONDOO_NAMESPACE_OVERRIDE": "mondoo-operator",
+                "FEATURE_ENABLE_V9": "1"
             }
         },
         {
