@@ -24,7 +24,7 @@ var DefaultCnspecResources corev1.ResourceRequirements = corev1.ResourceRequirem
 // DefaultContainerScanningResources for cnspec container
 var DefaultContainerScanningResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("300M"),
+		corev1.ResourceMemory: resource.MustParse("500M"),
 		corev1.ResourceCPU:    resource.MustParse("1"),
 	},
 
