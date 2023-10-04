@@ -31,6 +31,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Sanitize version input
+        run: |
+          TAG=${{ github.event.inputs.version }}
+          echo "VERSION=${TAG#v}" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -49,8 +54,8 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           tags: |
-            type=semver,pattern={{version}},value=${{ github.event.inputs.version }}
-            type=semver,pattern={{major}},value=${{ github.event.inputs.version }}
+            type=semver,pattern={{version}},value=${{ env.VERSION }}
+            type=semver,pattern={{major}},value=${{ env.VERSION }}
             type=raw,value=latest
           flavor: |
             suffix=${{ matrix.suffix }},onlatest=true
@@ -61,7 +66,7 @@ jobs:
         with:
           context: .
           file: cnspec.Dockerfile
-          build-args: VERSION=${{ github.event.inputs.version }}
+          build-args: VERSION=${{ env.VERSION }}
           platforms: linux/amd64,linux/arm64,linux/arm
           push: true
           labels: ${{ steps.meta.outputs.labels }}
