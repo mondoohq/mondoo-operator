@@ -355,7 +355,7 @@ func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.M
 	}
 
 	if feature_flags.GetEnableV9() {
-		inv.Spec.Assets[0].Connections[0].Type = "fs"
+		inv.Spec.Assets[0].Connections[0].Type = "filesystem"
 	} else {
 		inv.Spec.Assets[0].Connections[0].Backend = inventory.ProviderType_FS
 	}
