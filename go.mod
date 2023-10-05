@@ -3,10 +3,10 @@ module go.mondoo.com/mondoo-operator
 go 1.21
 
 require (
+	github.com/cert-manager/cert-manager v1.12.1
 	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang/mock v1.6.0
-	github.com/jetstack/cert-manager v1.7.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.64.1
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.4
@@ -289,6 +289,7 @@ require (
 	mvdan.cc/interfacer v0.0.0-20180901003855-c20040233aed // indirect
 	mvdan.cc/lint v0.0.0-20170908181259-adc824a0674b // indirect
 	mvdan.cc/unparam v0.0.0-20230815095028-f7c6fb1088f0 // indirect
+	sigs.k8s.io/gateway-api v0.7.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 )
 
