@@ -34,10 +34,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Sanitize version input
+      - name: Sanitize version input (Workflow Dispatch)
+        if: github.event_name == 'workflow_dispatch'
         run: |
           TAG=${{ github.event.inputs.version }}
           echo "VERSION=${TAG#v}" >> $GITHUB_ENV
+      - name: Sanitize version input (Repository Dispatch)
+        if: github.event_name == 'repository_dispatch'
+        run: |
+          TAG=${{ github.event.client_payload.version }}
+          echo "VERSION=${TAG#v}" >> $GITHUB_ENV
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
