@@ -17,8 +17,8 @@ import (
 
 const (
 	CnspecImageV9              = "ghcr.io/mondoohq/mondoo-operator/cnspec"
-	CnspecTagV9                = "9.0.0-beta16-rootless"
-	OpenShiftMondooClientTagV9 = "9.0.0-beta16-ubi-rootless"
+	CnspecTagV9                = "9-rootless"
+	OpenShiftMondooClientTagV9 = "9-ubi-rootless"
 
 	CnspecImage              = "docker.io/mondoo/cnspec"
 	CnspecTag                = "8-rootless"
