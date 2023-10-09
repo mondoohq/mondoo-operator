@@ -26,8 +26,6 @@ jobs:
       matrix:
         suffix:
           - ""
-          - -rootless
-          - -ubi-rootless
           - -ubi
 
     steps:
@@ -67,7 +65,7 @@ jobs:
             type=semver,pattern={{major}},value=${{ env.VERSION }}
             type=raw,value=latest
           flavor: |
-            suffix=${{ matrix.suffix }},onlatest=true
+            suffix=${{ matrix.suffix }}-rootless,onlatest=true
 
       - name: Build and push cnspec image
         id: build-and-push-operator
@@ -75,8 +73,8 @@ jobs:
         with:
           context: .
           file: cnspec.Dockerfile
-          build-args: VERSION=${{ env.VERSION }}
-          platforms: linux/amd64,linux/arm64,linux/arm
+          build-args: VERSION=${{ env.VERSION }}${{ matrix.suffix }}
+          platforms: linux/amd64,linux/arm64
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
