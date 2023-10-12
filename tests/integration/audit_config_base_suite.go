@@ -64,10 +64,7 @@ func (s *AuditConfigBaseSuite) SetupSuite() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	s.ctx = context.Background()
 
-	sa, err := utils.GetServiceAccount()
-	s.Require().NoError(err, "Service account not set")
-	nexusClient, err := nexus.NewClient(sa)
-
+	nexusClient, err := nexus.NewClient()
 	s.Require().NoError(err, "Failed to create Nexus client")
 	s.spaceClient = nexusClient.GetSpace()
 
@@ -808,7 +805,7 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	cicdProject, err := s.integration.GetCiCdProject(s.ctx)
 	s.Require().NoError(err, "Failed to get CICD project")
 
-	assets, err := cicdProject.ListAssets(s.ctx, "")
+	assets, err := cicdProject.ListAssets(s.ctx)
 	s.Require().NoError(err, "Failed to list CICD assets")
 
 	assetNames := utils.CiCdJobNames(assets)
@@ -824,7 +821,7 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 		s.NoErrorf(err, "Failed creating a Deployment in permissive mode.")
 	}
 
-	assets, err = cicdProject.ListAssets(s.ctx, "")
+	assets, err = cicdProject.ListAssets(s.ctx)
 	s.Require().NoError(err, "Failed to list CICD assets")
 
 	assetNames = utils.CiCdJobNames(assets)

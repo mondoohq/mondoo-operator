@@ -86,6 +86,7 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_KubernetesResources() {
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Containers() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, true, false, false)
+	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 
 	// Ignore the operator namespace and the scanner namespace because we cannot scan a local image
 	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{s.ns.Name, s.testCluster.Settings.Namespace, "kube-system"}

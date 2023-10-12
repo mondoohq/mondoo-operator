@@ -183,7 +183,7 @@ type CiCdJob struct {
 	Grade     string
 }
 
-func (p *CiCdProject) ListAssets(ctx context.Context, assetType string) ([]CiCdJob, error) {
+func (p *CiCdProject) ListAssets(ctx context.Context) ([]CiCdJob, error) {
 	var q struct {
 		CicdProjectJobs struct {
 			Jobs struct {

@@ -4,4 +4,5 @@
     "gopls": {
         "formatting.gofumpt": true,
     },
+    "go.testEnvFile": "${workspaceFolder}/.env",
 }

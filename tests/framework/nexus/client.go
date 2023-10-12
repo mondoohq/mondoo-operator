@@ -4,28 +4,40 @@
 package nexus
 
 import (
-	"go.mondoo.com/cnquery/v9/providers-sdk/v1/upstream"
+	"fmt"
+	"os"
 
 	mondoogql "go.mondoo.com/mondoo-go"
 	"go.mondoo.com/mondoo-go/option"
 )
 
-type Client struct {
-	spaceMrn string
+const (
+	MONDOO_API_TOKEN_VAR    = "MONDOO_API_TOKEN"
+	MONDOO_GQL_ENDPOINT_VAR = "MONDOO_GQL_ENDPOINT"
+)
 
+type Client struct {
 	Client *mondoogql.Client
 }
 
-func NewClient(serviceAccount *upstream.ServiceAccountCredentials) (*Client, error) {
+func NewClient() (*Client, error) {
+	gqlEndpoint := os.Getenv(MONDOO_GQL_ENDPOINT_VAR)
+	if gqlEndpoint == "" {
+		return nil, fmt.Errorf("missing environment variable %s", MONDOO_GQL_ENDPOINT_VAR)
+	}
+
+	apiToken := os.Getenv(MONDOO_API_TOKEN_VAR)
+	if apiToken == "" {
+		return nil, fmt.Errorf("missing environment variable %s", MONDOO_API_TOKEN_VAR)
+	}
 	// Initialize the client
-	client, err := mondoogql.NewClient(option.WithEndpoint("https://api.edge.mondoo.com/query"), option.WithAPIToken(""))
+	client, err := mondoogql.NewClient(option.WithEndpoint(gqlEndpoint), option.WithAPIToken(apiToken))
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		spaceMrn: serviceAccount.ParentMrn,
-		Client:   client,
+		Client: client,
 	}, nil
 }
 
