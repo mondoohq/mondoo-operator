@@ -6,13 +6,14 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
+	nexusK8s "go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
 	v1 "k8s.io/api/core/v1"
 )
 
 func ExcludeClusterAsset(as []assets.AssetWithScore) []assets.AssetWithScore {
 	var newAssets []assets.AssetWithScore
 	for _, asset := range as {
-		if asset.Asset.AssetType != "k8s.cluster" {
+		if asset.AssetType != "k8s.cluster" {
 			newAssets = append(newAssets, asset)
 		}
 	}
@@ -22,7 +23,15 @@ func ExcludeClusterAsset(as []assets.AssetWithScore) []assets.AssetWithScore {
 func AssetNames(assets []assets.AssetWithScore) []string {
 	assetNames := make([]string, 0, len(assets))
 	for _, asset := range assets {
-		assetNames = append(assetNames, asset.Asset.Name)
+		assetNames = append(assetNames, asset.Name)
+	}
+	return assetNames
+}
+
+func CiCdAssetNames(assets []nexusK8s.CiCdAsset) []string {
+	assetNames := make([]string, 0, len(assets))
+	for _, asset := range assets {
+		assetNames = append(assetNames, asset.Name)
 	}
 	return assetNames
 }

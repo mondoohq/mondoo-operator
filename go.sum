@@ -824,6 +824,8 @@ github.com/shazow/go-diff v0.0.0-20160112020656-b6b7b6733b8c h1:W65qqJCIOVP4jpqP
 github.com/shazow/go-diff v0.0.0-20160112020656-b6b7b6733b8c/go.mod h1:/PevMnwAxekIXwN8qQyfc5gl2NlkB3CQlkizAbOkeBs=
 github.com/shurcooL/go v0.0.0-20180423040247-9e1955d9fb6e/go.mod h1:TDJrrUr11Vxrven61rcy3hJMUqaf/CLWYhHNPmT14Lk=
 github.com/shurcooL/go-goon v0.0.0-20170922171312-37c2f522c041/go.mod h1:N5mDOmsrJOB+vfqUK+7DmDyjhSLIIBnXo9lvZJj3MWQ=
+github.com/shurcooL/graphql v0.0.0-20230722043721-ed46e5a46466 h1:17JxqqJY66GmZVHkmAsGEkcIu0oCe3AM420QDgGwZx0=
+github.com/shurcooL/graphql v0.0.0-20230722043721-ed46e5a46466/go.mod h1:9dIRpgIY7hVhoqfe0/FcYp0bpInZaT7dc3BYOprrIUE=
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
 github.com/sirupsen/logrus v1.6.0/go.mod h1:7uNnSEd1DgxDLC74fIahvMZmmYsHGZGEOFrfsX/uA88=
@@ -932,6 +934,8 @@ go.mondoo.com/cnquery/v9 v9.0.3 h1:Su51rEkwpQUwo8z4ImXof4y3DdSGbB2s1U5e1YGyKEM=
 go.mondoo.com/cnquery/v9 v9.0.3/go.mod h1:z5QWUfNdvmjclRPcXjZBQID2/o2ivYiRCF8+3HE6dLc=
 go.mondoo.com/cnspec/v9 v9.0.3 h1:cPFktMYj3mIVS5wh/npr+d59BXdTHzTtqG5yBhcY1pw=
 go.mondoo.com/cnspec/v9 v9.0.3/go.mod h1:adEfockieGqy5WUKSgOVFhsY7YqfYp6UEWqM7EwVqyE=
+go.mondoo.com/mondoo-go v0.0.0-20231003201540-9988d4953ca2 h1:QZuJ/BB+b9IrEy9PYCe+WDKEHrZ8TvF9RMmmDrgkyvk=
+go.mondoo.com/mondoo-go v0.0.0-20231003201540-9988d4953ca2/go.mod h1:5J966CXm/8xQQzMNpbG1jGfn5FEbscJI5Tt/V2CIQ5w=
 go.mondoo.com/ranger-rpc v0.5.2 h1:UrcVtMIinzfWsuSzZKibbMqcGZSARInKJi0Xs2AxXeU=
 go.mondoo.com/ranger-rpc v0.5.2/go.mod h1:y5qqdFhOnSLKnAo8lXC0FKZoKLUYgLENvneww+q+7ws=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=

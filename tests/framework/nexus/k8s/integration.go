@@ -7,17 +7,11 @@ import (
 	"context"
 	"fmt"
 
-	cnspec "go.mondoo.com/cnspec/v9/policy"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/integrations"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
+	mondoogql "go.mondoo.com/mondoo-go"
 )
 
 type IntegrationBuilder struct {
-	integrations   integrations.IntegrationsManager
-	assetStore     policy.AssetStore
-	policyResolver cnspec.PolicyResolver
-
+	client              *mondoogql.Client
 	spaceMrn            string
 	name                string
 	scanNodes           bool
@@ -36,7 +30,7 @@ func (i *IntegrationBuilder) EnableWorkloadsScan() *IntegrationBuilder {
 	return i
 }
 
-func (i *IntegrationBuilder) EnableContainerImagesScan() *IntegrationBuilder {
+func (i *IntegrationBuilder) EnableContainersScan() *IntegrationBuilder {
 	i.scanContainerImages = true
 	return i
 }
@@ -47,39 +41,42 @@ func (i *IntegrationBuilder) EnableAdmissionController() *IntegrationBuilder {
 }
 
 func (b *IntegrationBuilder) Run(ctx context.Context) (*Integration, error) {
-	resp, err := b.integrations.Create(ctx, &integrations.CreateIntegrationRequest{
-		Name:     b.name,
-		SpaceMrn: b.spaceMrn,
-		Type:     integrations.Type_K8S,
-		ConfigurationInput: &integrations.ConfigurationInput{
-			ConfigOptions: &integrations.ConfigurationInput_K8SOptions{
-				K8SOptions: &integrations.K8SConfigurationOptionsInput{
-					ScanNodes:        b.scanNodes,
-					ScanWorkloads:    b.scanWorkloads,
-					ScanPublicImages: b.scanContainerImages,
-					ScanDeploys:      b.admissionController,
-				},
+	var m struct {
+		CreateIntegration struct {
+			Integration struct {
+				Mrn   string
+				Token string
+			}
+		} `graphql:"createClientIntegration(input: $input)"`
+	}
+	err := b.client.Mutate(ctx, &m, mondoogql.CreateClientIntegrationInput{
+		SpaceMrn: mondoogql.String(b.spaceMrn),
+		Name:     mondoogql.String(b.name),
+		Type:     mondoogql.ClientIntegrationTypeK8s,
+		ConfigurationOptions: mondoogql.ClientIntegrationConfigurationInput{
+			K8sConfigurationOptions: &mondoogql.K8sConfigurationOptionsInput{
+				ScanNodes:        mondoogql.Boolean(b.scanNodes),
+				ScanWorkloads:    mondoogql.Boolean(b.scanWorkloads),
+				ScanPublicImages: mondoogql.NewBooleanPtr(mondoogql.Boolean(b.scanContainerImages)),
+				ScanDeploys:      mondoogql.Boolean(b.admissionController),
 			},
 		},
-	})
+	}, nil)
 	if err != nil {
 		return nil, err
 	}
+
 	return &Integration{
-		integrations:   b.integrations,
-		assetStore:     b.assetStore,
-		policyResolver: b.policyResolver,
-		name:           b.name,
-		mrn:            resp.Integration.Mrn,
-		token:          resp.Integration.Token,
-		spaceMrn:       b.spaceMrn,
+		gqlClient: b.client,
+		name:      b.name,
+		mrn:       m.CreateIntegration.Integration.Mrn,
+		token:     m.CreateIntegration.Integration.Token,
+		spaceMrn:  b.spaceMrn,
 	}, nil
 }
 
 type Integration struct {
-	integrations   integrations.IntegrationsManager
-	assetStore     policy.AssetStore
-	policyResolver cnspec.PolicyResolver
+	gqlClient *mondoogql.Client
 
 	name     string
 	mrn      string
@@ -96,8 +93,12 @@ func (i *Integration) Token() string {
 }
 
 func (i *Integration) Delete(ctx context.Context) error {
-	_, err := i.integrations.Delete(ctx, &integrations.DeleteIntegrationRequest{Mrn: i.mrn})
-	return err
+	var m struct {
+		DeleteIntegration struct {
+			Mrn string
+		} `graphql:"deleteClientIntegration(input: $input)"`
+	}
+	return i.gqlClient.Mutate(ctx, &m, mondoogql.DeleteClientIntegrationInput{Mrn: mondoogql.String(i.mrn)}, nil)
 }
 
 func (i *Integration) DeleteCiCdProjectIfExists(ctx context.Context) error {
@@ -110,31 +111,92 @@ func (i *Integration) DeleteCiCdProjectIfExists(ctx context.Context) error {
 }
 
 func (i *Integration) GetCiCdProject(ctx context.Context) (*CiCdProject, error) {
-	resp, err := i.assetStore.ListCicdProjects(ctx, &policy.ListCicdProjectsRequest{SpaceMrn: i.spaceMrn})
+	var q struct {
+		CiCdProjects struct {
+			Projects struct {
+				Projects struct {
+					Edges []struct {
+						Node struct {
+							Mrn    string
+							Labels []struct {
+								Key   string
+								Value string
+							}
+						}
+					}
+				} `graphql:"projects(first: $first)"`
+			} `graphql:"... on CicdProjects"`
+		} `graphql:"cicdProjects(input: $input)"`
+	}
+
+	err := i.gqlClient.Query(ctx, &q, map[string]interface{}{"input": mondoogql.CicdProjectsInput{SpaceMrn: i.spaceMrn}, "first": mondoogql.Int(100)})
 	if err != nil {
 		return nil, err
 	}
 
-	for _, p := range resp.List {
-		if p.Labels["mondoo.com/integration-mrn"] == i.mrn {
-			return &CiCdProject{assetStore: i.assetStore, policyResolver: i.policyResolver, mrn: p.Mrn, spaceMrn: i.spaceMrn}, nil
+	for _, p := range q.CiCdProjects.Projects.Projects.Edges {
+		for _, l := range p.Node.Labels {
+			if l.Key == "mondoo.com/integration-mrn" && l.Value == i.mrn {
+				return &CiCdProject{gqlClient: i.gqlClient, mrn: p.Node.Mrn, spaceMrn: i.spaceMrn}, nil
+			}
 		}
 	}
 	return nil, fmt.Errorf("cannot find CI/CD project for integration %s", i.mrn)
 }
 
 type CiCdProject struct {
-	assetStore     policy.AssetStore
-	policyResolver cnspec.PolicyResolver
-	mrn            string
-	spaceMrn       string
+	gqlClient *mondoogql.Client
+	mrn       string
+	spaceMrn  string
 }
 
 func (p *CiCdProject) Delete(ctx context.Context) error {
-	_, err := p.assetStore.DeleteCicdProjects(ctx, &policy.DeleteCicdProjectsRequest{Mrns: []string{p.mrn}})
-	return err
+	var m struct {
+		DeleteCicdProject struct {
+			Mrns []string
+		} `graphql:"deleteCicdProjects(input: $input)"`
+	}
+	return p.gqlClient.Mutate(ctx, &m, mondoogql.DeleteProjectsInput{Mrns: []mondoogql.String{mondoogql.String(p.mrn)}}, nil)
 }
 
-func (p *CiCdProject) ListAssets(ctx context.Context, assetType string) ([]assets.AssetWithScore, error) {
-	return assets.ListAssetsWithScores(ctx, p.spaceMrn, "", p.mrn, assetType, p.assetStore, p.policyResolver)
+type CiCdAsset struct {
+	Mrn   string
+	Name  string
+	Grade string
+}
+
+func (p *CiCdProject) ListAssets(ctx context.Context, assetType string) ([]CiCdAsset, error) {
+	var q struct {
+		CicdProjectJobs struct {
+			Jobs struct {
+				Jobs struct {
+					Edges []struct {
+						Node struct {
+							Job struct {
+								Mrn   string
+								Name  string
+								Grade string
+							} `graphql:"... on KubernetesJob"`
+						}
+					}
+				} `graphql:"jobs(first:$first)"`
+			} `graphql:"... on CicdProjectJobs"`
+		} `graphql:"cicdProjectJobs(input: $input)"`
+	}
+	err := p.gqlClient.Query(ctx, &q, map[string]interface{}{
+		"input": mondoogql.CicdProjectJobsInput{SpaceMrn: p.spaceMrn, ProjectID: p.mrn},
+		"first": mondoogql.Int(100),
+	})
+	if err != nil {
+		return nil, err
+	}
+	assets := make([]CiCdAsset, 0, len(q.CicdProjectJobs.Jobs.Jobs.Edges))
+	for _, e := range q.CicdProjectJobs.Jobs.Jobs.Edges {
+		assets = append(assets, CiCdAsset{
+			Mrn:   e.Node.Job.Mrn,
+			Name:  e.Node.Job.Name,
+			Grade: e.Node.Job.Grade,
+		})
+	}
+	return assets, nil
 }

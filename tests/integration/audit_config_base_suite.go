@@ -37,7 +37,6 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
 	nexusK8s "go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
@@ -141,7 +140,7 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		// not sure why the above list does not work. It returns zero deployments. So, first a plain sleep to stabilize the test.
 		zap.S().Info("Cleanup done. Cluster should be good to go for the next test.")
 
-		s.Require().NoError(s.spaceClient.DeleteAssetsManagedBy(s.ctx, s.testCluster.ManagedBy()), "Failed to delete assets for integration")
+		s.Require().NoError(s.spaceClient.DeleteAssets(s.ctx), "Failed to delete assets in space")
 		s.Require().NoError(s.integration.DeleteCiCdProjectIfExists(s.ctx), "Failed to delete CICD project for integration")
 
 		_, err = s.testCluster.K8sHelper.Kubectl("delete", "pods", "-n", "default", "--all", "--wait")
@@ -194,7 +193,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	workloadNames, err := s.testCluster.K8sHelper.GetWorkloadNames(s.ctx)
 	s.NoError(err, "Failed to get workload names.")
 
-	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn(), "")
+	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
 	s.NoError(err, "Failed to list assets with scores.")
 
 	// TODO: the cluster name is non-deterministic currenctly so we cannot test for it
@@ -362,7 +361,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 		nodeNames = append(nodeNames, node.Name)
 	}
 
-	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn(), "")
+	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
 	s.NoError(err, "Failed to list assets")
 	assetNames := utils.AssetNames(assets)
 
@@ -795,9 +794,9 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	assets, err := cicdProject.ListAssets(s.ctx, "")
 	s.Require().NoError(err, "Failed to list CICD assets")
 
-	assetNames := utils.AssetNames(assets)
+	assetNames := utils.CiCdAssetNames(assets)
 	s.Contains(assetNames, fmt.Sprintf("%s/%s", passingDeployment.Namespace, passingDeployment.Name))
-	s.AssetsNotUnscored(assets)
+	s.CiCdAssetsNotUnscored(assets)
 
 	zap.S().Info("Create a Deployment which should be denied in enforcing mode.")
 	err = s.testCluster.K8sHelper.Clientset.Create(s.ctx, failingDeployment)
@@ -811,9 +810,9 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	assets, err = cicdProject.ListAssets(s.ctx, "")
 	s.Require().NoError(err, "Failed to list CICD assets")
 
-	assetNames = utils.AssetNames(assets)
+	assetNames = utils.CiCdAssetNames(assets)
 	s.Contains(assetNames, fmt.Sprintf("%s/%s", failingDeployment.Namespace, failingDeployment.Name))
-	s.AssetsNotUnscored(assets)
+	s.CiCdAssetsNotUnscored(assets)
 
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(passingDeployment), "Failed to delete passingDeployment")
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(failingDeployment), "Failed to delete failingDeployment")
@@ -1034,11 +1033,18 @@ func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []assets.AssetWithScore)
 	for _, asset := range assets {
 		// We don't score scratch containers at the moment so they are always unscored.
 		// We don't have policies for a cluster asset enabled at the moment so they are always unscored.
-		if asset.Asset.PlatformName != "scratch" && asset.Asset.PlatformName != "k8s-cluster" {
-			if asset.Score == nil {
-				zap.S().Infof("Asset %s has no score %v", asset.Asset.Name, asset.Asset)
+		if asset.Platform.Name != "scratch" && asset.Platform.Name != "k8s-cluster" {
+			if asset.Grade == "U" || asset.Grade == "" {
+				zap.S().Infof("Asset %s has no score", asset.Name)
 			}
-			s.NotEqualf(uint32(policy.ScoreType_UNSCORED), asset.Score.Type, "Asset %s should not be unscored", asset.Asset.Name)
+			s.NotEqualf("U", asset.Grade, "Asset %s should not be unscored", asset.Name)
+			// s.NotEqualf(uint32(policy.ScoreType_UNSCORED), asset.Score.Type, "Asset %s should not be unscored", asset.Asset.Name)
 		}
+	}
+}
+
+func (s *AuditConfigBaseSuite) CiCdAssetsNotUnscored(assets []nexusK8s.CiCdAsset) {
+	for _, asset := range assets {
+		s.NotEqualf("U", asset.Grade, "Asset %s should not be unscored", asset.Name)
 	}
 }
