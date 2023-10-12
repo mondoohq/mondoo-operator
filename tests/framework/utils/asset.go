@@ -28,10 +28,10 @@ func AssetNames(assets []assets.AssetWithScore) []string {
 	return assetNames
 }
 
-func CiCdAssetNames(assets []nexusK8s.CiCdAsset) []string {
+func CiCdJobNames(assets []nexusK8s.CiCdJob) []string {
 	assetNames := make([]string, 0, len(assets))
 	for _, asset := range assets {
-		assetNames = append(assetNames, asset.Name)
+		assetNames = append(assetNames, asset.Namespace+"/"+asset.Name)
 	}
 	return assetNames
 }

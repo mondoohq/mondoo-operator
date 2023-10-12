@@ -92,6 +92,21 @@ func (i *Integration) Token() string {
 	return i.token
 }
 
+func (i *Integration) GetStatus(ctx context.Context) (string, error) {
+	var q struct {
+		ClientIntegration struct {
+			Integration struct {
+				Status string
+			}
+		} `graphql:"clientIntegration(input: $input)"`
+	}
+	err := i.gqlClient.Query(ctx, &q, map[string]interface{}{"input": mondoogql.ClientIntegrationInput{Mrn: mondoogql.String(i.mrn)}})
+	if err != nil {
+		return "", err
+	}
+	return q.ClientIntegration.Integration.Status, nil
+}
+
 func (i *Integration) Delete(ctx context.Context) error {
 	var m struct {
 		DeleteIntegration struct {
@@ -118,6 +133,7 @@ func (i *Integration) GetCiCdProject(ctx context.Context) (*CiCdProject, error) 
 					Edges []struct {
 						Node struct {
 							Mrn    string
+							Id     string
 							Labels []struct {
 								Key   string
 								Value string
@@ -137,7 +153,7 @@ func (i *Integration) GetCiCdProject(ctx context.Context) (*CiCdProject, error) 
 	for _, p := range q.CiCdProjects.Projects.Projects.Edges {
 		for _, l := range p.Node.Labels {
 			if l.Key == "mondoo.com/integration-mrn" && l.Value == i.mrn {
-				return &CiCdProject{gqlClient: i.gqlClient, mrn: p.Node.Mrn, spaceMrn: i.spaceMrn}, nil
+				return &CiCdProject{gqlClient: i.gqlClient, mrn: p.Node.Mrn, id: p.Node.Id, spaceMrn: i.spaceMrn}, nil
 			}
 		}
 	}
@@ -147,6 +163,7 @@ func (i *Integration) GetCiCdProject(ctx context.Context) (*CiCdProject, error) 
 type CiCdProject struct {
 	gqlClient *mondoogql.Client
 	mrn       string
+	id        string
 	spaceMrn  string
 }
 
@@ -159,13 +176,14 @@ func (p *CiCdProject) Delete(ctx context.Context) error {
 	return p.gqlClient.Mutate(ctx, &m, mondoogql.DeleteProjectsInput{Mrns: []mondoogql.String{mondoogql.String(p.mrn)}}, nil)
 }
 
-type CiCdAsset struct {
-	Mrn   string
-	Name  string
-	Grade string
+type CiCdJob struct {
+	Mrn       string
+	Name      string
+	Namespace string
+	Grade     string
 }
 
-func (p *CiCdProject) ListAssets(ctx context.Context, assetType string) ([]CiCdAsset, error) {
+func (p *CiCdProject) ListAssets(ctx context.Context, assetType string) ([]CiCdJob, error) {
 	var q struct {
 		CicdProjectJobs struct {
 			Jobs struct {
@@ -173,9 +191,10 @@ func (p *CiCdProject) ListAssets(ctx context.Context, assetType string) ([]CiCdA
 					Edges []struct {
 						Node struct {
 							Job struct {
-								Mrn   string
-								Name  string
-								Grade string
+								Mrn       string
+								Name      string
+								Namespace string
+								Grade     string
 							} `graphql:"... on KubernetesJob"`
 						}
 					}
@@ -184,18 +203,19 @@ func (p *CiCdProject) ListAssets(ctx context.Context, assetType string) ([]CiCdA
 		} `graphql:"cicdProjectJobs(input: $input)"`
 	}
 	err := p.gqlClient.Query(ctx, &q, map[string]interface{}{
-		"input": mondoogql.CicdProjectJobsInput{SpaceMrn: p.spaceMrn, ProjectID: p.mrn},
+		"input": mondoogql.CicdProjectJobsInput{SpaceMrn: p.spaceMrn, ProjectID: p.id},
 		"first": mondoogql.Int(100),
 	})
 	if err != nil {
 		return nil, err
 	}
-	assets := make([]CiCdAsset, 0, len(q.CicdProjectJobs.Jobs.Jobs.Edges))
+	assets := make([]CiCdJob, 0, len(q.CicdProjectJobs.Jobs.Jobs.Edges))
 	for _, e := range q.CicdProjectJobs.Jobs.Jobs.Edges {
-		assets = append(assets, CiCdAsset{
-			Mrn:   e.Node.Job.Mrn,
-			Name:  e.Node.Job.Name,
-			Grade: e.Node.Job.Grade,
+		assets = append(assets, CiCdJob{
+			Mrn:       e.Node.Job.Mrn,
+			Name:      e.Node.Job.Name,
+			Namespace: e.Node.Job.Namespace,
+			Grade:     e.Node.Job.Grade,
 		})
 	}
 	return assets, nil

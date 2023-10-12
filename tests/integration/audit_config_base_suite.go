@@ -95,7 +95,7 @@ func (s *AuditConfigBaseSuite) SetupSuite() {
 
 func (s *AuditConfigBaseSuite) TearDownSuite() {
 	s.NoError(s.testCluster.UninstallOperator())
-	s.NoError(s.integration.Delete(s.ctx))
+	s.NoError(s.spaceClient.Delete(s.ctx))
 }
 
 func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
@@ -204,6 +204,10 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	s.ElementsMatch(workloadNames, assetNames, "Workloads were not sent upstream.")
 
 	s.AssetsNotUnscored(assets)
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondoov2.MondooAuditConfig) {
@@ -255,20 +259,21 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 
-	// TODO: we cannot verify container image scores, since multiple clusters are scanned in parallel
-	// at the moment just 1 container image asset exists per space
-
-	// containerImages, err := utils.ContainerImages(pods.Items, auditConfig)
-	// s.NoError(err, "Failed to get container image names")
+	containerImages, err := utils.ContainerImages(pods.Items, auditConfig)
+	s.NoError(err, "Failed to get container image names")
 
 	// Verify the container images have been sent upstream and have scores.
-	// assets, err := s.spaceClient.ListAssetsWithScores(s.ctx, s.integration.Mrn(), "container_image")
-	// s.NoError(err, "Failed to list assets with scores")
+	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
+	s.NoError(err, "Failed to list assets with scores")
 
-	// assetNames := utils.AssetNames(assets)
-	// s.Subset(assetNames, containerImages, "Container images were not sent upstream.")
+	assetNames := utils.AssetNames(assets)
+	s.Subset(assetNames, containerImages, "Container images were not sent upstream.")
 
-	// s.AssetsNotUnscored(assets)
+	s.AssetsNotUnscored(assets)
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
@@ -340,7 +345,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	// Verify the amount of CronJobs created is 1
 	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
 		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, gcCronJobs, gcListOpts))
-		if 1 == len(cronJobs.Items) {
+		if len(cronJobs.Items) == 1 {
 			return true, nil
 		}
 		return false, nil
@@ -367,6 +372,10 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 
 	s.ElementsMatch(assetNames, nodeNames, "Node names do not match")
 	s.AssetsNotUnscored(assets)
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
@@ -433,6 +442,10 @@ func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.Mondo
 	s.NoErrorf(err, "Couldn't access Webhook via port-forward")
 	zap.S().Info("Webhook should be working by now.")
 	s.checkDeployments(&auditConfig)
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionScaleDownScanApi(auditConfig mondoov2.MondooAuditConfig) {
@@ -579,6 +592,10 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAllDisabled(auditConfig mond
 
 	err := s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&s.auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
 }
 
 func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mondoov2.MondooAuditConfig) {
@@ -794,9 +811,9 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	assets, err := cicdProject.ListAssets(s.ctx, "")
 	s.Require().NoError(err, "Failed to list CICD assets")
 
-	assetNames := utils.CiCdAssetNames(assets)
+	assetNames := utils.CiCdJobNames(assets)
 	s.Contains(assetNames, fmt.Sprintf("%s/%s", passingDeployment.Namespace, passingDeployment.Name))
-	s.CiCdAssetsNotUnscored(assets)
+	s.CiCdJobNotUnscored(assets)
 
 	zap.S().Info("Create a Deployment which should be denied in enforcing mode.")
 	err = s.testCluster.K8sHelper.Clientset.Create(s.ctx, failingDeployment)
@@ -810,9 +827,9 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	assets, err = cicdProject.ListAssets(s.ctx, "")
 	s.Require().NoError(err, "Failed to list CICD assets")
 
-	assetNames = utils.CiCdAssetNames(assets)
+	assetNames = utils.CiCdJobNames(assets)
 	s.Contains(assetNames, fmt.Sprintf("%s/%s", failingDeployment.Namespace, failingDeployment.Name))
-	s.CiCdAssetsNotUnscored(assets)
+	s.CiCdJobNotUnscored(assets)
 
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(passingDeployment), "Failed to delete passingDeployment")
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(failingDeployment), "Failed to delete failingDeployment")
@@ -1043,8 +1060,8 @@ func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []assets.AssetWithScore)
 	}
 }
 
-func (s *AuditConfigBaseSuite) CiCdAssetsNotUnscored(assets []nexusK8s.CiCdAsset) {
+func (s *AuditConfigBaseSuite) CiCdJobNotUnscored(assets []nexusK8s.CiCdJob) {
 	for _, asset := range assets {
-		s.NotEqualf("U", asset.Grade, "Asset %s should not be unscored", asset.Name)
+		s.NotEqualf("U", asset.Grade, "CI/CD job %s should not be unscored", asset.Name)
 	}
 }
