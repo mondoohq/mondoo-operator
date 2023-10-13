@@ -62,7 +62,7 @@ To run the integration tests locally copy the `.env.example` file:
 ```bash
 cp .env.example .env
 ```
-Go to the Mondoo platform and create an API token for an organization of choice. Add the API token to the `.env` file. Double-check that the API is set to the correct environment, then run:
+Go to the Mondoo Platform and create an API token for an organization of choice. Add the API token to the `.env` file. Double-check that the API is set to the correct environment, then run:
 ```bash
 make test/integration
 ```
