@@ -57,6 +57,16 @@ Many files (documentation, manifests, ...) are auto-generated. Before proposing 
 2. Run `make generate` and `make test`.
 3. Commit the generated changes.
 
+### Running the integration tests locally
+To run the integration tests locally copy the `.env.example` file:
+```bash
+cp .env.example .env
+```
+Go to the Mondoo platform and create an API token for an organization of choice. Add the API token to the `.env` file. Double-check that the API is set to the correct environment, then run:
+```bash
+make test/integration
+```
+
 ## Security
 
 If you find a security vulnerability related to the Mondoo Operator, please do not report it by opening a GitHub issue. Instead, send an e-mail to [security@mondoo.com](mailto:security@mondoo.com)
