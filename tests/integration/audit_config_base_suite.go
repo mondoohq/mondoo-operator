@@ -193,6 +193,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	workloadNames, err := s.testCluster.K8sHelper.GetWorkloadNames(s.ctx)
 	s.NoError(err, "Failed to get workload names.")
 
+	time.Sleep(10 * time.Second)
+
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
 	s.NoError(err, "Failed to list assets with scores.")
 
@@ -261,6 +263,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 
 	containerImages, err := utils.ContainerImages(pods.Items, auditConfig)
 	s.NoError(err, "Failed to get container image names")
+
+	time.Sleep(10 * time.Second)
 
 	// Verify the container images have been sent upstream and have scores.
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
@@ -365,6 +369,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	for _, node := range nodes.Items {
 		nodeNames = append(nodeNames, node.Name)
 	}
+
+	time.Sleep(10 * time.Second)
 
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
 	s.NoError(err, "Failed to list assets")
