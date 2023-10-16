@@ -12,7 +12,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	go.mondoo.com/cnquery v0.0.0-20231002095839-7e970f5de89c
 	go.mondoo.com/cnspec v0.0.0-20231002100509-f3c8139427d2
-	go.mondoo.com/ranger-rpc v0.5.1
+	go.mondoo.com/ranger-rpc v0.5.2
 	k8s.io/api v0.28.2
 	k8s.io/apimachinery v0.28.2
 	k8s.io/client-go v0.28.2
@@ -279,7 +279,7 @@ require (
 	google.golang.org/api v0.143.0 // indirect
 	google.golang.org/genproto v0.0.0-20230920204549-e6e6cdab5c13 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230920204549-e6e6cdab5c13 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230920204549-e6e6cdab5c13 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20231002182017-d307bd883b97 // indirect
 	google.golang.org/grpc v1.58.2 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect

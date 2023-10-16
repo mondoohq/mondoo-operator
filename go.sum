@@ -926,8 +926,8 @@ go.mondoo.com/cnquery v0.0.0-20231002095839-7e970f5de89c h1:IJVxUDn6Skq1HuDB6oJg
 go.mondoo.com/cnquery v0.0.0-20231002095839-7e970f5de89c/go.mod h1:f+0iOhwFt7Clnl+1ereKY9bswZUjlLhKRLIAKAqLToU=
 go.mondoo.com/cnspec v0.0.0-20231002100509-f3c8139427d2 h1:PmWkg7ojHWNFnXl2ppEPJqoqk8N/TG7S1/M5IbYQMTs=
 go.mondoo.com/cnspec v0.0.0-20231002100509-f3c8139427d2/go.mod h1:PndB5E2I8GqOaGX8Ap6h7S/QmwnY4A0MwQFnSsNNhWY=
-go.mondoo.com/ranger-rpc v0.5.1 h1:OaVQntDJWDRgbc9nXBP4wOCR9h9Bij8LgHHs86IguGk=
-go.mondoo.com/ranger-rpc v0.5.1/go.mod h1:3YKcqFrlPgaB4FZ4EoLgdmRtwMQdO7RoAkZYFn+F1eY=
+go.mondoo.com/ranger-rpc v0.5.2 h1:UrcVtMIinzfWsuSzZKibbMqcGZSARInKJi0Xs2AxXeU=
+go.mondoo.com/ranger-rpc v0.5.2/go.mod h1:y5qqdFhOnSLKnAo8lXC0FKZoKLUYgLENvneww+q+7ws=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
@@ -1337,8 +1337,8 @@ google.golang.org/genproto v0.0.0-20230920204549-e6e6cdab5c13 h1:vlzZttNJGVqTsRF
 google.golang.org/genproto v0.0.0-20230920204549-e6e6cdab5c13/go.mod h1:CCviP9RmpZ1mxVr8MUjCnSiY09IbAXZxhLE6EhHIdPU=
 google.golang.org/genproto/googleapis/api v0.0.0-20230920204549-e6e6cdab5c13 h1:U7+wNaVuSTaUqNvK2+osJ9ejEZxbjHHk8F2b6Hpx0AE=
 google.golang.org/genproto/googleapis/api v0.0.0-20230920204549-e6e6cdab5c13/go.mod h1:RdyHbowztCGQySiCvQPgWQWgWhGnouTdCflKoDBt32U=
-google.golang.org/genproto/googleapis/rpc v0.0.0-20230920204549-e6e6cdab5c13 h1:N3bU/SQDCDyD6R528GJ/PwW9KjYcJA3dgyH+MovAkIM=
-google.golang.org/genproto/googleapis/rpc v0.0.0-20230920204549-e6e6cdab5c13/go.mod h1:KSqppvjFjtoCI+KGd4PELB0qLNxdJHRGqRI09mB6pQA=
+google.golang.org/genproto/googleapis/rpc v0.0.0-20231002182017-d307bd883b97 h1:6GQBEOdGkX6MMTLT9V+TjtIRZCw9VPD5Z+yHY9wMgS0=
+google.golang.org/genproto/googleapis/rpc v0.0.0-20231002182017-d307bd883b97/go.mod h1:v7nGkzlmW8P3n/bKmWBn2WpBjpOEx8Q6gMueudAmKfY=
 google.golang.org/grpc v1.19.0/go.mod h1:mqu4LbDTu4XGKhr4mRzUsmM4RtVoemTSY81AxZiDr8c=
 google.golang.org/grpc v1.20.1/go.mod h1:10oTOabMzJvdu6/UiuZezV6QK5dSlG84ov/aaiqXj38=
 google.golang.org/grpc v1.21.1/go.mod h1:oYelfM1adQP15Ek0mdvEgi9Df8B9CZIaU1084ijfRaM=
