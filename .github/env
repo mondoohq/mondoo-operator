@@ -1,2 +1,2 @@
-golang-version=1.21
+golang-version=1.21.3
 operator-sdk-version=v1.26.0
