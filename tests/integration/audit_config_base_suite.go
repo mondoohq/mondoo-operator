@@ -66,7 +66,7 @@ func (s *AuditConfigBaseSuite) SetupSuite() {
 
 	nexusClient, err := nexus.NewClient()
 	s.Require().NoError(err, "Failed to create Nexus client")
-	s.spaceClient = nexusClient.GetSpace()
+	s.spaceClient = nexusClient.CreateSpace()
 
 	// TODO: this is only needed because the integration creation is not part of the MondooInstaller struct.
 	// That code will move there once all tests are migrated to use the E2E approach.

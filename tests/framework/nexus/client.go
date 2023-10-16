@@ -13,14 +13,21 @@ import (
 
 const (
 	MONDOO_API_TOKEN_VAR    = "MONDOO_API_TOKEN"
+	MONDOO_ORG_MRN_VAR      = "MONDOO_ORG_MRN"
 	MONDOO_GQL_ENDPOINT_VAR = "MONDOO_GQL_ENDPOINT"
 )
 
 type Client struct {
+	orgMrn string
 	Client *mondoogql.Client
 }
 
 func NewClient() (*Client, error) {
+	orgMrn := os.Getenv(MONDOO_ORG_MRN_VAR)
+	if orgMrn == "" {
+		return nil, fmt.Errorf("missing environment variable %s", MONDOO_ORG_MRN_VAR)
+	}
+
 	gqlEndpoint := os.Getenv(MONDOO_GQL_ENDPOINT_VAR)
 	if gqlEndpoint == "" {
 		return nil, fmt.Errorf("missing environment variable %s", MONDOO_GQL_ENDPOINT_VAR)
@@ -37,11 +44,12 @@ func NewClient() (*Client, error) {
 	}
 
 	return &Client{
+		orgMrn: orgMrn,
 		Client: client,
 	}, nil
 }
 
 // TODO: when we support creating spaces this will actually create a space
-func (c *Client) GetSpace() *Space {
-	return NewSpace(c.Client)
+func (c *Client) CreateSpace() *Space {
+	return NewSpace(c.Client, c.orgMrn)
 }

@@ -18,13 +18,13 @@ type Space struct {
 	K8s       *k8s.Client
 }
 
-func NewSpace(gqlClient *mondoogql.Client) *Space {
+func NewSpace(gqlClient *mondoogql.Client, orgMrn string) *Space {
 	var m struct {
 		CreateSpace struct {
 			Mrn string
 		} `graphql:"createSpace(input: $input)"`
 	}
-	err := gqlClient.Mutate(context.Background(), &m, mondoogql.CreateSpaceInput{Name: "test", OrgMrn: "//captain.api.mondoo.app/organizations/determined-archimedes-391628"}, nil)
+	err := gqlClient.Mutate(context.Background(), &m, mondoogql.CreateSpaceInput{Name: "test", OrgMrn: mondoogql.String(orgMrn)}, nil)
 	if err != nil {
 		zap.S().Error(err)
 	}
