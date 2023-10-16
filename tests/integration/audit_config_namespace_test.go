@@ -120,6 +120,11 @@ func TestAuditConfigCustomNamespaceSuite(t *testing.T) {
 			if err := s.testCluster.UninstallOperator(); err != nil {
 				zap.S().Errorf("Failed to uninstall Mondoo operator. %v", err)
 			}
+			if s.spaceClient != nil {
+				if err := s.spaceClient.Delete(s.ctx); err != nil {
+					zap.S().Errorf("Failed to delete Mondoo space. %v", err)
+				}
+			}
 		}, s.T)
 	}(s)
 	suite.Run(t, s)
