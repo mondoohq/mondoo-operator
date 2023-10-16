@@ -82,7 +82,8 @@ jobs:
 
       - name: Run integration tests
         env:
-          MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE}}
+          MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
+          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration/ci
 
       - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml

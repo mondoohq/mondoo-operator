@@ -339,7 +339,8 @@ jobs:
 
       - name: Run integration tests
         env:
-          MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE }}
+          MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
+          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.meta.outputs.version }} make test/integration/ci
 
       - name: Clean up
@@ -434,7 +435,8 @@ jobs:
 
       - name: Run integration tests
         env:
-          MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE }}
+          MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
+          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.meta.outputs.version }} make test/integration/ci
 
       - name: Upload test logs artifact
