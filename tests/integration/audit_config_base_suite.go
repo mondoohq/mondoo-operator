@@ -34,6 +34,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus"
@@ -41,6 +42,7 @@ import (
 	nexusK8s "go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -62,6 +64,7 @@ type AuditConfigBaseSuite struct {
 
 func (s *AuditConfigBaseSuite) SetupSuite() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.SetLogger(logger.NewLogger())
 	s.ctx = context.Background()
 
 	nexusClient, err := nexus.NewClient()
@@ -193,7 +196,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
 	s.NoError(err, "Failed to list assets with scores.")
 
-	// TODO: the cluster name is non-deterministic currenctly so we cannot test for it
+	// TODO: the cluster name is non-deterministic currently so we cannot test for it
 	assetsExceptCluster := utils.ExcludeClusterAsset(assets)
 	s.Equal(len(assets)-1, len(assetsExceptCluster), "Cluster asset was sent upstream.")
 

@@ -11,6 +11,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/debouncer/mock"
+	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
+	scanapistoremock "go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store/mock"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,16 +41,42 @@ func (s *ResourceMonitorControllerSuite) AfterTest(suiteName, testName string) {
 
 func (s *ResourceMonitorControllerSuite) TestReconcile_Pod() {
 	ctx := context.Background()
+	scanApiStore := scanapistoremock.NewMockScanApiStore(s.mockCtrl)
 	r, err := NewResourceMonitorController(
 		s.fakeClientBuilder.Build(),
 		func() client.Object { return &corev1.Pod{} },
-		nil)
+		scanApiStore)
 	s.Require().NoError(err)
 	r.debouncer = s.debouncerMock
 
 	ns := utils.RandString(10)
 	name := utils.RandString(10)
+	scanApiStore.EXPECT().GetAll().Return([]scan_api_store.ClientConfiguration{{}}).Times(1)
 	s.debouncerMock.EXPECT().Add(fmt.Sprintf("pod:%s:%s", ns, name)).Times(1)
+
+	res, err := r.Reconcile(ctx, controllerruntime.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: ns,
+			Name:      name,
+		},
+	})
+	s.True(res.IsZero())
+	s.NoError(err)
+}
+
+func (s *ResourceMonitorControllerSuite) TestReconcile_Pod_NoScanApi() {
+	ctx := context.Background()
+	scanApiStore := scanapistoremock.NewMockScanApiStore(s.mockCtrl)
+	r, err := NewResourceMonitorController(
+		s.fakeClientBuilder.Build(),
+		func() client.Object { return &corev1.Pod{} },
+		scanApiStore)
+	s.Require().NoError(err)
+	r.debouncer = s.debouncerMock
+
+	ns := utils.RandString(10)
+	name := utils.RandString(10)
+	scanApiStore.EXPECT().GetAll().Return(nil)
 
 	res, err := r.Reconcile(ctx, controllerruntime.Request{
 		NamespacedName: types.NamespacedName{
