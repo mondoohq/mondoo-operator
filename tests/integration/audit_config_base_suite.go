@@ -635,7 +635,7 @@ func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mo
 
 	// everything is fine, now upgrade to current branch/release
 
-	branchInstaller := installer.NewMondooInstaller(installer.NewDefaultSettings(), s.T)
+	branchInstaller := installer.NewMondooInstaller(installer.NewDefaultSettings().SetToken(s.integration.Token()), s.T)
 	err = branchInstaller.InstallOperator()
 	s.NoErrorf(err, "Failed updating the latest operator release to this branch")
 
