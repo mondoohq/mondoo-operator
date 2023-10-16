@@ -64,6 +64,8 @@ jobs:
       - name: Print workflow inputs
         run: echo "${{ toJSON(github.event.inputs) }}"
 
+      - run: sleep 30
+
       # Now that dependencies are cached the tests start almost immediately after minikube has started
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
       # before the test execution starts.

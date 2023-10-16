@@ -24,6 +24,7 @@ func (s *AuditConfigUpgradeSuite) AfterTest(suiteName, testName string) {
 
 func (s *AuditConfigUpgradeSuite) TearDownSuite() {
 	s.NoError(s.testCluster.UninstallOperator())
+	s.NoError(s.spaceClient.Delete(s.ctx))
 }
 
 func (s *AuditConfigUpgradeSuite) TestUpgradePreviousReleaseToLatest() {
