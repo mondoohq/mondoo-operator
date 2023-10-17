@@ -24,7 +24,6 @@ import (
 const (
 	OperatorManifest           = "mondoo-operator-manifests.yaml"
 	AuditConfigManifest        = "config/samples/k8s_v1alpha2_mondooauditconfig_minimal.yaml"
-	MondooCredsFile            = "creds.json"
 	MondooClientsLabel         = "mondoo_cr=mondoo-client"
 	MondooClientsNodesLabel    = "audit=node"
 	MondooClientsK8sLabel      = "audit=k8s"

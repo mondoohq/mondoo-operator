@@ -1,3 +1,8 @@
+ifneq (,$(wildcard ./.env))
+	include .env
+	export
+endif
+
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -104,7 +109,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd paths="./api/..." output:crd:artifacts:config=config/crd/bases
 	$(CONTROLLER_GEN) rbac:roleName=manager-role webhook paths="./pkg/webhooks/..."
 
-generate: controller-gen gomockgen prep/repos prep/tools ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen gomockgen prep/tools ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 	go generate ./controllers/... ./pkg/...
 
@@ -135,7 +140,7 @@ test/integration: manifests generate generate-manifests load-k3d
 else
 test/integration: manifests generate generate-manifests load-minikube
 endif
-	go test -ldflags $(LDFLAGS) -v -timeout 25m -p 1 ./tests/integration/...
+	go test -ldflags $(LDFLAGS) -v -timeout 35m -p 1 ./tests/integration/...
 
 ifeq ($(K8S_DISTRO),gke)
 test/integration/ci: manifests generate generate-manifests gotestsum
@@ -148,7 +153,7 @@ test/integration/ci: manifests generate generate-manifests gotestsum load-k3d
 else
 test/integration/ci: manifests generate generate-manifests gotestsum load-minikube
 endif
-	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -ldflags $(LDFLAGS) -v -timeout 25m -p 1
+	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -ldflags $(LDFLAGS) -v -timeout 35m -p 1
 
 ##@ Build
 
@@ -402,16 +407,6 @@ prep/tools: prep/tools/ranger
 
 prep/tools/ranger:
 	go install go.mondoo.com/ranger-rpc/protoc-gen-rangerrpc@latest
-
-prep/repos:
-	test -x cnquery || git clone https://github.com/mondoohq/cnquery.git
-	cd cnquery && git fetch && git checkout main
-	test -x cnspec || git clone https://github.com/mondoohq/cnspec.git
-	cd cnspec && git fetch && git checkout main
-
-prep/repos/update: prep/repos
-	cd cnquery; git fetch; git checkout main && git pull; cd -;
-	cd cnspec; git checkout main && git pull; cd -;
 
 prep/ci/protoc:
 	curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v${PROTO_VERSION}/protoc-${PROTO_VERSION}-linux-x86_64.zip

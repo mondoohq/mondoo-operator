@@ -5,10 +5,6 @@ on:
       cnspecImageTag:
         required: true
         type: string
-      useEdge:
-        required: false
-        type: boolean
-        default: false
     secrets:
       MONDOO_CLIENT:
         required: true
@@ -64,15 +60,7 @@ jobs:
       - name: Print workflow inputs
         run: echo "${{ toJSON(github.event.inputs) }}"
 
-      - name: Store creds (edge)
-        if: ${{ inputs.useEdge == true }}
-        run: |
-          echo ${{ secrets.MONDOO_CLIENT_EDGE }} | base64 -d > creds.json
-
-      - name: Store creds (prod)
-        if: ${{ inputs.useEdge == false }}
-        run: |
-          echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
+      - run: sleep 30
 
       # Now that dependencies are cached the tests start almost immediately after minikube has started
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
@@ -82,7 +70,9 @@ jobs:
 
       - name: Run integration tests
         env:
-          MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE}}
+          MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
+          MONDOO_ORG_MRN: //captain.api.mondoo.app/organizations/serene-lovelace-854342
+          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration/ci
 
       - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml

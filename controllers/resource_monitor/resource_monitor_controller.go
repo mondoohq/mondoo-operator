@@ -82,6 +82,8 @@ func (r *ResourceMonitorController) Start(ctx context.Context) error {
 }
 
 func (r *ResourceMonitorController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.debouncer.Add(fmt.Sprintf("%s:%s:%s", r.resourceType, req.Namespace, req.Name))
+	if len(r.scanApiStore.GetAll()) > 0 {
+		r.debouncer.Add(fmt.Sprintf("%s:%s:%s", r.resourceType, req.Namespace, req.Name))
+	}
 	return ctrl.Result{}, nil
 }

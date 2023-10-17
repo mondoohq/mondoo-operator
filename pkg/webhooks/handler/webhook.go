@@ -22,7 +22,7 @@ import (
 
 	serializerYaml "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 
-	"go.mondoo.com/cnquery/providers-sdk/v1/inventory"
+	"go.mondoo.com/cnquery/v9/providers-sdk/v1/inventory"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -265,7 +265,7 @@ func (a *webhookValidator) objFromRaw(rawObj runtime.RawExtension) (runtime.Obje
 func (a *webhookValidator) skipNamespace(obj runtime.Object) (bool, error) {
 	objmeta, err := meta.Accessor(obj)
 	if err != nil {
-		handlerlog.Error(err, "error getting metadata from object")
+		handlerlog.Error(err, "error getting metadata from object", "type", reflect.TypeOf(obj))
 		return false, nil
 	}
 

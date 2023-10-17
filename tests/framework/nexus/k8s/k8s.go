@@ -4,29 +4,25 @@
 package k8s
 
 import (
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/integrations"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
+	mondoogql "go.mondoo.com/mondoo-go"
 )
 
 type Client struct {
-	spaceMrn     string
-	integrations integrations.IntegrationsManager
-	assetStore   policy.AssetStore
+	spaceMrn string
+	client   *mondoogql.Client
 }
 
-func NewClient(spaceMrn string, integrations integrations.IntegrationsManager, assetStore policy.AssetStore) *Client {
+func NewClient(spaceMrn string, gqlClient *mondoogql.Client) *Client {
 	return &Client{
-		spaceMrn:     spaceMrn,
-		integrations: integrations,
-		assetStore:   assetStore,
+		spaceMrn: spaceMrn,
+		client:   gqlClient,
 	}
 }
 
 func (k *Client) CreateIntegration(name string) *IntegrationBuilder {
 	return &IntegrationBuilder{
-		spaceMrn:     k.spaceMrn,
-		name:         name,
-		integrations: k.integrations,
-		assetStore:   k.assetStore,
+		spaceMrn: k.spaceMrn,
+		name:     name,
+		client:   k.client,
 	}
 }

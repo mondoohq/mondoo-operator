@@ -6,72 +6,57 @@ package nexus
 import (
 	"context"
 
-	cnspec "go.mondoo.com/cnspec/policy"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/captain"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/integrations"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
+	mondoogql "go.mondoo.com/mondoo-go"
+	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
 )
 
 type Space struct {
-	spaceMrn string
-
-	AssetStore     policy.AssetStore
-	PolicyResolver cnspec.PolicyResolver
-	Captain        captain.Captain
-	Integrations   integrations.IntegrationsManager
-
-	K8s *k8s.Client
+	spaceMrn  string
+	gqlClient *mondoogql.Client
+	K8s       *k8s.Client
 }
 
-type AssetWithScore struct {
-	Asset *policy.Asset
-	Score *cnspec.Score
-}
-
-func NewSpace(spaceMrn string, assetStore policy.AssetStore, policyResolver cnspec.PolicyResolver, captain captain.Captain, integrations integrations.IntegrationsManager) *Space {
-	return &Space{
-		spaceMrn:       spaceMrn,
-		AssetStore:     assetStore,
-		PolicyResolver: policyResolver,
-		Captain:        captain,
-		Integrations:   integrations,
-		K8s:            k8s.NewClient(spaceMrn, integrations, assetStore),
+func NewSpace(gqlClient *mondoogql.Client, orgMrn string) (*Space, error) {
+	var m struct {
+		CreateSpace struct {
+			Mrn string
+		} `graphql:"createSpace(input: $input)"`
 	}
-}
-
-func (s *Space) ListAssetsWithScores(ctx context.Context, integrationMrn string) ([]AssetWithScore, error) {
-	filter := &policy.AssetSearchFilter{SpaceMrn: s.spaceMrn}
-	if integrationMrn != "" {
-		filter.QueryTerms = []string{"{ \"mondoo.com/integration-mrn\": \"" + integrationMrn + "\" }"}
-	}
-
-	assetsPage, err := s.AssetStore.ListAssets(ctx, filter)
+	err := gqlClient.Mutate(context.Background(), &m, mondoogql.CreateSpaceInput{Name: "test", OrgMrn: mondoogql.String(orgMrn)}, nil)
 	if err != nil {
 		return nil, err
 	}
-
-	mrns := make([]string, len(assetsPage.List))
-	for i := range assetsPage.List {
-		mrns[i] = assetsPage.List[i].Mrn
-	}
-
-	assetScores := make([]AssetWithScore, len(assetsPage.List))
-	for i := range assetsPage.List {
-		asset := assetsPage.List[i]
-
-		// TODO: replace this call with GetScore(ctx, &cnspec.EntityScoreReq{EntityMrn: asset.Mrn, ScoreMrn: asset.Mrn}) once nexus is released
-		score, err := s.PolicyResolver.GetReport(ctx, &cnspec.EntityScoreReq{EntityMrn: asset.Mrn})
-		if err != nil {
-			return nil, err
-		}
-		assetScores[i] = AssetWithScore{Asset: asset, Score: score.Scores[asset.Mrn]}
-	}
-
-	return assetScores, nil
+	return &Space{
+		spaceMrn:  m.CreateSpace.Mrn,
+		gqlClient: gqlClient,
+		K8s:       k8s.NewClient(m.CreateSpace.Mrn, gqlClient),
+	}, nil
 }
 
-func (s *Space) DeleteAssetsManagedBy(ctx context.Context, managedBy string) error {
-	_, err := s.AssetStore.DeleteAssets(ctx, &policy.DeleteAssetsRequest{SpaceMrn: s.spaceMrn, ManagedBy: managedBy})
-	return err
+func (s *Space) Mrn() string {
+	return s.spaceMrn
+}
+
+func (s *Space) ListAssetsWithScores(ctx context.Context) ([]assets.AssetWithScore, error) {
+	return assets.ListAssetsWithScores(ctx, s.spaceMrn, s.gqlClient)
+}
+
+func (s *Space) Delete(ctx context.Context) error {
+	var m struct {
+		DeleteSpace string `graphql:"deleteSpace(spaceMrn: $input)"`
+	}
+	return s.gqlClient.Mutate(ctx, &m, nil, map[string]interface{}{
+		"input": mondoogql.ID(s.spaceMrn),
+	})
+}
+
+func (s *Space) DeleteAssets(ctx context.Context) error {
+	var m struct {
+		DeleteAssets struct {
+			SpaceMrn string
+		} `graphql:"deleteAssets(input: $input)"`
+	}
+
+	return s.gqlClient.Mutate(ctx, &m, mondoogql.DeleteAssetsInput{SpaceMrn: mondoogql.String(s.spaceMrn)}, nil)
 }

@@ -49,3 +49,4 @@ tests/integration/_output
 /cnspec
 
 package.json
+.env

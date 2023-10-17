@@ -24,10 +24,11 @@ func (s *AuditConfigUpgradeSuite) AfterTest(suiteName, testName string) {
 
 func (s *AuditConfigUpgradeSuite) TearDownSuite() {
 	s.NoError(s.testCluster.UninstallOperator())
+	s.NoError(s.spaceClient.Delete(s.ctx))
 }
 
 func (s *AuditConfigUpgradeSuite) TestUpgradePreviousReleaseToLatest() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, true, true, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, true, false)
 	s.testUpgradePreviousReleaseToLatest(auditConfig)
 }
 
@@ -38,6 +39,11 @@ func TestAuditConfigUpgradeSuite(t *testing.T) {
 		HandlePanics(recover(), func() {
 			if err := s.testCluster.UninstallOperator(); err != nil {
 				zap.S().Errorf("Failed to uninstall Mondoo operator. %v", err)
+			}
+			if s.spaceClient != nil {
+				if err := s.spaceClient.Delete(s.ctx); err != nil {
+					zap.S().Errorf("Failed to delete Mondoo space. %v", err)
+				}
 			}
 		}, s.T)
 	}(s)

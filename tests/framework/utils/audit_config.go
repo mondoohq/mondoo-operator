@@ -33,14 +33,14 @@ func init() {
 // make sure a test passes (e.g. setting the correct secret name). Values which have defaults are not set.
 // This means that using this function in unit tests might result in strange behavior. For unit tests use
 // DefaultAuditConfig instead.
-func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes, admission, consoleIntegration bool) mondoov2.MondooAuditConfig {
+func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes, admission bool) mondoov2.MondooAuditConfig {
 	auditConfig := mondoov2.MondooAuditConfig{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "mondoo-client",
 			Namespace: ns,
 		},
 		Spec: mondoov2.MondooAuditConfigSpec{
-			ConsoleIntegration:   mondoov2.ConsoleIntegration{Enable: consoleIntegration},
+			ConsoleIntegration:   mondoov2.ConsoleIntegration{Enable: true},
 			MondooCredsSecretRef: corev1.LocalObjectReference{Name: MondooClientSecret},
 			MondooTokenSecretRef: corev1.LocalObjectReference{Name: MondooTokenSecret},
 			KubernetesResources:  mondoov2.KubernetesResources{Enable: workloads},

@@ -5,15 +5,13 @@ package k8s
 
 import (
 	"context"
+	"fmt"
 
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/integrations"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
+	mondoogql "go.mondoo.com/mondoo-go"
 )
 
 type IntegrationBuilder struct {
-	integrations integrations.IntegrationsManager
-	assetStore   policy.AssetStore
-
+	client              *mondoogql.Client
 	spaceMrn            string
 	name                string
 	scanNodes           bool
@@ -32,7 +30,7 @@ func (i *IntegrationBuilder) EnableWorkloadsScan() *IntegrationBuilder {
 	return i
 }
 
-func (i *IntegrationBuilder) EnableContainerImagesScan() *IntegrationBuilder {
+func (i *IntegrationBuilder) EnableContainersScan() *IntegrationBuilder {
 	i.scanContainerImages = true
 	return i
 }
@@ -43,50 +41,182 @@ func (i *IntegrationBuilder) EnableAdmissionController() *IntegrationBuilder {
 }
 
 func (b *IntegrationBuilder) Run(ctx context.Context) (*Integration, error) {
-	resp, err := b.integrations.Create(ctx, &integrations.CreateIntegrationRequest{
-		Name:     b.name,
-		SpaceMrn: b.spaceMrn,
-		Type:     integrations.Type_K8S,
-		ConfigurationInput: &integrations.ConfigurationInput{
-			ConfigOptions: &integrations.ConfigurationInput_K8SOptions{
-				K8SOptions: &integrations.K8SConfigurationOptionsInput{
-					ScanNodes:        b.scanNodes,
-					ScanWorkloads:    b.scanWorkloads,
-					ScanPublicImages: b.scanContainerImages,
-					ScanDeploys:      b.admissionController,
-				},
+	var m struct {
+		CreateIntegration struct {
+			Integration struct {
+				Mrn   string
+				Token string
+			}
+		} `graphql:"createClientIntegration(input: $input)"`
+	}
+	err := b.client.Mutate(ctx, &m, mondoogql.CreateClientIntegrationInput{
+		SpaceMrn: mondoogql.String(b.spaceMrn),
+		Name:     mondoogql.String(b.name),
+		Type:     mondoogql.ClientIntegrationTypeK8s,
+		ConfigurationOptions: mondoogql.ClientIntegrationConfigurationInput{
+			K8sConfigurationOptions: &mondoogql.K8sConfigurationOptionsInput{
+				ScanNodes:        mondoogql.Boolean(b.scanNodes),
+				ScanWorkloads:    mondoogql.Boolean(b.scanWorkloads),
+				ScanPublicImages: mondoogql.NewBooleanPtr(mondoogql.Boolean(b.scanContainerImages)),
+				ScanDeploys:      mondoogql.Boolean(b.admissionController),
 			},
 		},
-	})
+	}, nil)
 	if err != nil {
 		return nil, err
 	}
+
 	return &Integration{
-		integrations: b.integrations,
-		mrn:          resp.Integration.Mrn,
+		gqlClient: b.client,
+		name:      b.name,
+		mrn:       m.CreateIntegration.Integration.Mrn,
+		token:     m.CreateIntegration.Integration.Token,
+		spaceMrn:  b.spaceMrn,
 	}, nil
 }
 
 type Integration struct {
-	integrations integrations.IntegrationsManager
+	gqlClient *mondoogql.Client
 
-	mrn string
+	name     string
+	mrn      string
+	spaceMrn string
+	token    string
 }
 
 func (i *Integration) Mrn() string {
 	return i.mrn
 }
 
-func (i *Integration) GetRegistrationToken(ctx context.Context) (string, error) {
-	resp, err := i.integrations.GetTokenForIntegration(
-		ctx, &integrations.GetTokenForIntegrationRequest{Mrn: i.mrn, LongLivedToken: false})
+func (i *Integration) Token() string {
+	return i.token
+}
+
+func (i *Integration) GetStatus(ctx context.Context) (string, error) {
+	var q struct {
+		ClientIntegration struct {
+			Integration struct {
+				Status string
+			}
+		} `graphql:"clientIntegration(input: $input)"`
+	}
+	err := i.gqlClient.Query(ctx, &q, map[string]interface{}{"input": mondoogql.ClientIntegrationInput{Mrn: mondoogql.String(i.mrn)}})
 	if err != nil {
 		return "", err
 	}
-	return resp.Token, nil
+	return q.ClientIntegration.Integration.Status, nil
 }
 
 func (i *Integration) Delete(ctx context.Context) error {
-	_, err := i.integrations.Delete(ctx, &integrations.DeleteIntegrationRequest{Mrn: i.mrn})
-	return err
+	var m struct {
+		DeleteIntegration struct {
+			Mrn string
+		} `graphql:"deleteClientIntegration(input: $input)"`
+	}
+	return i.gqlClient.Mutate(ctx, &m, mondoogql.DeleteClientIntegrationInput{Mrn: mondoogql.String(i.mrn)}, nil)
+}
+
+func (i *Integration) DeleteCiCdProjectIfExists(ctx context.Context) error {
+	p, err := i.GetCiCdProject(ctx)
+	if err != nil {
+		return nil
+	}
+
+	return p.Delete(ctx)
+}
+
+func (i *Integration) GetCiCdProject(ctx context.Context) (*CiCdProject, error) {
+	var q struct {
+		CiCdProjects struct {
+			Projects struct {
+				Projects struct {
+					Edges []struct {
+						Node struct {
+							Mrn    string
+							Id     string
+							Labels []struct {
+								Key   string
+								Value string
+							}
+						}
+					}
+				} `graphql:"projects(first: $first)"`
+			} `graphql:"... on CicdProjects"`
+		} `graphql:"cicdProjects(input: $input)"`
+	}
+
+	err := i.gqlClient.Query(ctx, &q, map[string]interface{}{"input": mondoogql.CicdProjectsInput{SpaceMrn: i.spaceMrn}, "first": mondoogql.Int(100)})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, p := range q.CiCdProjects.Projects.Projects.Edges {
+		for _, l := range p.Node.Labels {
+			if l.Key == "mondoo.com/integration-mrn" && l.Value == i.mrn {
+				return &CiCdProject{gqlClient: i.gqlClient, mrn: p.Node.Mrn, id: p.Node.Id, spaceMrn: i.spaceMrn}, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("cannot find CI/CD project for integration %s", i.mrn)
+}
+
+type CiCdProject struct {
+	gqlClient *mondoogql.Client
+	mrn       string
+	id        string
+	spaceMrn  string
+}
+
+func (p *CiCdProject) Delete(ctx context.Context) error {
+	var m struct {
+		DeleteCicdProject struct {
+			Mrns []string
+		} `graphql:"deleteCicdProjects(input: $input)"`
+	}
+	return p.gqlClient.Mutate(ctx, &m, mondoogql.DeleteProjectsInput{Mrns: []mondoogql.String{mondoogql.String(p.mrn)}}, nil)
+}
+
+type CiCdJob struct {
+	Mrn       string
+	Name      string
+	Namespace string
+	Grade     string
+}
+
+func (p *CiCdProject) ListAssets(ctx context.Context) ([]CiCdJob, error) {
+	var q struct {
+		CicdProjectJobs struct {
+			Jobs struct {
+				Jobs struct {
+					Edges []struct {
+						Node struct {
+							Job struct {
+								Mrn       string
+								Name      string
+								Namespace string
+								Grade     string
+							} `graphql:"... on KubernetesJob"`
+						}
+					}
+				} `graphql:"jobs(first:$first)"`
+			} `graphql:"... on CicdProjectJobs"`
+		} `graphql:"cicdProjectJobs(input: $input)"`
+	}
+	err := p.gqlClient.Query(ctx, &q, map[string]interface{}{
+		"input": mondoogql.CicdProjectJobsInput{SpaceMrn: p.spaceMrn, ProjectID: p.id},
+		"first": mondoogql.Int(100),
+	})
+	if err != nil {
+		return nil, err
+	}
+	assets := make([]CiCdJob, 0, len(q.CicdProjectJobs.Jobs.Jobs.Edges))
+	for _, e := range q.CicdProjectJobs.Jobs.Jobs.Edges {
+		assets = append(assets, CiCdJob{
+			Mrn:       e.Node.Job.Mrn,
+			Name:      e.Node.Job.Name,
+			Namespace: e.Node.Job.Namespace,
+			Grade:     e.Node.Job.Grade,
+		})
+	}
+	return assets, nil
 }

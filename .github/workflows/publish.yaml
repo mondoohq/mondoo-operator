@@ -328,9 +328,6 @@ jobs:
           kubectl get pods -n mondoo-operator -o yaml >> tests/integration/_output/mondoo-pods.log
           kubectl logs -n olm deployment/olm-operator >> tests/integration/_output/olm-operator-pods.log
 
-      - name: Store creds
-        run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
-
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -339,7 +336,9 @@ jobs:
 
       - name: Run integration tests
         env:
-          MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE }}
+          MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
+          MONDOO_ORG_MRN: //captain.api.mondoo.app/organizations/serene-lovelace-854342
+          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.meta.outputs.version }} make test/integration/ci
 
       - name: Clean up
@@ -414,9 +413,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
         id: install
 
-      - name: Store creds
-        run: echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
-
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -434,7 +430,9 @@ jobs:
 
       - name: Run integration tests
         env:
-          MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE }}
+          MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
+          MONDOO_ORG_MRN: //captain.api.mondoo.app/organizations/serene-lovelace-854342
+          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.meta.outputs.version }} make test/integration/ci
 
       - name: Upload test logs artifact

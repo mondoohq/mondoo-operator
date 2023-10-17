@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -33,10 +34,15 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
+	"go.mondoo.com/mondoo-operator/tests/framework/nexus"
+	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
+	nexusK8s "go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -49,16 +55,40 @@ const (
 type AuditConfigBaseSuite struct {
 	suite.Suite
 	ctx            context.Context
+	spaceClient    *nexus.Space
+	integration    *nexusK8s.Integration
 	testCluster    *TestCluster
 	auditConfig    mondoov2.MondooAuditConfig
 	installRelease bool
 }
 
 func (s *AuditConfigBaseSuite) SetupSuite() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.SetLogger(logger.NewLogger())
 	s.ctx = context.Background()
-	settings := installer.NewDefaultSettings()
+
+	nexusClient, err := nexus.NewClient()
+	s.Require().NoError(err, "Failed to create Nexus client")
+	s.spaceClient, err = nexusClient.CreateSpace()
+	s.Require().NoError(err, "Failed to create Nexus space")
+
+	// TODO: this is only needed because the integration creation is not part of the MondooInstaller struct.
+	// That code will move there once all tests are migrated to use the E2E approach.
+	k8sHelper, err := utils.CreateK8sHelper()
+	s.Require().NoError(err, "Failed to create K8s helper")
+
+	ns := &corev1.Namespace{}
+	s.NoError(k8sHelper.Clientset.Get(s.ctx, client.ObjectKey{Name: "kube-system"}, ns))
+	integration, err := s.spaceClient.K8s.CreateIntegration("test-integration-" + string(ns.UID)).
+		EnableNodesScan().
+		EnableWorkloadsScan().
+		Run(s.ctx)
+	s.Require().NoError(err, "Failed to create k8s integration")
+	s.integration = integration
+
+	settings := installer.NewDefaultSettings().SetToken(integration.Token())
 	if s.installRelease {
-		settings = installer.NewReleaseSettings()
+		settings = installer.NewReleaseSettings().SetToken(integration.Token())
 	}
 
 	s.testCluster = StartTestCluster(s.ctx, settings, s.T)
@@ -66,6 +96,7 @@ func (s *AuditConfigBaseSuite) SetupSuite() {
 
 func (s *AuditConfigBaseSuite) TearDownSuite() {
 	s.NoError(s.testCluster.UninstallOperator())
+	s.NoError(s.spaceClient.Delete(s.ctx))
 }
 
 func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
@@ -95,8 +126,25 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(webhookListOpts)
 		s.NoErrorf(err, "Failed to wait for Webhook Pods to be gone")
 
-		// not sure why the above list does not work. It returns zero deployments. So, first a plain sleep to stabilize the test.
+		k8sScanListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(k8s_scan.CronJobLabels(s.auditConfig))}
+		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(k8sScanListOpts)
+		s.NoErrorf(err, "Failed to wait for k8s scan pods to be gone")
+
+		containerScanListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(container_image.CronJobLabels(s.auditConfig))}
+		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(containerScanListOpts)
+		s.NoErrorf(err, "Failed to wait for container scan pods to be gone")
+
+		nodeScanListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(nodes.CronJobLabels(s.auditConfig))}
+		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(nodeScanListOpts)
+		s.NoErrorf(err, "Failed to wait for node scan pods to be gone")
+
 		zap.S().Info("Cleanup done. Cluster should be good to go for the next test.")
+
+		s.Require().NoError(s.spaceClient.DeleteAssets(s.ctx), "Failed to delete assets in space")
+		s.Require().NoError(s.integration.DeleteCiCdProjectIfExists(s.ctx), "Failed to delete CICD project for integration")
+
+		_, err = s.testCluster.K8sHelper.Kubectl("delete", "pods", "-n", "default", "--all", "--wait")
+		s.Require().NoError(err, "Failed to delete all pods")
 	}
 }
 
@@ -111,6 +159,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
+
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
 
 	// Verify scan API deployment and service
 	s.validateScanApiDeployment(auditConfig)
@@ -138,9 +188,40 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+
+	// Verify the workloads have been sent upstream and have scores.
+	workloadNames, err := s.testCluster.K8sHelper.GetWorkloadNames(s.ctx)
+	s.NoError(err, "Failed to get workload names.")
+
+	time.Sleep(10 * time.Second)
+
+	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
+	s.NoError(err, "Failed to list assets with scores.")
+
+	// TODO: the cluster name is non-deterministic currently so we cannot test for it
+	assetsExceptCluster := utils.ExcludeClusterAsset(assets)
+	s.Equal(len(assets)-1, len(assetsExceptCluster), "Cluster asset was sent upstream.")
+
+	assetNames := utils.AssetNames(assetsExceptCluster)
+	s.ElementsMatch(workloadNames, assetNames, "Workloads were not sent upstream.")
+
+	s.AssetsNotUnscored(assets)
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondoov2.MondooAuditConfig) {
+	nginxLabel := "app.kubernetes.io/name=nginx"
+	_, err := s.testCluster.K8sHelper.Kubectl("run", "-n", "default", "nginx", "--image", "nginx", "-l", nginxLabel)
+	s.Require().NoError(err, "Failed to create nginx pod.")
+	redisLabel := "app.kubernetes.io/name=redis"
+	_, err = s.testCluster.K8sHelper.Kubectl("run", "-n", "default", "redis", "--image", "redis", "-l", redisLabel)
+	s.Require().NoError(err, "Failed to create redis pod.")
+
+	s.True(s.testCluster.K8sHelper.IsPodReady(nginxLabel, "default"), "nginx pod is not ready")
+	s.True(s.testCluster.K8sHelper.IsPodReady(redisLabel, "default"), "redis pod is not ready")
 	s.auditConfig = auditConfig
 
 	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
@@ -152,12 +233,16 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
 
+	// Get the available container images at the time the cronjob is created.
+	pods := &corev1.PodList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, pods), "Failed to list pods")
+
 	// K8s container image scan
 	zap.S().Info("Make sure the Mondoo k8s container image scan CronJob is created.")
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{Name: container_image.CronJobName(auditConfig.Name), Namespace: auditConfig.Namespace},
 	}
-	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
 		if err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(cronJob), cronJob); err != nil {
 			return false, nil
 		}
@@ -175,6 +260,24 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+
+	containerImages, err := utils.ContainerImages(pods.Items, auditConfig)
+	s.NoError(err, "Failed to get container image names")
+
+	time.Sleep(10 * time.Second)
+
+	// Verify the container images have been sent upstream and have scores.
+	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
+	s.NoError(err, "Failed to list assets with scores")
+
+	assetNames := utils.AssetNames(assets)
+	s.Subset(assetNames, containerImages, "Container images were not sent upstream.")
+
+	s.AssetsNotUnscored(assets)
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
@@ -188,6 +291,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
+
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
 
 	zap.S().Info("Verify the nodes scanning cron jobs are created.")
 
@@ -244,7 +349,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	// Verify the amount of CronJobs created is 1
 	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
 		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, gcCronJobs, gcListOpts))
-		if 1 == len(cronJobs.Items) {
+		if len(cronJobs.Items) == 1 {
 			return true, nil
 		}
 		return false, nil
@@ -255,6 +360,28 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+
+	// Verify nodes are sent upstream and have scores.
+	nodes := &corev1.NodeList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodes))
+
+	nodeNames := make([]string, 0, len(nodes.Items))
+	for _, node := range nodes.Items {
+		nodeNames = append(nodeNames, node.Name)
+	}
+
+	time.Sleep(10 * time.Second)
+
+	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
+	s.NoError(err, "Failed to list assets")
+	assetNames := utils.AssetNames(assets)
+
+	s.ElementsMatch(assetNames, nodeNames, "Node names do not match")
+	s.AssetsNotUnscored(assets)
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
@@ -279,6 +406,8 @@ func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.Mondo
 	s.NoErrorf(
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
+
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
 
 	// Wait for Ready Pod
 	zap.S().Info("Waiting for webhook Pod to become ready.")
@@ -319,6 +448,10 @@ func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.Mondo
 	s.NoErrorf(err, "Couldn't access Webhook via port-forward")
 	zap.S().Info("Webhook should be working by now.")
 	s.checkDeployments(&auditConfig)
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionScaleDownScanApi(auditConfig mondoov2.MondooAuditConfig) {
@@ -387,6 +520,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
 
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
+
 	// Pod should not start, because of missing service account
 
 	// do not wait until IsPodReady timeout, pod will not be present
@@ -402,22 +537,30 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionMissingSA(auditConf
 	s.NoErrorf(err, "Couldn't list scan API pod.")
 	s.Equalf(0, len(podList.Items), "No ScanAPI Pod should be present")
 
-	// Check for the ScanAPI Deployment to be present.
-	deployments := &appsv1.DeploymentList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		// Check for the ScanAPI Deployment to be present.
+		deployments := &appsv1.DeploymentList{}
+		if err := s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts); err != nil {
+			return false, nil
+		}
 
-	s.Equalf(1, len(deployments.Items), "Deployments count for ScanAPI should be precisely one")
+		return len(deployments.Items) == 1, nil
+	})
+	s.NoErrorf(err, "Deployments count for ScanAPI should be precisely one")
 
 	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
 		// Condition of MondooAuditConfig should be updated
 		foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
 		if err != nil {
+			zap.S().Errorf("Failed to get mondoo audit config: %s", err.Error())
 			return false, err
 		}
 		condition, err := s.testCluster.K8sHelper.GetMondooAuditConfigConditionByType(foundMondooAuditConfig, mondoov2.ScanAPIDegraded)
 		if err != nil {
-			return false, err
+			zap.S().Errorf("Failed to get condition: %s", err.Error())
+			return false, nil // The condition might not exist yet. This doesn't mean we should stop trying.
 		}
+		zap.S().Infof("Condition message: %s", condition.Message)
 		if strings.Contains(condition.Message, "error looking up service account") {
 			return true, nil
 		}
@@ -455,6 +598,10 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAllDisabled(auditConfig mond
 
 	err := s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&s.auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
 }
 
 func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mondoov2.MondooAuditConfig) {
@@ -481,6 +628,8 @@ func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mo
 		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
 		"Failed to create Mondoo audit config.")
 
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
+
 	// Verify scan API deployment and service
 	s.validateScanApiDeployment(auditConfig)
 
@@ -495,7 +644,7 @@ func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mo
 
 	// everything is fine, now upgrade to current branch/release
 
-	branchInstaller := installer.NewMondooInstaller(installer.NewDefaultSettings(), s.T)
+	branchInstaller := installer.NewMondooInstaller(installer.NewDefaultSettings().SetToken(s.integration.Token()), s.T)
 	err = branchInstaller.InstallOperator()
 	s.NoErrorf(err, "Failed updating the latest operator release to this branch")
 
@@ -661,6 +810,17 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	}
 	s.NoErrorf(err, "Failed to create Deployment which should pass.")
 
+	time.Sleep(5 * time.Second)
+	cicdProject, err := s.integration.GetCiCdProject(s.ctx)
+	s.Require().NoError(err, "Failed to get CICD project")
+
+	assets, err := cicdProject.ListAssets(s.ctx)
+	s.Require().NoError(err, "Failed to list CICD assets")
+
+	assetNames := utils.CiCdJobNames(assets)
+	s.Contains(assetNames, fmt.Sprintf("%s/%s", passingDeployment.Namespace, passingDeployment.Name))
+	s.CiCdJobNotUnscored(assets)
+
 	zap.S().Info("Create a Deployment which should be denied in enforcing mode.")
 	err = s.testCluster.K8sHelper.Clientset.Create(s.ctx, failingDeployment)
 
@@ -669,6 +829,13 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	} else {
 		s.NoErrorf(err, "Failed creating a Deployment in permissive mode.")
 	}
+
+	assets, err = cicdProject.ListAssets(s.ctx)
+	s.Require().NoError(err, "Failed to list CICD assets")
+
+	assetNames = utils.CiCdJobNames(assets)
+	s.Contains(assetNames, fmt.Sprintf("%s/%s", failingDeployment.Namespace, failingDeployment.Name))
+	s.CiCdJobNotUnscored(assets)
 
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(passingDeployment), "Failed to delete passingDeployment")
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(failingDeployment), "Failed to delete failingDeployment")
@@ -883,4 +1050,24 @@ func (s *AuditConfigBaseSuite) createPortForwardCmd(webhookService *corev1.Servi
 	}
 
 	return exec.Command("kubectl", kubectlArgs...)
+}
+
+func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []assets.AssetWithScore) {
+	for _, asset := range assets {
+		// We don't score scratch containers at the moment so they are always unscored.
+		// We don't have policies for a cluster asset enabled at the moment so they are always unscored.
+		if asset.Platform.Name != "scratch" && asset.Platform.Name != "k8s-cluster" {
+			if asset.Grade == "U" || asset.Grade == "" {
+				zap.S().Infof("Asset %s has no score", asset.Name)
+			}
+			s.NotEqualf("U", asset.Grade, "Asset %s should not be unscored", asset.Name)
+			// s.NotEqualf(uint32(policy.ScoreType_UNSCORED), asset.Score.Type, "Asset %s should not be unscored", asset.Asset.Name)
+		}
+	}
+}
+
+func (s *AuditConfigBaseSuite) CiCdJobNotUnscored(assets []nexusK8s.CiCdJob) {
+	for _, asset := range assets {
+		s.NotEqualf("U", asset.Grade, "CI/CD job %s should not be unscored", asset.Name)
+	}
 }

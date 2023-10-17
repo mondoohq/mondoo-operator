@@ -28,17 +28,11 @@ func (s Settings) GetSecret(ns string) corev1.Secret {
 	secret := corev1.Secret{Type: corev1.SecretTypeOpaque}
 	secret.Namespace = ns
 
-	if s.token == "" {
-		secret.Name = utils.MondooClientSecret
-		secret.Data = map[string][]byte{
-			"config": []byte(utils.ReadFile(MondooCredsFile)),
-		}
-	} else {
-		secret.Name = utils.MondooTokenSecret
-		secret.Data = map[string][]byte{
-			constants.MondooTokenSecretKey: []byte(s.token),
-		}
+	secret.Name = utils.MondooTokenSecret
+	secret.Data = map[string][]byte{
+		constants.MondooTokenSecretKey: []byte(s.token),
 	}
+
 	return secret
 }
 

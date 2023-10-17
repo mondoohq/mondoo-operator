@@ -89,10 +89,6 @@ jobs:
           go-version: "${{ env.golang-version }}"
           cache: true
 
-      - name: Store creds
-        run: |
-          echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
-
       - name: Get operator version
         run: echo "OPERATOR_VERSION=$(docker run ghcr.io/mondoohq/mondoo-operator:${{ env.MONDOO_OPERATOR_IMAGE_TAG }} version --simple)" >> $GITHUB_ENV
 
@@ -101,7 +97,9 @@ jobs:
 
       - name: Run integration tests
         env:
-          MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE}}
+          MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
+          MONDOO_ORG_MRN: //captain.api.mondoo.app/organizations/serene-lovelace-854342
+          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: VERSION=${{ env.OPERATOR_VERSION }} K8S_DISTRO=aks make test/integration/ci
 
       - name: Clean up AKS terraform
@@ -177,10 +175,6 @@ jobs:
           go-version: "${{ env.golang-version }}"
           cache: true
 
-      - name: Store creds
-        run: |
-          echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
-
       - name: Get operator version
         run: echo "OPERATOR_VERSION=$(docker run ghcr.io/mondoohq/mondoo-operator:${{ env.MONDOO_OPERATOR_IMAGE_TAG }} version --simple)" >> $GITHUB_ENV
 
@@ -189,7 +183,9 @@ jobs:
 
       - name: Run integration tests
         env:
-          MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE}}
+          MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
+          MONDOO_ORG_MRN: //captain.api.mondoo.app/organizations/serene-lovelace-854342
+          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: VERSION=${{ env.OPERATOR_VERSION }} K8S_DISTRO=eks make test/integration/ci
 
       - name: Clean up EKS terraform
@@ -264,10 +260,6 @@ jobs:
           go-version: "${{ env.golang-version }}"
           cache: true
 
-      - name: Store creds
-        run: |
-          echo ${{ secrets.MONDOO_CLIENT }} | base64 -d > creds.json
-
       - name: Get operator version
         run: echo "OPERATOR_VERSION=$(docker run ghcr.io/mondoohq/mondoo-operator:${{ env.MONDOO_OPERATOR_IMAGE_TAG }} version --simple)" >> $GITHUB_ENV
 
@@ -276,7 +268,9 @@ jobs:
 
       - name: Run integration tests
         env:
-          MONDOO_SERVICE_ACCOUNT_EDGE: ${{ secrets.MONDOO_SERVICE_ACCOUNT_EDGE}}
+          MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
+          MONDOO_ORG_MRN: //captain.api.mondoo.app/organizations/serene-lovelace-854342
+          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: VERSION=${{ env.OPERATOR_VERSION }} K8S_DISTRO=gke make test/integration/ci
 
       - name: Clean up GKE terraform

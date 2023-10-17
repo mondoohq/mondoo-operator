@@ -79,35 +79,36 @@ func (s *AuditConfigCustomNamespaceSuite) TearDownSuite() {
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_KubernetesResources() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, true, false, false, false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, true, false, false, false)
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigKubernetesResources(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Containers() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, true, false, false, false)
-
-	// The mondoo-operator namespace is using local images which cnspec won't be able to download
-	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{s.ns.Name}
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, true, false, false)
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
+
+	// Ignore the operator namespace and the scanner namespace because we cannot scan a local image
+	// Ignore kube-system to speed up the containers test
+	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{s.ns.Name, s.testCluster.Settings.Namespace, "kube-system"}
 	s.testMondooAuditConfigContainers(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true, false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true, false)
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigNodes(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Admission() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, false, true, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, false, true)
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	auditConfig.Spec.Admission.ServiceAccountName = s.webhookServiceAccount.Name
 	s.testMondooAuditConfigAdmission(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_AdmissionMissingSA() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, false, true, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, false, true)
 	auditConfig.Spec.Scanner.ServiceAccountName = "missing-serviceaccount"
 	auditConfig.Spec.Admission.ServiceAccountName = s.webhookServiceAccount.Name
 	s.testMondooAuditConfigAdmissionMissingSA(auditConfig)
@@ -119,6 +120,11 @@ func TestAuditConfigCustomNamespaceSuite(t *testing.T) {
 		HandlePanics(recover(), func() {
 			if err := s.testCluster.UninstallOperator(); err != nil {
 				zap.S().Errorf("Failed to uninstall Mondoo operator. %v", err)
+			}
+			if s.spaceClient != nil {
+				if err := s.spaceClient.Delete(s.ctx); err != nil {
+					zap.S().Errorf("Failed to delete Mondoo space. %v", err)
+				}
 			}
 		}, s.T)
 	}(s)

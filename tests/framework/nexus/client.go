@@ -4,59 +4,52 @@
 package nexus
 
 import (
-	"go.mondoo.com/cnquery/providers-sdk/v1/upstream"
-	cnspec "go.mondoo.com/cnspec/policy"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/captain"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/integrations"
-	"go.mondoo.com/mondoo-operator/tests/framework/nexus/api/policy"
-	"go.mondoo.com/ranger-rpc"
+	"fmt"
+	"os"
+
+	mondoogql "go.mondoo.com/mondoo-go"
+	"go.mondoo.com/mondoo-go/option"
+)
+
+const (
+	MONDOO_API_TOKEN_VAR    = "MONDOO_API_TOKEN"
+	MONDOO_ORG_MRN_VAR      = "MONDOO_ORG_MRN"
+	MONDOO_GQL_ENDPOINT_VAR = "MONDOO_GQL_ENDPOINT"
 )
 
 type Client struct {
-	spaceMrn string
-
-	AssetStore     policy.AssetStore
-	PolicyResolver cnspec.PolicyResolver
-	Captain        captain.Captain
-	Integrations   integrations.IntegrationsManager
+	orgMrn string
+	Client *mondoogql.Client
 }
 
-func NewClient(serviceAccount *upstream.ServiceAccountCredentials) (*Client, error) {
-	plugin, err := upstream.NewServiceAccountRangerPlugin(serviceAccount)
-	if err != nil {
-		return nil, err
+func NewClient() (*Client, error) {
+	orgMrn := os.Getenv(MONDOO_ORG_MRN_VAR)
+	if orgMrn == "" {
+		return nil, fmt.Errorf("missing environment variable %s", MONDOO_ORG_MRN_VAR)
 	}
 
-	assetStore, err := policy.NewAssetStoreClient(serviceAccount.ApiEndpoint, ranger.DefaultHttpClient(), plugin)
-	if err != nil {
-		return nil, err
+	gqlEndpoint := os.Getenv(MONDOO_GQL_ENDPOINT_VAR)
+	if gqlEndpoint == "" {
+		return nil, fmt.Errorf("missing environment variable %s", MONDOO_GQL_ENDPOINT_VAR)
 	}
 
-	policyResolver, err := cnspec.NewPolicyResolverClient(serviceAccount.ApiEndpoint, ranger.DefaultHttpClient(), plugin)
-	if err != nil {
-		return nil, err
+	apiToken := os.Getenv(MONDOO_API_TOKEN_VAR)
+	if apiToken == "" {
+		return nil, fmt.Errorf("missing environment variable %s", MONDOO_API_TOKEN_VAR)
 	}
-
-	captain, err := captain.NewCaptainClient(serviceAccount.ApiEndpoint, ranger.DefaultHttpClient(), plugin)
-	if err != nil {
-		return nil, err
-	}
-
-	integrations, err := integrations.NewIntegrationsManagerClient(serviceAccount.ApiEndpoint, ranger.DefaultHttpClient(), plugin)
+	// Initialize the client
+	client, err := mondoogql.NewClient(option.WithEndpoint(gqlEndpoint), option.WithAPIToken(apiToken))
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		spaceMrn:       serviceAccount.ParentMrn,
-		AssetStore:     assetStore,
-		PolicyResolver: policyResolver,
-		Captain:        captain,
-		Integrations:   integrations,
+		orgMrn: orgMrn,
+		Client: client,
 	}, nil
 }
 
 // TODO: when we support creating spaces this will actually create a space
-func (c *Client) GetSpace() *Space {
-	return NewSpace(c.spaceMrn, c.AssetStore, c.PolicyResolver, c.Captain, c.Integrations)
+func (c *Client) CreateSpace() (*Space, error) {
+	return NewSpace(c.Client, c.orgMrn)
 }
