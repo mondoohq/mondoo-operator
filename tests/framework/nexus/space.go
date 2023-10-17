@@ -9,7 +9,6 @@ import (
 	mondoogql "go.mondoo.com/mondoo-go"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
-	"go.uber.org/zap"
 )
 
 type Space struct {
@@ -18,7 +17,7 @@ type Space struct {
 	K8s       *k8s.Client
 }
 
-func NewSpace(gqlClient *mondoogql.Client, orgMrn string) *Space {
+func NewSpace(gqlClient *mondoogql.Client, orgMrn string) (*Space, error) {
 	var m struct {
 		CreateSpace struct {
 			Mrn string
@@ -26,13 +25,13 @@ func NewSpace(gqlClient *mondoogql.Client, orgMrn string) *Space {
 	}
 	err := gqlClient.Mutate(context.Background(), &m, mondoogql.CreateSpaceInput{Name: "test", OrgMrn: mondoogql.String(orgMrn)}, nil)
 	if err != nil {
-		zap.S().Error(err)
+		return nil, err
 	}
 	return &Space{
 		spaceMrn:  m.CreateSpace.Mrn,
 		gqlClient: gqlClient,
 		K8s:       k8s.NewClient(m.CreateSpace.Mrn, gqlClient),
-	}
+	}, nil
 }
 
 func (s *Space) Mrn() string {

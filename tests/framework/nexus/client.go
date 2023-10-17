@@ -50,6 +50,6 @@ func NewClient() (*Client, error) {
 }
 
 // TODO: when we support creating spaces this will actually create a space
-func (c *Client) CreateSpace() *Space {
+func (c *Client) CreateSpace() (*Space, error) {
 	return NewSpace(c.Client, c.orgMrn)
 }
