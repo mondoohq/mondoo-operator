@@ -89,6 +89,7 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Containers() {
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 
 	// Ignore the operator namespace and the scanner namespace because we cannot scan a local image
+	// Ignore kube-system to speed up the containers test
 	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{s.ns.Name, s.testCluster.Settings.Namespace, "kube-system"}
 	s.testMondooAuditConfigContainers(auditConfig)
 }

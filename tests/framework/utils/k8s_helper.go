@@ -644,18 +644,6 @@ func (k8sh *K8sHelper) CheckForReconciledOperatorVersion(auditConfig *api.Mondoo
 func (k8sh *K8sHelper) GetWorkloadNames(ctx context.Context) ([]string, error) {
 	var names []string
 
-	// cluster
-	// localProvider, err := local.New()
-	// if err != nil {
-	// 	return names, err
-	// }
-	// k8sctlConfig, err := kubectl.LoadKubeConfig(localProvider)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// names = append(names, fmt.Sprintf("K8s Cluster %s", k8sctlConfig.CurrentClusterName()))
-
 	// pods
 	pods := &v1.PodList{}
 	if err := k8sh.Clientset.List(ctx, pods); err != nil {
