@@ -52,7 +52,7 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 
 func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	mondooClientImage, err := n.ContainerImageResolver.CnspecImage(
-		"", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
+		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		logger.Error(err, "Failed to resolve mondoo-client container image")
 		return err

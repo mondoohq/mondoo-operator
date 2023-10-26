@@ -82,6 +82,39 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	s.Equal(expected, created)
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomImage() {
+	d := s.createDeploymentHandler()
+
+	s.auditConfig.Spec.Scanner.Image.Name = "ubuntu"
+	s.auditConfig.Spec.Scanner.Image.Tag = "22.04"
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
+
+	image, err := s.containerImageResolver.CnspecImage("ubuntu", "22.04", false)
+	s.NoError(err)
+
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+
+	// Set some fields that the kube client sets
+	gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
+	s.NoError(err)
+	expected.SetGroupVersionKind(gvk)
+	expected.ResourceVersion = "1"
+
+	created := &batchv1.CronJob{}
+	created.Name = expected.Name
+	created.Namespace = expected.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+
+	s.Equal(expected, created)
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() {
 	d := s.createDeploymentHandler()
 
