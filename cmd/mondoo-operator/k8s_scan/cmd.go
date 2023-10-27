@@ -96,15 +96,23 @@ func init() {
 
 		// If scanning successful, now attempt some cleanup of older assets
 		if *setManagedBy != "" && *cleanupOlderThan != "" {
-			platformRuntime := "k8s"
-			if *scanContainerImages {
-				platformRuntime = "docker-image"
-			}
+			platformRuntime := "k8s-cluster"
+			logger.Info("garbage collecting assets", "platformRuntime", platformRuntime, "cleanupOlderThan", *cleanupOlderThan)
 
 			err = garbage_collect.GarbageCollectCmd(ctx, client, platformRuntime, *cleanupOlderThan, *setManagedBy, make(map[string]string), logger)
 			if err != nil {
-				logger.Error(err, "error while garbage collecting assets; will attempt on next scan")
+				logger.Error(err, "error while garbage collecting assets; will attempt on next scan", "platform", platformRuntime)
 			}
+			if *scanContainerImages {
+				platformRuntime = "docker-image"
+				logger.Info("garbage collecting assets", "platformRuntime", platformRuntime, "cleanupOlderThan", *cleanupOlderThan)
+				err = garbage_collect.GarbageCollectCmd(ctx, client, platformRuntime, *cleanupOlderThan, *setManagedBy, make(map[string]string), logger)
+				if err != nil {
+					logger.Error(err, "error while garbage collecting assets; will attempt on next scan", "platform", platformRuntime)
+				}
+			}
+		} else {
+			logger.Info("skipping garbage collection of assets; either --set-managed-by or --cleanup-assets-older-than are missing")
 		}
 
 		return nil
