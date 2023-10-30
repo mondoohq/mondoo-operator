@@ -109,7 +109,7 @@ func GarbageCollectCmd(ctx context.Context, client scanapiclient.ScanApiClient, 
 
 	if platformRuntime != "" {
 		switch platformRuntime {
-		case "k8s", "docker-image":
+		case "k8s-cluster", "docker-image":
 			gcOpts.PlatformRuntime = platformRuntime
 		default:
 			return fmt.Errorf("no matching platform runtime found for (%s)", platformRuntime)
