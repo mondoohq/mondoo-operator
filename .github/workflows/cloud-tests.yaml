@@ -133,7 +133,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: ["1.23", "1.24", "1.25", "1.26", "1.27"]
+        k8s-version: ["1.24", "1.25", "1.26", "1.27", "1.28"]
 
     env:
       TF_VAR_test_name: ${{ github.event.inputs.mondooOperatorImageTag }}
@@ -217,7 +217,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: ["1.24", "1.25", "1.26", "1.27"]
+        k8s-version: ["1.25", "1.26", "1.27"]
 
     env:
       GOOGLE_APPLICATION_CREDENTIALS: ${{ format('{0}/{1}', github.workspace, 'gcp_sa.json') }}
