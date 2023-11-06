@@ -9,7 +9,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.68.0
 	github.com/rs/zerolog v1.31.0
-	github.com/spf13/cobra v1.7.0
+	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
 	go.mondoo.com/cnquery/v9 v9.4.0
 	go.mondoo.com/cnspec/v9 v9.4.0
