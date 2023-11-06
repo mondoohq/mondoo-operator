@@ -66,7 +66,7 @@ jobs:
         run: cat ".github/env" >> $GITHUB_ENV
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3
 
       - name: Terraform init
         run: terraform init
@@ -153,7 +153,7 @@ jobs:
         run: cat ".github/env" >> $GITHUB_ENV
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3
 
       - run: terraform init
         working-directory: .github/terraform/aws
@@ -238,7 +238,7 @@ jobs:
         run: echo ${{ secrets.GCP_SERVICE_ACCOUNT }} | base64 -d > gcp_sa.json
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3
 
       - run: terraform init
         working-directory: .github/terraform/gke
