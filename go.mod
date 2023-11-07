@@ -11,8 +11,8 @@ require (
 	github.com/rs/zerolog v1.31.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
-	go.mondoo.com/cnquery/v9 v9.5.1
-	go.mondoo.com/cnspec/v9 v9.5.1
+	go.mondoo.com/cnquery/v9 v9.5.2
+	go.mondoo.com/cnspec/v9 v9.5.2
 	go.mondoo.com/mondoo-go v0.0.0-20231003201540-9988d4953ca2
 	k8s.io/api v0.28.3
 	k8s.io/apimachinery v0.28.3
@@ -341,7 +341,7 @@ require (
 	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.13.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/sys v0.14.0 // indirect
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
