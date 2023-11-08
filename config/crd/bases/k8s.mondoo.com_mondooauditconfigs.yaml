@@ -464,6 +464,12 @@ spec:
                 description: Conditions includes detailed status for the MondooAuditConfig
                 items:
                   properties:
+                    affectedPods:
+                      description: AffectedPods, when filled, contains a list which
+                        are affected by an issue
+                      items:
+                        type: string
+                      type: array
                     lastTransitionTime:
                       description: LastTransitionTime is the last time the condition
                         transitioned from one status to another.
@@ -472,6 +478,10 @@ spec:
                     lastUpdateTime:
                       description: LastUpdateTime is the last time we probed the condition
                       format: date-time
+                      type: string
+                    memoryLimit:
+                      description: MemoryLimit contains the currently active memory
+                        limit for a Pod
                       type: string
                     message:
                       description: Message is a human-readable message indicating

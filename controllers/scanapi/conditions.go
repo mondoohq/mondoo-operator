@@ -12,11 +12,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedStatus bool, conditions []appsv1.DeploymentCondition) {
+func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedStatus bool, conditions []appsv1.DeploymentCondition, pods *corev1.PodList) {
 	msg := "ScanAPI controller is available"
 	reason := "ScanAPIAvailable"
 	status := corev1.ConditionFalse
 	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
+	affectedPods := []string{}
+	memoryLimit := ""
 	if !config.Spec.KubernetesResources.Enable && !config.Spec.Admission.Enable {
 		msg = "ScanAPI is disabled"
 		reason = "ScanAPIDisabled"
@@ -33,9 +35,21 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 			}
 		}
 
+		for _, pod := range pods.Items {
+			for _, status := range pod.Status.ContainerStatuses {
+				if status.LastTerminationState.Terminated != nil && status.LastTerminationState.Terminated.ExitCode == 137 {
+					// TODO: double check container name?
+					msg = "ScanAPI controller is unavailable due to OOM"
+					affectedPods = append(affectedPods, pod.Name)
+					memoryLimit = pod.Spec.Containers[0].Resources.Limits.Memory().String()
+					break
+				}
+			}
+		}
+
 		reason = "ScanAPIUnvailable"
 		status = corev1.ConditionTrue
 	}
 
-	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha2.ScanAPIDegraded, status, reason, msg, updateCheck)
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha2.ScanAPIDegraded, status, reason, msg, updateCheck, affectedPods, memoryLimit)
 }

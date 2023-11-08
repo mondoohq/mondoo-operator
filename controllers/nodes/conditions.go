@@ -26,5 +26,5 @@ func updateNodeConditions(config *v1alpha2.MondooAuditConfig, degradedStatus boo
 	}
 
 	config.Status.Conditions = mondoo.SetMondooAuditCondition(
-		config.Status.Conditions, v1alpha2.NodeScanningDegraded, status, reason, msg, updateCheck)
+		config.Status.Conditions, v1alpha2.NodeScanningDegraded, status, reason, msg, updateCheck, []string{}, "")
 }

@@ -25,5 +25,5 @@ func updateWorkloadsConditions(config *v1alpha2.MondooAuditConfig, degradedStatu
 	}
 
 	config.Status.Conditions = mondoo.SetMondooAuditCondition(
-		config.Status.Conditions, v1alpha2.K8sResourcesScanningDegraded, status, reason, msg, updateCheck)
+		config.Status.Conditions, v1alpha2.K8sResourcesScanningDegraded, status, reason, msg, updateCheck, []string{}, "")
 }

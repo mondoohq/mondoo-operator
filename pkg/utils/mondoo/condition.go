@@ -151,6 +151,8 @@ func SetMondooAuditCondition(
 	reason string,
 	message string,
 	updateConditionCheck UpdateConditionCheck,
+	affectedPods []string,
+	memoryLimit string,
 ) []mondoov1alpha2.MondooAuditConfigCondition {
 	now := metav1.Now()
 	existingCondition := FindMondooAuditConditions(conditions, conditionType)
@@ -164,6 +166,8 @@ func SetMondooAuditCondition(
 				Message:            message,
 				LastTransitionTime: now,
 				LastUpdateTime:     now,
+				AffectedPods:       affectedPods,
+				MemoryLimit:        memoryLimit,
 			},
 		)
 	} else {
@@ -179,6 +183,8 @@ func SetMondooAuditCondition(
 			existingCondition.Reason = reason
 			existingCondition.Message = message
 			existingCondition.LastUpdateTime = now
+			existingCondition.AffectedPods = affectedPods
+			existingCondition.MemoryLimit = memoryLimit
 		}
 	}
 	return conditions

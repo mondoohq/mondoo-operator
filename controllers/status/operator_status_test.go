@@ -6,6 +6,7 @@ package status
 import (
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +19,7 @@ import (
 )
 
 func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
+	logger := logr.Logger{}
 	integrationMrn := utils.RandString(10)
 	nodes := []v1.Node{
 		{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
@@ -26,7 +28,7 @@ func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
 	v := &k8sversion.Info{GitVersion: "v1.24.0"}
 
 	m := testMondooAuditConfig()
-	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v)
+	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ACTIVE, reportStatus.Status)
 	assert.Equal(t, OperatorCustomState{
@@ -47,6 +49,7 @@ func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
 }
 
 func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
+	logger := logr.Logger{}
 	integrationMrn := utils.RandString(10)
 	nodes := []v1.Node{
 		{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
@@ -72,7 +75,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		{Message: "ScanAPI controller is available", Status: v1.ConditionFalse, Type: v1alpha2.ScanAPIDegraded},
 	}
 
-	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v)
+	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ACTIVE, reportStatus.Status)
 	assert.Equal(t, OperatorCustomState{
@@ -102,6 +105,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 }
 
 func TestReportStatusRequestFromAuditConfig_AllEnabled_DeprecatedFields(t *testing.T) {
+	logger := logr.Logger{}
 	integrationMrn := utils.RandString(10)
 	nodes := []v1.Node{
 		{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
@@ -127,7 +131,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_DeprecatedFields(t *testi
 		{Message: "ScanAPI controller is available", Status: v1.ConditionFalse, Type: v1alpha2.ScanAPIDegraded},
 	}
 
-	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v)
+	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ACTIVE, reportStatus.Status)
 	assert.Equal(t, OperatorCustomState{
@@ -157,6 +161,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_DeprecatedFields(t *testi
 }
 
 func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
+	logger := logr.Logger{}
 	integrationMrn := utils.RandString(10)
 	nodes := []v1.Node{
 		{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
@@ -178,7 +183,7 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		{Message: "ScanAPI controller error", Status: v1.ConditionTrue, Type: v1alpha2.ScanAPIDegraded},
 	}
 
-	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v)
+	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ERROR, reportStatus.Status)
 	assert.Equal(t, OperatorCustomState{
@@ -209,4 +214,36 @@ func testMondooAuditConfig() v1alpha2.MondooAuditConfig {
 			Namespace: "mondoo-operator",
 		},
 	}
+}
+
+func TestReportStatusRequestFromAuditConfig_AllEnabled_ScanAPI_OOM(t *testing.T) {
+	logger := logr.Logger{}
+	integrationMrn := utils.RandString(10)
+	nodes := []v1.Node{
+		{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "node2"}},
+	}
+	v := &k8sversion.Info{GitVersion: "v1.24.0"}
+
+	m := testMondooAuditConfig()
+	m.Spec.KubernetesResources.Enable = true
+	m.Spec.Containers.Enable = true
+	m.Spec.Nodes.Enable = true
+	m.Spec.Admission.Enable = true
+
+	m.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{
+		{Message: "Kubernetes Resources Scanning is Available", Status: v1.ConditionFalse, Type: v1alpha2.K8sResourcesScanningDegraded},
+		{Message: "Kubernetes Container Image Scanning is Available", Status: v1.ConditionFalse, Type: v1alpha2.K8sContainerImageScanningDegraded},
+		{Message: "Node Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.NodeScanningDegraded},
+		{Message: "Admission controller is available", Status: v1.ConditionFalse, Type: v1alpha2.AdmissionDegraded},
+		{Message: "ScanAPI controller is degraded due to OOM", Status: v1.ConditionTrue, Type: v1alpha2.ScanAPIDegraded, AffectedPods: []string{"scanapi-1", "scanapi-2"}, MemoryLimit: "300Mi"},
+	}
+
+	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
+	assert.Equal(t, integrationMrn, reportStatus.Mrn)
+	assert.Equal(t, mondooclient.Status_ERROR, reportStatus.Status)
+	extraData := string(reportStatus.Messages.Messages[4].Extra.([]byte))
+	assert.Contains(t, extraData, "OOMKilled")
+	assert.Contains(t, extraData, "scanapi-1")
+	assert.Contains(t, extraData, "300Mi")
 }

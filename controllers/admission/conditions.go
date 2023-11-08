@@ -28,5 +28,5 @@ func updateAdmissionConditions(config *mondoov1alpha2.MondooAuditConfig, degrade
 		}
 	}
 
-	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha2.AdmissionDegraded, status, reason, msg, updateCheck)
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha2.AdmissionDegraded, status, reason, msg, updateCheck, []string{}, "")
 }

@@ -4,10 +4,14 @@
 package status
 
 import (
+	"strings"
+
+	"github.com/go-logr/logr"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
+	"google.golang.org/protobuf/types/known/structpb"
 	v1 "k8s.io/api/core/v1"
 	k8sversion "k8s.io/apimachinery/pkg/version"
 )
@@ -39,8 +43,14 @@ type MondooAuditConfig struct {
 	Namespace string
 }
 
+type K8sIntegrationStatusMessageExtra struct {
+	ErrorCode    string   `json:"errorCode,omitempty"`
+	AffectedPods []string `json:"affectedPods,omitempty"`
+	MemoryLimit  string   `json:"memoryLimit,omitempty"`
+}
+
 func ReportStatusRequestFromAuditConfig(
-	integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node, k8sVersion *k8sversion.Info,
+	integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node, k8sVersion *k8sversion.Info, log logr.Logger,
 ) mondooclient.ReportStatusRequest {
 	nodeNames := make([]string, len(nodes))
 	for i := range nodes {
@@ -135,6 +145,25 @@ func ReportStatusRequestFromAuditConfig(
 		if scanApi != nil {
 			if scanApi.Status == v1.ConditionTrue {
 				messages[4].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+				if strings.HasSuffix(scanApi.Message, " OOM") {
+					// extraData := K8sIntegrationStatusMessageExtra{
+					// 	ErrorCode:    "OOMKilled",
+					// 	AffectedPods: scanApi.AffectedPods,
+					// 	MemoryLimit:  scanApi.MemoryLimit,
+					// }
+					log.Info("adding struct")
+					pbStruct, err := structpb.NewStruct(map[string]interface{}{
+						"errorCode":    "OOMKilled",
+						"affectedPods": strings.Join(scanApi.AffectedPods, ", "),
+						"memoryLimit":  scanApi.MemoryLimit,
+					})
+					log.Info("struct: %v", pbStruct)
+					if err != nil {
+						log.Error(err, "Failed to create structpb")
+					} else {
+						messages[4].Extra = pbStruct
+					}
+				}
 			} else {
 				messages[4].Status = mondooclient.MessageStatus_MESSAGE_INFO
 			}
