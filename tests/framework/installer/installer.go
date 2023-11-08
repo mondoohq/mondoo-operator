@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -64,6 +65,10 @@ func (i *MondooInstaller) InstallOperator() error {
 		}
 
 		zap.S().Info("The Mondoo operator is installed externally. Skipping installation...")
+		// We had race conditions were the integration wasn't ready when the operator tried to exchange the token
+		// for a service account. This sleep should give the integration enough time to get ready.
+		zap.S().Infof("Sleeping for 30 seconds to allow the token to get active")
+		time.Sleep(30 * time.Second)
 		return nil
 	}
 
@@ -121,6 +126,13 @@ func (i *MondooInstaller) UninstallOperator() error {
 		return err
 	}
 	zap.S().Infof("Deleted Mondoo client secret %s/%s.", secret.Namespace, secret.Name)
+
+	// A new suite gets a new integration/token, so cleanup the old one.
+	secret.Name = utils.MondooTokenSecret
+	if err := i.K8sHelper.DeleteResourceIfExists(secret); err != nil {
+		return err
+	}
+	zap.S().Infof("Deleted Mondoo token secret %s/%s.", secret.Namespace, secret.Name)
 
 	if i.isInstalledExternally {
 		zap.S().Info("The Mondoo operator has been installed externally. Skipping uninstall...")
