@@ -37,6 +37,8 @@ func NewClient() (*Client, error) {
 	if apiToken == "" {
 		return nil, fmt.Errorf("missing environment variable %s", MONDOO_API_TOKEN_VAR)
 	}
+	fmt.Printf("Using GraphQL endpoint %s\n", gqlEndpoint)
+	fmt.Printf("Using org MRN %s\n", orgMrn)
 	// Initialize the client
 	client, err := mondoogql.NewClient(option.WithEndpoint(gqlEndpoint), option.WithAPIToken(apiToken))
 	if err != nil {
