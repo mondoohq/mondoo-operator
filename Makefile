@@ -110,7 +110,11 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) rbac:roleName=manager-role webhook paths="./pkg/webhooks/..."
 
 generate: controller-gen gomockgen prep/tools ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+	echo "Running generate"
+	go mod tidy
+	echo "Running controller-gen"
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	echo "Running go generate"
 	go generate ./controllers/... ./pkg/...
 
 fmt: ## Run go fmt against code.
@@ -222,6 +226,7 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 
 .PHONY: generate-manifests
 generate-manifests: manifests kustomize ## Generates manifests and pipes into a yaml file
+	echo "Running generate-manifests"
 	cp config/manager/kustomization.yaml config/manager/kustomization.yaml.before_kustomize
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > mondoo-operator-manifests.yaml
@@ -268,6 +273,7 @@ endif
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
 $(CONTROLLER_GEN): $(LOCALBIN)
+	echo "Installing controller-gen"
 	test -s $(LOCALBIN)/controller-gen || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
 .PHONY: envtest
@@ -278,6 +284,7 @@ $(ENVTEST): $(LOCALBIN)
 GOTESTSUM = $(LOCALBIN)/gotestsum
 gotestsum: $(GOTESTSUM) ## Download gotestsum locally if necessary.
 $(GOTESTSUM): $(LOCALBIN)
+	echo "Installing gotestsum"
 	test -s $(LOCALBIN)/gotestsum || GOBIN=$(LOCALBIN) go install gotest.tools/gotestsum@latest
 
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
@@ -402,10 +409,12 @@ test/spell-check:
 # An alternative (especially for local development) is to soft-link a local copy of the repo
 # yourself. We don't pin submodules at this time, but we may want to check if they are up to date here.
 prep/tools: prep/tools/ranger
+	echo "Running prep/tools"
 	command -v protoc-gen-go || go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	command -v protoc-gen-rangerrpc-swagger || go install go.mondoo.com/ranger-rpc/protoc-gen-rangerrpc-swagger@latest
 
 prep/tools/ranger:
+	echo "prep/tools/ranger"
 	go install go.mondoo.com/ranger-rpc/protoc-gen-rangerrpc@latest
 
 prep/ci/protoc:

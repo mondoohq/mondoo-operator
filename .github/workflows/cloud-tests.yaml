@@ -55,9 +55,6 @@ jobs:
         k8s-version: ["1.25", "1.26", "1.27"]
 
     steps:
-      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
-        with:
-          config: ${{ vars.PERMISSIONS_CONFIG }}
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
@@ -143,9 +140,6 @@ jobs:
       AWS_REGION: us-east-2
 
     steps:
-      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
-        with:
-          config: ${{ vars.PERMISSIONS_CONFIG }}
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
@@ -225,9 +219,6 @@ jobs:
       KUBECONFIG: ${{ format('{0}/{1}', github.workspace, '.github/terraform/gke/kubeconfig') }}
 
     steps:
-      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
-        with:
-          config: ${{ vars.PERMISSIONS_CONFIG }}
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
@@ -265,7 +256,7 @@ jobs:
         run: echo "OPERATOR_VERSION=$(docker run ghcr.io/mondoohq/mondoo-operator:${{ env.MONDOO_OPERATOR_IMAGE_TAG }} version --simple)" >> $GITHUB_ENV
 
       - name: Wait a bit for the cluster to become more stable
-        run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
+        run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=300s
 
       - name: Run integration tests
         env:
@@ -306,9 +297,6 @@ jobs:
     needs: [eks-integration-test,aks-integration-test,gke-integration-test]
     if: always()
     steps:
-    - uses: GitHubSecurityLab/actions-permissions/monitor@v1
-      with:
-        config: ${{ vars.PERMISSIONS_CONFIG }}
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
@@ -332,9 +320,6 @@ jobs:
     # Run only if the previous job has failed and only if it's running against the main branch
     if: ${{ always() && contains(join(needs.*.result, ','), 'fail') && github.ref_name == 'main' }}
     steps:
-      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
-        with:
-          config: ${{ vars.PERMISSIONS_CONFIG }}
       - uses: sarisia/actions-status-discord@v1
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
