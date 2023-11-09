@@ -132,6 +132,7 @@ jobs:
     
     strategy:
       fail-fast: false
+      max-parallel: 3 # Otherwise we will hit AWS VPC quota limits
       matrix:
         k8s-version: ["1.24", "1.25", "1.26", "1.27", "1.28"]
 
