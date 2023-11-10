@@ -67,8 +67,8 @@ func (i *MondooInstaller) InstallOperator() error {
 		zap.S().Info("The Mondoo operator is installed externally. Skipping installation...")
 		// We had race conditions were the integration wasn't ready when the operator tried to exchange the token
 		// for a service account. This sleep should give the integration enough time to get ready.
-		zap.S().Infof("Sleeping for 30 seconds to allow the token to get active")
-		time.Sleep(30 * time.Second)
+		zap.S().Infof("Sleeping for 10 seconds to allow the token to get active")
+		time.Sleep(10 * time.Second)
 		return nil
 	}
 
