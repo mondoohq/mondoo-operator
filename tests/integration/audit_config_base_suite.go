@@ -71,6 +71,7 @@ func (s *AuditConfigBaseSuite) SetupSuite() {
 	s.Require().NoError(err, "Failed to create Nexus client")
 	s.spaceClient, err = nexusClient.CreateSpace()
 	s.Require().NoError(err, "Failed to create Nexus space")
+	log.Log.Info("Created Nexus space", "space", s.spaceClient.Mrn())
 
 	// TODO: this is only needed because the integration creation is not part of the MondooInstaller struct.
 	// That code will move there once all tests are migrated to use the E2E approach.
@@ -192,11 +193,15 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	// Verify the workloads have been sent upstream and have scores.
 	workloadNames, err := s.testCluster.K8sHelper.GetWorkloadNames(s.ctx)
 	s.NoError(err, "Failed to get workload names.")
+	zap.S().Info("number of workload", " amount ", len(workloadNames))
 
 	time.Sleep(10 * time.Second)
 
+	// The number of assets from upstream is limited by paganiation.
+	// In case we have more than 100 workloads, we need to call this mutlple times, with different page numbers.
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
 	s.NoError(err, "Failed to list assets with scores.")
+	zap.S().Info("number of assets from upstream: ", len(assets))
 
 	// TODO: the cluster name is non-deterministic currently so we cannot test for it
 	assetsExceptCluster := utils.ExcludeClusterAsset(assets)
@@ -267,6 +272,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 	time.Sleep(10 * time.Second)
 
 	// Verify the container images have been sent upstream and have scores.
+	// The number of assets from upstream is limited by paganiation.
+	// In case we have more than 100 workloads, we need to call this mutlple times, with different page numbers.
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
 	s.NoError(err, "Failed to list assets with scores")
 
@@ -372,6 +379,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 
 	time.Sleep(10 * time.Second)
 
+	// The number of assets from upstream is limited by paganiation.
+	// In case we have more than 100 workloads, we need to call this mutlple times, with different page numbers.
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
 	s.NoError(err, "Failed to list assets")
 	assetNames := utils.AssetNames(assets)

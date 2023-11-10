@@ -44,7 +44,7 @@ func ListAssetsWithScores(
 					AssetType string `graphql:"asset_type"`
 				}
 			}
-		} `graphql:"assets(spaceMrn: $spaceMrn)"`
+		} `graphql:"assets(spaceMrn: $spaceMrn, first: 100)"`
 	}
 
 	err := gqlClient.Query(ctx, &q, map[string]interface{}{"spaceMrn": mondoogql.String(spaceMrn)})
