@@ -127,7 +127,21 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
-	updateNodeConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs))
+	// Get Pods for this CronJob
+	pods := &corev1.PodList{}
+	if len(cronJobs) > 0 {
+		opts := &client.ListOptions{
+			Namespace:     n.Mondoo.Namespace,
+			LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
+		}
+		err = n.KubeClient.List(ctx, pods, opts)
+		if err != nil {
+			logger.Error(err, "Failed to list Pods for Node Scanning")
+			return err
+		}
+	}
+
+	updateNodeConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs), pods)
 	return nil
 }
 
@@ -299,7 +313,7 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 	}
 
 	// Update any remnant conditions
-	updateNodeConditions(n.Mondoo, false)
+	updateNodeConditions(n.Mondoo, false, &corev1.PodList{})
 
 	return nil
 }

@@ -106,7 +106,21 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
-	updateWorkloadsConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs))
+	// Get Pods for this CronJob
+	pods := &corev1.PodList{}
+	if len(cronJobs) > 0 {
+		opts := &client.ListOptions{
+			Namespace:     n.Mondoo.Namespace,
+			LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
+		}
+		err = n.KubeClient.List(ctx, pods, opts)
+		if err != nil {
+			logger.Error(err, "Failed to list Pods for scan Kubernetes Reosurce Scanning")
+			return err
+		}
+	}
+
+	updateWorkloadsConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs), pods)
 	return n.cleanupWorkloadDeployment(ctx)
 }
 
@@ -136,7 +150,7 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 	}
 
 	// Clear any remnant status
-	updateWorkloadsConditions(n.Mondoo, false)
+	updateWorkloadsConditions(n.Mondoo, false, &corev1.PodList{})
 
 	return nil
 }

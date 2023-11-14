@@ -143,7 +143,6 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		return nil
 	}
 
-	// TODO: refactor to func?
 	// Get Pods for this deployment
 	selector, _ := metav1.LabelSelectorAsSelector(existingDeployment.Spec.Selector)
 	opts := []client.ListOption{

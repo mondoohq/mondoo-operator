@@ -19,6 +19,7 @@ import (
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -431,6 +432,90 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningStatus() {
 	s.Equal("Node Scanning is disabled", condition.Message)
 	s.Equal("NodeScanningDisabled", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+
+	// Reconcile to create all resources
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Verify the node scanning status is set to available
+	s.Equal(1, len(d.Mondoo.Status.Conditions))
+	condition := d.Mondoo.Status.Conditions[0]
+	s.Equal("Node Scanning is available", condition.Message)
+	s.Equal("NodeScanningAvailable", condition.Reason)
+	s.Equal(corev1.ConditionFalse, condition.Status)
+
+	listOpts := &client.ListOptions{
+		Namespace:     s.auditConfig.Namespace,
+		LabelSelector: labels.SelectorFromSet(CronJobLabels(s.auditConfig)),
+	}
+	cronJobs := &batchv1.CronJobList{}
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
+
+	oomPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "node-scan-123",
+			Namespace: s.auditConfig.Namespace,
+			Labels:    CronJobLabels(s.auditConfig),
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "node-scan",
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceMemory: *resource.NewQuantity(1, resource.BinarySI),
+						},
+					},
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: "node-scan",
+					LastTerminationState: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							ExitCode: 137,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	d.KubeClient.Create(s.ctx, oomPod)
+
+	now := time.Now()
+	metaNow := metav1.NewTime(now)
+	metaHourAgo := metav1.NewTime(now.Add(-1 * time.Hour))
+	cronJobs.Items[0].Status.LastScheduleTime = &metaNow
+	cronJobs.Items[0].Status.LastSuccessfulTime = &metaHourAgo
+
+	s.NoError(d.KubeClient.Status().Update(s.ctx, &cronJobs.Items[0]))
+
+	// Reconcile to update the audit config status
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	pods := &corev1.PodList{}
+	s.NoError(d.KubeClient.List(s.ctx, pods, listOpts))
+	s.Equal(1, len(pods.Items))
+
+	// Verify the node scanning status is set to unavailable
+	condition = d.Mondoo.Status.Conditions[0]
+	s.Equal("Node Scanning is unavailable due to OOM", condition.Message)
+	s.Contains(condition.AffectedPods, "node-scan-123")
+	containerMemory := pods.Items[0].Spec.Containers[0].Resources.Limits.Memory()
+	s.Equal(containerMemory.String(), condition.MemoryLimit)
+	s.Equal("NodeScanningUnavailable", condition.Reason)
+	s.Equal(corev1.ConditionTrue, condition.Status)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_DisableNodeScanning() {
