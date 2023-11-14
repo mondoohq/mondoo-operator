@@ -42,7 +42,6 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 					msg = "ScanAPI controller is unavailable due to OOM"
 					affectedPods = append(affectedPods, pod.Name)
 					memoryLimit = pod.Spec.Containers[0].Resources.Limits.Memory().String()
-					break
 				}
 			}
 		}
