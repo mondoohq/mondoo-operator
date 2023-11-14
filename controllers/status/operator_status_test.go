@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/structpb"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sversion "k8s.io/apimachinery/pkg/version"
@@ -246,4 +247,95 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_ScanAPI_OOM(t *testing.T)
 	assert.Contains(t, extraData, "OOMKilled")
 	assert.Contains(t, extraData, "scanapi-1")
 	assert.Contains(t, extraData, "300Mi")
+}
+
+func TestCreateOOMExtraInformation(t *testing.T) {
+	// Test cases
+	tests := []struct {
+		name         string
+		message      string
+		affectedPods []string
+		memoryLimit  string
+		expected     *structpb.Struct
+		expectedErr  error
+	}{
+		{
+			name:         "Message ends with OOM",
+			message:      "Container was terminated due to OOM",
+			affectedPods: []string{"pod1", "pod2"},
+			memoryLimit:  "1Gi",
+			expected: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"errorCode": {
+						Kind: &structpb.Value_StringValue{
+							StringValue: "OOMKilled",
+						},
+					},
+					"affectedPods": {
+						Kind: &structpb.Value_StringValue{
+							StringValue: "pod1, pod2",
+						},
+					},
+					"memoryLimit": {
+						Kind: &structpb.Value_StringValue{
+							StringValue: "1Gi",
+						},
+					},
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			name:         "Message does not end with OOM",
+			message:      "Container was terminated due to an error",
+			affectedPods: []string{"pod1", "pod2"},
+			memoryLimit:  "1Gi",
+			expected:     nil,
+			expectedErr:  nil,
+		},
+	}
+
+	// Run tests
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual, err := createOOMExtraInformation(tt.message, tt.affectedPods, tt.memoryLimit)
+			assert.Equal(t, tt.expectedErr, err)
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
+}
+
+func TestCreateOOMExtraInformationPBMap(t *testing.T) {
+	// Test cases
+	tests := []struct {
+		name         string
+		message      string
+		affectedPods []string
+		memoryLimit  string
+		expected     map[string]interface{}
+		expectedErr  error
+	}{
+		{
+			name:         "Message ends with OOM",
+			message:      "Container was terminated due to OOM",
+			affectedPods: []string{"pod1", "pod2"},
+			memoryLimit:  "1Gi",
+			expected: map[string]interface{}{
+				"errorCode":    "OOMKilled",
+				"affectedPods": "pod1, pod2",
+				"memoryLimit":  "1Gi",
+			},
+			expectedErr: nil,
+		},
+	}
+
+	// Run tests
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual, err := createOOMExtraInformation(tt.message, tt.affectedPods, tt.memoryLimit)
+
+			assert.Equal(t, tt.expectedErr, err)
+			assert.Equal(t, tt.expected, actual.AsMap())
+		})
+	}
 }
