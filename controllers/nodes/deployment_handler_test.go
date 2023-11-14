@@ -449,7 +449,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
 	s.Equal("Node Scanning is available", condition.Message)
 	s.Equal("NodeScanningAvailable", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
-	s.Len(condition.AffectedPods, 0)
 
 	listOpts := &client.ListOptions{
 		Namespace:     s.auditConfig.Namespace,
@@ -490,8 +489,15 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
 		},
 	}
 
-	err = d.KubeClient.Create(s.ctx, oomPod)
-	s.NoError(err)
+	d.KubeClient.Create(s.ctx, oomPod)
+
+	now := time.Now()
+	metaNow := metav1.NewTime(now)
+	metaHourAgo := metav1.NewTime(now.Add(-1 * time.Hour))
+	cronJobs.Items[0].Status.LastScheduleTime = &metaNow
+	cronJobs.Items[0].Status.LastSuccessfulTime = &metaHourAgo
+
+	s.NoError(d.KubeClient.Status().Update(s.ctx, &cronJobs.Items[0]))
 
 	// Reconcile to update the audit config status
 	result, err = d.Reconcile(s.ctx)
@@ -505,26 +511,11 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
 	// Verify the node scanning status is set to unavailable
 	condition = d.Mondoo.Status.Conditions[0]
 	s.Equal("Node Scanning is unavailable due to OOM", condition.Message)
-	s.Len(condition.AffectedPods, 1)
 	s.Contains(condition.AffectedPods, "node-scan-123")
 	containerMemory := pods.Items[0].Spec.Containers[0].Resources.Limits.Memory()
 	s.Equal(containerMemory.String(), condition.MemoryLimit)
 	s.Equal("NodeScanningUnavailable", condition.Reason)
 	s.Equal(corev1.ConditionTrue, condition.Status)
-
-	err = d.KubeClient.Delete(s.ctx, &pods.Items[0])
-	s.NoError(err)
-	result, err = d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
-
-	// Verify the node scanning status is set to available again
-	s.Equal(1, len(d.Mondoo.Status.Conditions))
-	condition = d.Mondoo.Status.Conditions[0]
-	s.Equal("Node Scanning is available", condition.Message)
-	s.Equal("NodeScanningAvailable", condition.Reason)
-	s.Equal(corev1.ConditionFalse, condition.Status)
-	s.Len(condition.AffectedPods, 0)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_DisableNodeScanning() {

@@ -22,6 +22,17 @@ func updateImageScanningConditions(config *v1alpha2.MondooAuditConfig, degradedS
 		status = corev1.ConditionFalse
 	} else if degradedStatus {
 		msg = "Kubernetes Container Image Scanning is unavailable"
+		for _, pod := range pods.Items {
+			for _, status := range pod.Status.ContainerStatuses {
+				if status.LastTerminationState.Terminated != nil && status.LastTerminationState.Terminated.ExitCode == 137 {
+					// TODO: double check container name?
+					msg = "Kubernetes Container Image Scanning is unavailable due to OOM"
+					affectedPods = append(affectedPods, pod.Name)
+					memoryLimit = pod.Spec.Containers[0].Resources.Limits.Memory().String()
+					break
+				}
+			}
+		}
 		reason = "KubernetesContainerImageScanningUnavailable"
 		status = corev1.ConditionTrue
 	}
