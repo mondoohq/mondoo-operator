@@ -218,7 +218,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	// Verify container image scanning and kubernetes resources conditions
 	s.Equal(1, len(d.Mondoo.Status.Conditions))
 	condition := d.Mondoo.Status.Conditions[0]
-	s.Equal("Kubernetes Resources Scanning is Available", condition.Message)
+	s.Equal("Kubernetes Resources Scanning is available", condition.Message)
 	s.Equal("KubernetesResourcesScanningAvailable", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
 
@@ -240,7 +240,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 
 	// Verify the kubernetes resources status is set to unavailable
 	condition = d.Mondoo.Status.Conditions[0]
-	s.Equal("Kubernetes Resources Scanning is Unavailable", condition.Message)
+	s.Equal("Kubernetes Resources Scanning is unavailable", condition.Message)
 	s.Equal("KubernetesResourcesScanningUnavailable", condition.Reason)
 	s.Equal(corev1.ConditionTrue, condition.Status)
 
@@ -256,7 +256,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 
 	// Verify the kubernetes resources scanning status is set to available
 	condition = d.Mondoo.Status.Conditions[0]
-	s.Equal("Kubernetes Resources Scanning is Available", condition.Message)
+	s.Equal("Kubernetes Resources Scanning is available", condition.Message)
 	s.Equal("KubernetesResourcesScanningAvailable", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
 
@@ -274,7 +274,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 
 	// Verify the kubernetes resources scanning status is set to available when there is an active scan
 	condition = d.Mondoo.Status.Conditions[0]
-	s.Equal("Kubernetes Resources Scanning is Available", condition.Message)
+	s.Equal("Kubernetes Resources Scanning is available", condition.Message)
 	s.Equal("KubernetesResourcesScanningAvailable", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
 

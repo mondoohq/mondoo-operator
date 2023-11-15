@@ -69,8 +69,8 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 	}
 
 	m.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{
-		{Message: "Kubernetes Resources Scanning is Available", Status: v1.ConditionFalse, Type: v1alpha2.K8sResourcesScanningDegraded},
-		{Message: "Kubernetes Container Image Scanning is Available", Status: v1.ConditionFalse, Type: v1alpha2.K8sContainerImageScanningDegraded},
+		{Message: "Kubernetes Resources Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.K8sResourcesScanningDegraded},
+		{Message: "Kubernetes Container Image Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.K8sContainerImageScanningDegraded},
 		{Message: "Node Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.NodeScanningDegraded},
 		{Message: "Admission controller is available", Status: v1.ConditionFalse, Type: v1alpha2.AdmissionDegraded},
 		{Message: "ScanAPI controller is available", Status: v1.ConditionFalse, Type: v1alpha2.ScanAPIDegraded},
@@ -125,8 +125,8 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_DeprecatedFields(t *testi
 	}
 
 	m.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{
-		{Message: "Kubernetes Resources Scanning is Available", Status: v1.ConditionFalse, Type: v1alpha2.K8sResourcesScanningDegraded},
-		{Message: "Kubernetes Container Image Scanning is Available", Status: v1.ConditionFalse, Type: v1alpha2.K8sContainerImageScanningDegraded},
+		{Message: "Kubernetes Resources Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.K8sResourcesScanningDegraded},
+		{Message: "Kubernetes Container Image Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.K8sContainerImageScanningDegraded},
 		{Message: "Node Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.NodeScanningDegraded},
 		{Message: "Admission controller is available", Status: v1.ConditionFalse, Type: v1alpha2.AdmissionDegraded},
 		{Message: "ScanAPI controller is available", Status: v1.ConditionFalse, Type: v1alpha2.ScanAPIDegraded},
@@ -233,8 +233,8 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_ScanAPI_OOM(t *testing.T)
 	m.Spec.Admission.Enable = true
 
 	m.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{
-		{Message: "Kubernetes Resources Scanning is Available", Status: v1.ConditionFalse, Type: v1alpha2.K8sResourcesScanningDegraded},
-		{Message: "Kubernetes Container Image Scanning is Available", Status: v1.ConditionFalse, Type: v1alpha2.K8sContainerImageScanningDegraded},
+		{Message: "Kubernetes Resources Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.K8sResourcesScanningDegraded},
+		{Message: "Kubernetes Container Image Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.K8sContainerImageScanningDegraded},
 		{Message: "Node Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.NodeScanningDegraded},
 		{Message: "Admission controller is available", Status: v1.ConditionFalse, Type: v1alpha2.AdmissionDegraded},
 		{Message: "ScanAPI controller is degraded due to OOM", Status: v1.ConditionTrue, Type: v1alpha2.ScanAPIDegraded, AffectedPods: []string{"scanapi-1", "scanapi-2"}, MemoryLimit: "300Mi"},
@@ -243,10 +243,14 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_ScanAPI_OOM(t *testing.T)
 	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ERROR, reportStatus.Status)
-	extraData := string(reportStatus.Messages.Messages[4].Extra.([]byte))
-	assert.Contains(t, extraData, "OOMKilled")
-	assert.Contains(t, extraData, "scanapi-1")
-	assert.Contains(t, extraData, "300Mi")
+	extraData := reportStatus.Messages.Messages[4].Extra.(*structpb.Struct)
+	extraMap := extraData.AsMap()
+	assert.Contains(t, extraMap, "errorCode")
+	assert.Contains(t, extraMap, "affectedPods")
+	assert.Contains(t, extraMap, "memoryLimit")
+	assert.Contains(t, extraMap["errorCode"], "OOMKilled")
+	assert.Contains(t, extraMap["affectedPods"], "scanapi-1")
+	assert.Contains(t, extraMap["memoryLimit"], "300Mi")
 }
 
 func TestCreateOOMExtraInformation(t *testing.T) {
