@@ -80,6 +80,7 @@ func AreCronJobsEqual(a, b batchv1.CronJob) bool {
 		AreSecurityContextsEqual(aPodSpec.Containers[0].SecurityContext, bPodSpec.Containers[0].SecurityContext) &&
 		reflect.DeepEqual(aPodSpec.Volumes, bPodSpec.Volumes) &&
 		reflect.DeepEqual(a.Spec.SuccessfulJobsHistoryLimit, b.Spec.SuccessfulJobsHistoryLimit) &&
+		a.Spec.Schedule == b.Spec.Schedule &&
 		reflect.DeepEqual(a.Spec.FailedJobsHistoryLimit, b.Spec.FailedJobsHistoryLimit) &&
 		reflect.DeepEqual(a.GetOwnerReferences(), b.GetOwnerReferences())
 }

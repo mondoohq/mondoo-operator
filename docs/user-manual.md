@@ -449,6 +449,25 @@ subjects:
 
 After some seconds, you should see that the operator picked up the new `MondooAuditConfig` and starts creating objects.
 
+## Adjust the scan interval
+
+You can adjust the interval for scans triggered via a CronJob.
+Edit the `MondooAuditConfig` to adjust the interval:
+```
+kubectl -n mondoo-operator edit mondooauditconfigs.k8s.mondoo.com mondoo-client
+```
+
+```
+  kubernetesResources:
+    enable: true
+    schedule: 41 * * * *
+```
+
+You can adjust the schedule for the following components:
+- Kubernetes Resources Scanning
+- Container Image Scanning
+- Node Scanning
+
 ## Uninstalling the Mondoo operator
 
 Before uninstalling the Mondoo operator, be sure to delete all `MondooAuditConfig` and `MondooOperatorConfig` objects. You can find any in your cluster by running:

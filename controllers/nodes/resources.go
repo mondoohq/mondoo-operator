@@ -16,6 +16,8 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 
+	// That's the mod k8s relies on https://github.com/kubernetes/kubernetes/blob/master/go.mod#L63
+	"github.com/robfig/cron/v3"
 	"go.mondoo.com/cnquery/v9/providers-sdk/v1/inventory"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
@@ -38,6 +40,15 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 	ls := CronJobLabels(m)
 
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
+	if m.Spec.Nodes.Schedule != "" {
+		_, err := cron.ParseStandard(m.Spec.Nodes.Schedule)
+		if err != nil {
+			logger.Error(err, "invalid cron schedule specified in MondooAuditConfig Spec.Nodes.Schedule; using default")
+		} else {
+			logger.Info("using cron custom schedule", "crontab", m.Spec.Nodes.Schedule)
+			cronTab = m.Spec.Nodes.Schedule
+		}
+	}
 	unsetHostPath := corev1.HostPathUnset
 
 	name := "cnspec"
@@ -193,7 +204,7 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
-	cronTab := fmt.Sprintf("%d */2 * * *", time.Now().Add(1*time.Minute).Minute())
+	cronTab := fmt.Sprintf("%d */12 * * *", time.Now().Add(1*time.Minute).Minute())
 	scanApiUrl := scanapi.ScanApiServiceUrl(m)
 	containerArgs := []string{
 		"garbage-collect",
@@ -202,8 +213,8 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 
 		// The job runs hourly and we need to make sure that the previous one is killed before the new one is started so we don't stack them.
 		"--timeout", "55",
-		// Cleanup any resources more than 2 hours old
-		"--filter-older-than", "2h",
+		// Cleanup any resources more than 48 hours old
+		"--filter-older-than", "48h",
 		"--labels", "k8s.mondoo.com/kind=node",
 	}
 

@@ -86,11 +86,15 @@ type KubernetesResources struct {
 	// DEPRECATED: ContainerImageScanning determines whether container images are being scanned. The current implementation
 	// runs a separate job once every 24h that scans the container images running in the cluster.
 	ContainerImageScanning bool `json:"containerImageScanning,omitempty"`
+	// Specify a custom crontab schedule for the Kubernetes resource scanning job. If not specified, the default schedule is used.
+	Schedule string `json:"schedule,omitempty"`
 }
 
 type Nodes struct {
 	Enable    bool                        `json:"enable,omitempty"`
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Specify a custom crontab schedule for the node scanning job. If not specified, the default schedule is used.
+	Schedule string `json:"schedule,omitempty"`
 }
 
 type Admission struct {
@@ -118,6 +122,8 @@ type Admission struct {
 type Containers struct {
 	Enable    bool                        `json:"enable,omitempty"`
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Specify a custom crontab schedule for the container image scanning job. If not specified, the default schedule is used.
+	Schedule string `json:"schedule,omitempty"`
 }
 
 type Image struct {
