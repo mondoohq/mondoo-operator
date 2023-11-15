@@ -2,6 +2,40 @@
 
 This user manual describes how to install and use the Mondoo Operator.
 
+- [User manual](#user-manual)
+  - [Mondoo Operator Installation](#mondoo-operator-installation)
+    - [Installing with kubectl](#installing-with-kubectl)
+    - [Installing with Helm](#installing-with-helm)
+      - [Customization](#customization)
+    - [Installing with Operator Lifecycle Manager (OLM)](#installing-with-operator-lifecycle-manager-olm)
+  - [Configuring the Mondoo Secret](#configuring-the-mondoo-secret)
+  - [Creating a MondooAuditConfig](#creating-a-mondooauditconfig)
+    - [Filter Kubernetes objects based on namespace](#filter-kubernetes-objects-based-on-namespace)
+  - [Deploying the admission controller](#deploying-the-admission-controller)
+    - [Scanned workload types](#scanned-workload-types)
+    - [Different modes of operation](#different-modes-of-operation)
+    - [Deploying the admission controller using cert-manager](#deploying-the-admission-controller-using-cert-manager)
+    - [Manually creating TLS certificates using OpenSSL](#manually-creating-tls-certificates-using-openssl)
+    - [Firewall rules for the webhook](#firewall-rules-for-the-webhook)
+  - [Creating a secret for private image scanning](#creating-a-secret-for-private-image-scanning)
+  - [Installing Mondoo into multiple namespaces](#installing-mondoo-into-multiple-namespaces)
+  - [Adjust the scan interval](#adjust-the-scan-interval)
+  - [Configure resources for the operator and its components](#configure-resources-for-the-operator-and-its-components)
+    - [Configure resources for the operator-controller](#configure-resources-for-the-operator-controller)
+    - [Configure resources for the different scanning components](#configure-resources-for-the-different-scanning-components)
+  - [Uninstalling the Mondoo operator](#uninstalling-the-mondoo-operator)
+    - [Uninstalling the operator with kubectl](#uninstalling-the-operator-with-kubectl)
+    - [Uninstalling the operator with Helm](#uninstalling-the-operator-with-helm)
+    - [Uninstalling the operator with Operator Lifecycle Manager (OLM)](#uninstalling-the-operator-with-operator-lifecycle-manager-olm)
+  - [FAQ](#faq)
+    - [I do not see the service running, only the operator. What should I do?](#i-do-not-see-the-service-running-only-the-operator-what-should-i-do)
+    - [How do I edit an existing operator configuration?](#how-do-i-edit-an-existing-operator-configuration)
+    - [How do I run asset garbage collection manually?](#how-do-i-run-asset-garbage-collection-manually)
+    - [Why is there a deployment marked as unschedulable?](#why-is-there-a-deployment-marked-as-unschedulable)
+    - [Why are (some of) my nodes unscored?](#why-are-some-of-my-nodes-unscored)
+    - [How can I trigger a new scan?](#how-can-i-trigger-a-new-scan)
+    - [I had a `MondooAuditConfig` in my cluster with version `v1alpha1` and now I can no longer access it. What should I do?](#i-had-a-mondooauditconfig-in-my-cluster-with-version-v1alpha1-and-now-i-can-no-longer-access-it-what-should-i-do)
+
 ## Mondoo Operator Installation
 
 Install the Mondoo Operator using kubectl, Helm, or Operator Lifecycle Manager.
@@ -467,6 +501,86 @@ You can adjust the schedule for the following components:
 - Kubernetes Resources Scanning
 - Container Image Scanning
 - Node Scanning
+
+## Configure resources for the operator and its components
+
+### Configure resources for the operator-controller
+
+To change resources for the `mondoo-operator-controller-manager`, you need to change the Deployment:
+
+```
+kubectl -n mondoo-operator edit deployment mondoo-operator-controller-manager
+```
+
+The `mondoo-operator-controller-manager` has predefined `requests` and `limits`.
+Depending on your cluster size, something other than these might work better.
+During editing, search for the defaults in the manifest:
+```
+        resources:
+          limits:
+            cpu: 200m
+            memory: 140Mi
+          requests:
+            cpu: 100m
+            memory: 70Mi
+
+```
+Increase them as required.
+
+### Configure resources for the different scanning components
+
+The `mondoo-operator-controller-manager` manages the other Deployments and CronJobs needed to scan your cluster.
+If the provided `requests` and `limits` do not match your cluster size, increase them as needed.
+For components, do **not** edit the Deploymets or CronJobs directly.
+The `mondoo-operator-controller-manager` will revert your changes.
+Instead, edit the `MondooAuditConfig`:
+```
+kubectl -n mondoo-operator edit mondooauditconfigs.k8s.mondoo.com mondoo-client
+```
+You can change the resources for different components in the config:
+```
+spec:
+...
+  containers:
+    resources: {}
+...
+  nodes:
+    enable: true
+    resources: {}
+  scanner:
+    image: {}
+    privateRegistriesPullSecretRef: {}
+    replicas: 1
+    resources: {}
+    serviceAccountName: mondoo-operator-k8s-resources-scanning
+...
+```
+
+The `resources` field accepts the [Kubernetes resource defintions](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/):
+```
+spec:
+...
+  containers:
+    resources: {}
+...
+  nodes:
+    enable: true
+    resources:
+      limits:
+        cpu: 1
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 200Mi
+  scanner:
+    image: {}
+    privateRegistriesPullSecretRef: {}
+    replicas: 1
+    resources: {}
+    serviceAccountName: mondoo-operator-k8s-resources-scanning
+...
+```
+After you saved the changes, the `mondoo-operator-controller-manager` will adjust the corresponding Deployment or CronJob.
 
 ## Uninstalling the Mondoo operator
 
