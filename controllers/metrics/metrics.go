@@ -70,7 +70,6 @@ func (mr *MetricsReconciler) Start(ctx context.Context) error {
 }
 
 func (mr *MetricsReconciler) metricsLoop() {
-	mr.log.Info("Updating metrics")
 	mondooAuditConfigs := &v1alpha2.MondooAuditConfigList{}
 	if err := mr.Client.List(mr.ctx, mondooAuditConfigs); err != nil {
 		mr.log.Error(err, "error listing MondooAuditConfigs")

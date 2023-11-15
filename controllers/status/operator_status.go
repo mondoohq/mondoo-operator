@@ -23,6 +23,7 @@ const (
 	AdmissionControllerIdentifier    = "admission-controller"
 	ScanApiIdentifier                = "scan-api"
 	NamespaceFilteringIdentifier     = "namespace-filtering"
+	MondooOperatorIdentifier         = "mondoo-operator"
 	noStatusMessage                  = "No status reported yet"
 )
 
@@ -51,7 +52,7 @@ func ReportStatusRequestFromAuditConfig(
 		nodeNames[i] = nodes[i].Name
 	}
 
-	messages := make([]mondooclient.IntegrationMessage, 5)
+	messages := make([]mondooclient.IntegrationMessage, 6)
 
 	// Kubernetes resources scanning status
 	messages[0].Identifier = K8sResourcesScanningIdentifier
@@ -185,6 +186,20 @@ func ReportStatusRequestFromAuditConfig(
 	} else {
 		messages[4].Status = mondooclient.MessageStatus_MESSAGE_INFO
 		messages[4].Message = "Scan API is disabled"
+	}
+
+	messages[5].Identifier = MondooOperatorIdentifier
+	mondooOperator := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.MondooOperaotrDegraded)
+	if mondooOperator != nil {
+		if mondooOperator.Status == v1.ConditionTrue {
+			messages[5].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+		} else {
+			messages[5].Status = mondooclient.MessageStatus_MESSAGE_INFO
+		}
+		messages[5].Message = mondooOperator.Message
+	} else {
+		messages[5].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
+		messages[5].Message = noStatusMessage
 	}
 
 	// If there were any error messages, the overall status is error
