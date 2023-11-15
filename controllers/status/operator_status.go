@@ -174,7 +174,6 @@ func ReportStatusRequestFromAuditConfig(
 				if extraStruct != nil {
 					messages[4].Extra = extraStruct
 				}
-				messages[4].Extra = extraStruct
 			} else {
 				messages[4].Status = mondooclient.MessageStatus_MESSAGE_INFO
 			}
