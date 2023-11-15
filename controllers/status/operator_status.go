@@ -43,12 +43,6 @@ type MondooAuditConfig struct {
 	Namespace string
 }
 
-type K8sIntegrationStatusMessageExtra struct {
-	ErrorCode    string   `json:"errorCode,omitempty"`
-	AffectedPods []string `json:"affectedPods,omitempty"`
-	MemoryLimit  string   `json:"memoryLimit,omitempty"`
-}
-
 func ReportStatusRequestFromAuditConfig(
 	integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node, k8sVersion *k8sversion.Info, log logr.Logger,
 ) mondooclient.ReportStatusRequest {
