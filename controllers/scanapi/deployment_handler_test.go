@@ -421,16 +421,12 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateOOMCondition() {
 	s.NoError(d.KubeClient.List(s.ctx, pods))
 	s.Equal(1, len(pods.Items))
 
-	conditions := s.auditConfig.Status.Conditions
-	foundOOMCondition := false
-	s.Assertions.NotEmpty(conditions)
-	for _, condition := range conditions {
-		if strings.HasSuffix(condition.Message, " OOM") {
-			foundOOMCondition = true
-			break
-		}
-	}
-	s.Assertions.Truef(foundOOMCondition, "No OOM Condition for pod found")
+	// ordering is fixed: 5 => ScanAPI
+	condition := s.auditConfig.Status.Conditions[0]
+	s.Assertions.NotEmpty(condition)
+	s.Contains(condition.Message, " OOM")
+	s.Contains(condition.AffectedPods, "scan-api-123")
+	s.Contains(condition.MemoryLimit, "1")
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Update() {

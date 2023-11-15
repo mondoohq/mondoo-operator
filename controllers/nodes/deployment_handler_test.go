@@ -490,7 +490,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
 		},
 	}
 
-	d.KubeClient.Create(s.ctx, oomPod)
+	err = d.KubeClient.Create(s.ctx, oomPod)
+	s.NoError(err)
 
 	// Reconcile to update the audit config status
 	result, err = d.Reconcile(s.ctx)
@@ -511,7 +512,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
 	s.Equal("NodeScanningUnavailable", condition.Reason)
 	s.Equal(corev1.ConditionTrue, condition.Status)
 
-	d.KubeClient.Delete(s.ctx, &pods.Items[0])
+	err = d.KubeClient.Delete(s.ctx, &pods.Items[0])
+	s.NoError(err)
 	result, err = d.Reconcile(s.ctx)
 	s.NoError(err)
 	s.True(result.IsZero())
