@@ -531,7 +531,7 @@ Increase them as required.
 
 The `mondoo-operator-controller-manager` manages the other Deployments and CronJobs needed to scan your cluster.
 If the provided `requests` and `limits` do not match your cluster size, increase them as needed.
-For components, do **not** edit the Deploymets or CronJobs directly.
+For components, do **not** edit the Deployments or CronJobs directly.
 The `mondoo-operator-controller-manager` will revert your changes.
 Instead, edit the `MondooAuditConfig`:
 ```
@@ -556,7 +556,7 @@ spec:
 ...
 ```
 
-The `resources` field accepts the [Kubernetes resource defintions](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/):
+The `resources` field accepts the [Kubernetes resource definitions](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/):
 ```
 spec:
 ...
