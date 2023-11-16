@@ -66,7 +66,7 @@ func ReportStatusRequestFromAuditConfig(
 					log.Error(err, "Failed to create extra information for Kubernetes Resource Scanning on OOM error")
 				}
 				if extraStruct != nil {
-					messages[4].Extra = extraStruct
+					messages[0].Extra = extraStruct
 				}
 			} else {
 				messages[0].Status = mondooclient.MessageStatus_MESSAGE_INFO
@@ -93,7 +93,7 @@ func ReportStatusRequestFromAuditConfig(
 					log.Error(err, "Failed to create extra information for Kubernetes Container Image on OOM error")
 				}
 				if extraStruct != nil {
-					messages[4].Extra = extraStruct
+					messages[1].Extra = extraStruct
 				}
 			} else {
 				messages[1].Status = mondooclient.MessageStatus_MESSAGE_INFO
@@ -120,7 +120,7 @@ func ReportStatusRequestFromAuditConfig(
 					log.Error(err, "Failed to create extra information for Node Scanning on OOM error")
 				}
 				if extraStruct != nil {
-					messages[4].Extra = extraStruct
+					messages[2].Extra = extraStruct
 				}
 			} else {
 				messages[2].Status = mondooclient.MessageStatus_MESSAGE_INFO
@@ -147,7 +147,7 @@ func ReportStatusRequestFromAuditConfig(
 					log.Error(err, "Failed to create extra information for Admission Controller on OOM error")
 				}
 				if extraStruct != nil {
-					messages[4].Extra = extraStruct
+					messages[3].Extra = extraStruct
 				}
 			} else {
 				messages[3].Status = mondooclient.MessageStatus_MESSAGE_INFO
@@ -193,6 +193,13 @@ func ReportStatusRequestFromAuditConfig(
 	if mondooOperator != nil {
 		if mondooOperator.Status == v1.ConditionTrue {
 			messages[5].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+			extraStruct, err := createOOMExtraInformation(mondooOperator.Message, mondooOperator.AffectedPods, mondooOperator.MemoryLimit)
+			if err != nil {
+				log.Error(err, "Failed to create extra information for Scan API on OOM error")
+			}
+			if extraStruct != nil {
+				messages[5].Extra = extraStruct
+			}
 		} else {
 			messages[5].Status = mondooclient.MessageStatus_MESSAGE_INFO
 		}
