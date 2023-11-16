@@ -179,6 +179,10 @@ type MondooAuditConfigCondition struct {
 	Reason string `json:"reason,omitempty"`
 	// Message is a human-readable message indicating details about the last transition
 	Message string `json:"message,omitempty"`
+	// AffectedPods, when filled, contains a list which are affected by an issue
+	AffectedPods []string `json:"affectedPods,omitempty"`
+	// MemoryLimit contains the currently active memory limit for a Pod
+	MemoryLimit string `json:"memoryLimit,omitempty"`
 }
 
 // MondooOperatorConfigConditionType is a valid value for MondooOperatorConfig.Status.Condition[].Type

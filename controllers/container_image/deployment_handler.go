@@ -139,7 +139,23 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
-	updateImageScanningConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs))
+	// Get Pods for this CronJob
+	pods := &corev1.PodList{}
+	if len(cronJobs) > 0 {
+		lSelector := metav1.SetAsLabelSelector(CronJobLabels(*n.Mondoo))
+		selector, _ := metav1.LabelSelectorAsSelector(lSelector)
+		opts := []client.ListOption{
+			client.InNamespace(n.Mondoo.Namespace),
+			client.MatchingLabelsSelector{Selector: selector},
+		}
+		err = n.KubeClient.List(ctx, pods, opts...)
+		if err != nil {
+			logger.Error(err, "Failed to list Pods for Kubernetes Container Image Scanning")
+			return err
+		}
+	}
+
+	updateImageScanningConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs), pods)
 	return nil
 }
 
@@ -214,7 +230,7 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 	}
 
 	// Clear any remnant status
-	updateImageScanningConditions(n.Mondoo, false)
+	updateImageScanningConditions(n.Mondoo, false, &corev1.PodList{})
 
 	return nil
 }

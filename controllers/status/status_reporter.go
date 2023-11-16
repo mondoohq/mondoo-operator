@@ -54,7 +54,7 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 		return err
 	}
 
-	operatorStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes.Items, r.k8sVersion)
+	operatorStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes.Items, r.k8sVersion, logger)
 	if reflect.DeepEqual(operatorStatus, r.lastReportedStatus) {
 		return nil // If the status hasn't change, don't report
 	}

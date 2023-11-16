@@ -314,6 +314,98 @@ func (r *MondooAuditConfigReconciler) nodeEventsRequestMapper(ctx context.Contex
 	return requests
 }
 
+// cronJobPodsRequestMapper watches Pods created by our CronJobs
+// Otherwise we wouldn't be able to report OOM status on the spawned Pods
+func (r *MondooAuditConfigReconciler) cronJobPodsRequestMapper(ctx context.Context, o client.Object) []reconcile.Request {
+	var requests []reconcile.Request
+	auditConfigs := &v1alpha2.MondooAuditConfigList{}
+	if err := r.Client.List(ctx, auditConfigs); err != nil {
+		logger := ctrllog.Log.WithName("cronjob-pod-watcher")
+		logger.Error(err, "Failed to list MondooAuditConfigs")
+		return requests
+	}
+
+	for _, a := range auditConfigs.Items {
+		if a.Namespace == o.GetNamespace() {
+			podLabels := o.GetLabels()
+			isScanPod := isCronJobScanPod(a, podLabels)
+			if !isScanPod {
+				return []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(&a)}}
+			}
+		}
+	}
+	return []reconcile.Request{}
+}
+
+// isCronJobScanPod checks whether the provided podLabels belong to one of the Mondoo scan CronJobs
+func isCronJobScanPod(a v1alpha2.MondooAuditConfig, podLabels map[string]string) bool {
+	isNodeScanPod := true
+	isResourceScanPod := true
+	isImageScanPod := true
+
+	// Check whether it is a Pod for node scanning
+	if a.Spec.Nodes.Enable {
+		nodeCronJobLabels := nodes.CronJobLabels(a)
+		// podLabels should include all of the labels from type of the CronJobs
+		for k, v := range nodeCronJobLabels {
+			if val, ok := podLabels[k]; ok {
+				if val != v {
+					isNodeScanPod = false
+					break
+				}
+			} else {
+				isNodeScanPod = false
+				break
+			}
+		}
+	}
+	if isNodeScanPod {
+		return isNodeScanPod
+	}
+
+	// Check whether it is a Pod for k8s resource scanning
+	if a.Spec.KubernetesResources.Enable {
+		resourceCronJobLabels := k8s_scan.CronJobLabels(a)
+		// podLabels should include all of the labels from type of the CronJobs
+		for k, v := range resourceCronJobLabels {
+			if val, ok := podLabels[k]; ok {
+				if val != v {
+					isResourceScanPod = false
+					break
+				}
+			} else {
+				isResourceScanPod = false
+				break
+			}
+		}
+	}
+	if isResourceScanPod {
+		return isResourceScanPod
+	}
+
+	// Check whether it is a Pod for container image scanning
+	if a.Spec.Containers.Enable {
+		imageCronJobLabels := container_image.CronJobLabels(a)
+		// podLabels should include all of the labels from type of the CronJobs
+		for k, v := range imageCronJobLabels {
+			if val, ok := podLabels[k]; ok {
+				if val != v {
+					isImageScanPod = false
+					break
+				}
+			} else {
+				isImageScanPod = false
+				break
+			}
+		}
+	}
+	if isImageScanPod {
+		return isImageScanPod
+	}
+
+	return false
+}
+
 func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context.Context, auditConfig *v1alpha2.MondooAuditConfig, cfg *v1alpha2.MondooOperatorConfig, log logr.Logger) error {
 	if auditConfig.Spec.MondooCredsSecretRef.Name == "" {
 		log.Info("MondooAuditConfig without .spec.mondooCredsSecretRef defined")
@@ -374,6 +466,10 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&v1alpha2.MondooAuditConfig{}).
 		Owns(&batchv1.CronJob{}).
 		Owns(&appsv1.Deployment{}).
+		Watches(
+			&corev1.Pod{},
+			handler.EnqueueRequestsFromMapFunc(r.cronJobPodsRequestMapper),
+			builder.WithPredicates(k8s.CreateUpdateEventsPredicate{})).
 		Watches(
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.nodeEventsRequestMapper),

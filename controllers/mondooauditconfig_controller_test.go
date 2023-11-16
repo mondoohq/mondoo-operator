@@ -26,6 +26,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/controllers/container_image"
+	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
+	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
 	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
@@ -444,5 +447,103 @@ func testIntegrationTokenSecret() *corev1.Secret {
 		Data: map[string][]byte{
 			"token": []byte(testIntegrationTokenData),
 		},
+	}
+}
+
+func TestIsCronJobScanPod(t *testing.T) {
+	a := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mondoo-client",
+			Namespace: "mondoo-operator",
+		},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Nodes: v1alpha2.Nodes{
+				Enable: true,
+			},
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable: true,
+			},
+			Containers: v1alpha2.Containers{
+				Enable: true,
+			},
+		},
+	}
+
+	nodeCronJobLabels := nodes.CronJobLabels(a)
+	resourceCronJobLabels := k8s_scan.CronJobLabels(a)
+	imageCronJobLabels := container_image.CronJobLabels(a)
+
+	tests := []struct {
+		name       string
+		podLabels  map[string]string
+		wantResult bool
+	}{
+		{
+			name: "node scan pod",
+			podLabels: map[string]string{
+				"app":       "mondoo",
+				"scan":      "nodes",
+				"mondoo_cr": "mondoo-client",
+				"job-name":  nodeCronJobLabels["job-name"],
+			},
+			wantResult: true,
+		},
+		{
+			name: "k8s resource scan pod",
+			podLabels: map[string]string{
+				"app":       "mondoo-k8s-scan",
+				"scan":      "k8s",
+				"mondoo_cr": "mondoo-client",
+				"job-name":  resourceCronJobLabels["job-name"],
+			},
+			wantResult: true,
+		},
+		{
+			name: "container image scan pod",
+			podLabels: map[string]string{
+				"app":       "mondoo-container-scan",
+				"scan":      "k8s",
+				"mondoo_cr": "mondoo-client",
+				"job-name":  imageCronJobLabels["job-name"],
+			},
+			wantResult: true,
+		},
+		{
+			name: "mondoo node scan pod missing label",
+			podLabels: map[string]string{
+				"scan":      "node",
+				"mondoo_cr": "mondoo-client",
+				"job-name":  imageCronJobLabels["job-name"],
+			},
+			wantResult: false,
+		},
+		{
+			name: "non-mondoo node scan pod",
+			podLabels: map[string]string{
+				"app":       "not-mondoo",
+				"scan":      "node",
+				"mondoo_cr": "mondoo-client",
+				"job-name":  imageCronJobLabels["job-name"],
+			},
+			wantResult: false,
+		},
+		{
+			name: "invalid pod labels",
+			podLabels: map[string]string{
+				"app":       "mondoo",
+				"component": "invalid",
+				"job-name":  "invalid",
+			},
+			wantResult: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotResult := isCronJobScanPod(a, tt.podLabels)
+			if gotResult != tt.wantResult {
+				t.Errorf("isCronJobScanPod() = %v, want %v", gotResult, tt.wantResult)
+			}
+		})
 	}
 }

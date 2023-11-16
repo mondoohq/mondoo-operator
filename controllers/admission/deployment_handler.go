@@ -238,8 +238,8 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 		webhookLog.V(3).Info("Webhook deployment is only scaled to 1 replica, but the webhook mode is set to 'enforcing'. This might be problematic if the API server is not able to connect to the webhook. Please consider increasing the replicas.")
 	}
 
-	deployment := &appsv1.Deployment{}
-	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, deployment, desiredDeployment)
+	existingDeployment := &appsv1.Deployment{}
+	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existingDeployment, desiredDeployment)
 	if err != nil {
 		webhookLog.Error(err, "failed to create Deployment for webhook")
 		return err
@@ -250,18 +250,31 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 		return nil
 	}
 
-	updateAdmissionConditions(n.Mondoo, n.isWebhookDegraded(deployment))
+	// Get Pods for this deployment
+	selector, _ := metav1.LabelSelectorAsSelector(existingDeployment.Spec.Selector)
+	opts := []client.ListOption{
+		client.InNamespace(existingDeployment.Namespace),
+		client.MatchingLabelsSelector{Selector: selector},
+	}
+	pods := &corev1.PodList{}
+	err = n.KubeClient.List(ctx, pods, opts...)
+	if err != nil {
+		webhookLog.Error(err, "Failed to list Pods for Admission controller")
+		return err
+	}
+
+	updateAdmissionConditions(n.Mondoo, n.isWebhookDegraded(existingDeployment), pods)
 
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.
-	if !k8s.AreDeploymentsEqual(*deployment, *desiredDeployment) {
+	if !k8s.AreDeploymentsEqual(*existingDeployment, *desiredDeployment) {
 		// Note: changes to the labels/selector labels means we can't Update() the
 		// Deployment, so we'll do a delete/create instead.
-		if err := k8s.DeleteIfExists(ctx, n.KubeClient, deployment); err != nil {
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, existingDeployment); err != nil {
 			webhookLog.Error(err, "failed to delete exising webhook Deployment")
 			return err
 		}
-		if _, err := k8s.CreateIfNotExist(ctx, n.KubeClient, deployment, desiredDeployment); err != nil {
+		if _, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existingDeployment, desiredDeployment); err != nil {
 			webhookLog.Error(err, "failed to replace exising webhook Deployment")
 			return err
 		}
@@ -526,7 +539,7 @@ func (n *DeploymentHandler) down(ctx context.Context) (ctrl.Result, error) {
 	}
 
 	// Make sure to clear any degraded status
-	updateAdmissionConditions(n.Mondoo, false)
+	updateAdmissionConditions(n.Mondoo, false, &corev1.PodList{})
 
 	return ctrl.Result{}, nil
 }

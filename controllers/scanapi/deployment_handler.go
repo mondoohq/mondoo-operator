@@ -65,7 +65,7 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 	}
 
 	// Make sure to clear any degraded status
-	updateScanAPIConditions(n.Mondoo, false, []appsv1.DeploymentCondition{})
+	updateScanAPIConditions(n.Mondoo, false, []appsv1.DeploymentCondition{}, &corev1.PodList{})
 
 	return nil
 }
@@ -143,7 +143,20 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		return nil
 	}
 
-	updateScanAPIConditions(n.Mondoo, existingDeployment.Status.UnavailableReplicas != 0, existingDeployment.Status.Conditions)
+	// Get Pods for this deployment
+	selector, _ := metav1.LabelSelectorAsSelector(existingDeployment.Spec.Selector)
+	opts := []client.ListOption{
+		client.InNamespace(existingDeployment.Namespace),
+		client.MatchingLabelsSelector{Selector: selector},
+	}
+	pods := &corev1.PodList{}
+	err = n.KubeClient.List(ctx, pods, opts...)
+	if err != nil {
+		logger.Error(err, "Failed to list Pods for scan API")
+		return err
+	}
+
+	updateScanAPIConditions(n.Mondoo, existingDeployment.Status.UnavailableReplicas != 0, existingDeployment.Status.Conditions, pods)
 
 	if !k8s.AreDeploymentsEqual(*deployment, existingDeployment) {
 		logger.Info("Update needed for scan API Deployment")

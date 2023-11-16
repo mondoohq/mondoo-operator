@@ -19,6 +19,7 @@ import (
 	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -351,6 +352,81 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
 		}
 	}
 	s.Assertions.Truef(foundMissingServiceAccountCondition, "No Condition for missing service account found")
+}
+
+func (s *DeploymentHandlerSuite) TestDeploy_CreateOOMCondition() {
+	ns := "test-ns"
+	s.auditConfig = utils.DefaultAuditConfig(ns, false, false, false, true)
+
+	image, err := s.containerImageResolver.CnspecImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	labels := DeploymentLabels(s.auditConfig)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", false)
+	deployment.Status.UnavailableReplicas = 1
+	deployment.Status.Conditions = []appsv1.DeploymentCondition{
+		{
+			Type:    appsv1.DeploymentConditionType(mondoov1alpha2.ScanAPIDegraded),
+			Status:  "ScanAPI degarded",
+			Message: "", // This message is not important for the test. The Container Status is evaluated for OOM.
+		},
+	}
+
+	oomPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "scan-api-123",
+			Namespace: ns,
+			Labels:    labels,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "scan-api",
+					Image: image,
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceMemory: *resource.NewQuantity(1, resource.BinarySI),
+						},
+					},
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: "scan-api",
+					LastTerminationState: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							ExitCode: 137,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(&s.auditConfig, deployment, oomPod)
+
+	d := s.createDeploymentHandler()
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, ds))
+	s.Equal(1, len(ds.Items))
+
+	pods := &corev1.PodList{}
+	s.NoError(d.KubeClient.List(s.ctx, pods))
+	s.Equal(1, len(pods.Items))
+
+	// ordering is fixed: 5 => ScanAPI
+	condition := s.auditConfig.Status.Conditions[0]
+	s.Assertions.NotEmpty(condition)
+	s.Contains(condition.Message, " OOM")
+	s.Contains(condition.AffectedPods, "scan-api-123")
+	s.Contains(condition.MemoryLimit, "1")
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Update() {

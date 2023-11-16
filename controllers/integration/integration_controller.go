@@ -167,5 +167,5 @@ func updateIntegrationCondition(config *v1alpha2.MondooAuditConfig, degradedStat
 		msg = customMessage
 	}
 
-	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, v1alpha2.MondooIntegrationDegraded, status, reason, msg, updateCheck)
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, v1alpha2.MondooIntegrationDegraded, status, reason, msg, updateCheck, []string{}, "")
 }
