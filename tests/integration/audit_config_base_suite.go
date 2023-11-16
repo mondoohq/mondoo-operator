@@ -217,6 +217,49 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	s.Equal("ACTIVE", status)
 }
 
+func (s *AuditConfigBaseSuite) testOOMMondooOperatorController(auditConfig mondoov2.MondooAuditConfig) {
+	s.auditConfig = auditConfig
+
+	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
+
+	zap.S().Info("Create an audit config that enables nothing.")
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
+		"Failed to create Mondoo audit config.")
+
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
+
+	deployments := &appsv1.DeploymentList{}
+	listOpts := &client.ListOptions{
+		Namespace: auditConfig.Namespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"app.kubernetes.io/name": "mondoo-operator",
+		}),
+	}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
+	s.Equalf(1, len(deployments.Items), "mondoo-operator deployment not found")
+
+	operatorDeployment := deployments.Items[0]
+	operatorDeployment.Spec.Template.Spec.Containers[0].Resources.Requests = corev1.ResourceList{}
+	operatorDeployment.Spec.Template.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("15Mi"), // this should be low enough to trigger an OOMkilled
+	}
+
+	s.NoError(s.testCluster.K8sHelper.Clientset.Update(s.ctx, &operatorDeployment, nil))
+
+	// This will take some time, because:
+	// a new replicaset should be created
+	// the first Pod tries to start and gets killed
+	// on the 2nd start we should get an OOMkilled status update
+	s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.MondooOperaotrDegraded, corev1.ConditionTrue)
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ERROR", status)
+}
+
 func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondoov2.MondooAuditConfig) {
 	nginxLabel := "app.kubernetes.io/name=nginx"
 	_, err := s.testCluster.K8sHelper.Kubectl("run", "-n", "default", "nginx", "--image", "nginx", "-l", nginxLabel)

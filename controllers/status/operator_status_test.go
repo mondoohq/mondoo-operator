@@ -45,6 +45,7 @@ func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Node scanning is disabled"},
 		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Admission controller is disabled"},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Scan API is disabled"},
+		{Identifier: MondooOperatorIdentifier, Status: mondooclient.MessageStatus_MESSAGE_UNKNOWN, Message: "No status reported yet"},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }
@@ -74,6 +75,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		{Message: "Node Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.NodeScanningDegraded},
 		{Message: "Admission controller is available", Status: v1.ConditionFalse, Type: v1alpha2.AdmissionDegraded},
 		{Message: "ScanAPI controller is available", Status: v1.ConditionFalse, Type: v1alpha2.ScanAPIDegraded},
+		{Message: "Mondoo Operator controller is available", Status: v1.ConditionFalse, Type: v1alpha2.MondooOperaotrDegraded},
 	}
 
 	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
@@ -101,6 +103,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[2].Message},
 		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[3].Message},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[4].Message},
+		{Identifier: MondooOperatorIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[5].Message},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }
@@ -130,6 +133,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_DeprecatedFields(t *testi
 		{Message: "Node Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.NodeScanningDegraded},
 		{Message: "Admission controller is available", Status: v1.ConditionFalse, Type: v1alpha2.AdmissionDegraded},
 		{Message: "ScanAPI controller is available", Status: v1.ConditionFalse, Type: v1alpha2.ScanAPIDegraded},
+		{Message: "Mondoo Operator controller is available", Status: v1.ConditionFalse, Type: v1alpha2.MondooOperaotrDegraded},
 	}
 
 	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
@@ -157,6 +161,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_DeprecatedFields(t *testi
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[2].Message},
 		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[3].Message},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[4].Message},
+		{Identifier: MondooOperatorIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[5].Message},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }
@@ -182,6 +187,7 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		{Message: "Node Scanning error", Status: v1.ConditionTrue, Type: v1alpha2.NodeScanningDegraded},
 		{Message: "Admission controller error", Status: v1.ConditionTrue, Type: v1alpha2.AdmissionDegraded},
 		{Message: "ScanAPI controller error", Status: v1.ConditionTrue, Type: v1alpha2.ScanAPIDegraded},
+		{Message: "Mondoo Operator controller is unavailable", Status: v1.ConditionTrue, Type: v1alpha2.MondooOperaotrDegraded},
 	}
 
 	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
@@ -204,6 +210,7 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[2].Message},
 		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[3].Message},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[4].Message},
+		{Identifier: MondooOperatorIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[5].Message},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }
