@@ -125,6 +125,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		logger.Info("Created CronJob", "namespace", desired.Namespace, "name", desired.Name)
 	} else if !k8s.AreCronJobsEqual(*existing, *desired) {
 		existing.Spec.JobTemplate = desired.Spec.JobTemplate
+		existing.Spec.Schedule = desired.Spec.Schedule
 		existing.SetOwnerReferences(desired.GetOwnerReferences())
 
 		if err := n.KubeClient.Update(ctx, existing); err != nil {

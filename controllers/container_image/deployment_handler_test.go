@@ -59,9 +59,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	nodes := &corev1.NodeList{}
-	s.NoError(d.KubeClient.List(s.ctx, nodes))
-
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
@@ -92,9 +89,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomImage() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	nodes := &corev1.NodeList{}
-	s.NoError(d.KubeClient.List(s.ctx, nodes))
-
 	image, err := s.containerImageResolver.CnspecImage("ubuntu", "22.04", false)
 	s.NoError(err)
 
@@ -113,6 +107,51 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomImage() {
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
 
 	s.Equal(expected, created)
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
+	d := s.createDeploymentHandler()
+
+	customSchedule := "0 0 * * *"
+	s.auditConfig.Spec.Containers.Schedule = customSchedule
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	s.NoError(err)
+
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+
+	created := &batchv1.CronJob{}
+	created.Name = expected.Name
+	created.Namespace = expected.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+
+	s.Equal(created.Spec.Schedule, customSchedule)
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomScheduleFail() {
+	d := s.createDeploymentHandler()
+
+	customSchedule := "this is not valid"
+	s.auditConfig.Spec.Containers.Schedule = customSchedule
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	s.NoError(err)
+
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	created := &batchv1.CronJob{}
+	created.Name = expected.Name
+	created.Namespace = expected.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+
+	s.NotEqual(created.Spec.Schedule, customSchedule)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() {
@@ -134,9 +173,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() 
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
 	s.True(result.IsZero())
-
-	nodes := &corev1.NodeList{}
-	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
@@ -176,9 +212,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
 	s.True(result.IsZero())
-
-	nodes := &corev1.NodeList{}
-	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)

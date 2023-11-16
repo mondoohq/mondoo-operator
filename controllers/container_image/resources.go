@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	// That's the mod k8s relies on https://github.com/kubernetes/kubernetes/blob/master/go.mod#L63
+	"github.com/robfig/cron/v3"
 	"go.mondoo.com/cnquery/v9/providers-sdk/v1/inventory"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -49,6 +51,15 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 	// We want to start the cron job one minute after it was enabled.
 	cronStart := time.Now().Add(1 * time.Minute)
 	cronTab := fmt.Sprintf("%d %d * * *", cronStart.Minute(), cronStart.Hour())
+	if m.Spec.Containers.Schedule != "" {
+		_, err := cron.ParseStandard(m.Spec.Containers.Schedule)
+		if err != nil {
+			logger.Error(err, "invalid cron schedule specified in MondooAuditConfig Spec.Containers.Schedule; using default")
+		} else {
+			logger.Info("using cron custom schedule", "crontab", m.Spec.Containers.Schedule)
+			cronTab = m.Spec.Containers.Schedule
+		}
+	}
 
 	cronjob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{

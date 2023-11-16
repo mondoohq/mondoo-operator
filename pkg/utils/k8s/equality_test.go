@@ -578,6 +578,15 @@ func TestAreCronJobsEqual(t *testing.T) {
 			},
 			shouldBeEqual: false,
 		},
+		{
+			name: "should not be equal when schedules differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.Schedule = "1 * * * *"
+				return b
+			},
+			shouldBeEqual: false,
+		},
 	}
 
 	for _, test := range tests {

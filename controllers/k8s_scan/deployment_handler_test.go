@@ -319,6 +319,64 @@ func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
 	s.Equal(0, len(cronJobs.Items))
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
+	d := s.createDeploymentHandler()
+
+	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
+	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
+		Url:   scanApiUrl,
+		Token: "token",
+	}).Times(1)
+
+	customSchedule := "0 0 * * *"
+	s.auditConfig.Spec.KubernetesResources.Schedule = customSchedule
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	s.NoError(err)
+
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig)
+
+	created := &batchv1.CronJob{}
+	created.Name = expected.Name
+	created.Namespace = expected.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+
+	s.Equal(created.Spec.Schedule, customSchedule)
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomScheduleFail() {
+	d := s.createDeploymentHandler()
+
+	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
+	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
+		Url:   scanApiUrl,
+		Token: "token",
+	}).Times(1)
+
+	customSchedule := "this is not valid"
+	s.auditConfig.Spec.KubernetesResources.Schedule = customSchedule
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	s.NoError(err)
+
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig)
+
+	created := &batchv1.CronJob{}
+	created.Name = expected.Name
+	created.Namespace = expected.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+
+	s.NotEqual(created.Spec.Schedule, customSchedule)
+}
+
 func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {
 	return DeploymentHandler{
 		KubeClient:             s.fakeClientBuilder.Build(),

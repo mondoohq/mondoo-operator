@@ -143,6 +143,11 @@ spec:
                           Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                         type: object
                     type: object
+                  schedule:
+                    description: Specify a custom crontab schedule for the container
+                      image scanning job. If not specified, the default schedule is
+                      used.
+                    type: string
                 type: object
               filtering:
                 properties:
@@ -175,6 +180,11 @@ spec:
                     type: boolean
                   enable:
                     type: boolean
+                  schedule:
+                    description: Specify a custom crontab schedule for the Kubernetes
+                      resource scanning job. If not specified, the default schedule
+                      is used.
+                    type: string
                 type: object
               mondooCredsSecretRef:
                 description: Config is an example field of MondooAuditConfig. Edit
@@ -252,6 +262,10 @@ spec:
                           Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                         type: object
                     type: object
+                  schedule:
+                    description: Specify a custom crontab schedule for the node scanning
+                      job. If not specified, the default schedule is used.
+                    type: string
                 type: object
               scanner:
                 description: Scanner defines the settings for the Mondoo scanner that
