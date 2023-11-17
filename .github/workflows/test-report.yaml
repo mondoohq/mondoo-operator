@@ -8,6 +8,10 @@ jobs:
   report:
     runs-on: ubuntu-latest
     steps:
+    # This step gets called, even when the triggering workflow is skipped
+    # That's causing errors, so we need to check if the triggering workflow was skipped
+    # But that's not that easy: https://github.com/orgs/community/discussions/21090
+    - run: echo "${{ toJson(github.event) }}"
     - uses: dorny/test-reporter@v1
       with:
         artifact: test-results
