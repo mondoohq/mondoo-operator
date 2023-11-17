@@ -27,6 +27,11 @@ jobs:
           persist-credentials: false
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ">=${{ env.golang-version }}"
+          cache: false
       - name: Scan AWS terraform with Mondoo
         uses: mondoohq/actions/terraform-hcl@main
         env:
