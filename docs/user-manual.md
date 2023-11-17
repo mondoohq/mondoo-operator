@@ -621,18 +621,18 @@ Under normal circumstances, the above steps clean up the complete operator insta
 In rare cases, the namespace gets stuck in `terminating` state.
 This most likely happens because of [finalizers](https://kubernetes.io/docs/concepts/overview/working-with-objects/finalizers/).
 
-This can happen when the operator-controller isn't running correctly during uninstallation.
+This can happen when the operator-controller isn't running correctly during uninstall.
 
 To clean up the namespace:
 - Find objects that are still present in the namespace:
   ```
   kubectl api-resources --verbs=list --namespaced -o name | xargs -n 1 kubectl get --show-kind --ignore-not-found -n mondoo-operator
   ```
-- Check the remaining objects for finalizers, e.g., the `MondooAuditConfig`:
+- Check the remaining objects for `finalizers`, e.g., the `MondooAuditConfig`:
   ```
   kubectl -n mondoo-operator get mondooauditconfigs.k8s.mondoo.com mondoo-client -o jsonpath='{.metadata.finalizers}'
   ```
-- Remove the finalizer from the object:
+- Remove the `finalizers` from the object:
   ```
   kubectl -n mondoo-operator patch --type=merge mondooauditconfigs.k8s.mondoo.com mondoo-client -p '{"metadata":{"finalizers":null}}'
   ```
