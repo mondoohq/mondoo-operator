@@ -356,14 +356,14 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	// Verify the amount of CronJobs created is 1
 	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
 		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, gcCronJobs, gcListOpts))
-		if len(cronJobs.Items) == 1 {
+		if len(gcCronJobs.Items) == 1 {
 			return true, nil
 		}
 		return false, nil
 	})
 	s.NoErrorf(
 		err,
-		"The amount of garbage collect CronJobs is not 1 expected: 1; actual: %d", len(cronJobs.Items))
+		"The amount of garbage collect CronJobs is not 1 expected: 1; actual: %d", len(gcCronJobs.Items))
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
