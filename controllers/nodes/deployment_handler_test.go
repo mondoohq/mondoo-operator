@@ -481,11 +481,14 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
 			Name:      "node-scan-123",
 			Namespace: s.auditConfig.Namespace,
 			Labels:    CronJobLabels(s.auditConfig),
+			CreationTimestamp: metav1.Time{
+				Time: time.Now(),
+			},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Name: "node-scan",
+					Name: "cnspec",
 					Resources: corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							corev1.ResourceMemory: *resource.NewQuantity(1, resource.BinarySI),
@@ -497,7 +500,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
 		Status: corev1.PodStatus{
 			ContainerStatuses: []corev1.ContainerStatus{
 				{
-					Name: "node-scan",
+					Name: "cnspec",
 					LastTerminationState: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode: 137,
