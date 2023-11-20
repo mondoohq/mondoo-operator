@@ -23,12 +23,15 @@ func updateAdmissionConditions(config *mondoov1alpha2.MondooAuditConfig, degrade
 	} else if degradedStatus {
 		msg = "Admission controller is unavailable"
 		for _, pod := range pods.Items {
-			for _, status := range pod.Status.ContainerStatuses {
-				if status.LastTerminationState.Terminated != nil && status.LastTerminationState.Terminated.ExitCode == 137 {
-					// TODO: double check container name?
+			for i, containerStatus := range pod.Status.ContainerStatuses {
+				if containerStatus.Name != "webhook" {
+					continue
+				}
+				if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
+					(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
 					msg = "Admission controller is unavailable due to OOM"
 					affectedPods = append(affectedPods, pod.Name)
-					memoryLimit = pod.Spec.Containers[0].Resources.Limits.Memory().String()
+					memoryLimit = pod.Spec.Containers[i].Resources.Limits.Memory().String()
 					break
 				}
 			}

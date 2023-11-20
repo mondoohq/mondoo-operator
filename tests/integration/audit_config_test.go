@@ -32,6 +32,16 @@ func (s *AuditConfigSuite) TestReconcile_KubernetesResources() {
 	s.testMondooAuditConfigKubernetesResources(auditConfig)
 }
 
+func (s *AuditConfigSuite) TestOOMScanAPI() {
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false, false)
+	s.testOOMScanAPI(auditConfig)
+}
+
+func (s *AuditConfigSuite) TestOOMNodeScan() {
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true, false)
+	s.testOOMNodeScan(auditConfig)
+}
+
 func (s *AuditConfigSuite) TestReconcile_Containers() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, true, false, false)
 
