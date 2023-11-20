@@ -110,6 +110,11 @@ func (s *StatusReporterSuite) TestReport() {
 					Identifier: ScanApiIdentifier,
 					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 				},
+				{
+					Message:    "No status reported yet",
+					Identifier: MondooOperatorIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_UNKNOWN,
+				},
 			},
 		},
 		LastState: OperatorCustomState{
@@ -178,6 +183,11 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 					Message:    "Scan API is disabled",
 					Identifier: ScanApiIdentifier,
 					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+				},
+				{
+					Message:    "No status reported yet",
+					Identifier: MondooOperatorIdentifier,
+					Status:     mondooclient.MessageStatus_MESSAGE_UNKNOWN,
 				},
 			},
 		},

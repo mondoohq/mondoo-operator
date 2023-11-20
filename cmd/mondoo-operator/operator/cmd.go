@@ -135,6 +135,28 @@ func init() {
 			return err
 		}
 
+		// Check whether the mondoo-operator crashed because of OOMKilled
+		setupLog.Info("Checking whether mondoo-operator was terminated before")
+
+		k8sConfig, err := ctrl.GetConfig()
+		if err != nil {
+			setupLog.Error(err, "unable to get k8s config")
+			return err
+		}
+		// use separate client to prevent errors due to cache
+		// "the cache is not started, can not read objects"
+		// https://sdk.operatorframework.io/docs/building-operators/golang/references/client/#non-default-client
+		client, err := client.New(k8sConfig, client.Options{Scheme: scheme})
+		if err != nil {
+			setupLog.Error(err, "unable to create non-caching k8s client")
+			return err
+		}
+		err = checkForTerminatedState(ctx, client, v, setupLog)
+		if err != nil {
+			setupLog.Error(err, "unable to check for terminated state of mondoo-operator-controller")
+			return err
+		}
+
 		if err = resource_monitor.RegisterResourceMonitors(mgr, scanApiStore); err != nil {
 			setupLog.Error(err, "unable to register resource monitors", "controller", "resource_monitor")
 			return err

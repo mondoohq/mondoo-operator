@@ -17,6 +17,11 @@ type AuditConfigSuite struct {
 	AuditConfigBaseSuite
 }
 
+func (s *AuditConfigSuite) TestOOMControllerReporting() {
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, false)
+	s.testOOMMondooOperatorController(auditConfig)
+}
+
 func (s *AuditConfigSuite) TestReconcile_AllDisabled() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, false)
 	s.testMondooAuditConfigAllDisabled(auditConfig)

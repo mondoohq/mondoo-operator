@@ -260,6 +260,11 @@ func TestTokenRegistration(t *testing.T) {
 								Identifier: status.ScanApiIdentifier,
 								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 							},
+							{
+								Message:    "No status reported yet",
+								Identifier: status.MondooOperatorIdentifier,
+								Status:     mondooclient.MessageStatus_MESSAGE_UNKNOWN,
+							},
 						},
 					},
 					LastState: status.OperatorCustomState{
