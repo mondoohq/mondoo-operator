@@ -6,6 +6,7 @@ package operator
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/go-logr/zapr"
 	"github.com/golang/mock/gomock"
@@ -74,6 +75,9 @@ func (s *DeploymentHandlerSuite) TestOOMDetect() {
 			Name:      "mondoo-operator-123",
 			Namespace: s.auditConfig.Namespace,
 			Labels:    map[string]string{"app.kubernetes.io/name": "mondoo-operator"},
+			CreationTimestamp: metav1.Time{
+				Time: time.Now(),
+			},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{

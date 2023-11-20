@@ -4,7 +4,12 @@
 package integration
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
+	"go.mondoo.com/mondoo-operator/tests/framework/utils"
+	"go.uber.org/zap"
 )
 
 type AuditConfigUpgradeSuite struct {
@@ -22,7 +27,6 @@ func (s *AuditConfigUpgradeSuite) TearDownSuite() {
 	s.NoError(s.spaceClient.Delete(s.ctx))
 }
 
-/*
 func (s *AuditConfigUpgradeSuite) TestUpgradePreviousReleaseToLatest() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, true, false)
 	s.testUpgradePreviousReleaseToLatest(auditConfig)
@@ -45,4 +49,3 @@ func TestAuditConfigUpgradeSuite(t *testing.T) {
 	}(s)
 	suite.Run(t, s)
 }
-*/

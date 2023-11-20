@@ -247,17 +247,52 @@ func (s *AuditConfigBaseSuite) testOOMMondooOperatorController(auditConfig mondo
 		corev1.ResourceMemory: resource.MustParse("15Mi"), // this should be low enough to trigger an OOMkilled
 	}
 
-	s.NoError(s.testCluster.K8sHelper.Clientset.Update(s.ctx, &operatorDeployment, nil))
+	zap.S().Info("Reducing memory limit to trigger OOM.")
+	s.NoError(s.testCluster.K8sHelper.Clientset.Update(s.ctx, &operatorDeployment))
 
 	// This will take some time, because:
 	// a new replicaset should be created
 	// the first Pod tries to start and gets killed
 	// on the 2nd start we should get an OOMkilled status update
-	s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.MondooOperaotrDegraded, corev1.ConditionTrue)
+	err := s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.MondooOperaotrDegraded, corev1.ConditionTrue)
+	s.NoError(err, "Failed to find degraded condition")
+
+	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+	s.NoError(err, "Failed to find MondooAuditConfig")
+	s.Contains(foundMondooAuditConfig.Status.Conditions[5].Message, "OOM", "Failed to find OOMKilled message in degraded condition")
+	s.Len(foundMondooAuditConfig.Status.Conditions[5].AffectedPods, 1, "Failed to find only one pod in degraded condition")
+
+	// Give the integration a chance to update
+	time.Sleep(2 * time.Second)
 
 	status, err := s.integration.GetStatus(s.ctx)
 	s.NoError(err, "Failed to get status")
 	s.Equal("ERROR", status)
+
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
+	s.Equalf(1, len(deployments.Items), "mondoo-operator deployment not found")
+
+	operatorDeployment = deployments.Items[0]
+	operatorDeployment.Spec.Template.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("100Mi"), // this should be enough to get the operator running again
+	}
+
+	zap.S().Info("Increasing memory limit to get controller running again.")
+	s.NoError(s.testCluster.K8sHelper.Clientset.Update(s.ctx, &operatorDeployment))
+
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.MondooOperaotrDegraded, corev1.ConditionFalse)
+	s.NoError(err, "Failed to find degraded condition")
+	foundMondooAuditConfig, err = s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+	s.NoError(err, "Failed to find MondooAuditConfig")
+	s.NotContains(foundMondooAuditConfig.Status.Conditions[5].Message, "OOM", "Found OOMKilled message in condition")
+	s.Len(foundMondooAuditConfig.Status.Conditions[5].AffectedPods, 0, "Found a pod in condition")
+
+	// Give the integration a chance to update
+	time.Sleep(2 * time.Second)
+
+	status, err = s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondoov2.MondooAuditConfig) {

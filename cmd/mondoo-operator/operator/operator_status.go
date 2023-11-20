@@ -12,6 +12,7 @@ import (
 	k8sv1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers"
 	"go.mondoo.com/mondoo-operator/controllers/status"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -54,35 +55,36 @@ func checkForTerminatedState(ctx context.Context, nonCacheClient client.Client, 
 			logger.Error(err, "failed to list pods", "Mondoo.Namespace", mondooAuditConfig.Namespace, "Mondoo.Name", mondooAuditConfig.Name)
 			return err
 		}
-		for _, pod := range podList.Items {
-			for _, containerStatus := range pod.Status.ContainerStatuses {
-				if containerStatus.Name != "manager" {
-					continue
+
+		currentPod := k8s.GetNewestPodFromList(podList)
+		for _, containerStatus := range currentPod.Status.ContainerStatuses {
+			if containerStatus.Name != "manager" {
+				continue
+			}
+			stateUpdate := false
+			if containerStatus.State.Terminated != nil || containerStatus.LastTerminationState.Terminated != nil {
+				logger.Info("mondoo-operator was terminated before")
+				// Update status
+				updateOperatorConditions(&mondooAuditConfig, true, currentPod)
+				stateUpdate = true
+			} else if containerStatus.RestartCount == 0 && containerStatus.State.Terminated == nil {
+				logger.Info("mondoo-operator is running or starting", "state", containerStatus.State)
+				updateOperatorConditions(&mondooAuditConfig, false, &corev1.Pod{})
+				stateUpdate = true
+			}
+			if stateUpdate {
+				err := mondoo.UpdateMondooAuditStatus(ctx, nonCacheClient, mondooAuditConfigCopy, &mondooAuditConfig, logger)
+				if err != nil {
+					logger.Error(err, "failed to update status for MondooAuditConfig")
+					return err
 				}
-				stateUpdate := false
-				if containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode != 0 {
-					logger.Info("mondoo-operator was terminated before")
-					// Update status
-					updateOperatorConditions(&mondooAuditConfig, true, &pod)
-					stateUpdate = true
-				} else if containerStatus.State.Running != nil {
-					updateOperatorConditions(&mondooAuditConfig, false, &corev1.Pod{})
-					stateUpdate = true
+				// Report upstream before we get OOMkilled again
+				err = statusReport.Report(ctx, mondooAuditConfig, *config)
+				if err != nil {
+					logger.Error(err, "failed to report status upstream")
+					return err
 				}
-				if stateUpdate {
-					err := mondoo.UpdateMondooAuditStatus(ctx, nonCacheClient, mondooAuditConfigCopy, &mondooAuditConfig, logger)
-					if err != nil {
-						logger.Error(err, "failed to update status for MondooAuditConfig")
-						return err
-					}
-					// Report upstream before we get OOMkilled again
-					err = statusReport.Report(ctx, mondooAuditConfig, *config)
-					if err != nil {
-						logger.Error(err, "failed to report status upstream")
-						return err
-					}
-					break
-				}
+				break
 			}
 		}
 	}
@@ -98,12 +100,12 @@ func updateOperatorConditions(config *k8sv1alpha2.MondooAuditConfig, degradedSta
 	memoryLimit := ""
 	if degradedStatus {
 		msg = "Mondoo Operator controller is unavailable"
-		for _, status := range pod.Status.ContainerStatuses {
-			if status.LastTerminationState.Terminated != nil && status.LastTerminationState.Terminated.ExitCode == 137 {
-				// TODO: double check container name?
+		for i, containerStatus := range pod.Status.ContainerStatuses {
+			if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
+				(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
 				msg = "Mondoo Operator controller is unavailable due to OOM"
 				affectedPods = append(affectedPods, pod.Name)
-				memoryLimit = pod.Spec.Containers[0].Resources.Limits.Memory().String()
+				memoryLimit = pod.Spec.Containers[i].Resources.Limits.Memory().String()
 				break
 			}
 		}
