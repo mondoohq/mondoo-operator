@@ -22,8 +22,8 @@ import (
 
 const CronJobNameSuffix = "-k8s-scan"
 
-func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
-	ls := CronJobLabels(m)
+func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+	ls := CronJobLabels(*m)
 
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
 	if m.Spec.KubernetesResources.Schedule != "" {
@@ -34,8 +34,11 @@ func CronJob(image, integrationMrn, clusterUid string, m v1alpha2.MondooAuditCon
 			logger.Info("using cron custom schedule", "crontab", m.Spec.KubernetesResources.Schedule)
 			cronTab = m.Spec.KubernetesResources.Schedule
 		}
+	} else {
+		logger.Info("using default cron schedule", "crontab", cronTab)
+		m.Spec.KubernetesResources.Schedule = cronTab
 	}
-	scanApiUrl := scanapi.ScanApiServiceUrl(m)
+	scanApiUrl := scanapi.ScanApiServiceUrl(*m)
 
 	containerArgs := []string{
 		"k8s-scan",

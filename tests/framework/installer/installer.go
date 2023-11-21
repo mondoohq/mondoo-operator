@@ -163,6 +163,7 @@ func (i *MondooInstaller) CleanupAuditConfigs() error {
 		if err := i.K8sHelper.WaitForResourceDeletion(&c); err != nil {
 			return err
 		}
+		zap.S().Infof("Deleted MondooAuditConfig %s/%s.", c.Namespace, c.Name)
 	}
 	return nil
 }

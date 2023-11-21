@@ -291,6 +291,16 @@ func (k8sh *K8sHelper) GetDescribeFromNamespace(namespace, testName string) {
 		k8sh.appendDeploymentDescribe(file, namespace, p.Name)
 	}
 
+	cronjobs, err := k8sh.kubeClient.BatchV1().CronJobs(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		zap.S().Errorf("failed to list cronjobs in namespace %s. %+v", namespace, err)
+		return
+	}
+
+	for _, p := range cronjobs.Items {
+		k8sh.appendCronJobDescribe(file, namespace, p.Name)
+	}
+
 	auditConfigs, err := k8sh.dynamicClient.Resource(v1alpha2.GroupVersion.WithResource("mondooauditconfigs")).
 		Namespace(namespace).
 		List(ctx, metav1.ListOptions{})
@@ -370,6 +380,16 @@ func (k8sh *K8sHelper) appendDeploymentDescribe(file *os.File, namespace, name s
 	file.WriteString("\n")                                   //nolint // ok to ignore this test logging
 }
 
+func (k8sh *K8sHelper) appendCronJobDescribe(file *os.File, namespace, name string) {
+	description := k8sh.getCronJobDescribe(namespace, name)
+	if description == "" {
+		return
+	}
+	writeHeader(file, fmt.Sprintf("CronJob: %s\n", name)) //nolint // ok to ignore this test logging
+	file.WriteString(description)                         //nolint // ok to ignore this test logging
+	file.WriteString("\n")                                //nolint // ok to ignore this test logging
+}
+
 func (k8sh *K8sHelper) appendPodDescribe(file *os.File, namespace, name string) {
 	description := k8sh.getPodDescribe(namespace, name)
 	if description == "" {
@@ -402,7 +422,17 @@ func (k8sh *K8sHelper) getDeploymentDescribe(namespace string, args ...string) s
 	args = append([]string{"get", "deployment", "-o", "yaml", "-n", namespace}, args...)
 	description, err := k8sh.Kubectl(args...)
 	if err != nil {
-		zap.S().Errorf("failed to describe pod. %v %+v", args, err)
+		zap.S().Errorf("failed to describe deployment. %v %+v", args, err)
+		return ""
+	}
+	return description
+}
+
+func (k8sh *K8sHelper) getCronJobDescribe(namespace string, args ...string) string {
+	args = append([]string{"get", "cronjob", "-o", "yaml", "-n", namespace}, args...)
+	description, err := k8sh.Kubectl(args...)
+	if err != nil {
+		zap.S().Errorf("failed to describe cronjob. %v %+v", args, err)
 		return ""
 	}
 	return description
@@ -422,7 +452,7 @@ func (k8sh *K8sHelper) getAuditConfigDescribe(namespace string, args ...string) 
 	args = append([]string{"get", "mondooauditconfig", "-o", "yaml", "-n", namespace}, args...)
 	description, err := k8sh.Kubectl(args...)
 	if err != nil {
-		zap.S().Errorf("failed to describe pod. %v %+v", args, err)
+		zap.S().Errorf("failed to describe mondooauditconfig. %v %+v", args, err)
 		return ""
 	}
 	return description

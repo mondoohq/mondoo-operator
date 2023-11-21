@@ -31,8 +31,8 @@ const (
 	InventoryConfigMapBase = "-containers-inventory"
 )
 
-func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
-	ls := CronJobLabels(m)
+func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
+	ls := CronJobLabels(*m)
 
 	cmd := []string{
 		"cnspec", "scan", "k8s",
@@ -59,6 +59,9 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 			logger.Info("using cron custom schedule", "crontab", m.Spec.Containers.Schedule)
 			cronTab = m.Spec.Containers.Schedule
 		}
+	} else {
+		logger.Info("using default cron schedule", "crontab", cronTab)
+		m.Spec.Containers.Schedule = cronTab
 	}
 
 	cronjob := &batchv1.CronJob{

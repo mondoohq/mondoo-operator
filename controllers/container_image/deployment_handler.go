@@ -109,7 +109,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	existing := &batchv1.CronJob{}
-	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, privateRegistriesSecretName, *n.Mondoo, *n.MondooOperatorConfig)
+	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, privateRegistriesSecretName, n.Mondoo, *n.MondooOperatorConfig)
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 		return err
@@ -123,6 +123,11 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 
 	if created {
 		logger.Info("Created CronJob", "namespace", desired.Namespace, "name", desired.Name)
+		err = mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger)
+		if err != nil {
+			logger.Error(err, "Failed to update MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
+			return err
+		}
 	} else if !k8s.AreCronJobsEqual(*existing, *desired) {
 		existing.Spec.JobTemplate = desired.Spec.JobTemplate
 		existing.Spec.Schedule = desired.Spec.Schedule
