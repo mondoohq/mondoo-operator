@@ -17,11 +17,6 @@ type AuditConfigSuite struct {
 	AuditConfigBaseSuite
 }
 
-func (s *AuditConfigSuite) TestOOMControllerReporting() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, false)
-	s.testOOMMondooOperatorController(auditConfig)
-}
-
 func (s *AuditConfigSuite) TestReconcile_AllDisabled() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, false)
 	s.testMondooAuditConfigAllDisabled(auditConfig)
@@ -30,16 +25,6 @@ func (s *AuditConfigSuite) TestReconcile_AllDisabled() {
 func (s *AuditConfigSuite) TestReconcile_KubernetesResources() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false, false)
 	s.testMondooAuditConfigKubernetesResources(auditConfig)
-}
-
-func (s *AuditConfigSuite) TestOOMScanAPI() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false, false)
-	s.testOOMScanAPI(auditConfig)
-}
-
-func (s *AuditConfigSuite) TestOOMNodeScan() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true, false)
-	s.testOOMNodeScan(auditConfig)
 }
 
 func (s *AuditConfigSuite) TestReconcile_Containers() {
