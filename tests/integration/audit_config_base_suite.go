@@ -195,7 +195,24 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	s.NoError(err, "Failed to get workload names.")
 	zap.S().Info("number of workload", " amount ", len(workloadNames))
 
-	time.Sleep(10 * time.Second)
+	// Wait a bit to longer, to later check, whether the CronJob schedule was changed.
+	time.Sleep(61 * time.Second)
+
+	currentCronJob := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{Name: k8s_scan.CronJobName(auditConfig.Name), Namespace: auditConfig.Namespace},
+	}
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		if err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(currentCronJob), currentCronJob); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	s.NoError(err, "Kubernetes resources scanning CronJob was not found.")
+	s.Equal(cronJob.Spec.Schedule, currentCronJob.Spec.Schedule, "CronJob schedule was changed.")
+
+	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+	s.NoError(err, "Failed to find MondooAuditConfig")
+	s.Equal(cronJob.Spec.Schedule, foundMondooAuditConfig.Spec.KubernetesResources.Schedule, "CronJob schedule was not updated in MondooAuditConfig")
 
 	// The number of assets from upstream is limited by paganiation.
 	// In case we have more than 100 workloads, we need to call this mutlple times, with different page numbers.
@@ -347,7 +364,24 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 	containerImages, err := utils.ContainerImages(pods.Items, auditConfig)
 	s.NoError(err, "Failed to get container image names")
 
-	time.Sleep(10 * time.Second)
+	// Wait a bit to longer, to later check, whether the CronJob schedule was changed.
+	time.Sleep(61 * time.Second)
+
+	currentCronJob := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{Name: container_image.CronJobName(auditConfig.Name), Namespace: auditConfig.Namespace},
+	}
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		if err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(currentCronJob), currentCronJob); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	s.NoError(err, "Kubernetes container scanning CronJob was not found.")
+	s.Equal(cronJob.Spec.Schedule, currentCronJob.Spec.Schedule, "CronJob schedule was changed.")
+
+	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+	s.NoError(err, "Failed to find MondooAuditConfig")
+	s.Equal(cronJob.Spec.Schedule, foundMondooAuditConfig.Spec.Containers.Schedule, "CronJob schedule was not updated in MondooAuditConfig")
 
 	// Verify the container images have been sent upstream and have scores.
 	// The number of assets from upstream is limited by paganiation.
@@ -455,7 +489,23 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 		nodeNames = append(nodeNames, node.Name)
 	}
 
-	time.Sleep(10 * time.Second)
+	// Wait a bit to longer, to later check, whether the CronJob schedule was changed.
+	time.Sleep(61 * time.Second)
+
+	currentCronJobs := &batchv1.CronJobList{}
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, currentCronJobs, listOpts))
+		if len(nodeList.Items) == len(currentCronJobs.Items) {
+			return true, nil
+		}
+		return false, nil
+	})
+	s.NoError(err, "Kubernetes node scanning CronJob was not found.")
+	s.Equal(cronJobs.Items[0].Spec.Schedule, currentCronJobs.Items[0].Spec.Schedule, "CronJob schedule was changed.")
+
+	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+	s.NoError(err, "Failed to find MondooAuditConfig")
+	s.Equal(cronJobs.Items[0].Spec.Schedule, foundMondooAuditConfig.Spec.Nodes.Schedule, "CronJob schedule was not updated in MondooAuditConfig")
 
 	// The number of assets from upstream is limited by paganiation.
 	// In case we have more than 100 workloads, we need to call this mutlple times, with different page numbers.

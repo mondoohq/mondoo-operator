@@ -73,6 +73,8 @@ func (s *DeploymentHandlerSuite) AfterTest(suiteName, testName string) {
 
 func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
 	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
@@ -90,7 +92,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	image, err := s.containerImageResolver.MondooOperatorImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig)
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, &s.auditConfig)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -110,6 +112,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 	s.auditConfig.Spec.ConsoleIntegration.Enable = true
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	integrationMrn := utils.RandString(20)
 	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
@@ -144,7 +148,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 	image, err := s.containerImageResolver.MondooOperatorImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, integrationMrn, test.KubeSystemNamespaceUid, s.auditConfig)
+	expected := CronJob(image, integrationMrn, test.KubeSystemNamespaceUid, &s.auditConfig)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -174,7 +178,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.NoError(err)
 
 	// Make sure a cron job exists with different container command
-	cronJob := CronJob(image, "", "", s.auditConfig)
+	cronJob := CronJob(image, "", "", &s.auditConfig)
 	cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, cronJob))
 
@@ -182,7 +186,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig)
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, &s.auditConfig)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -203,6 +207,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 
 func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
 	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
@@ -295,6 +301,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 
 func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
 	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
@@ -319,8 +327,56 @@ func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
 	s.Equal(0, len(cronJobs.Items))
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_CreateWithDefaultSchedule() {
+	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+
+	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
+	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
+		Url:   scanApiUrl,
+		Token: "token",
+	}).Times(1)
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	s.NoError(err)
+
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, &s.auditConfig)
+
+	created := &batchv1.CronJob{}
+	created.Name = expected.Name
+	created.Namespace = expected.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+
+	// Wait a bit to longer, to later check, whether the CronJob schedule was changed.
+	time.Sleep(61 * time.Second)
+
+	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
+		Url:   scanApiUrl,
+		Token: "token",
+	}).Times(1)
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+	foundMAC := &mondoov1alpha2.MondooAuditConfig{}
+	foundMAC.Name = mondooAuditConfig.Name
+	foundMAC.Namespace = mondooAuditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(foundMAC), foundMAC))
+
+	s.Equal(created.Spec.Schedule, expected.Spec.Schedule)
+	s.Equal(foundMAC.Spec.KubernetesResources.Schedule, expected.Spec.Schedule)
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
 	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
@@ -338,7 +394,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig)
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, &s.auditConfig)
 
 	created := &batchv1.CronJob{}
 	created.Name = expected.Name
@@ -350,6 +406,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomScheduleFail() {
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
 	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
@@ -367,7 +425,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomScheduleFail() {
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig)
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, &s.auditConfig)
 
 	created := &batchv1.CronJob{}
 	created.Name = expected.Name

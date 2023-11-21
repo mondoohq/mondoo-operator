@@ -36,8 +36,8 @@ const (
 	ignoreAnnotationValue = "ignore"
 )
 
-func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
-	ls := CronJobLabels(m)
+func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
+	ls := CronJobLabels(*m)
 
 	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
 	if m.Spec.Nodes.Schedule != "" {
@@ -48,6 +48,9 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 			logger.Info("using cron custom schedule", "crontab", m.Spec.Nodes.Schedule)
 			cronTab = m.Spec.Nodes.Schedule
 		}
+	} else {
+		logger.Info("using default cron schedule", "crontab", cronTab)
+		m.Spec.Nodes.Schedule = cronTab
 	}
 	unsetHostPath := corev1.HostPathUnset
 
@@ -70,7 +73,7 @@ func CronJob(image string, node corev1.Node, m v1alpha2.MondooAuditConfig, isOpe
 			},
 			Name:      CronJobName(m.Name, node.Name),
 			Namespace: m.Namespace,
-			Labels:    CronJobLabels(m),
+			Labels:    CronJobLabels(*m),
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:          cronTab,

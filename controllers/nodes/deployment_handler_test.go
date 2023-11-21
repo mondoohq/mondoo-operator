@@ -58,6 +58,8 @@ func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
 func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMap() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
@@ -108,6 +110,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN
 	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(credsWithIntegration)
 
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
@@ -139,6 +143,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN
 func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	nodes := &corev1.NodeList{}
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
@@ -177,6 +183,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
 func (s *DeploymentHandlerSuite) TestReconcile_CleanConfigMapsForDeletedNodes() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	// Reconcile to create the initial cron jobs
 	result, err := d.Reconcile(s.ctx)
@@ -220,6 +228,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanConfigMapsForDeletedNodes() 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
@@ -233,7 +243,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	s.NoError(err)
 
 	for _, n := range nodes.Items {
-		expected := CronJob(image, n, s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		expected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 		// Set some fields that the kube client sets
@@ -274,6 +284,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	nodes := &corev1.NodeList{}
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
@@ -283,7 +295,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	s.NoError(err)
 
 	// Make sure a cron job exists for one of the nodes
-	cronJob := CronJob(image, nodes.Items[1], s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	cronJob := CronJob(image, nodes.Items[1], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 	cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, cronJob))
 
@@ -292,7 +304,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	s.True(result.IsZero())
 
 	for i, n := range nodes.Items {
-		expected := CronJob(image, n, s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		expected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 		// Set some fields that the kube client sets
@@ -315,6 +327,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	// Reconcile to create the initial cron jobs
 	result, err := d.Reconcile(s.ctx)
@@ -345,7 +359,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 
 	s.Equal(1, len(cronJobs.Items))
 
-	expected := CronJob(image, nodes.Items[0], s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -365,6 +379,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningStatus() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	// Reconcile to create all resources
 	result, err := d.Reconcile(s.ctx)
@@ -437,6 +453,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningStatus() {
 func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	// Reconcile to create all resources
 	result, err := d.Reconcile(s.ctx)
@@ -530,6 +548,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
 func (s *DeploymentHandlerSuite) TestReconcile_DisableNodeScanning() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	// Reconcile to create all resources
 	result, err := d.Reconcile(s.ctx)
@@ -554,6 +574,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_DisableNodeScanning() {
 func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	customSchedule := "0 0 * * *"
 	s.auditConfig.Spec.Nodes.Schedule = customSchedule
@@ -568,7 +590,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, nodes.Items[0], s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 
 	created := &batchv1.CronJob{}
 	created.Name = expected.Name
@@ -581,6 +603,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomScheduleFail() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	customSchedule := "this is not valid"
 	s.auditConfig.Spec.Nodes.Schedule = customSchedule
@@ -595,7 +619,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomScheduleFail() {
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, nodes.Items[0], s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 
 	created := &batchv1.CronJob{}
 	created.Name = expected.Name
