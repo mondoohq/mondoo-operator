@@ -5,6 +5,7 @@ package nodes
 
 import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 
 	corev1 "k8s.io/api/core/v1"
@@ -27,16 +28,18 @@ func updateNodeConditions(config *v1alpha2.MondooAuditConfig, degradedStatus boo
 		status = corev1.ConditionTrue
 	}
 
-	for _, pod := range pods.Items {
-		for _, containerStatus := range pod.Status.ContainerStatuses {
-			if containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137 {
-				// TODO: double check container name?
-				msg = "Node Scanning is unavailable due to OOM"
-				affectedPods = append(affectedPods, pod.Name)
-				memoryLimit = pod.Spec.Containers[0].Resources.Limits.Memory().String()
-				reason = "NodeScanningUnavailable"
-				status = corev1.ConditionTrue
-			}
+	currentPod := k8s.GetNewestPodFromList(pods)
+	for i, containerStatus := range currentPod.Status.ContainerStatuses {
+		if containerStatus.Name != "cnspec" {
+			continue
+		}
+		if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
+			(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
+			msg = "Node Scanning is unavailable due to OOM"
+			affectedPods = append(affectedPods, currentPod.Name)
+			memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
+			reason = "NodeScanningUnavailable"
+			status = corev1.ConditionTrue
 		}
 	}
 

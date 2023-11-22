@@ -179,6 +179,8 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	})
 	s.NoError(err, "Kubernetes resources scanning CronJob was not created.")
 
+	time.Sleep(60 * time.Second)
+
 	cronJobLabels := k8s_scan.CronJobLabels(auditConfig)
 	s.True(
 		s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(utils.LabelsToLabelSelector(cronJobLabels), auditConfig.Namespace),
@@ -517,6 +519,159 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	s.AssetsNotUnscored(assets)
 
 	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
+}
+
+func (s *AuditConfigBaseSuite) testOOMScanAPI(auditConfig mondoov2.MondooAuditConfig) {
+	s.auditConfig = auditConfig
+
+	auditConfig.Spec.Scanner.Resources.Limits = corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("10Mi"), // this should be low enough to trigger an OOMkilled
+	}
+
+	// Move CronJob into the future to avoid interference with tests.
+	cronStart := time.Now().Add(30 * time.Minute)
+	auditConfig.Spec.KubernetesResources.Schedule = fmt.Sprintf("%d * * * *", cronStart.Minute())
+
+	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
+
+	zap.S().Info("Create an audit config that enables only workloads scanning. (with reduced memory limit)")
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
+		"Failed to create Mondoo audit config.")
+
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
+
+	time.Sleep(10 * time.Second)
+
+	// This will take some time, because:
+	// reconcile needs to happen
+	err := s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.ScanAPIDegraded, corev1.ConditionTrue)
+	s.NoError(err, "Failed to find degraded condition")
+
+	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+	s.NoError(err, "Failed to find MondooAuditConfig")
+
+	s.Contains(foundMondooAuditConfig.Status.Conditions[4].Message, "OOM", "Failed to find OOMKilled message in degraded condition")
+	s.Len(foundMondooAuditConfig.Status.Conditions[4].AffectedPods, 1, "Failed to find only one pod in degraded condition")
+
+	// Give the integration a chance to update
+	time.Sleep(2 * time.Second)
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ERROR", status)
+
+	foundMondooAuditConfig.Spec.Scanner.Resources.Limits = corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("200Mi"), // this should be enough to get the ScanAPI running again
+	}
+
+	zap.S().Info("Increasing memory limit to get ScanAPI running again.")
+	s.NoError(s.testCluster.K8sHelper.Clientset.Update(s.ctx, foundMondooAuditConfig))
+
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.ScanAPIDegraded, corev1.ConditionFalse)
+	s.NoError(err, "Failed to find degraded condition")
+	foundMondooAuditConfig, err = s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+	s.NoError(err, "Failed to find MondooAuditConfig")
+	s.NotContains(foundMondooAuditConfig.Status.Conditions[4].Message, "OOM", "Found OOMKilled message in condition")
+	s.Len(foundMondooAuditConfig.Status.Conditions[4].AffectedPods, 0, "Found a pod in condition")
+
+	// Give the integration a chance to update
+	time.Sleep(2 * time.Second)
+
+	status, err = s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
+}
+
+func (s *AuditConfigBaseSuite) testOOMNodeScan(auditConfig mondoov2.MondooAuditConfig) {
+	s.auditConfig = auditConfig
+
+	auditConfig.Spec.Nodes.Resources.Limits = corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("10Mi"), // this should be low enough to trigger an OOMkilled
+	}
+
+	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
+
+	zap.S().Info("Create an audit config that enables only nodes scanning. (with reduced memory limit)")
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
+		"Failed to create Mondoo audit config.")
+
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
+
+	cronJobs := &batchv1.CronJobList{}
+	cronJobLabels := nodes.CronJobLabels(auditConfig)
+
+	// List only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
+	listOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(cronJobLabels)}
+
+	nodeList := &corev1.NodeList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodeList))
+
+	// Verify the amount of CronJobs created is equal to the amount of nodes
+	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, cronJobs, listOpts))
+		if len(nodeList.Items) == len(cronJobs.Items) {
+			return true, nil
+		}
+		return false, nil
+	})
+	s.NoErrorf(
+		err,
+		"The amount of node scanning CronJobs is not equal to the amount of cluster nodes. expected: %d; actual: %d",
+		len(nodeList.Items), len(cronJobs.Items))
+
+	// Wait some time for the CronJob to trigger
+	time.Sleep(50 * time.Second)
+
+	// This will take some time, because:
+	// reconcile needs to happen
+	// a new replicaset should be created
+	// the first Pod tries to start and gets killed
+	// on the 2nd start we should get an OOMkilled status update
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.NodeScanningDegraded, corev1.ConditionTrue)
+	s.NoError(err, "Failed to find degraded condition")
+
+	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+	s.NoError(err, "Failed to find MondooAuditConfig")
+	s.Contains(foundMondooAuditConfig.Status.Conditions[0].Message, "OOM", "Failed to find OOMKilled message in degraded condition")
+	s.Len(foundMondooAuditConfig.Status.Conditions[0].AffectedPods, 1, "Failed to find only one pod in degraded condition")
+
+	// Give the integration a chance to update
+	time.Sleep(2 * time.Second)
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ERROR", status)
+
+	foundMondooAuditConfig.Spec.Nodes.Resources.Limits = corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("200Mi"), // this should be enough to get the ScanAPI running again
+	}
+	foundMondooAuditConfig.Spec.Nodes.Schedule = "*/1 * * * *"
+
+	zap.S().Info("Increasing memory limit to get node Scans running again.")
+	s.NoError(s.testCluster.K8sHelper.Clientset.Update(s.ctx, foundMondooAuditConfig))
+
+	// Wait for the next run of the CronJob
+	time.Sleep(30 * time.Second)
+
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.NodeScanningDegraded, corev1.ConditionFalse)
+	s.NoError(err, "Failed to find degraded condition")
+	foundMondooAuditConfig, err = s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+	s.NoError(err, "Failed to find MondooAuditConfig")
+	s.NotContains(foundMondooAuditConfig.Status.Conditions[0].Message, "OOM", "Found OOMKilled message in condition")
+	s.Len(foundMondooAuditConfig.Status.Conditions[0].AffectedPods, 0, "Found a pod in condition")
+
+	// Give the integration a chance to update
+	time.Sleep(2 * time.Second)
+
+	status, err = s.integration.GetStatus(s.ctx)
 	s.NoError(err, "Failed to get status")
 	s.Equal("ACTIVE", status)
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -378,11 +379,14 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateOOMCondition() {
 			Name:      "scan-api-123",
 			Namespace: ns,
 			Labels:    labels,
+			CreationTimestamp: metav1.Time{
+				Time: time.Now(),
+			},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Name:  "scan-api",
+					Name:  "cnspec",
 					Image: image,
 					Resources: corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
@@ -395,7 +399,7 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateOOMCondition() {
 		Status: corev1.PodStatus{
 			ContainerStatuses: []corev1.ContainerStatus{
 				{
-					Name: "scan-api",
+					Name: "cnspec",
 					LastTerminationState: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode: 137,

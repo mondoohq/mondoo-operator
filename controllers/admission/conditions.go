@@ -5,6 +5,7 @@ package admission
 
 import (
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -22,15 +23,17 @@ func updateAdmissionConditions(config *mondoov1alpha2.MondooAuditConfig, degrade
 		status = corev1.ConditionFalse
 	} else if degradedStatus {
 		msg = "Admission controller is unavailable"
-		for _, pod := range pods.Items {
-			for _, status := range pod.Status.ContainerStatuses {
-				if status.LastTerminationState.Terminated != nil && status.LastTerminationState.Terminated.ExitCode == 137 {
-					// TODO: double check container name?
-					msg = "Admission controller is unavailable due to OOM"
-					affectedPods = append(affectedPods, pod.Name)
-					memoryLimit = pod.Spec.Containers[0].Resources.Limits.Memory().String()
-					break
-				}
+		currentPod := k8s.GetNewestPodFromList(pods)
+		for i, containerStatus := range currentPod.Status.ContainerStatuses {
+			if containerStatus.Name != "webhook" {
+				continue
+			}
+			if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
+				(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
+				msg = "Admission controller is unavailable due to OOM"
+				affectedPods = append(affectedPods, currentPod.Name)
+				memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
+				break
 			}
 		}
 		reason = "AdmissionUnvailable"

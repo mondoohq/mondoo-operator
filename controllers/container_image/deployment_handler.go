@@ -5,6 +5,7 @@ package container_image
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -158,6 +159,22 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 			logger.Error(err, "Failed to list Pods for Kubernetes Container Image Scanning")
 			return err
 		}
+	}
+
+	containerStillCreating := false
+	currentPod := k8s.GetNewestPodFromList(pods)
+	for _, containerStatus := range currentPod.Status.ContainerStatuses {
+		if containerStatus.Name != "mondoo-container-scans" {
+			continue
+		}
+		if containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == "ContainerCreating" {
+			containerStillCreating = true
+			break
+		}
+	}
+	if containerStillCreating {
+		// Wait a moment and refresh the pods
+		return fmt.Errorf("container image scan pods are still creating")
 	}
 
 	updateImageScanningConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs), pods)
