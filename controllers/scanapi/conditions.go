@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -35,17 +36,17 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 			}
 		}
 
-		for _, pod := range pods.Items {
-			for i, containerStatus := range pod.Status.ContainerStatuses {
-				if containerStatus.Name != "cnspec" {
-					continue
-				}
-				if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
-					(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
-					msg = "ScanAPI controller is unavailable due to OOM"
-					affectedPods = append(affectedPods, pod.Name)
-					memoryLimit = pod.Spec.Containers[i].Resources.Limits.Memory().String()
-				}
+		currentPod := k8s.GetNewestPodFromList(pods)
+		logger.Info("ScanAPI controller is unavailable", " pod ", currentPod.Status.ContainerStatuses)
+		for i, containerStatus := range currentPod.Status.ContainerStatuses {
+			if containerStatus.Name != "cnspec" {
+				continue
+			}
+			if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
+				(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
+				msg = "ScanAPI controller is unavailable due to OOM"
+				affectedPods = append(affectedPods, currentPod.Name)
+				memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
 			}
 		}
 

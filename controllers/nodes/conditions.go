@@ -29,14 +29,7 @@ func updateNodeConditions(config *v1alpha2.MondooAuditConfig, degradedStatus boo
 	}
 
 	currentPod := k8s.GetNewestPodFromList(pods)
-	var cnspecContainer *corev1.Container
-	for _, container := range currentPod.Spec.Containers {
-		if container.Name == "cnspec" {
-			cnspecContainer = &container
-			break
-		}
-	}
-	for _, containerStatus := range currentPod.Status.ContainerStatuses {
+	for i, containerStatus := range currentPod.Status.ContainerStatuses {
 		if containerStatus.Name != "cnspec" {
 			continue
 		}
@@ -44,7 +37,7 @@ func updateNodeConditions(config *v1alpha2.MondooAuditConfig, degradedStatus boo
 			(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
 			msg = "Node Scanning is unavailable due to OOM"
 			affectedPods = append(affectedPods, currentPod.Name)
-			memoryLimit = cnspecContainer.Resources.Limits.Memory().String()
+			memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
 			reason = "NodeScanningUnavailable"
 			status = corev1.ConditionTrue
 		}

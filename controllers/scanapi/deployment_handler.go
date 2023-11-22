@@ -5,6 +5,7 @@ package scanapi
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -154,6 +155,22 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	if err != nil {
 		logger.Error(err, "Failed to list Pods for scan API")
 		return err
+	}
+
+	containerStillCreating := false
+	currentPod := k8s.GetNewestPodFromList(pods)
+	for _, containerStatus := range currentPod.Status.ContainerStatuses {
+		if containerStatus.Name != "cnspec" {
+			continue
+		}
+		if containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == "ContainerCreating" {
+			containerStillCreating = true
+			break
+		}
+	}
+	if containerStillCreating {
+		// Wait a moment and refresh the pods
+		return fmt.Errorf("ScanAPI controller pods are still creating")
 	}
 
 	updateScanAPIConditions(n.Mondoo, existingDeployment.Status.UnavailableReplicas != 0, existingDeployment.Status.Conditions, pods)

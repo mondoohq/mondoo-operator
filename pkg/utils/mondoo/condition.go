@@ -202,6 +202,8 @@ func UpdateMondooAuditStatus(ctx context.Context, client client.Client, origMOC,
 	return nil
 }
 
+// UpdateMondooAuditConfig updates only the spec of the MondooAuditConfig
+// The status is not updated
 func UpdateMondooAuditConfig(ctx context.Context, k8sClient client.Client, newMAC *mondoov1alpha2.MondooAuditConfig, log logr.Logger) error {
 	currentMAC := &mondoov1alpha2.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{
@@ -213,13 +215,18 @@ func UpdateMondooAuditConfig(ctx context.Context, k8sClient client.Client, newMA
 	if err != nil {
 		return err
 	}
+	log.Info("updating mondooauditconfig", "namespace", newMAC.Namespace, "name", newMAC.Name, "config", currentMAC)
 	if !reflect.DeepEqual(currentMAC.Spec, newMAC.Spec) {
-		log.Info("status has changed, updating")
 		err := k8sClient.Update(ctx, newMAC)
 		if err != nil {
 			log.Error(err, "failed to update mondooauditconfig")
 			return err
 		}
+		err = k8sClient.Get(context.Background(), client.ObjectKeyFromObject(currentMAC), currentMAC)
+		if err != nil {
+			return err
+		}
+		log.Info("updating mondooauditconfig", "namespace", newMAC.Namespace, "name", newMAC.Name, "config", currentMAC)
 	}
 	return nil
 }
