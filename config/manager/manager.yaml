@@ -46,6 +46,9 @@ spec:
         image: controller:latest
         imagePullPolicy: IfNotPresent
         name: manager
+        env:
+          - name: FEATURE_ENABLE_V9
+            value: "true"
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true

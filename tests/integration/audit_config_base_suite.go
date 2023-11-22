@@ -219,12 +219,19 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
 	s.NoError(err, "Failed to list assets with scores.")
 	zap.S().Info("number of assets from upstream: ", len(assets))
+	for _, asset := range assets {
+		zap.S().Info("asset name: ", asset.Name, " type: ", asset.Platform.Name)
+	}
 
 	// TODO: the cluster name is non-deterministic currently so we cannot test for it
 	assetsExceptCluster := utils.ExcludeClusterAsset(assets)
-	s.Equal(len(assets)-1, len(assetsExceptCluster), "Cluster asset was sent upstream.")
+	assetsExceptClusterAndNode := utils.ExcludeNodeAsset(assetsExceptCluster)
+	expectedLength := len(assets) - 1
+	// On some clusters we have a node, on others not (e.g. k3s)
+	expectedLength -= len(assetsExceptCluster) - len(assetsExceptClusterAndNode)
+	s.Equal(expectedLength, len(assetsExceptClusterAndNode), "Cluster/Node asset was sent upstream.")
 
-	assetNames := utils.AssetNames(assetsExceptCluster)
+	assetNames := utils.AssetNames(assetsExceptClusterAndNode)
 	s.ElementsMatch(workloadNames, assetNames, "Workloads were not sent upstream.")
 
 	s.AssetsNotUnscored(assets)
@@ -1193,7 +1200,7 @@ func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []assets.AssetWithScore)
 	for _, asset := range assets {
 		// We don't score scratch containers at the moment so they are always unscored.
 		// We don't have policies for a cluster asset enabled at the moment so they are always unscored.
-		if asset.Platform.Name != "scratch" && asset.Platform.Name != "k8s-cluster" {
+		if asset.Platform.Name != "scratch" && asset.Platform.Name != "k8s-cluster" && asset.Platform.Name != "k8s-namespace" && asset.Platform.Name != "k8s-node" {
 			if asset.Grade == "U" || asset.Grade == "" {
 				zap.S().Infof("Asset %s has no score", asset.Name)
 			}

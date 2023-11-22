@@ -23,6 +23,16 @@ func ExcludeClusterAsset(as []assets.AssetWithScore) []assets.AssetWithScore {
 	return newAssets
 }
 
+func ExcludeNodeAsset(as []assets.AssetWithScore) []assets.AssetWithScore {
+	var newAssets []assets.AssetWithScore
+	for _, asset := range as {
+		if asset.AssetType != "k8s.node" {
+			newAssets = append(newAssets, asset)
+		}
+	}
+	return newAssets
+}
+
 func AssetNames(assets []assets.AssetWithScore) []string {
 	assetNames := make([]string, 0, len(assets))
 	for _, asset := range assets {
