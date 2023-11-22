@@ -152,6 +152,11 @@ spec:
                           Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                         type: object
                     type: object
+                  schedule:
+                    description: Specify a custom crontab schedule for the container
+                      image scanning job. If not specified, the default schedule is
+                      used.
+                    type: string
                 type: object
               filtering:
                 properties:
@@ -184,6 +189,11 @@ spec:
                     type: boolean
                   enable:
                     type: boolean
+                  schedule:
+                    description: Specify a custom crontab schedule for the Kubernetes
+                      resource scanning job. If not specified, the default schedule
+                      is used.
+                    type: string
                 type: object
               mondooCredsSecretRef:
                 description: Config is an example field of MondooAuditConfig. Edit mondooauditconfig_types.go
@@ -260,6 +270,10 @@ spec:
                           Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                         type: object
                     type: object
+                  schedule:
+                    description: Specify a custom crontab schedule for the node scanning
+                      job. If not specified, the default schedule is used.
+                    type: string
                 type: object
               scanner:
                 description: Scanner defines the settings for the Mondoo scanner that
@@ -468,6 +482,12 @@ spec:
                 description: Conditions includes detailed status for the MondooAuditConfig
                 items:
                   properties:
+                    affectedPods:
+                      description: AffectedPods, when filled, contains a list which
+                        are affected by an issue
+                      items:
+                        type: string
+                      type: array
                     lastTransitionTime:
                       description: LastTransitionTime is the last time the condition
                         transitioned from one status to another.
@@ -476,6 +496,10 @@ spec:
                     lastUpdateTime:
                       description: LastUpdateTime is the last time we probed the condition
                       format: date-time
+                      type: string
+                    memoryLimit:
+                      description: MemoryLimit contains the currently active memory
+                        limit for a Pod
                       type: string
                     message:
                       description: Message is a human-readable message indicating details
