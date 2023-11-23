@@ -27,6 +27,7 @@ This user manual describes how to install and use the Mondoo Operator.
     - [Uninstalling the operator with kubectl](#uninstalling-the-operator-with-kubectl)
     - [Uninstalling the operator with Helm](#uninstalling-the-operator-with-helm)
     - [Uninstalling the operator with Operator Lifecycle Manager (OLM)](#uninstalling-the-operator-with-operator-lifecycle-manager-olm)
+    - [Cleanup failed uninstalls](#cleanup-failed-uninstalls)
   - [FAQ](#faq)
     - [I do not see the service running, only the operator. What should I do?](#i-do-not-see-the-service-running-only-the-operator-what-should-i-do)
     - [How do I edit an existing operator configuration?](#how-do-i-edit-an-existing-operator-configuration)
@@ -613,6 +614,31 @@ Run:
 ```bash
 operator-sdk olm uninstall mondoo-operator
 ```
+
+### Cleanup failed uninstalls
+
+Under normal circumstances, the above steps clean up the complete operator installation.
+In rare cases, the namespace gets stuck in `terminating` state.
+This most likely happens because of [finalizers](https://kubernetes.io/docs/concepts/overview/working-with-objects/finalizers/).
+
+This can happen when the operator-controller isn't running correctly during uninstall.
+
+To clean up the namespace:
+- Find objects that are still present in the namespace:
+  ```
+  kubectl api-resources --verbs=list --namespaced -o name | xargs -n 1 kubectl get --show-kind --ignore-not-found -n mondoo-operator
+  ```
+- Check the remaining objects for `finalizers`, e.g., the `MondooAuditConfig`:
+  ```
+  kubectl -n mondoo-operator get mondooauditconfigs.k8s.mondoo.com mondoo-client -o jsonpath='{.metadata.finalizers}'
+  ```
+- Remove the `finalizers` from the object:
+  ```
+  kubectl -n mondoo-operator patch --type=merge mondooauditconfigs.k8s.mondoo.com mondoo-client -p '{"metadata":{"finalizers":null}}'
+  ```
+
+The namespace should now automatically clean up after a short time.
+
 
 ## FAQ
 
