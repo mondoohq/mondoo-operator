@@ -52,7 +52,7 @@ jobs:
           version: ${{ matrix.k8s-version }}
           k3d-args: --k3s-arg=--disable=traefik@server:*
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: "${{ env.golang-version }}"
 
