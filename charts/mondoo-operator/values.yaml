@@ -12,9 +12,11 @@ controllerManager:
         - ALL
       privileged: false
       readOnlyRootFilesystem: true
+    env:
+      featureEnableV9: "true"
     image:
       repository: ghcr.io/mondoohq/mondoo-operator
-      tag: v1.18.0
+      tag: v1.19.0
     imagePullPolicy: IfNotPresent
     resources:
       limits:
