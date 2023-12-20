@@ -1348,7 +1348,7 @@ func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []assets.AssetWithScore)
 	for _, asset := range assets {
 		// We don't score scratch containers at the moment so they are always unscored.
 		// We don't have policies for a cluster asset enabled at the moment so they are always unscored.
-		if asset.Platform.Name != "scratch" && asset.Platform.Name != "k8s-cluster" {
+		if asset.Platform.Name != "scratch" && asset.Platform.Name != "k8s-cluster" && asset.Platform.Name != "k8s-namespace" {
 			if asset.Grade == "U" || asset.Grade == "" {
 				zap.S().Infof("Asset %s has no score", asset.Name)
 			}
