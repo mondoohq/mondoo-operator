@@ -11,9 +11,9 @@ require (
 	github.com/rs/zerolog v1.31.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
-	go.mondoo.com/cnquery/v9 v9.12.0
+	go.mondoo.com/cnquery/v9 v9.12.1
 	go.mondoo.com/cnspec/v9 v9.12.0
-	go.mondoo.com/mondoo-go v0.0.0-20231219150337-47ab9e2aa496
+	go.mondoo.com/mondoo-go v0.0.0-20231221074701-234c3c844ed9
 	k8s.io/api v0.28.4
 	k8s.io/apimachinery v0.28.4
 	k8s.io/client-go v0.28.4
