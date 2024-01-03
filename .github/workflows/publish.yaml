@@ -347,7 +347,7 @@ jobs:
           operator-sdk olm uninstall
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: olm-test-logs-${{ matrix.k8s-version }}
@@ -436,7 +436,7 @@ jobs:
         run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.meta.outputs.version }} make test/integration/ci
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: helm-test-logs-${{ matrix.k8s-version }}
