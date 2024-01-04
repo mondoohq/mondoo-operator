@@ -11,7 +11,7 @@ require (
 	github.com/rs/zerolog v1.31.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
-	go.mondoo.com/cnquery/v9 v9.12.2
+	go.mondoo.com/cnquery/v9 v9.13.0
 	go.mondoo.com/cnspec/v9 v9.12.2
 	go.mondoo.com/mondoo-go v0.0.0-20231221074701-234c3c844ed9
 	k8s.io/api v0.28.4
@@ -52,7 +52,7 @@ require (
 	github.com/ashanbrown/forbidigo v1.6.0 // indirect
 	github.com/ashanbrown/makezero v1.1.1 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
-	github.com/aws/aws-sdk-go v1.49.11 // indirect
+	github.com/aws/aws-sdk-go v1.49.13 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.24.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.5.3 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.26.2 // indirect
