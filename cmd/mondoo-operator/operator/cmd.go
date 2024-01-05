@@ -154,7 +154,6 @@ func init() {
 		err = checkForTerminatedState(ctx, client, v, setupLog)
 		if err != nil {
 			setupLog.Error(err, "unable to check for terminated state of mondoo-operator-controller")
-			return err
 		}
 
 		if err = resource_monitor.RegisterResourceMonitors(mgr, scanApiStore); err != nil {
