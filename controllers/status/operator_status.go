@@ -189,7 +189,7 @@ func ReportStatusRequestFromAuditConfig(
 	}
 
 	messages[5].Identifier = MondooOperatorIdentifier
-	mondooOperator := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.MondooOperaotrDegraded)
+	mondooOperator := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.MondooOperatorDegraded)
 	if mondooOperator != nil {
 		if mondooOperator.Status == v1.ConditionTrue {
 			messages[5].Status = mondooclient.MessageStatus_MESSAGE_ERROR

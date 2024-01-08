@@ -200,7 +200,7 @@ const (
 	// Indicates weather Admission controller is Degraded because of the ScanAPI
 	ScanAPIDegraded MondooAuditConfigConditionType = "ScanAPIDegraded"
 	// Indicates weather the operator itself is Degraded
-	MondooOperaotrDegraded MondooAuditConfigConditionType = "MondooOperatorDegraded"
+	MondooOperatorDegraded MondooAuditConfigConditionType = "MondooOperatorDegraded"
 	// MondooIntegrationDegraded will hold the status for any issues encountered while trying to CheckIn()
 	// on behalf of the Mondoo integration MRN
 	MondooIntegrationDegraded MondooAuditConfigConditionType = "IntegrationDegraded"
