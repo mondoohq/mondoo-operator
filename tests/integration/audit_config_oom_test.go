@@ -30,6 +30,10 @@ func (s *AuditConfigOOMSuite) TestOOMNodeScan() {
 	s.testOOMNodeScan(auditConfig)
 }
 
+func (s *AuditConfigOOMSuite) TearDownSuite() {
+	s.AuditConfigBaseSuite.TearDownSuite()
+}
+
 func TestAuditConfigOOMSuite(t *testing.T) {
 	s := new(AuditConfigOOMSuite)
 	defer func(s *AuditConfigOOMSuite) {
