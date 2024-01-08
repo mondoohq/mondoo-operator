@@ -114,5 +114,5 @@ func updateOperatorConditions(config *k8sv1alpha2.MondooAuditConfig, degradedSta
 		status = corev1.ConditionTrue
 	}
 
-	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, k8sv1alpha2.MondooOperaotrDegraded, status, reason, msg, updateCheck, affectedPods, memoryLimit)
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, k8sv1alpha2.MondooOperatorDegraded, status, reason, msg, updateCheck, affectedPods, memoryLimit)
 }
