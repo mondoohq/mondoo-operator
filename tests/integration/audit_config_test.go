@@ -60,6 +60,10 @@ func (s *AuditConfigSuite) TestReconcile_AdmissionEnforcingScaleDownScanApi() {
 	s.testMondooAuditConfigAdmissionScaleDownScanApi(auditConfig)
 }
 
+func (s *AuditConfigSuite) TearDownSuite() {
+	s.AuditConfigBaseSuite.TearDownSuite()
+}
+
 func TestAuditConfigSuite(t *testing.T) {
 	s := new(AuditConfigSuite)
 	defer func(s *AuditConfigSuite) {

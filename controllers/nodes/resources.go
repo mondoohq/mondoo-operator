@@ -77,7 +77,7 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:          cronTab,
-			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			ConcurrencyPolicy: batchv1.ForbidConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -234,7 +234,7 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:          cronTab,
-			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			ConcurrencyPolicy: batchv1.ForbidConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: ls,
