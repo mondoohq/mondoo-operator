@@ -108,7 +108,7 @@ jobs:
         if: success() || failure()
 
       - name: Upload cloud test results
-        uses: actions/upload-artifact@v4  # upload test results
+        uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: cloud-test-results
@@ -117,7 +117,7 @@ jobs:
             .github/terraform/aks/aks-${{ matrix.k8s-version }}.json
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: test-logs-aks-${{ matrix.k8s-version }}
@@ -192,14 +192,14 @@ jobs:
         if: success() || failure()
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4  # upload test results
+        uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: cloud-test-results
           path: integration-tests-eks-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: test-logs-eks-${{ matrix.k8s-version }}
@@ -278,14 +278,14 @@ jobs:
         if: success() || failure()
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4  # upload test results
+        uses: actions/upload-artifact@v3  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: cloud-test-results
           path: integration-tests-gke-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: test-logs-gke-${{ matrix.k8s-version }}

@@ -16,7 +16,7 @@ controllerManager:
       featureEnableV9: "true"
     image:
       repository: ghcr.io/mondoohq/mondoo-operator
-      tag: v1.19.0
+      tag: v1.19.1
     imagePullPolicy: IfNotPresent
     resources:
       limits:
