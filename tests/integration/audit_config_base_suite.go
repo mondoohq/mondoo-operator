@@ -560,8 +560,10 @@ func (s *AuditConfigBaseSuite) testOOMScanAPI(auditConfig mondoov2.MondooAuditCo
 	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
 	s.NoError(err, "Failed to find MondooAuditConfig")
 
-	s.Contains(foundMondooAuditConfig.Status.Conditions[4].Message, "OOM", "Failed to find OOMKilled message in degraded condition")
-	s.Len(foundMondooAuditConfig.Status.Conditions[4].AffectedPods, 1, "Failed to find only one pod in degraded condition")
+	cond := mondoo.FindMondooAuditConditions(foundMondooAuditConfig.Status.Conditions, mondoov2.ScanAPIDegraded)
+	s.Require().NotNil(cond)
+	s.Contains(cond.Message, "OOM", "Failed to find OOMKilled message in degraded condition")
+	s.Len(cond.AffectedPods, 1, "Failed to find only one pod in degraded condition")
 
 	// Give the integration a chance to update
 	time.Sleep(2 * time.Second)
@@ -581,8 +583,11 @@ func (s *AuditConfigBaseSuite) testOOMScanAPI(auditConfig mondoov2.MondooAuditCo
 	s.NoError(err, "Failed to find degraded condition")
 	foundMondooAuditConfig, err = s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
 	s.NoError(err, "Failed to find MondooAuditConfig")
-	s.NotContains(foundMondooAuditConfig.Status.Conditions[4].Message, "OOM", "Found OOMKilled message in condition")
-	s.Len(foundMondooAuditConfig.Status.Conditions[4].AffectedPods, 0, "Found a pod in condition")
+
+	cond = mondoo.FindMondooAuditConditions(foundMondooAuditConfig.Status.Conditions, mondoov2.ScanAPIDegraded)
+	s.Require().NotNil(cond)
+	s.NotContains(cond.Message, "OOM", "Found OOMKilled message in condition")
+	s.Len(cond.AffectedPods, 0, "Found a pod in condition")
 
 	// Give the integration a chance to update
 	time.Sleep(2 * time.Second)
@@ -645,8 +650,10 @@ func (s *AuditConfigBaseSuite) testOOMNodeScan(auditConfig mondoov2.MondooAuditC
 
 	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
 	s.NoError(err, "Failed to find MondooAuditConfig")
-	s.Contains(foundMondooAuditConfig.Status.Conditions[0].Message, "OOM", "Failed to find OOMKilled message in degraded condition")
-	s.Len(foundMondooAuditConfig.Status.Conditions[0].AffectedPods, 1, "Failed to find only one pod in degraded condition")
+	cond := mondoo.FindMondooAuditConditions(foundMondooAuditConfig.Status.Conditions, mondoov2.NodeScanningDegraded)
+	s.Require().NotNil(cond)
+	s.Contains(cond.Message, "OOM", "Failed to find OOMKilled message in degraded condition")
+	s.Len(cond.AffectedPods, 1, "Failed to find only one pod in degraded condition")
 
 	// Give the integration a chance to update
 	time.Sleep(2 * time.Second)
@@ -670,8 +677,10 @@ func (s *AuditConfigBaseSuite) testOOMNodeScan(auditConfig mondoov2.MondooAuditC
 	s.NoError(err, "Failed to find degraded condition")
 	foundMondooAuditConfig, err = s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
 	s.NoError(err, "Failed to find MondooAuditConfig")
-	s.NotContains(foundMondooAuditConfig.Status.Conditions[0].Message, "OOM", "Found OOMKilled message in condition")
-	s.Len(foundMondooAuditConfig.Status.Conditions[0].AffectedPods, 0, "Found a pod in condition")
+	cond = mondoo.FindMondooAuditConditions(foundMondooAuditConfig.Status.Conditions, mondoov2.ScanAPIDegraded)
+	s.Require().NotNil(cond)
+	s.NotContains(cond.Message, "OOM", "Found OOMKilled message in condition")
+	s.Len(cond.AffectedPods, 0, "Found a pod in condition")
 
 	// Give the integration a chance to update
 	time.Sleep(2 * time.Second)
