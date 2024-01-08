@@ -480,6 +480,15 @@ func TestAreCronJobsEqual(t *testing.T) {
 			shouldBeEqual: false,
 		},
 		{
+			name: "should not be equal when concurrency policy differ",
+			createB: func(a batchv1.CronJob) batchv1.CronJob {
+				b := *a.DeepCopy()
+				b.Spec.ConcurrencyPolicy = batchv1.ForbidConcurrent
+				return b
+			},
+			shouldBeEqual: false,
+		},
+		{
 			name: "should not be equal when node names differ",
 			createB: func(a batchv1.CronJob) batchv1.CronJob {
 				b := *a.DeepCopy()
