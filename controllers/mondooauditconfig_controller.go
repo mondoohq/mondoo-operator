@@ -5,6 +5,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -164,6 +165,30 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			}
 			return ctrl.Result{}, reconcileError
 		}
+	}
+
+	// Set the default cron tab if none is set
+	defaultCronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
+	shouldUpdate := false
+	if mondooAuditConfig.Spec.Nodes.Schedule == "" {
+		mondooAuditConfig.Spec.Nodes.Schedule = defaultCronTab
+		shouldUpdate = true
+	}
+	if mondooAuditConfig.Spec.KubernetesResources.Schedule == "" {
+		mondooAuditConfig.Spec.KubernetesResources.Schedule = defaultCronTab
+		shouldUpdate = true
+	}
+	if mondooAuditConfig.Spec.Containers.Schedule == "" {
+		mondooAuditConfig.Spec.Containers.Schedule = defaultCronTab
+		shouldUpdate = true
+	}
+	if shouldUpdate {
+		err := r.Update(ctx, mondooAuditConfig)
+		if err != nil {
+			log.Error(reconcileError, "failed to update MondooAuditConfig with default schedule")
+			return ctrl.Result{}, reconcileError
+		}
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	mondooAuditConfigCopy := mondooAuditConfig.DeepCopy()

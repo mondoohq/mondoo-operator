@@ -67,23 +67,60 @@ func AreServicesEqual(a, b corev1.Service) bool {
 func AreCronJobsEqual(a, b batchv1.CronJob) bool {
 	aPodSpec := a.Spec.JobTemplate.Spec.Template.Spec
 	bPodSpec := b.Spec.JobTemplate.Spec.Template.Spec
-	return len(aPodSpec.Containers) == len(bPodSpec.Containers) &&
-		aPodSpec.ServiceAccountName == bPodSpec.ServiceAccountName &&
-		reflect.DeepEqual(aPodSpec.Tolerations, bPodSpec.Tolerations) &&
-		reflect.DeepEqual(aPodSpec.NodeName, bPodSpec.NodeName) &&
-		reflect.DeepEqual(aPodSpec.Containers[0].Image, bPodSpec.Containers[0].Image) &&
-		reflect.DeepEqual(aPodSpec.Containers[0].Command, bPodSpec.Containers[0].Command) &&
-		reflect.DeepEqual(aPodSpec.Containers[0].Args, bPodSpec.Containers[0].Args) &&
-		reflect.DeepEqual(aPodSpec.Containers[0].VolumeMounts, bPodSpec.Containers[0].VolumeMounts) &&
-		AreEnvVarsEqual(aPodSpec.Containers[0].Env, bPodSpec.Containers[0].Env) &&
-		AreResouceRequirementsEqual(aPodSpec.Containers[0].Resources, bPodSpec.Containers[0].Resources) &&
-		AreSecurityContextsEqual(aPodSpec.Containers[0].SecurityContext, bPodSpec.Containers[0].SecurityContext) &&
-		reflect.DeepEqual(aPodSpec.Volumes, bPodSpec.Volumes) &&
-		reflect.DeepEqual(a.Spec.SuccessfulJobsHistoryLimit, b.Spec.SuccessfulJobsHistoryLimit) &&
-		reflect.DeepEqual(a.Spec.ConcurrencyPolicy, b.Spec.ConcurrencyPolicy) &&
-		a.Spec.Schedule == b.Spec.Schedule &&
-		reflect.DeepEqual(a.Spec.FailedJobsHistoryLimit, b.Spec.FailedJobsHistoryLimit) &&
-		reflect.DeepEqual(a.GetOwnerReferences(), b.GetOwnerReferences())
+
+	if len(aPodSpec.Containers) != len(bPodSpec.Containers) {
+		return false
+	}
+	if aPodSpec.ServiceAccountName != bPodSpec.ServiceAccountName {
+		return false
+	}
+	if !reflect.DeepEqual(aPodSpec.Tolerations, bPodSpec.Tolerations) {
+		return false
+	}
+	if !reflect.DeepEqual(aPodSpec.NodeName, bPodSpec.NodeName) {
+		return false
+	}
+	if !reflect.DeepEqual(aPodSpec.Containers[0].Image, bPodSpec.Containers[0].Image) {
+		return false
+	}
+	if !reflect.DeepEqual(aPodSpec.Containers[0].Command, bPodSpec.Containers[0].Command) {
+		return false
+	}
+	if !reflect.DeepEqual(aPodSpec.Containers[0].Args, bPodSpec.Containers[0].Args) {
+		return false
+	}
+	if !reflect.DeepEqual(aPodSpec.Containers[0].VolumeMounts, bPodSpec.Containers[0].VolumeMounts) {
+		return false
+	}
+	if !AreEnvVarsEqual(aPodSpec.Containers[0].Env, bPodSpec.Containers[0].Env) {
+		return false
+	}
+	if !AreResouceRequirementsEqual(aPodSpec.Containers[0].Resources, bPodSpec.Containers[0].Resources) {
+		return false
+	}
+	if !AreSecurityContextsEqual(aPodSpec.Containers[0].SecurityContext, bPodSpec.Containers[0].SecurityContext) {
+		return false
+	}
+	if !reflect.DeepEqual(aPodSpec.Volumes, bPodSpec.Volumes) {
+		return false
+	}
+	if !reflect.DeepEqual(a.Spec.SuccessfulJobsHistoryLimit, b.Spec.SuccessfulJobsHistoryLimit) {
+		return false
+	}
+	if a.Spec.ConcurrencyPolicy != b.Spec.ConcurrencyPolicy {
+		return false
+	}
+	if a.Spec.Schedule != b.Spec.Schedule {
+		return false
+	}
+	if !reflect.DeepEqual(a.Spec.FailedJobsHistoryLimit, b.Spec.FailedJobsHistoryLimit) {
+		return false
+	}
+	if !reflect.DeepEqual(a.GetOwnerReferences(), b.GetOwnerReferences()) {
+		return false
+	}
+
+	return true
 }
 
 // AreResouceRequirementsEqual returns a value indicating whether 2 resource requirements are equal.

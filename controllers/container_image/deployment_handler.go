@@ -124,11 +124,6 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 
 	if created {
 		logger.Info("Created CronJob", "namespace", desired.Namespace, "name", desired.Name)
-		err = mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger)
-		if err != nil {
-			logger.Error(err, "Failed to update MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
-			return err
-		}
 	} else if !k8s.AreCronJobsEqual(*existing, *desired) {
 		existing.Spec.JobTemplate = desired.Spec.JobTemplate
 		existing.Spec.Schedule = desired.Spec.Schedule

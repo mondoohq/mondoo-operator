@@ -34,9 +34,6 @@ func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditCo
 			logger.Info("using cron custom schedule", "crontab", m.Spec.KubernetesResources.Schedule)
 			cronTab = m.Spec.KubernetesResources.Schedule
 		}
-	} else {
-		logger.Info("using default cron schedule", "crontab", cronTab)
-		m.Spec.KubernetesResources.Schedule = cronTab
 	}
 	scanApiUrl := scanapi.ScanApiServiceUrl(*m)
 

@@ -59,9 +59,6 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 			logger.Info("using cron custom schedule", "crontab", m.Spec.Containers.Schedule)
 			cronTab = m.Spec.Containers.Schedule
 		}
-	} else {
-		logger.Info("using default cron schedule", "crontab", cronTab)
-		m.Spec.Containers.Schedule = cronTab
 	}
 
 	cronjob := &batchv1.CronJob{

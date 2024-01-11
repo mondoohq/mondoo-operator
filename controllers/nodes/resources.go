@@ -48,9 +48,6 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 			logger.Info("using cron custom schedule", "crontab", m.Spec.Nodes.Schedule)
 			cronTab = m.Spec.Nodes.Schedule
 		}
-	} else {
-		logger.Info("using default cron schedule", "crontab", cronTab)
-		m.Spec.Nodes.Schedule = cronTab
 	}
 	unsetHostPath := corev1.HostPathUnset
 
