@@ -168,18 +168,18 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	// Set the default cron tab if none is set
-	defaultCronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
 	shouldUpdate := false
-	if mondooAuditConfig.Spec.Nodes.Schedule == "" {
-		mondooAuditConfig.Spec.Nodes.Schedule = defaultCronTab
+	if mondooAuditConfig.Spec.Nodes.Enable && mondooAuditConfig.Spec.Nodes.Schedule == "" {
+		mondooAuditConfig.Spec.Nodes.Schedule = fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
 		shouldUpdate = true
 	}
-	if mondooAuditConfig.Spec.KubernetesResources.Schedule == "" {
-		mondooAuditConfig.Spec.KubernetesResources.Schedule = defaultCronTab
+	if mondooAuditConfig.Spec.KubernetesResources.Enable && mondooAuditConfig.Spec.KubernetesResources.Schedule == "" {
+		mondooAuditConfig.Spec.KubernetesResources.Schedule = fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
 		shouldUpdate = true
 	}
-	if mondooAuditConfig.Spec.Containers.Schedule == "" {
-		mondooAuditConfig.Spec.Containers.Schedule = defaultCronTab
+	if mondooAuditConfig.Spec.Containers.Enable && mondooAuditConfig.Spec.Containers.Schedule == "" {
+		cronStart := time.Now().Add(1 * time.Minute)
+		mondooAuditConfig.Spec.Containers.Schedule = fmt.Sprintf("%d %d * * *", cronStart.Minute(), cronStart.Hour())
 		shouldUpdate = true
 	}
 	if shouldUpdate {
