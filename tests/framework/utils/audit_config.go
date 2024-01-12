@@ -69,9 +69,9 @@ func DefaultAuditConfig(ns string, workloads, containers, nodes, admission bool)
 		},
 		Spec: mondoov2.MondooAuditConfigSpec{
 			MondooCredsSecretRef: corev1.LocalObjectReference{Name: MondooClientSecret},
-			KubernetesResources:  mondoov2.KubernetesResources{Enable: workloads},
-			Containers:           mondoov2.Containers{Enable: containers},
-			Nodes:                mondoov2.Nodes{Enable: nodes},
+			KubernetesResources:  mondoov2.KubernetesResources{Enable: workloads, Schedule: "0 * * * *"},
+			Containers:           mondoov2.Containers{Enable: containers, Schedule: "0 0 * * *"},
+			Nodes:                mondoov2.Nodes{Enable: nodes, Schedule: "0 * * * *"},
 			Admission:            mondoov2.Admission{Enable: admission},
 			Scanner: mondoov2.Scanner{
 				Image:    mondoov2.Image{Name: "test", Tag: "latest"},

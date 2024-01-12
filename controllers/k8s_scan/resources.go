@@ -6,10 +6,9 @@ package k8s_scan
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	// That's the mod k8s relies on https://github.com/kubernetes/kubernetes/blob/master/go.mod#L63
-	"github.com/robfig/cron/v3"
+
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
@@ -24,17 +23,6 @@ const CronJobNameSuffix = "-k8s-scan"
 
 func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditConfig) *batchv1.CronJob {
 	ls := CronJobLabels(*m)
-
-	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
-	if m.Spec.KubernetesResources.Schedule != "" {
-		_, err := cron.ParseStandard(m.Spec.KubernetesResources.Schedule)
-		if err != nil {
-			logger.Error(err, "invalid cron schedule specified in MondooAuditConfig Spec.KubernetesResources.Schedule; using default")
-		} else {
-			logger.Info("using cron custom schedule", "crontab", m.Spec.KubernetesResources.Schedule)
-			cronTab = m.Spec.KubernetesResources.Schedule
-		}
-	}
 	scanApiUrl := scanapi.ScanApiServiceUrl(*m)
 
 	containerArgs := []string{
@@ -70,7 +58,7 @@ func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditCo
 			Labels:    ls,
 		},
 		Spec: batchv1.CronJobSpec{
-			Schedule:          cronTab,
+			Schedule:          m.Spec.KubernetesResources.Schedule,
 			ConcurrencyPolicy: batchv1.ForbidConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: ls},

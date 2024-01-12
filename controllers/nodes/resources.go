@@ -17,7 +17,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	// That's the mod k8s relies on https://github.com/kubernetes/kubernetes/blob/master/go.mod#L63
-	"github.com/robfig/cron/v3"
+
 	"go.mondoo.com/cnquery/v9/providers-sdk/v1/inventory"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
@@ -38,17 +38,6 @@ const (
 
 func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(*m)
-
-	cronTab := fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
-	if m.Spec.Nodes.Schedule != "" {
-		_, err := cron.ParseStandard(m.Spec.Nodes.Schedule)
-		if err != nil {
-			logger.Error(err, "invalid cron schedule specified in MondooAuditConfig Spec.Nodes.Schedule; using default")
-		} else {
-			logger.Info("using cron custom schedule", "crontab", m.Spec.Nodes.Schedule)
-			cronTab = m.Spec.Nodes.Schedule
-		}
-	}
 	unsetHostPath := corev1.HostPathUnset
 
 	name := "cnspec"
@@ -73,7 +62,7 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 			Labels:    CronJobLabels(*m),
 		},
 		Spec: batchv1.CronJobSpec{
-			Schedule:          cronTab,
+			Schedule:          m.Spec.Nodes.Schedule,
 			ConcurrencyPolicy: batchv1.ForbidConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

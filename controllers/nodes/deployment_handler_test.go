@@ -603,35 +603,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 	s.Equal(created.Spec.Schedule, customSchedule)
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomScheduleFail() {
-	s.seedNodes()
-	d := s.createDeploymentHandler()
-	mondooAuditConfig := &s.auditConfig
-	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
-
-	customSchedule := "this is not valid"
-	s.auditConfig.Spec.Nodes.Schedule = customSchedule
-
-	result, err := d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
-
-	nodes := &corev1.NodeList{}
-	s.NoError(d.KubeClient.List(s.ctx, nodes))
-
-	image, err := s.containerImageResolver.CnspecImage("", "", false)
-	s.NoError(err)
-
-	expected := CronJob(image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
-
-	created := &batchv1.CronJob{}
-	created.Name = expected.Name
-	created.Namespace = expected.Namespace
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
-
-	s.NotEqual(created.Spec.Schedule, customSchedule)
-}
-
 func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {
 	return DeploymentHandler{
 		KubeClient:             s.fakeClientBuilder.Build(),
