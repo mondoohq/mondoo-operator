@@ -138,30 +138,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 	s.Equal(created.Spec.Schedule, customSchedule)
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomScheduleFail() {
-	d := s.createDeploymentHandler()
-	mondooAuditConfig := &s.auditConfig
-	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
-
-	customSchedule := "this is not valid"
-	s.auditConfig.Spec.Containers.Schedule = customSchedule
-
-	result, err := d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
-
-	image, err := s.containerImageResolver.CnspecImage("", "", false)
-	s.NoError(err)
-
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
-	created := &batchv1.CronJob{}
-	created.Name = expected.Name
-	created.Namespace = expected.Namespace
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
-
-	s.NotEqual(created.Spec.Schedule, customSchedule)
-}
-
 func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() {
 	d := s.createDeploymentHandler()
 	mondooAuditConfig := &s.auditConfig

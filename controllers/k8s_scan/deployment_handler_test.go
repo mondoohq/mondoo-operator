@@ -351,26 +351,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithDefaultSchedule() {
 	created.Name = expected.Name
 	created.Namespace = expected.Namespace
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
-
-	// Wait a bit to longer, to later check, whether the CronJob schedule was changed.
-	time.Sleep(61 * time.Second)
-
-	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
-		Url:   scanApiUrl,
-		Token: "token",
-	}).Times(1)
-	result, err = d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
-
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
-	foundMAC := &mondoov1alpha2.MondooAuditConfig{}
-	foundMAC.Name = mondooAuditConfig.Name
-	foundMAC.Namespace = mondooAuditConfig.Namespace
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(foundMAC), foundMAC))
-
-	s.Equal(created.Spec.Schedule, expected.Spec.Schedule)
-	s.Equal(foundMAC.Spec.KubernetesResources.Schedule, expected.Spec.Schedule)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
@@ -402,37 +382,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
 
 	s.Equal(created.Spec.Schedule, customSchedule)
-}
-
-func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomScheduleFail() {
-	d := s.createDeploymentHandler()
-	mondooAuditConfig := &s.auditConfig
-	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
-
-	scanApiUrl := scanapi.ScanApiServiceUrl(*d.Mondoo)
-	s.scanApiStoreMock.EXPECT().Add(&scan_api_store.ScanApiStoreAddOpts{
-		Url:   scanApiUrl,
-		Token: "token",
-	}).Times(1)
-
-	customSchedule := "this is not valid"
-	s.auditConfig.Spec.KubernetesResources.Schedule = customSchedule
-
-	result, err := d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
-
-	image, err := s.containerImageResolver.CnspecImage("", "", false)
-	s.NoError(err)
-
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, &s.auditConfig)
-
-	created := &batchv1.CronJob{}
-	created.Name = expected.Name
-	created.Namespace = expected.Namespace
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
-
-	s.NotEqual(created.Spec.Schedule, customSchedule)
 }
 
 func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {

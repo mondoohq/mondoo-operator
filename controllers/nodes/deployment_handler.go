@@ -110,6 +110,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		if !k8s.AreCronJobsEqual(*existing, *desired) {
 			existing.Spec.JobTemplate = desired.Spec.JobTemplate
 			existing.Spec.Schedule = desired.Spec.Schedule
+			existing.Spec.ConcurrencyPolicy = desired.Spec.ConcurrencyPolicy
 			existing.SetOwnerReferences(desired.GetOwnerReferences())
 
 			// Remove any old jobs because they won't be updated when the cronjob changes
@@ -287,6 +288,7 @@ func (n *DeploymentHandler) syncGCCronjob(ctx context.Context, mondooOperatorIma
 
 	if !k8s.AreCronJobsEqual(*existing, *desired) {
 		existing.Spec.JobTemplate = desired.Spec.JobTemplate
+		existing.Spec.ConcurrencyPolicy = desired.Spec.ConcurrencyPolicy
 		existing.SetOwnerReferences(desired.GetOwnerReferences())
 
 		if err := n.KubeClient.Update(ctx, existing); err != nil {

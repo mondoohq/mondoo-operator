@@ -6,10 +6,9 @@ package container_image
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	// That's the mod k8s relies on https://github.com/kubernetes/kubernetes/blob/master/go.mod#L63
-	"github.com/robfig/cron/v3"
+
 	"go.mondoo.com/cnquery/v9/providers-sdk/v1/inventory"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -48,22 +47,6 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 
-	// We want to start the cron job one minute after it was enabled.
-	cronStart := time.Now().Add(1 * time.Minute)
-	cronTab := fmt.Sprintf("%d %d * * *", cronStart.Minute(), cronStart.Hour())
-	if m.Spec.Containers.Schedule != "" {
-		_, err := cron.ParseStandard(m.Spec.Containers.Schedule)
-		if err != nil {
-			logger.Error(err, "invalid cron schedule specified in MondooAuditConfig Spec.Containers.Schedule; using default")
-		} else {
-			logger.Info("using cron custom schedule", "crontab", m.Spec.Containers.Schedule)
-			cronTab = m.Spec.Containers.Schedule
-		}
-	} else {
-		logger.Info("using default cron schedule", "crontab", cronTab)
-		m.Spec.Containers.Schedule = cronTab
-	}
-
 	cronjob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CronJobName(m.Name),
@@ -71,7 +54,7 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 			Labels:    ls,
 		},
 		Spec: batchv1.CronJobSpec{
-			Schedule:          cronTab,
+			Schedule:          m.Spec.Containers.Schedule,
 			ConcurrencyPolicy: batchv1.ForbidConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: ls},
