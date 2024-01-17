@@ -82,4 +82,4 @@ If there **is** more than one major version difference between the installed Mon
 
 3. Apply the manifest for `v3.4.3` (the latest version):
    `bash kubectl apply -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml `
-   Adjust the steps above to fit your current situation. There may be multiple major release versions between your installed version and the latest release. You must install each major version independently, wait between each update to verify that the version installed properly and the log is error-free.
+   Adjust the steps above to fit your current situation. There may be multiple major release versions between your installed version and the latest release. You must install each major version independently, waiting between each update to verify that the version installed properly and the log is error free.
