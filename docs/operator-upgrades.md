@@ -16,7 +16,7 @@ Two update your operator installed with Helm, you have two options:
 
 ## OLM installations
 
-For OLM installations first list the subscriptions:
+For OLM installations, first list the subscriptions:
 
 ```bash
 kubectl get subscription -n mondoo-operator
