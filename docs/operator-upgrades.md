@@ -2,7 +2,7 @@
 
 The Mondoo Operator version numbers are expressed as `x.y.z`, where `x` is the major version, `y` is the minor version, and `z` is the patch version, following [Semantic Versioning](https://semver.org/) standards. Our release approach ensures there are no breaking changes between two adjacent minor versions. For example, you can upgrade the Mondoo Operator from `v1.2.15` to `v1.3.0` without any manual actions. The Mondoo Operator automatically executes any required migration and/or cleanup steps.
 
-The Mondoo Operator can be upgraded from major version to major version as long as each major version is visited during the upgrade. For example, if you are on version 1.3.2 and wanted to upgrade to version 3.0.5, you should first upgrade to a 2.y.z release to ensure any migrations that need to take place from 1.x to 2.x are completed before upgrading to 3.x. Jumping from any 1.x to any 2.x is a safe operation.
+You can upgrade the Mondoo Operator from major version to major version as long as each major version is visited during the upgrade. For example, if you are on version 1.3.2 and want to upgrade to version 3.0.5, you should first upgrade to a 2.y.z release to ensure any migrations that need to take place from 1.x to 2.x are completed before upgrading to 3.x. Jumping from any 1.x to any 2.x is a safe operation.
 
 **WARNING: Never try to upgrade the Mondoo Operator by simply changing the tag for the Mondoo Operator container image.**
 
