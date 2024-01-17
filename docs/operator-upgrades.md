@@ -6,37 +6,7 @@ You can upgrade the Mondoo Operator from major version to major version as long 
 
 **WARNING: Never try to upgrade the Mondoo Operator by simply changing the tag for the Mondoo Operator container image.**
 
-## Updating an operator deployed with Helm
-
-Two update your operator installed with Helm, you have two options:
-
-- Upgrade the Helm chart to the [latest release](https://github.com/mondoohq/mondoo-operator/releases/latest)
-- Update the [values](https://github.com/mondoohq/mondoo-operator/blob/main/charts/mondoo-operator/values.yaml#L17) for the Helm chart to the latest image tag which matched the latest Helm chart release.
-  You can also find it [here](https://github.com/mondoohq/mondoo-operator/pkgs/container/mondoo-operator/versions?filters%5Bversion_type%5D=tagged)
-
-## OLM installations
-
-For OLM installations, first list the subscriptions:
-
-```bash
-kubectl get subscription -n mondoo-operator
-```
-
-Delete the Mondoo Operator subscription:
-
-```bash
-kubectl delete sub -n mondoo-operator mondoo-operator-v0-7-1-sub
-```
-
-Delete the Mondoo Operator cluster service version:
-
-```bash
-kubectl delete csv -n mondoo-operator mondoo-operator.v0.7.1
-```
-
-After that you can install the latest Mondoo Operator version using the standard OLM installation command.
-
-## Non-Helm recommended Mondoo Operator upgrade process
+## Updating a manually deployed operator
 
 Follow these steps for a smooth Mondoo Operator upgrade:
 
@@ -83,3 +53,33 @@ If there **is** more than one major version difference between the installed Mon
 3. Apply the manifest for `v3.4.3` (the latest version):
    `bash kubectl apply -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml `
    Adjust the steps above to fit your current situation. There may be multiple major release versions between your installed version and the latest release. You must install each major version independently, waiting between each update to verify that the version installed properly and the log is error free.
+
+## Updating an operator deployed with Helm
+
+Two update your operator installed with Helm, you have two options:
+
+- Upgrade the Helm chart to the [latest release](https://github.com/mondoohq/mondoo-operator/releases/latest)
+- Update the [values](https://github.com/mondoohq/mondoo-operator/blob/main/charts/mondoo-operator/values.yaml#L17) for the Helm chart to the latest image tag which matched the latest Helm chart release.
+  You can also find it [here](https://github.com/mondoohq/mondoo-operator/pkgs/container/mondoo-operator/versions?filters%5Bversion_type%5D=tagged)
+
+## OLM installations
+
+For OLM installations, first list the subscriptions:
+
+```bash
+kubectl get subscription -n mondoo-operator
+```
+
+Delete the Mondoo Operator subscription:
+
+```bash
+kubectl delete sub -n mondoo-operator mondoo-operator-v0-7-1-sub
+```
+
+Delete the Mondoo Operator cluster service version:
+
+```bash
+kubectl delete csv -n mondoo-operator mondoo-operator.v0.7.1
+```
+
+After that you can install the latest Mondoo Operator version using the standard OLM installation command.
