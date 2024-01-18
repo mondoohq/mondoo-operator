@@ -330,7 +330,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.6.0
-	github.com/google/go-containerregistry v0.17.0
+	github.com/google/go-containerregistry v0.18.0
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.5.0
 	github.com/imdario/mergo v0.3.12 // indirect
