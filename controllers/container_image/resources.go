@@ -14,7 +14,6 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
-	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -233,6 +232,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 				{
 					Connections: []*inventory.Config{
 						{
+							Type: "k8s",
 							Options: map[string]string{
 								"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
 								"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
@@ -249,14 +249,6 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 				},
 			},
 		},
-	}
-
-	if feature_flags.GetEnableV9() {
-		zap.S().Info("using v9 inventory")
-		inv.Spec.Assets[0].Connections[0].Type = "k8s"
-	} else {
-		zap.S().Info("using v8 inventory")
-		inv.Spec.Assets[0].Connections[0].Backend = inventory.ProviderType_K8S
 	}
 
 	if integrationMRN != "" {
