@@ -16,13 +16,12 @@ import (
 )
 
 const (
-	CnspecImageV9              = "ghcr.io/mondoohq/mondoo-operator/cnspec"
-	CnspecTagV9                = "9-rootless"
-	OpenShiftMondooClientTagV9 = "9-ubi-rootless"
+	CnspecTagV10                = "10-rootless"
+	OpenShiftMondooClientTagV10 = "10-ubi-rootless"
 
-	CnspecImage              = "docker.io/mondoo/cnspec"
-	CnspecTag                = "8-rootless"
-	OpenShiftMondooClientTag = "8-ubi-rootless"
+	CnspecImage              = "ghcr.io/mondoohq/mondoo-operator/cnspec"
+	CnspecTag                = "9-rootless"
+	OpenShiftMondooClientTag = "9-ubi-rootless"
 	MondooOperatorImage      = "ghcr.io/mondoohq/mondoo-operator"
 )
 
@@ -64,9 +63,8 @@ func (c *containerImageResolver) CnspecImage(userImage, userTag string, skipImag
 	}
 
 	defaultImage := CnspecImage
-	if feature_flags.GetEnableV9() {
-		defaultTag = CnspecTagV9
-		defaultImage = CnspecImageV9
+	if feature_flags.GetEnableV10() {
+		defaultTag = CnspecTagV10
 	}
 	image := userImageOrDefault(defaultImage, defaultTag, userImage, userTag)
 	return c.resolveImage(image, skipImageResolution)
