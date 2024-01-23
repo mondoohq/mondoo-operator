@@ -42,8 +42,6 @@ spec:
         command:
         - /mondoo-operator
         env:
-        - name: FEATURE_ENABLE_V9
-          value: {{ quote .Values.controllerManager.manager.env.featureEnableV9 }}
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
