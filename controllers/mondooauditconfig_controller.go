@@ -169,6 +169,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	// Set the default cron tab if none is set
 	shouldUpdate := false
+	if mondooAuditConfig.Spec.KubernetesResources.ContainerImageScanning && !mondooAuditConfig.Spec.Containers.Enable {
+		mondooAuditConfig.Spec.Containers.Enable = true
+		shouldUpdate = true
+	}
 	if mondooAuditConfig.Spec.Nodes.Enable && mondooAuditConfig.Spec.Nodes.Schedule == "" {
 		mondooAuditConfig.Spec.Nodes.Schedule = fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute())
 		shouldUpdate = true

@@ -538,6 +538,52 @@ func TestMondooAuditConfig_Containers_Schedule(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("%d %d * * *", cronStart.Minute(), cronStart.Hour()), mondooAuditConfig.Spec.Containers.Schedule)
 }
 
+func TestMondooAuditConfig_Containers_Enable(t *testing.T) {
+	utilruntime.Must(v1alpha2.AddToScheme(scheme.Scheme))
+
+	testMondooServiceAccount.PrivateKey = credentials.MondooServiceAccount(t)
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
+	}
+
+	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.KubernetesResources.ContainerImageScanning = true
+
+	fakeClient := fake.NewClientBuilder().
+		WithStatusSubresource(mondooAuditConfig).
+		WithObjects(mondooAuditConfig).
+		Build()
+
+	ctx := context.Background()
+	scanApiStore := scan_api_store.NewScanApiStore(ctx)
+	go scanApiStore.Start()
+	reconciler := &MondooAuditConfigReconciler{
+		MondooClientBuilder: testMondooClientBuilder,
+		Client:              fakeClient,
+		ScanApiStore:        scanApiStore,
+	}
+
+	_, err := reconciler.Reconcile(ctx, reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      testMondooAuditConfigName,
+			Namespace: testNamespace,
+		},
+	})
+	require.NoError(t, err)
+
+	err = fakeClient.Get(ctx, client.ObjectKeyFromObject(mondooAuditConfig), mondooAuditConfig)
+	require.NoError(t, err)
+
+	assert.True(t, mondooAuditConfig.Spec.Containers.Enable)
+	cronStart := time.Now().Add(1 * time.Minute)
+	assert.Equal(t, fmt.Sprintf("%d %d * * *", cronStart.Minute(), cronStart.Hour()), mondooAuditConfig.Spec.Containers.Schedule)
+}
+
 func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {
 	return &v1alpha2.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{
