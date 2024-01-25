@@ -10,18 +10,14 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/imagecache"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 )
 
 const (
-	CnspecTagV10                = "10-rootless"
-	OpenShiftMondooClientTagV10 = "10-ubi-rootless"
-
 	CnspecImage              = "ghcr.io/mondoohq/mondoo-operator/cnspec"
-	CnspecTag                = "9-rootless"
-	OpenShiftMondooClientTag = "9-ubi-rootless"
+	CnspecTag                = "10-rootless"
+	OpenShiftMondooClientTag = "10-ubi-rootless"
 	MondooOperatorImage      = "ghcr.io/mondoohq/mondoo-operator"
 )
 
@@ -63,9 +59,6 @@ func (c *containerImageResolver) CnspecImage(userImage, userTag string, skipImag
 	}
 
 	defaultImage := CnspecImage
-	if feature_flags.GetEnableV10() {
-		defaultTag = CnspecTagV10
-	}
 	image := userImageOrDefault(defaultImage, defaultTag, userImage, userTag)
 	return c.resolveImage(image, skipImageResolution)
 }
