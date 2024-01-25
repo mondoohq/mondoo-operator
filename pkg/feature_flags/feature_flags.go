@@ -14,7 +14,6 @@ const FeatureFlagPrefix = "FEATURE_"
 
 var (
 	enableAdmissionReviewDiscovery bool
-	enableV10                      bool
 	allFeatureFlags                = make(map[string]string)
 )
 
@@ -46,10 +45,6 @@ func GetAdmissionReviewDiscovery() bool {
 	return enableAdmissionReviewDiscovery
 }
 
-func GetEnableV10() bool {
-	return enableV10
-}
-
 func setGlobalFlags(k, v string) {
 	if v != "true" && v != "1" {
 		return
@@ -57,7 +52,5 @@ func setGlobalFlags(k, v string) {
 	switch k {
 	case "FEATURE_ENABLE_ADMISSION_REVIEW_DISCOVERY":
 		enableAdmissionReviewDiscovery = true
-	case "FEATURE_ENABLE_V10":
-		enableV10 = true
 	}
 }
