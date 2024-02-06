@@ -52,7 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: ["1.25", "1.26", "1.27"]
+        k8s-version: ["1.26", "1.27", "1.28"]
 
     steps:
       - uses: actions/checkout@v4
@@ -131,7 +131,7 @@ jobs:
       fail-fast: false
       max-parallel: 3 # Otherwise we will hit AWS VPC quota limits
       matrix:
-        k8s-version: ["1.24", "1.25", "1.26", "1.27", "1.28"]
+        k8s-version: ["1.25", "1.26", "1.27", "1.28", "1.29"]
 
     env:
       TF_VAR_test_name: ${{ github.event.inputs.mondooOperatorImageTag }}
@@ -212,7 +212,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: ["1.25", "1.26", "1.27"]
+        k8s-version: ["1.25", "1.26", "1.27", "1.28", "1.29"]
 
     env:
       GOOGLE_APPLICATION_CREDENTIALS: ${{ format('{0}/{1}', github.workspace, 'gcp_sa.json') }}
