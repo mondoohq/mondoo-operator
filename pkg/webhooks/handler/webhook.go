@@ -22,7 +22,7 @@ import (
 
 	serializerYaml "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 
-	"go.mondoo.com/cnquery/v9/providers-sdk/v1/inventory"
+	"go.mondoo.com/cnquery/v10/providers-sdk/v1/inventory"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
