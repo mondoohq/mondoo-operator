@@ -35,7 +35,7 @@ on:
 
 env:
   MONDOO_OPERATOR_IMAGE_TAG: ${{ github.event.inputs.mondooOperatorImageTag || 'main' }}
-  CNSPEC_IMAGE_TAG: ${{ github.event.inputs.cnspecImageTag || 'edge-latest-rootless' }}
+  CNSPEC_IMAGE_TAG: ${{ github.event.inputs.cnspecImageTag || 'latest-rootless' }}
 
 jobs:
   aks-integration-test:

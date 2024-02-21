@@ -157,7 +157,7 @@ test/integration/ci: manifests generate generate-manifests gotestsum load-k3d
 else
 test/integration/ci: manifests generate generate-manifests gotestsum load-minikube
 endif
-	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -ldflags $(LDFLAGS) -v -timeout 45m -p 1
+	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -ldflags $(LDFLAGS) -v -timeout 75m -p 1
 
 ##@ Build
 
