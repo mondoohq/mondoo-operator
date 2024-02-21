@@ -71,8 +71,6 @@ jobs:
       - name: Run integration tests
         env:
           MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
-          MONDOO_ORG_MRN: //captain.api.mondoo.app/organizations/serene-lovelace-854342
-          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: K8S_DISTRO=${{ matrix.k8s-distro }} make test/integration/ci
 
       - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml

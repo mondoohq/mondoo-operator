@@ -337,8 +337,6 @@ jobs:
       - name: Run integration tests
         env:
           MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
-          MONDOO_ORG_MRN: //captain.api.mondoo.app/organizations/serene-lovelace-854342
-          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.meta.outputs.version }} make test/integration/ci
 
       - name: Clean up
@@ -431,8 +429,6 @@ jobs:
       - name: Run integration tests
         env:
           MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
-          MONDOO_ORG_MRN: //captain.api.mondoo.app/organizations/serene-lovelace-854342
-          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.meta.outputs.version }} make test/integration/ci
 
       - name: Upload test logs artifact
