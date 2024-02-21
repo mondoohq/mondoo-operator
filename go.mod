@@ -1,6 +1,6 @@
 module go.mondoo.com/mondoo-operator
 
-go 1.21
+go 1.22
 
 require (
 	github.com/cert-manager/cert-manager v1.14.1

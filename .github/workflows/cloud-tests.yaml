@@ -95,8 +95,6 @@ jobs:
       - name: Run integration tests
         env:
           MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
-          MONDOO_ORG_MRN: //captain.api.mondoo.app/organizations/serene-lovelace-854342
-          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: VERSION=${{ env.OPERATOR_VERSION }} K8S_DISTRO=aks make test/integration/ci
 
       - name: Clean up AKS terraform
@@ -179,8 +177,6 @@ jobs:
       - name: Run integration tests
         env:
           MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
-          MONDOO_ORG_MRN: //captain.api.mondoo.app/organizations/serene-lovelace-854342
-          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: VERSION=${{ env.OPERATOR_VERSION }} K8S_DISTRO=eks make test/integration/ci
 
       - name: Clean up EKS terraform
@@ -261,8 +257,6 @@ jobs:
       - name: Run integration tests
         env:
           MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
-          MONDOO_ORG_MRN: //captain.api.mondoo.app/organizations/serene-lovelace-854342
-          MONDOO_GQL_ENDPOINT: https://api.edge.mondoo.com/query
         run: VERSION=${{ env.OPERATOR_VERSION }} K8S_DISTRO=gke make test/integration/ci
 
       - name: Clean up GKE terraform
