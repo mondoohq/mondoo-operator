@@ -8,7 +8,7 @@ on:
       cnspecImageTag:
         required: true
         type: string
-        default: edge-latest-rootless
+        default: latest-rootless
         description: The image tag to use for the cnspec image
       mondooOperatorImageTag:
         required: true
