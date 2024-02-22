@@ -637,9 +637,6 @@ func (s *AuditConfigBaseSuite) testOOMNodeScan(auditConfig mondoov2.MondooAuditC
 		"The amount of node scanning CronJobs is not equal to the amount of cluster nodes. expected: %d; actual: %d",
 		len(nodeList.Items), len(cronJobs.Items))
 
-	// Wait some time for the CronJob to trigger
-	time.Sleep(50 * time.Second)
-
 	// This will take some time, because:
 	// reconcile needs to happen
 	// a new replicaset should be created
