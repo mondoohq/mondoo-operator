@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
+	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/utils"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -90,5 +91,9 @@ func (d *debouncer) Start(ctx context.Context, managedBy string) {
 }
 
 func (d *debouncer) Add(res string) {
+	// If the resource monitor is disabled ignore the update
+	if feature_flags.GetDisableResourceMonitor() {
+		return
+	}
 	d.resChan <- res
 }

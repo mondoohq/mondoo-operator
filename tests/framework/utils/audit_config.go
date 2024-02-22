@@ -4,7 +4,9 @@
 package utils
 
 import (
+	"fmt"
 	"os"
+	"time"
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -34,6 +36,9 @@ func init() {
 // This means that using this function in unit tests might result in strange behavior. For unit tests use
 // DefaultAuditConfig instead.
 func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes, admission bool) mondoov2.MondooAuditConfig {
+	now := time.Now()
+	startScan := now.Add(time.Minute).Add(time.Second * 30)
+	schedule := fmt.Sprintf("%d * * * *", startScan.Minute())
 	auditConfig := mondoov2.MondooAuditConfig{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "mondoo-client",
@@ -43,10 +48,19 @@ func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes, admissio
 			ConsoleIntegration:   mondoov2.ConsoleIntegration{Enable: true},
 			MondooCredsSecretRef: corev1.LocalObjectReference{Name: MondooClientSecret},
 			MondooTokenSecretRef: corev1.LocalObjectReference{Name: MondooTokenSecret},
-			KubernetesResources:  mondoov2.KubernetesResources{Enable: workloads},
-			Containers:           mondoov2.Containers{Enable: containers},
-			Nodes:                mondoov2.Nodes{Enable: nodes},
-			Admission:            mondoov2.Admission{Enable: admission},
+			KubernetesResources: mondoov2.KubernetesResources{
+				Enable:   workloads,
+				Schedule: schedule,
+			},
+			Containers: mondoov2.Containers{
+				Enable:   containers,
+				Schedule: schedule,
+			},
+			Nodes: mondoov2.Nodes{
+				Enable:   nodes,
+				Schedule: schedule,
+			},
+			Admission: mondoov2.Admission{Enable: admission},
 		},
 	}
 

@@ -550,8 +550,6 @@ func (s *AuditConfigBaseSuite) testOOMScanAPI(auditConfig mondoov2.MondooAuditCo
 
 	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
 
-	time.Sleep(10 * time.Second)
-
 	// This will take some time, because:
 	// reconcile needs to happen
 	err := s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.ScanAPIDegraded, corev1.ConditionTrue)
@@ -636,9 +634,6 @@ func (s *AuditConfigBaseSuite) testOOMNodeScan(auditConfig mondoov2.MondooAuditC
 		err,
 		"The amount of node scanning CronJobs is not equal to the amount of cluster nodes. expected: %d; actual: %d",
 		len(nodeList.Items), len(cronJobs.Items))
-
-	// Wait some time for the CronJob to trigger
-	time.Sleep(50 * time.Second)
 
 	// This will take some time, because:
 	// reconcile needs to happen

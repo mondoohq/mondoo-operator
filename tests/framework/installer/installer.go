@@ -18,8 +18,10 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -92,6 +94,29 @@ func (i *MondooInstaller) InstallOperator() error {
 	i.isInstalled = true // If the command above has run there is a chance things have been partially created.
 	if err != nil {
 		return fmt.Errorf("failed to create mondoo-operator manifest(s): %v ", err)
+	}
+
+	// Disable the resource monitor for the integratio ntests to make sure we don't run scans in parallel
+	err = i.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		deployment := &appsv1.Deployment{}
+		if err := i.K8sHelper.Clientset.Get(
+			i.ctx,
+			types.NamespacedName{Name: "mondoo-operator-controller-manager", Namespace: i.Settings.Namespace},
+			deployment); err != nil {
+			return false, nil
+		}
+
+		deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+			Name:  "FEATURE_DISABLE_RESOURCE_MONITOR",
+			Value: "1",
+		})
+		if err := i.K8sHelper.Clientset.Update(i.ctx, deployment); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to disable resource monitor feature flag: %v", err)
 	}
 
 	if err := i.CreateClientSecret(i.Settings.Namespace); err != nil {

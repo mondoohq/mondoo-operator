@@ -8,7 +8,7 @@ on:
       cnspecImageTag:
         required: true
         type: string
-        default: edge-latest-rootless
+        default: latest-rootless
         description: The image tag to use for the cnspec image
       mondooOperatorImageTag:
         required: true
@@ -35,7 +35,7 @@ on:
 
 env:
   MONDOO_OPERATOR_IMAGE_TAG: ${{ github.event.inputs.mondooOperatorImageTag || 'main' }}
-  CNSPEC_IMAGE_TAG: ${{ github.event.inputs.cnspecImageTag || 'edge-latest-rootless' }}
+  CNSPEC_IMAGE_TAG: ${{ github.event.inputs.cnspecImageTag || 'latest-rootless' }}
 
 jobs:
   aks-integration-test:
