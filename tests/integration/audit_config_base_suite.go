@@ -550,8 +550,6 @@ func (s *AuditConfigBaseSuite) testOOMScanAPI(auditConfig mondoov2.MondooAuditCo
 
 	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
 
-	time.Sleep(10 * time.Second)
-
 	// This will take some time, because:
 	// reconcile needs to happen
 	err := s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.ScanAPIDegraded, corev1.ConditionTrue)
