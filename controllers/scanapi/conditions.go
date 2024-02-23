@@ -33,7 +33,7 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 			return
 		}
 
-		reason = "ScanAPIUnvailable"
+		reason = "ScanAPIUnavailable"
 		status = corev1.ConditionTrue
 		msg = "ScanAPI controller is unavailable"
 

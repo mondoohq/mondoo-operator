@@ -10,6 +10,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const oomMessage = "Kubernetes Container Image Scanning is unavailable due to OOM"
+
 func updateImageScanningConditions(config *v1alpha2.MondooAuditConfig, degradedStatus bool, pods *corev1.PodList) {
 	msg := "Kubernetes Container Image Scanning is available"
 	reason := "KubernetesContainerImageScanningAvailable"
@@ -22,6 +24,12 @@ func updateImageScanningConditions(config *v1alpha2.MondooAuditConfig, degradedS
 		reason = "KubernetesContainerImageScanningDisabled"
 		status = corev1.ConditionFalse
 	} else if degradedStatus {
+		cond := mondoo.FindMondooAuditConditions(config.Status.Conditions, v1alpha2.K8sContainerImageScanningDegraded)
+		if cond != nil && cond.Status == corev1.ConditionTrue && cond.Message == oomMessage {
+			// no need to update condition if it's already set to OOM. We should only update if it's back to active
+			return
+		}
+
 		msg = "Kubernetes Container Image Scanning is unavailable"
 		reason = "KubernetesContainerImageScanningUnavailable"
 		status = corev1.ConditionTrue
@@ -34,7 +42,7 @@ func updateImageScanningConditions(config *v1alpha2.MondooAuditConfig, degradedS
 		}
 		if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
 			(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
-			msg = "Kubernetes Container Image Scanning is unavailable due to OOM"
+			msg = oomMessage
 			affectedPods = append(affectedPods, currentPod.Name)
 			memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
 			reason = "KubernetesContainerImageScanningUnavailable"
