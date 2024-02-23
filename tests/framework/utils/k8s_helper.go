@@ -596,11 +596,13 @@ func (k8sh *K8sHelper) CheckForDegradedCondition(auditConfig *api.MondooAuditCon
 		}
 		condition, err := k8sh.GetMondooAuditConfigConditionByType(foundMondooAuditConfig, conditionType)
 		if err != nil {
+			zap.S().Info("Condition might not exist yet. This doesn't mean we should stop trying.", "stasuses", foundMondooAuditConfig.Status.Conditions)
 			return false, nil // The condition might not exist yet. This doesn't mean we should stop trying.
 		}
 		if condition.Status == conditionStatus {
 			return true, nil
 		}
+		zap.S().Info("Condition status mismatch.", "stasuses", foundMondooAuditConfig.Status.Conditions)
 		return false, nil
 	})
 

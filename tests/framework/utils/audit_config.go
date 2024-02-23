@@ -37,7 +37,7 @@ func init() {
 // DefaultAuditConfig instead.
 func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes, admission bool) mondoov2.MondooAuditConfig {
 	now := time.Now()
-	startScan := now.Add(time.Minute).Add(time.Second * 30)
+	startScan := now.Add(time.Minute).Add(time.Second * 15)
 	schedule := fmt.Sprintf("%d * * * *", startScan.Minute())
 	auditConfig := mondoov2.MondooAuditConfig{
 		ObjectMeta: v1.ObjectMeta{
