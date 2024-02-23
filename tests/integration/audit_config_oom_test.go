@@ -75,11 +75,14 @@ func (s *AuditConfigOOMSuite) TestOOMControllerReporting() {
 	s.Len(cond.AffectedPods, 1, "Failed to find only one pod in degraded condition")
 
 	// Give the integration a chance to update
-	time.Sleep(2 * time.Second)
-
-	status, err := s.integration.GetStatus(s.ctx)
-	s.NoError(err, "Failed to get status")
-	s.Equal("ERROR", status)
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		status, err := s.integration.GetStatus(s.ctx)
+		if err != nil {
+			return false, err
+		}
+		return status == "ERROR", nil
+	})
+	s.NoErrorf(err, "Failed to check for ERROR status")
 
 	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
 	s.Equalf(1, len(deployments.Items), "mondoo-operator deployment not found")
@@ -101,12 +104,14 @@ func (s *AuditConfigOOMSuite) TestOOMControllerReporting() {
 	s.NotContains(cond.Message, "OOM", "Found OOMKilled message in condition")
 	s.Len(cond.AffectedPods, 0, "Found a pod in condition")
 
-	// Give the integration a chance to update
-	time.Sleep(2 * time.Second)
-
-	status, err = s.integration.GetStatus(s.ctx)
-	s.NoError(err, "Failed to get status")
-	s.Equal("ACTIVE", status)
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		status, err := s.integration.GetStatus(s.ctx)
+		if err != nil {
+			return false, err
+		}
+		return status == "ACTIVE", nil
+	})
+	s.NoErrorf(err, "Failed to check for ACTIVE status")
 }
 
 func (s *AuditConfigOOMSuite) TestOOMScanAPI() {
