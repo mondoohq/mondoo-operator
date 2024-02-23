@@ -13,6 +13,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const oomMessage = "ScanAPI controller is unavailable due to OOM"
+
 func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedStatus bool, conditions []appsv1.DeploymentCondition, pods *corev1.PodList) {
 	msg := "ScanAPI controller is available"
 	reason := "ScanAPIAvailable"
@@ -25,6 +27,14 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 		reason = "ScanAPIDisabled"
 		status = corev1.ConditionFalse
 	} else if degradedStatus {
+		cond := mondoo.FindMondooAuditConditions(config.Status.Conditions, mondoov1alpha2.ScanAPIDegraded)
+		if cond != nil && cond.Status == corev1.ConditionTrue && cond.Message == oomMessage {
+			// no need to update condition if it's already set to OOM. We should only update if it's back to active
+			return
+		}
+
+		reason = "ScanAPIUnvailable"
+		status = corev1.ConditionTrue
 		msg = "ScanAPI controller is unavailable"
 
 		// perhaps more general ReplicaFailure?
@@ -44,14 +54,11 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 			}
 			if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
 				(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
-				msg = "ScanAPI controller is unavailable due to OOM"
+				msg = oomMessage
 				affectedPods = append(affectedPods, currentPod.Name)
 				memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
 			}
 		}
-
-		reason = "ScanAPIUnvailable"
-		status = corev1.ConditionTrue
 	}
 
 	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, mondoov1alpha2.ScanAPIDegraded, status, reason, msg, updateCheck, affectedPods, memoryLimit)

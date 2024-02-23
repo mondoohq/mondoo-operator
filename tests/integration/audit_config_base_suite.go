@@ -281,7 +281,7 @@ func (s *AuditConfigBaseSuite) testOOMMondooOperatorController(auditConfig mondo
 	s.NoError(err, "Failed to find MondooAuditConfig")
 	cond := mondoo.FindMondooAuditConditions(foundMondooAuditConfig.Status.Conditions, mondoov2.MondooOperatorDegraded)
 	s.Require().NotNil(cond)
-	s.Contains(cond.Message, "OOM", "Failed to find OOMKilled message in degraded condition")
+	s.Containsf(cond.Message, "OOM", "Failed to find OOMKilled message in degraded condition")
 	s.Len(cond.AffectedPods, 1, "Failed to find only one pod in degraded condition")
 
 	// Give the integration a chance to update
@@ -560,7 +560,8 @@ func (s *AuditConfigBaseSuite) testOOMScanAPI(auditConfig mondoov2.MondooAuditCo
 
 	cond := mondoo.FindMondooAuditConditions(foundMondooAuditConfig.Status.Conditions, mondoov2.ScanAPIDegraded)
 	s.Require().NotNil(cond)
-	s.Contains(cond.Message, "OOM", "Failed to find OOMKilled message in degraded condition")
+	s.Containsf(cond.Message, "OOM", "Failed to find OOMKilled message in degraded condition")
+	zap.S().Warn("wtf", "cond", cond)
 	s.Len(cond.AffectedPods, 1, "Failed to find only one pod in degraded condition")
 
 	// Give the integration a chance to update
@@ -570,6 +571,8 @@ func (s *AuditConfigBaseSuite) testOOMScanAPI(auditConfig mondoov2.MondooAuditCo
 	s.NoError(err, "Failed to get status")
 	s.Equal("ERROR", status)
 
+	foundMondooAuditConfig, err = s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+	s.Require().NoError(err)
 	foundMondooAuditConfig.Spec.Scanner.Resources.Limits = corev1.ResourceList{
 		corev1.ResourceMemory: resource.MustParse("200Mi"), // this should be enough to get the ScanAPI running again
 	}
@@ -647,7 +650,7 @@ func (s *AuditConfigBaseSuite) testOOMNodeScan(auditConfig mondoov2.MondooAuditC
 	s.NoError(err, "Failed to find MondooAuditConfig")
 	cond := mondoo.FindMondooAuditConditions(foundMondooAuditConfig.Status.Conditions, mondoov2.NodeScanningDegraded)
 	s.Require().NotNil(cond)
-	s.Contains(cond.Message, "OOM", "Failed to find OOMKilled message in degraded condition")
+	s.Containsf(cond.Message, "OOM", "Failed to find OOMKilled message in degraded condition")
 	s.Len(cond.AffectedPods, 1, "Failed to find only one pod in degraded condition")
 
 	// Give the integration a chance to update

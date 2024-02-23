@@ -10,6 +10,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const oomMessage = "Admission controller is unavailable due to OOM"
+
 func updateAdmissionConditions(config *mondoov1alpha2.MondooAuditConfig, degradedStatus bool, pods *corev1.PodList) {
 	msg := "Admission controller is available"
 	reason := "AdmissionAvailable"
@@ -22,6 +24,12 @@ func updateAdmissionConditions(config *mondoov1alpha2.MondooAuditConfig, degrade
 		reason = "AdmissionDisabled"
 		status = corev1.ConditionFalse
 	} else if degradedStatus {
+		cond := mondoo.FindMondooAuditConditions(config.Status.Conditions, mondoov1alpha2.AdmissionDegraded)
+		if cond != nil && cond.Status == corev1.ConditionTrue && cond.Message == oomMessage {
+			// no need to update condition if it's already set to OOM. We should only update if it's back to active
+			return
+		}
+
 		msg = "Admission controller is unavailable"
 		currentPod := k8s.GetNewestPodFromList(pods.Items)
 		for i, containerStatus := range currentPod.Status.ContainerStatuses {
@@ -30,7 +38,7 @@ func updateAdmissionConditions(config *mondoov1alpha2.MondooAuditConfig, degrade
 			}
 			if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
 				(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
-				msg = "Admission controller is unavailable due to OOM"
+				msg = oomMessage
 				affectedPods = append(affectedPods, currentPod.Name)
 				memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
 				break
