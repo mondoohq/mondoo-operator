@@ -11,15 +11,14 @@ import (
 
 // GetNewestPodFromList returns the most recent pod from a pod list
 // This is determined by the creation timestamp of the pod
-func GetNewestPodFromList(pods *corev1.PodList) *corev1.Pod {
-	podCreationtime := time.Unix(0, 0)
-	currentPod := &corev1.Pod{}
-	for i := range pods.Items {
-		pod := &pods.Items[i]
-		if pod.ObjectMeta.CreationTimestamp.Time.Before(podCreationtime) {
+func GetNewestPodFromList(pods []corev1.Pod) corev1.Pod {
+	podCreationTime := time.Unix(0, 0)
+	currentPod := corev1.Pod{}
+	for _, pod := range pods {
+		if pod.ObjectMeta.CreationTimestamp.Time.Before(podCreationTime) {
 			continue
 		}
-		podCreationtime = pod.ObjectMeta.CreationTimestamp.Time
+		podCreationTime = pod.ObjectMeta.CreationTimestamp.Time
 		currentPod = pod
 	}
 	return currentPod

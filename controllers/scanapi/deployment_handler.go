@@ -158,7 +158,7 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	}
 
 	containerStillCreating := false
-	currentPod := k8s.GetNewestPodFromList(pods)
+	currentPod := k8s.GetNewestPodFromList(pods.DeepCopy().Items)
 	for _, containerStatus := range currentPod.Status.ContainerStatuses {
 		if containerStatus.Name != "cnspec" {
 			continue

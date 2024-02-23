@@ -27,7 +27,7 @@ func updateImageScanningConditions(config *v1alpha2.MondooAuditConfig, degradedS
 		status = corev1.ConditionTrue
 	}
 
-	currentPod := k8s.GetNewestPodFromList(pods)
+	currentPod := k8s.GetNewestPodFromList(pods.Items)
 	for i, containerStatus := range currentPod.Status.ContainerStatuses {
 		if containerStatus.Name != "mondoo-containers-scan" {
 			continue

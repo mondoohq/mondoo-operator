@@ -28,18 +28,34 @@ func updateNodeConditions(config *v1alpha2.MondooAuditConfig, degradedStatus boo
 		status = corev1.ConditionTrue
 	}
 
-	currentPod := k8s.GetNewestPodFromList(pods)
-	for i, containerStatus := range currentPod.Status.ContainerStatuses {
-		if containerStatus.Name != "cnspec" {
-			continue
+	podsPerNode := map[string][]corev1.Pod{}
+	for _, pod := range pods.Items {
+		podsPerNode[pod.Spec.NodeName] = append(podsPerNode[pod.Spec.NodeName], pod)
+	}
+
+	// Check if the latest pod for each node is not OOM
+	for _, pods := range podsPerNode {
+		currentPod := k8s.GetNewestPodFromList(pods)
+		isOOM := false
+		for i, containerStatus := range currentPod.Status.ContainerStatuses {
+			if containerStatus.Name != "cnspec" {
+				continue
+			}
+			if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
+				(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
+				isOOM = true
+				msg = "Node Scanning is unavailable due to OOM"
+				affectedPods = append(affectedPods, currentPod.Name)
+				memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
+				reason = "NodeScanningUnavailable"
+				status = corev1.ConditionTrue
+				break
+			}
 		}
-		if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
-			(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
-			msg = "Node Scanning is unavailable due to OOM"
-			affectedPods = append(affectedPods, currentPod.Name)
-			memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
-			reason = "NodeScanningUnavailable"
-			status = corev1.ConditionTrue
+
+		// If there is at least 1 pod that is OOM, then we report OOM
+		if isOOM {
+			break
 		}
 	}
 

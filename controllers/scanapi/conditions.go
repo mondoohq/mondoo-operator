@@ -36,7 +36,7 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 			}
 		}
 
-		currentPod := k8s.GetNewestPodFromList(pods)
+		currentPod := k8s.GetNewestPodFromList(pods.Items)
 		logger.Info("ScanAPI controller is unavailable", " pod ", currentPod.Status.ContainerStatuses)
 		for i, containerStatus := range currentPod.Status.ContainerStatuses {
 			if containerStatus.Name != "cnspec" {

@@ -23,7 +23,7 @@ func updateAdmissionConditions(config *mondoov1alpha2.MondooAuditConfig, degrade
 		status = corev1.ConditionFalse
 	} else if degradedStatus {
 		msg = "Admission controller is unavailable"
-		currentPod := k8s.GetNewestPodFromList(pods)
+		currentPod := k8s.GetNewestPodFromList(pods.Items)
 		for i, containerStatus := range currentPod.Status.ContainerStatuses {
 			if containerStatus.Name != "webhook" {
 				continue

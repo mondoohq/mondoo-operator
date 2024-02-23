@@ -1197,8 +1197,15 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 	if *vwc.Webhooks[0].FailurePolicy == webhooksv1.Fail {
 
 		deployments := &appsv1.DeploymentList{}
-		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts))
-
+		err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+			if err := s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts); err == nil {
+				if len(deployments.Items) == 1 {
+					return true, nil
+				}
+			}
+			return false, nil
+		})
+		s.NoError(err)
 		s.Equalf(1, len(deployments.Items), "Deployments count for webhook should be precisely one")
 
 		deployments.Items[0].Labels["testLabel"] = "testValue"

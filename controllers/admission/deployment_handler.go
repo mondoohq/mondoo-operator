@@ -264,7 +264,7 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 	}
 
 	containerStillCreating := false
-	currentPod := k8s.GetNewestPodFromList(pods)
+	currentPod := k8s.GetNewestPodFromList(pods.Items)
 	for _, containerStatus := range currentPod.Status.ContainerStatuses {
 		if containerStatus.Name != "webhook" {
 			continue
