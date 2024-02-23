@@ -31,24 +31,27 @@ func updateAdmissionConditions(config *mondoov1alpha2.MondooAuditConfig, degrade
 		}
 
 		msg = "Admission controller is unavailable"
-		currentPod := k8s.GetNewestPodFromList(pods.Items)
-		for i, containerStatus := range currentPod.Status.ContainerStatuses {
-			if containerStatus.Name != "webhook" {
-				continue
-			}
-			if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
-				(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
-				msg = oomMessage
-				affectedPods = append(affectedPods, currentPod.Name)
-				memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
-				break
-			}
-		}
 		reason = "AdmissionUnvailable"
 		status = corev1.ConditionTrue
 		condition := mondoo.FindMondooAuditConditions(config.Status.Conditions, mondoov1alpha2.ScanAPIDegraded)
 		if condition != nil && condition.Status == corev1.ConditionTrue {
 			reason = "Scan API is unavailable"
+		}
+	}
+
+	currentPod := k8s.GetNewestPodFromList(pods.Items)
+	for i, containerStatus := range currentPod.Status.ContainerStatuses {
+		if containerStatus.Name != "webhook" {
+			continue
+		}
+		if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
+			(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
+			msg = oomMessage
+			reason = "AdmissionUnvailable"
+			status = corev1.ConditionTrue
+			affectedPods = append(affectedPods, currentPod.Name)
+			memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
+			break
 		}
 	}
 

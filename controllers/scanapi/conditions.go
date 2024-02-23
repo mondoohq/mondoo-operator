@@ -45,19 +45,21 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 				break
 			}
 		}
+	}
 
-		currentPod := k8s.GetNewestPodFromList(pods.Items)
-		logger.Info("ScanAPI controller is unavailable", " pod ", currentPod.Status.ContainerStatuses)
-		for i, containerStatus := range currentPod.Status.ContainerStatuses {
-			if containerStatus.Name != "cnspec" {
-				continue
-			}
-			if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
-				(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
-				msg = oomMessage
-				affectedPods = append(affectedPods, currentPod.Name)
-				memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
-			}
+	currentPod := k8s.GetNewestPodFromList(pods.Items)
+	logger.Info("ScanAPI controller is unavailable", " pod ", currentPod.Status.ContainerStatuses)
+	for i, containerStatus := range currentPod.Status.ContainerStatuses {
+		if containerStatus.Name != "cnspec" {
+			continue
+		}
+		if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
+			(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
+			msg = oomMessage
+			reason = "ScanAPIUnavailable"
+			status = corev1.ConditionTrue
+			affectedPods = append(affectedPods, currentPod.Name)
+			memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
 		}
 	}
 
