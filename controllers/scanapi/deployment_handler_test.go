@@ -352,7 +352,7 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
 			break
 		}
 	}
-	s.Assertions.Truef(foundMissingServiceAccountCondition, "No Condition for missing service account found")
+	s.Truef(foundMissingServiceAccountCondition, "No Condition for missing service account found")
 }
 
 func (s *DeploymentHandlerSuite) TestDeploy_CreateOOMCondition() {

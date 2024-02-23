@@ -156,7 +156,7 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		return err
 	}
 
-	updateScanAPIConditions(n.Mondoo, existingDeployment.Status.UnavailableReplicas != 0, existingDeployment.Status.Conditions, pods)
+	updateScanAPIConditions(n.Mondoo, existingDeployment.Status.ReadyReplicas < *existingDeployment.Spec.Replicas, existingDeployment.Status.Conditions, pods)
 
 	if !k8s.AreDeploymentsEqual(*deployment, existingDeployment) {
 		logger.Info("Update needed for scan API Deployment")
