@@ -106,16 +106,16 @@ jobs:
         if: success() || failure()
 
       - name: Upload cloud test results
-        uses: actions/upload-artifact@v3  # upload test results
+        uses: actions/upload-artifact@v4  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
-          name: cloud-test-results
+          name: cloud-test-results-aks-${{ matrix.k8s-version }}
           path: |
             integration-tests-aks-${{ matrix.k8s-version }}.xml
             .github/terraform/aks/aks-${{ matrix.k8s-version }}.json
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-logs-aks-${{ matrix.k8s-version }}
@@ -188,14 +188,14 @@ jobs:
         if: success() || failure()
 
       - name: Upload test results
-        uses: actions/upload-artifact@v3  # upload test results
+        uses: actions/upload-artifact@v4  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
-          name: cloud-test-results
+          name: cloud-test-results-eks-${{ matrix.k8s-version }}
           path: integration-tests-eks-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-logs-eks-${{ matrix.k8s-version }}
@@ -272,14 +272,14 @@ jobs:
         if: success() || failure()
 
       - name: Upload test results
-        uses: actions/upload-artifact@v3  # upload test results
+        uses: actions/upload-artifact@v4  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
-          name: cloud-test-results
+          name: cloud-test-results-gke-${{ matrix.k8s-version }}
           path: integration-tests-gke-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-logs-gke-${{ matrix.k8s-version }}
@@ -291,21 +291,19 @@ jobs:
     needs: [eks-integration-test,aks-integration-test,gke-integration-test]
     if: always()
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
-
     - name: Download test results
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
-        name: cloud-test-results
+        pattern: cloud-test-results-*
+        merge-multiple: true
 
-    - name: Parse test results
-      uses: dorny/test-reporter@v1
+    - name: Publish Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v2
       with:
-        name: Report cloud test results
-        path: '*.xml'                     # Path to test results
-        reporter: java-junit              # Format of test results
+        commit: ${{ github.event.workflow_run.head_sha }}
+        event_file: ${{ github.event_path }}
+        event_name: ${{ github.event.workflow_run.event }}
+        files: "artifacts/**/*.xml"
 
   discord-notification:
     runs-on: ubuntu-latest
