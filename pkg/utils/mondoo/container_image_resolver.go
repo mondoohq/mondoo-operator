@@ -85,16 +85,23 @@ func (c *containerImageResolver) CnspecImage(userImage, userTag string, skipImag
 }
 
 func (c *containerImageResolver) MondooOperatorImage(ctx context.Context, userImage, userTag string, skipImageResolution bool) (string, error) {
+	image := ""
+
+	// First try with the provided user image and tag (if any)
 	if userImage != "" || userTag != "" {
-		image := userImageOrDefault(MondooOperatorImage, MondooOperatorTag, userImage, userTag)
-		return c.resolveImage(image, skipImageResolution)
+		image = userImageOrDefault(MondooOperatorImage, MondooOperatorTag, userImage, userTag)
 	}
 
-	operatorPod := &corev1.Pod{}
-	if err := c.kubeClient.Get(ctx, client.ObjectKey{Namespace: c.operatorPodNamespace, Name: c.operatorPodName}, operatorPod); err != nil {
-		return "", err
+	// If still no image, then load the image from the operator pod
+	if image == "" {
+		operatorPod := &corev1.Pod{}
+		if err := c.kubeClient.Get(ctx, client.ObjectKey{Namespace: c.operatorPodNamespace, Name: c.operatorPodName}, operatorPod); err != nil {
+			return "", err
+		}
+		image = operatorPod.Spec.Containers[0].Image
 	}
-	return operatorPod.Status.ContainerStatuses[0].ImageID, nil
+
+	return c.resolveImage(image, skipImageResolution)
 }
 
 func (c *containerImageResolver) resolveImage(image string, skipImageResolution bool) (string, error) {
