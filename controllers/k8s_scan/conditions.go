@@ -10,6 +10,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const oomMessage = "Kubernetes Resources Scanning is unavailable due to OOM"
+
 func updateWorkloadsConditions(config *v1alpha2.MondooAuditConfig, degradedStatus bool, pods *corev1.PodList) {
 	msg := "Kubernetes Resources Scanning is available"
 	reason := "KubernetesResourcesScanningAvailable"
@@ -22,19 +24,25 @@ func updateWorkloadsConditions(config *v1alpha2.MondooAuditConfig, degradedStatu
 		reason = "KubernetesResourcesScanningDisabled"
 		status = corev1.ConditionFalse
 	} else if degradedStatus {
+		cond := mondoo.FindMondooAuditConditions(config.Status.Conditions, v1alpha2.K8sResourcesScanningDegraded)
+		if cond != nil && cond.Status == corev1.ConditionTrue && cond.Message == oomMessage {
+			// no need to update condition if it's already set to OOM. We should only update if it's back to active
+			return
+		}
+
 		msg = "Kubernetes Resources Scanning is unavailable"
 		reason = "KubernetesResourcesScanningUnavailable"
 		status = corev1.ConditionTrue
 	}
 
-	currentPod := k8s.GetNewestPodFromList(pods)
+	currentPod := k8s.GetNewestPodFromList(pods.Items)
 	for i, containerStatus := range currentPod.Status.ContainerStatuses {
 		if containerStatus.Name != "mondoo-k8s-scan" {
 			continue
 		}
 		if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
 			(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
-			msg = "Kubernetes Resources Scanning is unavailable due to OOM"
+			msg = oomMessage
 			affectedPods = append(affectedPods, currentPod.Name)
 			memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
 			reason = "KubernetesResourcesScanningUnavailable"

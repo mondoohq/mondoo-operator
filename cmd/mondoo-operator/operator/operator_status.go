@@ -56,7 +56,7 @@ func checkForTerminatedState(ctx context.Context, nonCacheClient client.Client, 
 			return err
 		}
 
-		currentPod := k8s.GetNewestPodFromList(podList)
+		currentPod := k8s.GetNewestPodFromList(podList.Items)
 		for _, containerStatus := range currentPod.Status.ContainerStatuses {
 			if containerStatus.Name != "manager" {
 				continue
@@ -65,7 +65,7 @@ func checkForTerminatedState(ctx context.Context, nonCacheClient client.Client, 
 			if containerStatus.State.Terminated != nil || containerStatus.LastTerminationState.Terminated != nil {
 				logger.Info("mondoo-operator was terminated before")
 				// Update status
-				updateOperatorConditions(&mondooAuditConfig, true, currentPod)
+				updateOperatorConditions(&mondooAuditConfig, true, &currentPod)
 				stateUpdate = true
 			} else if containerStatus.RestartCount == 0 && containerStatus.State.Terminated == nil {
 				logger.Info("mondoo-operator is running or starting", "state", containerStatus.State)

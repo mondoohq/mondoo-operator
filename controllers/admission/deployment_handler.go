@@ -263,22 +263,6 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 		return err
 	}
 
-	containerStillCreating := false
-	currentPod := k8s.GetNewestPodFromList(pods)
-	for _, containerStatus := range currentPod.Status.ContainerStatuses {
-		if containerStatus.Name != "webhook" {
-			continue
-		}
-		if containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == "ContainerCreating" {
-			containerStillCreating = true
-			break
-		}
-	}
-	if containerStillCreating {
-		// Wait a moment and refresh the pods
-		return fmt.Errorf("admissions pods are still creating")
-	}
-
 	updateAdmissionConditions(n.Mondoo, n.isWebhookDegraded(existingDeployment), pods)
 
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know

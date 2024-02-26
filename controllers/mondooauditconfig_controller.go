@@ -359,7 +359,7 @@ func (r *MondooAuditConfigReconciler) cronJobPodsRequestMapper(ctx context.Conte
 		if a.Namespace == o.GetNamespace() {
 			podLabels := o.GetLabels()
 			isScanPod := isCronJobScanPod(a, podLabels)
-			if !isScanPod {
+			if isScanPod {
 				return []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(&a)}}
 			}
 		}
