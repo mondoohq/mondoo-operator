@@ -29,6 +29,16 @@ jobs:
           gh pr edit ${{ github.event.pull_request.number }} --remove-label "ok to test"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  event_file:
+    needs: [check-label]
+    name: "Store event file"
+    runs-on: ubuntu-latest
+    steps:
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: Event File
+        path: ${{ github.event_path }}
   unit-tests:
     needs: [check-label]
     if: needs.check-label.result == 'success'
