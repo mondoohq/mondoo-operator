@@ -260,8 +260,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 		s.Equal(expected, created)
 	}
 
-	operatorImage, err := s.containerImageResolver.MondooOperatorImage(
-		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	operatorImage, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
 	s.NoError(err)
 
 	// Verify node garbage collection cronjob

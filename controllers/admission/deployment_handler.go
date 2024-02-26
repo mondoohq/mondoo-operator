@@ -223,7 +223,7 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 		return err
 	}
 
-	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(
+	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(ctx,
 		n.Mondoo.Spec.Admission.Image.Name, n.Mondoo.Spec.Admission.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		return err

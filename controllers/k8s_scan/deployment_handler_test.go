@@ -89,7 +89,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	nodes := &corev1.NodeList{}
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-	image, err := s.containerImageResolver.MondooOperatorImage("", "", false)
+	image, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
 	s.NoError(err)
 
 	expected := CronJob(image, "", test.KubeSystemNamespaceUid, &s.auditConfig)
@@ -145,7 +145,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 	nodes := &corev1.NodeList{}
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-	image, err := s.containerImageResolver.MondooOperatorImage("", "", false)
+	image, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
 	s.NoError(err)
 
 	expected := CronJob(image, integrationMrn, test.KubeSystemNamespaceUid, &s.auditConfig)
@@ -174,7 +174,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 		Token: "token",
 	}).Times(1)
 
-	image, err := s.containerImageResolver.MondooOperatorImage("", "", false)
+	image, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
 	s.NoError(err)
 
 	// Make sure a cron job exists with different container command
