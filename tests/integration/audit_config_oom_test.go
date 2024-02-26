@@ -65,7 +65,7 @@ func (s *AuditConfigOOMSuite) TestOOMControllerReporting() {
 	// the first Pod tries to start and gets killed
 	// on the 2nd start we should get an OOMkilled status update
 	err := s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.MondooOperatorDegraded, corev1.ConditionTrue)
-	s.NoError(err, "Failed to find degraded condition")
+	s.Require().NoError(err, "Failed to find degraded condition")
 
 	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
 	s.NoError(err, "Failed to find MondooAuditConfig")
@@ -96,7 +96,7 @@ func (s *AuditConfigOOMSuite) TestOOMControllerReporting() {
 	s.NoError(s.testCluster.K8sHelper.Clientset.Update(s.ctx, &operatorDeployment))
 
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.MondooOperatorDegraded, corev1.ConditionFalse)
-	s.NoError(err, "Failed to find degraded condition")
+	s.Require().NoError(err, "Failed to find degraded condition")
 	foundMondooAuditConfig, err = s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
 	s.NoError(err, "Failed to find MondooAuditConfig")
 	cond = mondoo.FindMondooAuditConditions(foundMondooAuditConfig.Status.Conditions, mondoov2.MondooOperatorDegraded)
@@ -140,7 +140,7 @@ func (s *AuditConfigOOMSuite) TestOOMScanAPI() {
 	// This will take some time, because:
 	// reconcile needs to happen
 	err := s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.ScanAPIDegraded, corev1.ConditionTrue)
-	s.NoError(err, "Failed to find degraded condition")
+	s.Require().NoError(err, "Failed to find degraded condition")
 
 	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
 	s.NoError(err, "Failed to find MondooAuditConfig")
@@ -165,7 +165,7 @@ func (s *AuditConfigOOMSuite) TestOOMScanAPI() {
 	s.Require().NoError(err)
 
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.ScanAPIDegraded, corev1.ConditionFalse)
-	s.NoError(err, "Failed to find degraded condition")
+	s.Require().NoError(err, "Failed to find degraded condition")
 	foundMondooAuditConfig, err = s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
 	s.NoError(err, "Failed to find MondooAuditConfig")
 
@@ -229,7 +229,7 @@ func (s *AuditConfigOOMSuite) TestOOMNodeScan() {
 	// the first Pod tries to start and gets killed
 	// on the 2nd start we should get an OOMkilled status update
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.NodeScanningDegraded, corev1.ConditionTrue)
-	s.NoError(err, "Failed to find degraded condition")
+	s.Require().NoError(err, "Failed to find degraded condition")
 
 	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
 	s.NoError(err, "Failed to find MondooAuditConfig")
@@ -258,7 +258,7 @@ func (s *AuditConfigOOMSuite) TestOOMNodeScan() {
 	time.Sleep(30 * time.Second)
 
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.NodeScanningDegraded, corev1.ConditionFalse)
-	s.NoError(err, "Failed to find degraded condition")
+	s.Require().NoError(err, "Failed to find degraded condition")
 	foundMondooAuditConfig, err = s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
 	s.NoError(err, "Failed to find MondooAuditConfig")
 	cond = mondoo.FindMondooAuditConditions(foundMondooAuditConfig.Status.Conditions, mondoov2.ScanAPIDegraded)
