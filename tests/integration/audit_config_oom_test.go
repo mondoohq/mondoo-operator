@@ -5,6 +5,7 @@ package integration
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -142,10 +143,20 @@ func (s *AuditConfigOOMSuite) TestOOMScanAPI() {
 	err := s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.ScanAPIDegraded, corev1.ConditionTrue)
 	s.Require().NoError(err, "Failed to find degraded condition")
 
-	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
-	s.NoError(err, "Failed to find MondooAuditConfig")
+	var cond *mondoov2.MondooAuditConfigCondition
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+		if err != nil {
+			return false, err
+		}
 
-	cond := mondoo.FindMondooAuditConditions(foundMondooAuditConfig.Status.Conditions, mondoov2.ScanAPIDegraded)
+		cond = mondoo.FindMondooAuditConditions(foundMondooAuditConfig.Status.Conditions, mondoov2.ScanAPIDegraded)
+		if cond != nil && strings.Contains(cond.Message, "OOM") {
+			return true, nil
+		}
+		return false, nil
+	})
+	s.Require().NoError(err, "Failed to find degraded condition")
 	s.Require().NotNil(cond)
 	s.Containsf(cond.Message, "OOM", "Failed to find OOMKilled message in degraded condition")
 	s.Len(cond.AffectedPods, 1, "Failed to find only one pod in degraded condition")
@@ -166,7 +177,7 @@ func (s *AuditConfigOOMSuite) TestOOMScanAPI() {
 
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.ScanAPIDegraded, corev1.ConditionFalse)
 	s.Require().NoError(err, "Failed to find degraded condition")
-	foundMondooAuditConfig, err = s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
 	s.NoError(err, "Failed to find MondooAuditConfig")
 
 	cond = mondoo.FindMondooAuditConditions(foundMondooAuditConfig.Status.Conditions, mondoov2.ScanAPIDegraded)

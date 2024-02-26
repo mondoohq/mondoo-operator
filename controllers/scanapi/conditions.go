@@ -47,12 +47,7 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 		}
 	}
 
-	for _, pod := range pods.Items {
-		logger.Info("ScanAPI pod", " pod ", pod.Status.ContainerStatuses, "creationTimestamp", pod.CreationTimestamp)
-	}
-
 	currentPod := k8s.GetNewestPodFromList(pods.Items)
-	logger.Info("ScanAPI controller is unavailable", " pod ", currentPod.Status.ContainerStatuses)
 	for i, containerStatus := range currentPod.Status.ContainerStatuses {
 		if containerStatus.Name != "cnspec" {
 			continue
@@ -64,7 +59,7 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 			status = corev1.ConditionTrue
 			affectedPods = append(affectedPods, currentPod.Name)
 			memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
-			logger.Info("OOM detected", " pod ", currentPod.Name, "memory limit", memoryLimit)
+			logger.Info("ScanAPI OOM detected", " pod ", currentPod.Name, "memory limit", memoryLimit)
 			break
 		}
 	}
