@@ -47,7 +47,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
-	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(ctx, "", "", false)
+	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(ctx, "", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		logger.Error(err, "Failed to resolve mondoo-operator container image")
 		return err
