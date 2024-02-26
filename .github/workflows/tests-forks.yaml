@@ -10,14 +10,6 @@ permissions:
   pull-requests: read  # needed for the "labeled" event?
 
 jobs:
-  # Makes it easier to see what was the input for this workflow in case we need to debug.
-  debug-event:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Print workflow actor
-        run: echo "${{ toJSON(github.actor) }}"
-      - name: Print workflow event
-        run: jq '.' $GITHUB_EVENT_PATH
   check-label:
     name: Check label
     runs-on: ubuntu-latest

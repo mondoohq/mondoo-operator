@@ -76,14 +76,14 @@ jobs:
       - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
         if: success() || failure()
 
-      - uses: actions/upload-artifact@v3  # upload test results
+      - uses: actions/upload-artifact@v4  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
-          name: test-results
+          name: test-results-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
           path: integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-logs-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
@@ -103,3 +103,13 @@ jobs:
           url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           description: Workflow ${{ github.workflow }} failed for commit ${{ github.sha }}.
           color: 0xff4d4d
+
+  event_file:
+    name: "Store event file"
+    runs-on: ubuntu-latest
+    steps:
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: Event File
+        path: ${{ github.event_path }}

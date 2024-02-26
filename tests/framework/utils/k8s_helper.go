@@ -355,6 +355,22 @@ func (k8sh *K8sHelper) WaitForResourceDeletion(r client.Object) error {
 	})
 }
 
+func (k8sh *K8sHelper) UpdateAuditConfigWithRetries(name, namespace string, update func(auditConfig *v1alpha2.MondooAuditConfig)) error {
+	err := k8sh.ExecuteWithRetries(func() (bool, error) {
+		auditConfig, err := k8sh.GetMondooAuditConfigFromCluster(name, namespace)
+		if err != nil {
+			return false, err
+		}
+		update(auditConfig)
+		err = k8sh.Clientset.Update(context.Background(), auditConfig)
+		if err != nil {
+			return false, nil // retry
+		}
+		return true, nil // success
+	})
+	return err
+}
+
 func (k8sh *K8sHelper) ExecuteWithRetries(f func() (bool, error)) error {
 	for i := 0; i < RetryLoop; i++ {
 		success, err := f()
