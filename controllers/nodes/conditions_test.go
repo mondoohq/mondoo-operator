@@ -104,6 +104,46 @@ func TestConditions_OOM_MultiplePods(t *testing.T) {
 	assert.Equal(t, []string{pod.Name}, cond.AffectedPods)
 }
 
+func TestConditions_OOM_MultipleNodes(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Nodes: v1alpha2.Nodes{Enable: true},
+		},
+	}
+
+	podList := oomPodList()
+	pod := podList.Items[0]
+	podList = &corev1.PodList{
+		Items: []corev1.Pod{
+			{
+				Spec: corev1.PodSpec{
+					NodeName: "node2",
+				},
+			},
+			pod,
+			{
+				Spec: corev1.PodSpec{
+					NodeName: "node3",
+				},
+			},
+			{
+				Spec: corev1.PodSpec{
+					NodeName: "node4",
+				},
+			},
+		},
+	}
+	updateNodeConditions(config, true, podList)
+
+	cond := config.Status.Conditions[0]
+	assert.Equal(t, oomMessage, cond.Message)
+	assert.Equal(t, "NodeScanningUnavailable", cond.Reason)
+	assert.Equal(t, corev1.ConditionTrue, cond.Status)
+	assert.Equal(t, v1alpha2.NodeScanningDegraded, cond.Type)
+	assert.Equal(t, pod.Spec.Containers[0].Resources.Limits.Memory().String(), cond.MemoryLimit)
+	assert.Equal(t, []string{pod.Name}, cond.AffectedPods)
+}
+
 func TestConditions_OOM_Unavailable(t *testing.T) {
 	config := &v1alpha2.MondooAuditConfig{
 		Spec: v1alpha2.MondooAuditConfigSpec{
@@ -165,6 +205,7 @@ func oomPodList() *corev1.PodList {
 			{
 				ObjectMeta: metav1.ObjectMeta{CreationTimestamp: metav1.Time{Time: time.Now()}},
 				Spec: corev1.PodSpec{
+					NodeName: "node1",
 					Containers: []corev1.Container{
 						{
 							Name: "cnspec",
