@@ -103,13 +103,3 @@ jobs:
           url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           description: Workflow ${{ github.workflow }} failed for commit ${{ github.sha }}.
           color: 0xff4d4d
-
-  event_file:
-    name: "Store event file"
-    runs-on: ubuntu-latest
-    steps:
-    - name: Upload
-      uses: actions/upload-artifact@v4
-      with:
-        name: Event File
-        path: ${{ github.event_path }}
