@@ -145,12 +145,12 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 
 	// Get Pods for this deployment
 	selector, _ := metav1.LabelSelectorAsSelector(existingDeployment.Spec.Selector)
-	opts := []client.ListOption{
-		client.InNamespace(existingDeployment.Namespace),
-		client.MatchingLabelsSelector{Selector: selector},
+	opts := &client.ListOptions{
+		Namespace:     existingDeployment.Namespace,
+		LabelSelector: client.MatchingLabelsSelector{Selector: selector},
 	}
 	pods := &corev1.PodList{}
-	err = n.KubeClient.List(ctx, pods, opts...)
+	err = n.KubeClient.List(ctx, pods, opts)
 	if err != nil {
 		logger.Error(err, "Failed to list Pods for scan API")
 		return err
