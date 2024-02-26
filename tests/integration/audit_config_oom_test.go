@@ -157,14 +157,12 @@ func (s *AuditConfigOOMSuite) TestOOMScanAPI() {
 	s.NoError(err, "Failed to get status")
 	s.Equal("ERROR", status)
 
-	foundMondooAuditConfig, err = s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+	err = s.testCluster.K8sHelper.UpdateAuditConfigWithRetries(auditConfig.Name, auditConfig.Namespace, func(config *mondoov2.MondooAuditConfig) {
+		config.Spec.Scanner.Resources.Limits = corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("200Mi"), // this should be enough to get the ScanAPI running again
+		}
+	})
 	s.Require().NoError(err)
-	foundMondooAuditConfig.Spec.Scanner.Resources.Limits = corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("200Mi"), // this should be enough to get the ScanAPI running again
-	}
-
-	zap.S().Info("Increasing memory limit to get ScanAPI running again.")
-	s.NoError(s.testCluster.K8sHelper.Clientset.Update(s.ctx, foundMondooAuditConfig))
 
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.ScanAPIDegraded, corev1.ConditionFalse)
 	s.NoError(err, "Failed to find degraded condition")
@@ -247,13 +245,14 @@ func (s *AuditConfigOOMSuite) TestOOMNodeScan() {
 	s.NoError(err, "Failed to get status")
 	s.Equal("ERROR", status)
 
-	foundMondooAuditConfig.Spec.Nodes.Resources.Limits = corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("200Mi"), // this should be enough to get the ScanAPI running again
-	}
-	foundMondooAuditConfig.Spec.Nodes.Schedule = "*/1 * * * *"
-
 	zap.S().Info("Increasing memory limit to get node Scans running again.")
-	s.NoError(s.testCluster.K8sHelper.Clientset.Update(s.ctx, foundMondooAuditConfig))
+	err = s.testCluster.K8sHelper.UpdateAuditConfigWithRetries(auditConfig.Name, auditConfig.Namespace, func(config *mondoov2.MondooAuditConfig) {
+		config.Spec.Nodes.Resources.Limits = corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("200Mi"), // this should be enough to get the ScanAPI running again
+		}
+		foundMondooAuditConfig.Spec.Nodes.Schedule = "*/1 * * * *"
+	})
+	s.Require().NoError(err)
 
 	// Wait for the next run of the CronJob
 	time.Sleep(30 * time.Second)
