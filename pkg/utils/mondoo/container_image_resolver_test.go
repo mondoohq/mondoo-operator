@@ -47,11 +47,11 @@ func (s *ContainerImageResolverSuite) BeforeTest(suiteName, testName string) {
 			Name:      "mondoo-operator-controller-manager",
 			Namespace: "mondoo-operator",
 		},
-		Status: corev1.PodStatus{
-			ContainerStatuses: []corev1.ContainerStatus{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
-					Name:    "manager",
-					ImageID: "ghcr.io/mondoohq/mondoo-operator@sha256:634ffd8eaf99495e397b063ac061bd75efba72e02ecf65d5220dd6a95a52a138",
+					Name:  "manager",
+					Image: "ghcr.io/mondoohq/mondoo-operator:testtag",
 				},
 			},
 		},
@@ -141,15 +141,31 @@ func (s *ContainerImageResolverSuite) TestMondooOperatorImage() {
 	res, err := resolver.MondooOperatorImage(context.Background(), "", "", false)
 	s.NoError(err)
 
-	s.Equal("ghcr.io/mondoohq/mondoo-operator@sha256:634ffd8eaf99495e397b063ac061bd75efba72e02ecf65d5220dd6a95a52a138", res)
+	s.Equal("ghcr.io/mondoohq/mondoo-operator@sha256:test", res)
 }
 
 func (s *ContainerImageResolverSuite) TestMondooOperatorImage_CustomImage() {
+	image := "ghcr.io/mondoo/testimage"
+	tag := "testtag"
+
 	resolver := s.containerImageResolver()
-	res, err := resolver.MondooOperatorImage(context.Background(), "", "", false)
+	res, err := resolver.MondooOperatorImage(context.Background(), image, tag, false)
 	s.NoError(err)
 
-	s.Equal("ghcr.io/mondoohq/mondoo-operator@sha256:634ffd8eaf99495e397b063ac061bd75efba72e02ecf65d5220dd6a95a52a138", res)
+	s.Equal("ghcr.io/mondoo/testimage@sha256:test", res)
+}
+
+func (s *ContainerImageResolverSuite) TestMondooOperatorImage_SkipImageResolution() {
+	image := "ghcr.io/mondoo/testimage"
+	tag := "testtag"
+
+	resolver := s.containerImageResolver()
+	res, err := resolver.MondooOperatorImage(context.Background(), image, tag, true)
+	s.NoError(err)
+
+	s.Equal(fmt.Sprintf("%s:%s", image, tag), res)
+	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
+	s.Equal("ghcr.io/mondoo/testimage:testtag", res)
 }
 
 func TestContainerImageResolverSuite(t *testing.T) {
