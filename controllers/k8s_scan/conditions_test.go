@@ -23,7 +23,6 @@ func TestConditions_Disabled(t *testing.T) {
 	assert.Equal(t, "KubernetesResourcesScanningDisabled", cond.Reason)
 	assert.Equal(t, corev1.ConditionFalse, cond.Status)
 	assert.Equal(t, v1alpha2.K8sResourcesScanningDegraded, cond.Type)
-	assert.False(t, true)
 }
 
 func TestConditions_Available(t *testing.T) {

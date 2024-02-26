@@ -467,7 +467,7 @@ jobs:
           commit: ${{ github.event.workflow_run.head_sha }}
           event_file: ${{ github.event_path }}
           event_name: ${{ github.event.workflow_run.event }}
-          files: "artifacts/**/*.xml"
+          files: "*.xml"
 
   release-helm:
     name: Release helm chart

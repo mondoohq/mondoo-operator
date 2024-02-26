@@ -17,8 +17,7 @@ jobs:
       uses: dawidd6/action-download-artifact@v3
       with:
         run_id: ${{ github.event.workflow_run.id }}
-        name: "^test-results-.*"
-        name_is_regexp: true
+        path: artifacts
 
     - name: Publish Test Results
       uses: EnricoMi/publish-unit-test-result-action@v2
