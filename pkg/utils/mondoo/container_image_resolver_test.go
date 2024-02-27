@@ -4,6 +4,7 @@
 package mondoo
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -11,14 +12,17 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/stretchr/testify/suite"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 type ContainerImageResolverSuite struct {
 	suite.Suite
-	resolver         containerImageResolver
-	remoteCallsCount int
-	testHex          string
+	remoteCallsCount  int
+	testHex           string
+	fakeClientBuilder *fake.ClientBuilder
 }
 
 type fakeCacher struct {
@@ -38,7 +42,28 @@ func NewFakeCacher(f func(string) (string, error)) *fakeCacher {
 func (s *ContainerImageResolverSuite) BeforeTest(suiteName, testName string) {
 	s.remoteCallsCount = 0
 	s.testHex = "test"
-	s.resolver = containerImageResolver{
+	s.fakeClientBuilder = fake.NewClientBuilder().WithObjects(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mondoo-operator-controller-manager",
+			Namespace: "mondoo-operator",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "random-container",
+					Image: "ghcr.io/mondoohq/test:random",
+				},
+				{
+					Name:  "manager",
+					Image: "ghcr.io/mondoohq/mondoo-operator:testtag",
+				},
+			},
+		},
+	})
+}
+
+func (s *ContainerImageResolverSuite) containerImageResolver() containerImageResolver {
+	return containerImageResolver{
 		logger: ctrl.Log.WithName("container-image-resolver"),
 		imageCacher: NewFakeCacher(func(image string) (string, error) {
 			s.remoteCallsCount++
@@ -46,11 +71,14 @@ func (s *ContainerImageResolverSuite) BeforeTest(suiteName, testName string) {
 			imageParts := strings.Split(image, ":")
 			return imageParts[0] + "@sha256:" + s.testHex, nil
 		}),
+		kubeClient:           s.fakeClientBuilder.Build(),
+		operatorPodName:      "mondoo-operator-controller-manager",
+		operatorPodNamespace: "mondoo-operator",
 	}
 }
 
 func (s *ContainerImageResolverSuite) TestNewContainerImageResolver() {
-	resolver := NewContainerImageResolver(false)
+	resolver := NewContainerImageResolver(s.fakeClientBuilder.Build(), false)
 
 	ref, err := name.ParseReference(fmt.Sprintf("%s:%s", CnspecImage, CnspecTag))
 	s.NoError(err)
@@ -71,8 +99,9 @@ func (s *ContainerImageResolverSuite) TestNewContainerImageResolver() {
 }
 
 func (s *ContainerImageResolverSuite) TestCnspecImage() {
+	resolver := s.containerImageResolver()
 	image := "ghcr.io/mondoo/testimage"
-	res, err := s.resolver.CnspecImage(image, "testtag", false)
+	res, err := resolver.CnspecImage(image, "testtag", false)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s@sha256:%s", image, s.testHex), res)
@@ -80,7 +109,8 @@ func (s *ContainerImageResolverSuite) TestCnspecImage() {
 }
 
 func (s *ContainerImageResolverSuite) TestCnspecImage_Defaults() {
-	res, err := s.resolver.CnspecImage("", "", true)
+	resolver := s.containerImageResolver()
+	res, err := resolver.CnspecImage("", "", true)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s:%s", CnspecImage, CnspecTag), res)
@@ -88,10 +118,11 @@ func (s *ContainerImageResolverSuite) TestCnspecImage_Defaults() {
 }
 
 func (s *ContainerImageResolverSuite) TestCnspecImage_SkipImageResolution() {
+	resolver := s.containerImageResolver()
 	image := "ghcr.io/mondoo/testimage"
 	tag := "testtag"
 
-	res, err := s.resolver.CnspecImage(image, tag, true)
+	res, err := resolver.CnspecImage(image, tag, true)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s:%s", image, tag), res)
@@ -99,9 +130,10 @@ func (s *ContainerImageResolverSuite) TestCnspecImage_SkipImageResolution() {
 }
 
 func (s *ContainerImageResolverSuite) TestCnspecImage_OpenShift() {
-	s.resolver.resolveForOpenShift = true
+	resolver := s.containerImageResolver()
+	resolver.resolveForOpenShift = true
 
-	res, err := s.resolver.CnspecImage("", "", true)
+	res, err := resolver.CnspecImage("", "", true)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s:%s", CnspecImage, OpenShiftMondooClientTag), res)
@@ -109,31 +141,35 @@ func (s *ContainerImageResolverSuite) TestCnspecImage_OpenShift() {
 }
 
 func (s *ContainerImageResolverSuite) TestMondooOperatorImage() {
-	image := "ghcr.io/mondoo/testimage"
-	res, err := s.resolver.MondooOperatorImage(image, "testtag", false)
+	resolver := s.containerImageResolver()
+	res, err := resolver.MondooOperatorImage(context.Background(), "", "", false)
 	s.NoError(err)
 
-	s.Equal(fmt.Sprintf("%s@sha256:%s", image, s.testHex), res)
-	s.Equalf(1, s.remoteCallsCount, "remote call has not been performed")
+	s.Equal("ghcr.io/mondoohq/mondoo-operator@sha256:test", res)
 }
 
-func (s *ContainerImageResolverSuite) TestMondooOperatorImage_Defaults() {
-	res, err := s.resolver.MondooOperatorImage("", "", true)
+func (s *ContainerImageResolverSuite) TestMondooOperatorImage_CustomImage() {
+	image := "ghcr.io/mondoo/testimage"
+	tag := "testtag"
+
+	resolver := s.containerImageResolver()
+	res, err := resolver.MondooOperatorImage(context.Background(), image, tag, false)
 	s.NoError(err)
 
-	s.Equal(fmt.Sprintf("%s:%s", MondooOperatorImage, MondooOperatorTag), res)
-	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
+	s.Equal("ghcr.io/mondoo/testimage@sha256:test", res)
 }
 
 func (s *ContainerImageResolverSuite) TestMondooOperatorImage_SkipImageResolution() {
 	image := "ghcr.io/mondoo/testimage"
 	tag := "testtag"
 
-	res, err := s.resolver.MondooOperatorImage(image, tag, true)
+	resolver := s.containerImageResolver()
+	res, err := resolver.MondooOperatorImage(context.Background(), image, tag, true)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s:%s", image, tag), res)
 	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
+	s.Equal("ghcr.io/mondoo/testimage:testtag", res)
 }
 
 func TestContainerImageResolverSuite(t *testing.T) {

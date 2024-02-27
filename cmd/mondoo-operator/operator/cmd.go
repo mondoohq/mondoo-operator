@@ -119,7 +119,7 @@ func init() {
 		if err = (&controllers.MondooAuditConfigReconciler{
 			Client:                 mgr.GetClient(),
 			MondooClientBuilder:    controllers.MondooClientBuilder,
-			ContainerImageResolver: mondoo.NewContainerImageResolver(isOpenShift),
+			ContainerImageResolver: mondoo.NewContainerImageResolver(mgr.GetClient(), isOpenShift),
 			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder, v),
 			RunningOnOpenShift:     isOpenShift,
 			ScanApiStore:           scanApiStore,

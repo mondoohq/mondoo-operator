@@ -4,6 +4,7 @@
 package fake
 
 import (
+	"context"
 	"fmt"
 
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -19,6 +20,6 @@ func (c *noOpContainerImageResolver) CnspecImage(userImage, userTag string, skip
 	return fmt.Sprintf("%s:%s", mondoo.CnspecImage, mondoo.CnspecTag), nil
 }
 
-func (c *noOpContainerImageResolver) MondooOperatorImage(userImage, userTag string, skipResolveImage bool) (string, error) {
+func (c *noOpContainerImageResolver) MondooOperatorImage(ctx context.Context, userImage, userTag string, skipResolveImage bool) (string, error) {
 	return fmt.Sprintf("%s:%s", mondoo.MondooOperatorImage, mondoo.MondooOperatorTag), nil
 }

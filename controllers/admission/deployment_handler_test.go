@@ -423,7 +423,7 @@ func TestReconcile(t *testing.T) {
 				require.NoError(
 					t, kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(auditConfig), auditConfig), "failed to retrieve mondoo audit config")
 
-				img, err := containerImageResolver.MondooOperatorImage("", "", false)
+				img, err := containerImageResolver.MondooOperatorImage(context.Background(), "", "", false)
 				require.NoErrorf(t, err, "failed to get mondoo operator image.")
 				expectedDeployment := WebhookDeployment(testNamespace, img, *auditConfig, "", testClusterID)
 				require.NoError(t, ctrl.SetControllerReference(auditConfig, expectedDeployment, kubeClient.Scheme()))
