@@ -5,7 +5,7 @@ package utils
 
 import (
 	"github.com/google/go-containerregistry/pkg/name"
-	"go.mondoo.com/cnquery/v9/providers/os/resources/discovery/container_registry"
+	"go.mondoo.com/cnquery/v10/providers/os/resources/discovery/container_registry"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
