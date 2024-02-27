@@ -498,7 +498,7 @@ func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.Mondo
 
 	s.verifyWebhookAndStart(webhookListOpts, caCert)
 
-	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionFalse)
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionFalse, "")
 	s.NoErrorf(err, "Admission shouldn't be in degraded state")
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
@@ -541,7 +541,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmissionScaleDownScanApi(au
 	s.NoErrorf(err, "Scan API Pod did not get deleted")
 
 	zap.S().Info("MondooAuditConfig condition should be updated to degraded.")
-	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionTrue)
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionTrue, "")
 	s.NoErrorf(err, "Admission should be in degraded state")
 
 	// try to change deployment => should fail
@@ -694,13 +694,13 @@ func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mo
 	// Verify scan API deployment and service
 	s.validateScanApiDeployment(auditConfig)
 
-	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionFalse)
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.AdmissionDegraded, corev1.ConditionFalse, "")
 	s.Require().NoErrorf(err, "Admission shouldn't be in degraded state")
 
-	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.NodeScanningDegraded, corev1.ConditionFalse)
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.NodeScanningDegraded, corev1.ConditionFalse, "")
 	s.Require().NoErrorf(err, "Node scanning shouldn't be in degraded state")
 
-	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.K8sResourcesScanningDegraded, corev1.ConditionFalse)
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.K8sResourcesScanningDegraded, corev1.ConditionFalse, "")
 	s.Require().NoErrorf(err, "k8s resource scanning shouldn't be in degraded state")
 
 	// everything is fine, now upgrade to current branch/release

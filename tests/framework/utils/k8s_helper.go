@@ -603,7 +603,9 @@ func (k8sh *K8sHelper) GetMondooAuditConfigConditionByType(auditConfig *api.Mond
 }
 
 // CheckForDegradedCondition Check whether specified Condition is in degraded state in a MondooAuditConfig with retries.
-func (k8sh *K8sHelper) CheckForDegradedCondition(auditConfig *api.MondooAuditConfig, conditionType api.MondooAuditConfigConditionType, conditionStatus v1.ConditionStatus) error {
+func (k8sh *K8sHelper) CheckForDegradedCondition(
+	auditConfig *api.MondooAuditConfig, conditionType api.MondooAuditConfigConditionType, conditionStatus v1.ConditionStatus, msg string,
+) error {
 	err := k8sh.ExecuteWithRetries(func() (bool, error) {
 		// Condition of MondooAuditConfig should be updated
 		foundMondooAuditConfig, err := k8sh.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
@@ -614,7 +616,8 @@ func (k8sh *K8sHelper) CheckForDegradedCondition(auditConfig *api.MondooAuditCon
 		if err != nil {
 			return false, nil // The condition might not exist yet. This doesn't mean we should stop trying.
 		}
-		if condition.Status == conditionStatus {
+		// If there is a msg specified then test for message too
+		if condition.Status == conditionStatus && (msg == "" || (msg != "" && strings.Contains(condition.Message, msg))) {
 			return true, nil
 		}
 		return false, nil
