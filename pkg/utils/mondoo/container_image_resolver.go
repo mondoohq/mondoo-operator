@@ -87,18 +87,29 @@ func (c *containerImageResolver) CnspecImage(userImage, userTag string, skipImag
 func (c *containerImageResolver) MondooOperatorImage(ctx context.Context, userImage, userTag string, skipImageResolution bool) (string, error) {
 	image := ""
 
-	// First try with the provided user image and tag (if any)
-	if userImage != "" || userTag != "" {
-		image = userImageOrDefault(MondooOperatorImage, MondooOperatorTag, userImage, userTag)
-	}
-
-	// If still no image, then load the image from the operator pod
-	if image == "" {
+	// If we have no user image or tag, we read the image from the operator pod
+	if userImage == "" || userTag == "" {
 		operatorPod := &corev1.Pod{}
 		if err := c.kubeClient.Get(ctx, client.ObjectKey{Namespace: c.operatorPodNamespace, Name: c.operatorPodName}, operatorPod); err != nil {
 			return "", err
 		}
-		image = operatorPod.Spec.Containers[0].Image
+
+		for _, container := range operatorPod.Spec.Containers {
+			if container.Name == "manager" {
+				image = container.Image
+				break
+			}
+		}
+
+		// If at this point we don't have an image, then something went wrong
+		if image == "" {
+			return "", fmt.Errorf("failed to get mondoo-operator image from operator pod")
+		}
+	}
+
+	// If still no image, then load the image user-specified image or use the defaults as last resort
+	if image == "" {
+		image = userImageOrDefault(MondooOperatorImage, MondooOperatorTag, userImage, userTag)
 	}
 
 	return c.resolveImage(image, skipImageResolution)

@@ -50,6 +50,10 @@ func (s *ContainerImageResolverSuite) BeforeTest(suiteName, testName string) {
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
+					Name:  "random-container",
+					Image: "ghcr.io/mondoohq/test:random",
+				},
+				{
 					Name:  "manager",
 					Image: "ghcr.io/mondoohq/mondoo-operator:testtag",
 				},
