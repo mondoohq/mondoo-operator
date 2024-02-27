@@ -14,7 +14,7 @@ controllerManager:
       readOnlyRootFilesystem: true
     image:
       repository: ghcr.io/mondoohq/mondoo-operator
-      tag: v1.20.0
+      tag: v1.21.0
     imagePullPolicy: IfNotPresent
     resources:
       limits:
