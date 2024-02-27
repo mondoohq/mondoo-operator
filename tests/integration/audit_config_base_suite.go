@@ -484,17 +484,18 @@ func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.Mondo
 	// Check number of Pods depending on mode
 	webhookListOpts, err := s.getWebhookListOps()
 	s.NoError(err)
-	pods := &corev1.PodList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, pods, webhookListOpts))
-	numPods := 1
+	deployments := &appsv1.DeploymentList{}
+	s.Require().NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts))
+	s.Require().Lenf(deployments.Items, 1, "Deployments count for webhook should be precisely one")
+	numReplicas := 1
 	if auditConfig.Spec.Admission.Mode == mondoov2.Enforcing {
-		numPods = 2
+		numReplicas = 2
 	}
 	if auditConfig.Spec.Admission.Replicas != nil {
-		numPods = int(*auditConfig.Spec.Admission.Replicas)
+		numReplicas = int(*auditConfig.Spec.Admission.Replicas)
 	}
-	failMessage := fmt.Sprintf("Pods count for webhook should be precisely %d because of mode and replicas", numPods)
-	s.Equalf(numPods, len(pods.Items), failMessage)
+	failMessage := fmt.Sprintf("Pods count for webhook should be precisely %d because of mode and replicas", numReplicas)
+	s.Equalf(numReplicas, int(*deployments.Items[0].Spec.Replicas), failMessage)
 
 	s.verifyWebhookAndStart(webhookListOpts, caCert)
 
