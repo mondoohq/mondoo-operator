@@ -138,7 +138,8 @@ func (i *MondooInstaller) UninstallOperator() error {
 		zap.S().Warn("Operator not installed. Skip gathering logs...")
 		return nil
 	}
-	i.K8sHelper.GetLogsFromNamespace(i.Settings.Namespace, i.T().Name())
+
+	i.K8sHelper.GetLogsFromNamespace(i.Settings.Namespace, i.Settings.SuiteName, i.T().Name())
 
 	if err := i.CleanupAuditConfigs(); err != nil {
 		return err
@@ -210,9 +211,9 @@ func (i *MondooInstaller) CreateClientSecret(ns string) error {
 func (i *MondooInstaller) GatherAllMondooLogs(testName string, namespaces ...string) {
 	zap.S().Infof("gathering all logs from the test")
 	for _, namespace := range namespaces {
-		i.K8sHelper.GetLogsFromNamespace(namespace, testName)
-		i.K8sHelper.GetDescribeFromNamespace(namespace, testName)
-		i.K8sHelper.GetEventsFromNamespace(namespace, testName)
+		i.K8sHelper.GetLogsFromNamespace(namespace, i.Settings.SuiteName, testName)
+		i.K8sHelper.GetDescribeFromNamespace(namespace, i.Settings.SuiteName, testName)
+		i.K8sHelper.GetEventsFromNamespace(namespace, i.Settings.SuiteName, testName)
 	}
 }
 

@@ -26,6 +26,11 @@ type AuditConfigOOMSuite struct {
 	AuditConfigBaseSuite
 }
 
+func (s *AuditConfigOOMSuite) SetupSuite() {
+	s.AuditConfigBaseSuite.SetupSuite()
+	s.testCluster.MondooInstaller.Settings.SuiteName = "AuditConfigOOMSuite"
+}
+
 func (s *AuditConfigOOMSuite) TestOOMControllerReporting() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, false)
 	s.auditConfig = auditConfig

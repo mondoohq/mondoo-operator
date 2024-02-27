@@ -12,6 +12,7 @@ import (
 const MondooNamespace = "mondoo-operator"
 
 type Settings struct {
+	SuiteName      string
 	Namespace      string
 	token          string
 	installRelease bool

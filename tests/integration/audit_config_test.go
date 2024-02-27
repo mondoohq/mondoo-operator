@@ -17,6 +17,11 @@ type AuditConfigSuite struct {
 	AuditConfigBaseSuite
 }
 
+func (s *AuditConfigSuite) SetupSuite() {
+	s.AuditConfigBaseSuite.SetupSuite()
+	s.testCluster.MondooInstaller.Settings.SuiteName = "AuditConfigSuite"
+}
+
 func (s *AuditConfigSuite) TestReconcile_AllDisabled() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, false)
 	s.testMondooAuditConfigAllDisabled(auditConfig)

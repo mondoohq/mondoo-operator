@@ -26,6 +26,7 @@ type AuditConfigCustomNamespaceSuite struct {
 
 func (s *AuditConfigCustomNamespaceSuite) SetupSuite() {
 	s.AuditConfigBaseSuite.SetupSuite()
+	s.testCluster.MondooInstaller.Settings.SuiteName = "AuditConfigCustomNamespaceSuite"
 
 	s.ns = &corev1.Namespace{}
 	s.ns.Name = "some-namespace"

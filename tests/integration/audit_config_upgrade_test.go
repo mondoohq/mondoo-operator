@@ -16,6 +16,11 @@ type AuditConfigUpgradeSuite struct {
 	AuditConfigBaseSuite
 }
 
+func (s *AuditConfigUpgradeSuite) SetupSuite() {
+	s.AuditConfigBaseSuite.SetupSuite()
+	s.testCluster.MondooInstaller.Settings.SuiteName = "AuditConfigUpgradeSuite"
+}
+
 func (s *AuditConfigUpgradeSuite) AfterTest(suiteName, testName string) {
 	if s.testCluster != nil {
 		s.testCluster.GatherAllMondooLogs(testName, installer.MondooNamespace)
