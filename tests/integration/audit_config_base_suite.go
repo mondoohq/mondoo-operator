@@ -873,10 +873,10 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 
 	time.Sleep(5 * time.Second)
 	cicdProject, err := s.integration.GetCiCdProject(s.ctx)
-	s.Require().NoError(err, "Failed to get CICD project")
+	s.Require().NoErrorf(err, "Failed to get CICD project")
 
-	assets, err := cicdProject.ListAssets(s.ctx)
-	s.Require().NoError(err, "Failed to list CICD assets")
+	assets, err := s.WaitUntilCiCdAssetsScored(cicdProject)
+	s.Require().NoErrorf(err, "Failed to list scored CICD assets")
 
 	assetNames := utils.CiCdJobNames(assets)
 	s.Contains(assetNames, fmt.Sprintf("%s/%s", passingDeployment.Namespace, passingDeployment.Name))
@@ -891,8 +891,8 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 		s.NoErrorf(err, "Failed creating a Deployment in permissive mode.")
 	}
 
-	assets, err = cicdProject.ListAssets(s.ctx)
-	s.Require().NoError(err, "Failed to list CICD assets")
+	assets, err = s.WaitUntilCiCdAssetsScored(cicdProject)
+	s.Require().NoErrorf(err, "Failed to list scored CICD assets")
 
 	assetNames = utils.CiCdJobNames(assets)
 	s.Contains(assetNames, fmt.Sprintf("%s/%s", failingDeployment.Namespace, failingDeployment.Name))
@@ -902,6 +902,24 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(failingDeployment), "Failed to delete failingDeployment")
 	s.NoErrorf(s.testCluster.K8sHelper.WaitForResourceDeletion(passingDeployment), "Error waiting for deleteion of passingDeployment")
 	s.NoErrorf(s.testCluster.K8sHelper.WaitForResourceDeletion(failingDeployment), "Error waiting for deleteion of failingDeployment")
+}
+
+func (s *AuditConfigBaseSuite) WaitUntilCiCdAssetsScored(cicdProject *nexusK8s.CiCdProject) ([]nexusK8s.CiCdJob, error) {
+	var assets []nexusK8s.CiCdJob
+	var err error
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		assets, err = cicdProject.ListAssets(s.ctx)
+		if err != nil {
+			return false, err
+		}
+		for _, asset := range assets {
+			if asset.Grade == "U" {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	return assets, err
 }
 
 func (s *AuditConfigBaseSuite) getWebhookLabelsString() string {
