@@ -6,8 +6,8 @@ package scanapiclient
 import (
 	"context"
 
-	"go.mondoo.com/cnquery/v9/providers-sdk/v1/inventory"
-	"go.mondoo.com/cnspec/v9/policy/scan"
+	"go.mondoo.com/cnquery/v10/providers-sdk/v1/inventory"
+	"go.mondoo.com/cnspec/v10/policy/scan"
 	"go.mondoo.com/mondoo-operator/pkg/client/common"
 	"google.golang.org/protobuf/types/known/structpb"
 )
