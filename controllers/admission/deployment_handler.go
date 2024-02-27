@@ -294,7 +294,7 @@ func (n *DeploymentHandler) isWebhookDegraded(deployment *appsv1.Deployment) boo
 		return true
 	}
 
-	return deployment.Status.Replicas != deployment.Status.ReadyReplicas
+	return deployment.Status.ReadyReplicas < deployment.Status.Replicas
 }
 
 func (n *DeploymentHandler) prepareValidatingWebhook(ctx context.Context, vwc *webhooksv1.ValidatingWebhookConfiguration) error {
@@ -370,9 +370,9 @@ func (n *DeploymentHandler) applyWebhooks(ctx context.Context) (ctrl.Result, err
 		return ctrl.Result{}, nil
 	}
 	// The ValidatingWebhook must be created after Scan API and Webhook are running. Otherwise it will reject their creation.
-	if n.Mondoo.Spec.Admission.Mode == mondoov1alpha2.Enforcing && n.isWebhookDegraded(deployment) {
+	cond := mondoo.FindMondooAuditConditions(n.Mondoo.Status.Conditions, mondoov1alpha2.AdmissionDegraded)
+	if n.Mondoo.Spec.Admission.Mode == mondoov1alpha2.Enforcing && (cond == nil || (cond != nil && cond.Status == corev1.ConditionTrue)) {
 		webhookLog.Info("Waiting for Webhook and Scan API deployment before creating the ValidationWebhook.")
-		// return reconcile.Result{Requeue: true}, nil
 		return ctrl.Result{}, nil
 	}
 
