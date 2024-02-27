@@ -96,7 +96,7 @@ func (i *MondooInstaller) InstallOperator() error {
 		return fmt.Errorf("failed to create mondoo-operator manifest(s): %v ", err)
 	}
 
-	// Disable the resource monitor for the integratio ntests to make sure we don't run scans in parallel
+	// Disable the resource monitor for the integration tests to make sure we don't run scans in parallel
 	err = i.K8sHelper.ExecuteWithRetries(func() (bool, error) {
 		deployment := &appsv1.Deployment{}
 		if err := i.K8sHelper.Clientset.Get(
