@@ -251,7 +251,7 @@ func LabelSelectorListOptions(labelSelector string) (*client.ListOptions, error)
 }
 
 // GetLogsFromNamespace collects logs for all containers in all pods in the namespace
-func (k8sh *K8sHelper) GetLogsFromNamespace(namespace, testName string) {
+func (k8sh *K8sHelper) GetLogsFromNamespace(namespace, suiteName, testName string) {
 	ctx := context.TODO()
 	zap.S().Infof("Gathering logs for all pods in namespace %s", namespace)
 	pods, err := k8sh.kubeClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
@@ -259,10 +259,10 @@ func (k8sh *K8sHelper) GetLogsFromNamespace(namespace, testName string) {
 		zap.S().Errorf("failed to list pods in namespace %s. %+v", namespace, err)
 		return
 	}
-	k8sh.getPodsLogs(pods, namespace, testName)
+	k8sh.getPodsLogs(pods, namespace, suiteName, testName)
 }
 
-func (k8sh *K8sHelper) GetDescribeFromNamespace(namespace, testName string) {
+func (k8sh *K8sHelper) GetDescribeFromNamespace(namespace, suiteName, testName string) {
 	ctx := context.TODO()
 	zap.S().Infof("Gathering pod describe for all pods in namespace %s", namespace)
 	pods, err := k8sh.kubeClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
@@ -271,7 +271,7 @@ func (k8sh *K8sHelper) GetDescribeFromNamespace(namespace, testName string) {
 		return
 	}
 
-	file, err := k8sh.createTestLogFile("", "describe", namespace, testName)
+	file, err := k8sh.createTestLogFile("", "describe", suiteName, testName, namespace)
 	if err != nil {
 		return
 	}
@@ -314,10 +314,10 @@ func (k8sh *K8sHelper) GetDescribeFromNamespace(namespace, testName string) {
 	}
 }
 
-func (k8sh *K8sHelper) GetEventsFromNamespace(namespace, testName string) {
+func (k8sh *K8sHelper) GetEventsFromNamespace(namespace, suiteName, testName string) {
 	zap.S().Infof("Gathering events in namespace %q", namespace)
 
-	file, err := k8sh.createTestLogFile("", "events", namespace, testName)
+	file, err := k8sh.createTestLogFile("", "events", suiteName, testName, namespace)
 	if err != nil {
 		zap.S().Errorf("failed to create event file. %v", err)
 		return
@@ -474,17 +474,17 @@ func (k8sh *K8sHelper) getAuditConfigDescribe(namespace string, args ...string) 
 	return description
 }
 
-func (k8sh *K8sHelper) getPodsLogs(pods *v1.PodList, namespace, testName string) {
+func (k8sh *K8sHelper) getPodsLogs(pods *v1.PodList, namespace, suiteName, testName string) {
 	for _, p := range pods.Items {
-		k8sh.getPodLogs(p, namespace, testName, false)
+		k8sh.getPodLogs(p, namespace, suiteName, testName, false)
 		if strings.Contains(p.Name, "operator") {
 			// get the previous logs for the operator
-			k8sh.getPodLogs(p, namespace, testName, true)
+			k8sh.getPodLogs(p, namespace, suiteName, testName, true)
 		}
 	}
 }
 
-func (k8sh *K8sHelper) createTestLogFile(name, namespace, testName, suffix string) (*os.File, error) {
+func (k8sh *K8sHelper) createTestLogFile(name, namespace, suiteName, testName, suffix string) (*os.File, error) {
 	dir, _ := os.Getwd()
 	logDir := path.Join(dir, "_output/tests/")
 	if _, err := os.Stat(logDir); os.IsNotExist(err) {
@@ -495,9 +495,27 @@ func (k8sh *K8sHelper) createTestLogFile(name, namespace, testName, suffix strin
 		}
 	}
 
-	fileName := fmt.Sprintf("%s_%s_%s%s_%d.log", testName, namespace, name, suffix, time.Now().Unix())
+	suiteDir := path.Join(logDir, suiteName)
+	if _, err := os.Stat(suiteDir); os.IsNotExist(err) {
+		err := os.MkdirAll(suiteDir, 0o777)
+		if err != nil {
+			zap.S().Errorf("Cannot get suite files dir for app : %v in namespace %v, err: %v", name, namespace, err)
+			return nil, err
+		}
+	}
+
+	testDir := path.Join(suiteDir, testName)
+	if _, err := os.Stat(testDir); os.IsNotExist(err) {
+		err := os.MkdirAll(testDir, 0o777)
+		if err != nil {
+			zap.S().Errorf("Cannot get test files dir for app : %v in namespace %v, err: %v", name, namespace, err)
+			return nil, err
+		}
+	}
+
+	fileName := fmt.Sprintf("%s_%s%s_%d.log", namespace, name, suffix, time.Now().Unix())
 	fileName = strings.ReplaceAll(fileName, "/", "")
-	filePath := path.Join(logDir, fileName)
+	filePath := path.Join(testDir, fileName)
 	file, err := os.Create(filePath)
 	if err != nil {
 		zap.S().Errorf("Cannot create file %s. %v", filePath, err)
@@ -508,12 +526,12 @@ func (k8sh *K8sHelper) createTestLogFile(name, namespace, testName, suffix strin
 	return file, nil
 }
 
-func (k8sh *K8sHelper) getPodLogs(pod v1.Pod, namespace, testName string, previousLog bool) {
+func (k8sh *K8sHelper) getPodLogs(pod v1.Pod, namespace, suiteName, testName string, previousLog bool) {
 	suffix := ""
 	if previousLog {
 		suffix = "_previous"
 	}
-	file, err := k8sh.createTestLogFile(pod.Name, namespace, testName, suffix)
+	file, err := k8sh.createTestLogFile(pod.Name, namespace, suiteName, testName, suffix)
 	if err != nil {
 		return
 	}
