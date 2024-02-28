@@ -30,4 +30,4 @@ webhooks:
     - jobs
     - cronjobs
   sideEffects: None
-  timeout: 20s
+  timeoutSeconds: 20

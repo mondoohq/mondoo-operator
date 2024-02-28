@@ -6,4 +6,4 @@ metadata:
 webhooks:
 - name: policy.k8s.mondoo.com
   # The default is 10s but on slow clusters we may take longer
-  timeout: 20s
+  timeoutSeconds: 20
