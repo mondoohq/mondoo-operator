@@ -268,14 +268,9 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 	// Not a full check for whether someone has modified our Deployment, but checking for some important bits so we know
 	// if an Update() is needed.
 	if !k8s.AreDeploymentsEqual(*existingDeployment, *desiredDeployment) {
-		// Note: changes to the labels/selector labels means we can't Update() the
-		// Deployment, so we'll do a delete/create instead.
-		if err := k8s.DeleteIfExists(ctx, n.KubeClient, existingDeployment); err != nil {
-			webhookLog.Error(err, "failed to delete exising webhook Deployment")
-			return err
-		}
-		if _, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existingDeployment, desiredDeployment); err != nil {
-			webhookLog.Error(err, "failed to replace exising webhook Deployment")
+		k8s.UpdateDeployment(existingDeployment, *desiredDeployment)
+		if err := n.KubeClient.Update(ctx, existingDeployment); err != nil {
+			webhookLog.Error(err, "failed to update exising webhook Deployment")
 			return err
 		}
 	}
