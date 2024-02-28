@@ -50,7 +50,7 @@ func NewClient(opts ScanApiClientOptions) (ScanApiClient, error) {
 }
 
 func (s *scanApiClient) HealthCheck(ctx context.Context, in *common.HealthCheckRequest) (*common.HealthCheckResponse, error) {
-	url := s.ApiEndpoint + common.HealthCheckEndpoint
+	url := s.ApiEndpoint + "/Scan/HealthCheck"
 
 	reqBodyBytes, err := json.Marshal(in)
 	if err != nil {

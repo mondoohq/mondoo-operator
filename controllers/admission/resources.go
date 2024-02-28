@@ -119,7 +119,7 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 									},
 								},
 								InitialDelaySeconds: int32(5),
-								PeriodSeconds:       int32(10),
+								PeriodSeconds:       int32(5),
 							},
 							Resources: corev1.ResourceRequirements{
 								Limits: corev1.ResourceList{
