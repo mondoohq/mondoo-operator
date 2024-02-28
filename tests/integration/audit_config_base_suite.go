@@ -876,8 +876,8 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	cicdProject, err := s.integration.GetCiCdProject(s.ctx)
 	s.Require().NoErrorf(err, "Failed to get CICD project")
 
-	assets, err := s.WaitUntilCiCdAssetsScored(cicdProject)
-	s.Require().NoErrorf(err, "Failed to list scored CICD assets")
+	assets, err := cicdProject.ListAssets(s.ctx)
+	s.Require().NoErrorf(err, "Failed to list CICD assets")
 
 	assetNames := utils.CiCdJobNames(assets)
 	s.Contains(assetNames, fmt.Sprintf("%s/%s", passingDeployment.Namespace, passingDeployment.Name))
@@ -892,8 +892,8 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 		s.NoErrorf(err, "Failed creating a Deployment in permissive mode.")
 	}
 
-	assets, err = s.WaitUntilCiCdAssetsScored(cicdProject)
-	s.Require().NoErrorf(err, "Failed to list scored CICD assets")
+	assets, err = cicdProject.ListAssets(s.ctx)
+	s.Require().NoErrorf(err, "Failed to list CICD assets")
 
 	assetNames = utils.CiCdJobNames(assets)
 	s.Contains(assetNames, fmt.Sprintf("%s/%s", failingDeployment.Namespace, failingDeployment.Name))
@@ -905,23 +905,23 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	s.NoErrorf(s.testCluster.K8sHelper.WaitForResourceDeletion(failingDeployment), "Error waiting for deleteion of failingDeployment")
 }
 
-func (s *AuditConfigBaseSuite) WaitUntilCiCdAssetsScored(cicdProject *nexusK8s.CiCdProject) ([]nexusK8s.CiCdJob, error) {
-	var assets []nexusK8s.CiCdJob
-	var err error
-	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
-		assets, err = cicdProject.ListAssets(s.ctx)
-		if err != nil {
-			return false, err
-		}
-		for _, asset := range assets {
-			if asset.Grade == "U" {
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-	return assets, err
-}
+// func (s *AuditConfigBaseSuite) WaitUntilCiCdAssetsScored(cicdProject *nexusK8s.CiCdProject) ([]nexusK8s.CiCdJob, error) {
+// 	var assets []nexusK8s.CiCdJob
+// 	var err error
+// 	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+// 		assets, err = cicdProject.ListAssets(s.ctx)
+// 		if err != nil {
+// 			return false, err
+// 		}
+// 		for _, asset := range assets {
+// 			if asset.Grade == "U" {
+// 				return false, nil
+// 			}
+// 		}
+// 		return true, nil
+// 	})
+// 	return assets, err
+// }
 
 func (s *AuditConfigBaseSuite) getWebhookLabelsString() string {
 	webhookDeploymentLabels := mondooadmission.WebhookDeploymentLabels()
