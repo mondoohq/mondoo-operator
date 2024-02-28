@@ -1080,7 +1080,7 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	}()
 	zap.S().Info("Created port-forward via kubectl for webhook with pid: ", cmd.Process.Pid)
 
-	webhookUrl := fmt.Sprintf("https://127.0.0.1:%d/validate-k8s-mondoo-com", webhookLocalPort)
+	webhookUrl := fmt.Sprintf("https://127.0.0.1:%d/readyz", webhookLocalPort)
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{Transport: customTransport}
