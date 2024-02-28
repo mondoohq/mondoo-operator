@@ -371,6 +371,26 @@ func (k8sh *K8sHelper) UpdateAuditConfigWithRetries(name, namespace string, upda
 	return err
 }
 
+func (k8sh *K8sHelper) UpdateDeploymentWithRetries(ctx context.Context, listOpts client.ListOption, update func(*appsv1.Deployment)) error {
+	deployments := &appsv1.DeploymentList{}
+	return k8sh.ExecuteWithRetries(func() (bool, error) {
+		if err := k8sh.Clientset.List(ctx, deployments, listOpts); err != nil {
+			return false, err
+		}
+		if len(deployments.Items) != 1 {
+			return false, nil
+		}
+
+		// update the deployment
+		dep := &deployments.Items[0]
+		update(dep)
+		if err := k8sh.Clientset.Update(ctx, dep); err != nil {
+			return false, nil // retry
+		}
+		return true, nil
+	})
+}
+
 func (k8sh *K8sHelper) ExecuteWithRetries(f func() (bool, error)) error {
 	for i := 0; i < RetryLoop; i++ {
 		success, err := f()
