@@ -1,7 +1,6 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  creationTimestamp: null
   name: mondoo-operator-validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
@@ -31,5 +30,4 @@ webhooks:
     - jobs
     - cronjobs
   sideEffects: None
-  # The default is 10s but on slow clusters we may take longer
   timeout: 20s

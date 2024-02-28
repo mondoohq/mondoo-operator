@@ -32,5 +32,3 @@ webhooks:
     - jobs
     - cronjobs
   sideEffects: None
-  # The default is 10s but on slow clusters we may take longer
-  timeout: 20s
