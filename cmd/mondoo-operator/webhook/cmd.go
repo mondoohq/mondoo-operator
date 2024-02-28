@@ -14,7 +14,6 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	webhookhandler "go.mondoo.com/mondoo-operator/pkg/webhooks/handler"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -89,11 +88,11 @@ func init() {
 		}
 		hookServer.Register("/validate-k8s-mondoo-com", &webhook.Admission{Handler: webhookValidator})
 
-		if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		if err := mgr.AddHealthzCheck("healthz", webhookValidator.HealthChecker()); err != nil {
 			webhookLog.Error(err, "unable to set up health check")
 			return err
 		}
-		if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		if err := mgr.AddReadyzCheck("readyz", webhookValidator.HealthChecker()); err != nil {
 			webhookLog.Error(err, "unable to set up ready check")
 			return err
 		}

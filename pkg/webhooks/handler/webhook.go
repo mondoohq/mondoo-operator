@@ -6,6 +6,7 @@ package webhookhandler
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"reflect"
 
 	"google.golang.org/protobuf/types/known/structpb"
@@ -16,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/yaml"
@@ -24,6 +26,7 @@ import (
 
 	"go.mondoo.com/cnquery/v10/providers-sdk/v1/inventory"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/client/common"
 	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
@@ -85,9 +88,14 @@ type NewWebhookValidatorOpts struct {
 	ExcludeNamespaces []string
 }
 
+type MondooWebhook interface {
+	admission.Handler
+	HealthChecker() healthz.Checker
+}
+
 // NewWebhookValidator will initialize a CoreValidator with the provided k8s Client and
 // set it to the provided mode. Returns error if mode is invalid.
-func NewWebhookValidator(opts *NewWebhookValidatorOpts) (admission.Handler, error) {
+func NewWebhookValidator(opts *NewWebhookValidatorOpts) (MondooWebhook, error) {
 	webhookMode, err := wutils.ModeStringToAdmissionMode(opts.Mode)
 	if err != nil {
 		return nil, err
@@ -112,8 +120,6 @@ func NewWebhookValidator(opts *NewWebhookValidatorOpts) (admission.Handler, erro
 		excludeNamespaces: opts.ExcludeNamespaces,
 	}, nil
 }
-
-var _ admission.Handler = &webhookValidator{}
 
 func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (response admission.Response) {
 	resource := fmt.Sprintf("%s/%s", req.Namespace, req.Name)
@@ -249,6 +255,13 @@ func (a *webhookValidator) generateLabels(req admission.Request, obj runtime.Obj
 	}
 
 	return labels, nil
+}
+
+func (a *webhookValidator) HealthChecker() healthz.Checker {
+	return func(req *http.Request) error {
+		_, err := a.scanner.HealthCheck(req.Context(), &common.HealthCheckRequest{})
+		return err
+	}
 }
 
 func (a *webhookValidator) objFromRaw(rawObj runtime.RawExtension) (runtime.Object, error) {
