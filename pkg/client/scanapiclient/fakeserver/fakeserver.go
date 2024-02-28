@@ -14,7 +14,7 @@ import (
 
 func FakeServer() *httptest.Server {
 	mux := http.NewServeMux()
-	mux.HandleFunc(common.HealthCheckEndpoint, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/Scan/HealthCheck", func(w http.ResponseWriter, r *http.Request) {
 		result := &common.HealthCheckResponse{
 			Status: "SERVING",
 		}
