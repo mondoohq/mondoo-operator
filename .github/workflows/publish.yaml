@@ -405,7 +405,7 @@ jobs:
           kubernetes-version: ${{ matrix.k8s-version }}
 
       - name: Install Helm
-        uses: azure/setup-helm@v3
+        uses: azure/setup-helm@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
         id: install
@@ -490,7 +490,7 @@ jobs:
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Install Helm
-        uses: azure/setup-helm@v3
+        uses: azure/setup-helm@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
         id: install
