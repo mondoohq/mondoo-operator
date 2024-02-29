@@ -905,24 +905,6 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	s.NoErrorf(s.testCluster.K8sHelper.WaitForResourceDeletion(failingDeployment), "Error waiting for deleteion of failingDeployment")
 }
 
-// func (s *AuditConfigBaseSuite) WaitUntilCiCdAssetsScored(cicdProject *nexusK8s.CiCdProject) ([]nexusK8s.CiCdJob, error) {
-// 	var assets []nexusK8s.CiCdJob
-// 	var err error
-// 	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
-// 		assets, err = cicdProject.ListAssets(s.ctx)
-// 		if err != nil {
-// 			return false, err
-// 		}
-// 		for _, asset := range assets {
-// 			if asset.Grade == "U" {
-// 				return false, nil
-// 			}
-// 		}
-// 		return true, nil
-// 	})
-// 	return assets, err
-// }
-
 func (s *AuditConfigBaseSuite) getWebhookLabelsString() string {
 	webhookDeploymentLabels := mondooadmission.WebhookDeploymentLabels()
 
