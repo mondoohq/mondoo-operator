@@ -484,17 +484,18 @@ func (s *AuditConfigBaseSuite) verifyAdmissionWorking(auditConfig mondoov2.Mondo
 	// Check number of Pods depending on mode
 	webhookListOpts, err := s.getWebhookListOps()
 	s.NoError(err)
-	pods := &corev1.PodList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, pods, webhookListOpts))
-	numPods := 1
+	deployments := &appsv1.DeploymentList{}
+	s.Require().NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, webhookListOpts))
+	s.Require().Lenf(deployments.Items, 1, "Deployments count for webhook should be precisely one")
+	numReplicas := 1
 	if auditConfig.Spec.Admission.Mode == mondoov2.Enforcing {
-		numPods = 2
+		numReplicas = 2
 	}
 	if auditConfig.Spec.Admission.Replicas != nil {
-		numPods = int(*auditConfig.Spec.Admission.Replicas)
+		numReplicas = int(*auditConfig.Spec.Admission.Replicas)
 	}
-	failMessage := fmt.Sprintf("Pods count for webhook should be precisely %d because of mode and replicas", numPods)
-	s.Equalf(numPods, len(pods.Items), failMessage)
+	failMessage := fmt.Sprintf("Pods count for webhook should be precisely %d because of mode and replicas", numReplicas)
+	s.Equalf(numReplicas, int(*deployments.Items[0].Spec.Replicas), failMessage)
 
 	s.verifyWebhookAndStart(webhookListOpts, caCert)
 
@@ -875,8 +876,8 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	cicdProject, err := s.integration.GetCiCdProject(s.ctx)
 	s.Require().NoErrorf(err, "Failed to get CICD project")
 
-	assets, err := s.WaitUntilCiCdAssetsScored(cicdProject)
-	s.Require().NoErrorf(err, "Failed to list scored CICD assets")
+	assets, err := cicdProject.ListAssets(s.ctx)
+	s.Require().NoErrorf(err, "Failed to list CICD assets")
 
 	assetNames := utils.CiCdJobNames(assets)
 	s.Contains(assetNames, fmt.Sprintf("%s/%s", passingDeployment.Namespace, passingDeployment.Name))
@@ -891,8 +892,8 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 		s.NoErrorf(err, "Failed creating a Deployment in permissive mode.")
 	}
 
-	assets, err = s.WaitUntilCiCdAssetsScored(cicdProject)
-	s.Require().NoErrorf(err, "Failed to list scored CICD assets")
+	assets, err = cicdProject.ListAssets(s.ctx)
+	s.Require().NoErrorf(err, "Failed to list CICD assets")
 
 	assetNames = utils.CiCdJobNames(assets)
 	s.Contains(assetNames, fmt.Sprintf("%s/%s", failingDeployment.Namespace, failingDeployment.Name))
@@ -902,24 +903,6 @@ func (s *AuditConfigBaseSuite) checkDeployments(auditConfig *mondoov2.MondooAudi
 	s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(failingDeployment), "Failed to delete failingDeployment")
 	s.NoErrorf(s.testCluster.K8sHelper.WaitForResourceDeletion(passingDeployment), "Error waiting for deleteion of passingDeployment")
 	s.NoErrorf(s.testCluster.K8sHelper.WaitForResourceDeletion(failingDeployment), "Error waiting for deleteion of failingDeployment")
-}
-
-func (s *AuditConfigBaseSuite) WaitUntilCiCdAssetsScored(cicdProject *nexusK8s.CiCdProject) ([]nexusK8s.CiCdJob, error) {
-	var assets []nexusK8s.CiCdJob
-	var err error
-	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
-		assets, err = cicdProject.ListAssets(s.ctx)
-		if err != nil {
-			return false, err
-		}
-		for _, asset := range assets {
-			if asset.Grade == "U" {
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-	return assets, err
 }
 
 func (s *AuditConfigBaseSuite) getWebhookLabelsString() string {
@@ -1079,7 +1062,7 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 	}()
 	zap.S().Info("Created port-forward via kubectl for webhook with pid: ", cmd.Process.Pid)
 
-	webhookUrl := fmt.Sprintf("https://127.0.0.1:%d/validate-k8s-mondoo-com", webhookLocalPort)
+	webhookUrl := fmt.Sprintf("https://127.0.0.1:%d/readyz", webhookLocalPort)
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{Transport: customTransport}

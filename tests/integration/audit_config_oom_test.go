@@ -46,30 +46,26 @@ func (s *AuditConfigOOMSuite) TestOOMControllerReporting() {
 
 	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
 
-	deployments := &appsv1.DeploymentList{}
 	listOpts := &client.ListOptions{
 		Namespace: auditConfig.Namespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			"app.kubernetes.io/name": "mondoo-operator",
 		}),
 	}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
-	s.Equalf(1, len(deployments.Items), "mondoo-operator deployment not found")
 
-	operatorDeployment := deployments.Items[0]
-	operatorDeployment.Spec.Template.Spec.Containers[0].Resources.Requests = corev1.ResourceList{}
-	operatorDeployment.Spec.Template.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("15Mi"), // this should be low enough to trigger an OOMkilled
-	}
-
-	zap.S().Info("Reducing memory limit to trigger OOM.")
-	s.NoError(s.testCluster.K8sHelper.Clientset.Update(s.ctx, &operatorDeployment))
+	err := s.testCluster.K8sHelper.UpdateDeploymentWithRetries(s.ctx, listOpts, func(dep *appsv1.Deployment) {
+		dep.Spec.Template.Spec.Containers[0].Resources.Requests = corev1.ResourceList{}
+		dep.Spec.Template.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("15Mi"), // this should be low enough to trigger an OOMkilled
+		}
+	})
+	s.Require().NoErrorf(err, "Failed to reduce memory limit")
 
 	// This will take some time, because:
 	// a new replicaset should be created
 	// the first Pod tries to start and gets killed
 	// on the 2nd start we should get an OOMkilled status update
-	err := s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.MondooOperatorDegraded, corev1.ConditionTrue, "OOM")
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.MondooOperatorDegraded, corev1.ConditionTrue, "OOM")
 	s.Require().NoError(err, "Failed to find degraded condition")
 
 	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
@@ -89,16 +85,17 @@ func (s *AuditConfigOOMSuite) TestOOMControllerReporting() {
 	})
 	s.NoErrorf(err, "Failed to check for ERROR status")
 
+	deployments := &appsv1.DeploymentList{}
 	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
 	s.Equalf(1, len(deployments.Items), "mondoo-operator deployment not found")
 
-	operatorDeployment = deployments.Items[0]
-	operatorDeployment.Spec.Template.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("100Mi"), // this should be enough to get the operator running again
-	}
-
 	zap.S().Info("Increasing memory limit to get controller running again.")
-	s.NoError(s.testCluster.K8sHelper.Clientset.Update(s.ctx, &operatorDeployment))
+	err = s.testCluster.K8sHelper.UpdateDeploymentWithRetries(s.ctx, listOpts, func(dep *appsv1.Deployment) {
+		dep.Spec.Template.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("100Mi"), // this should be low enough to trigger an OOMkilled
+		}
+	})
+	s.Require().NoErrorf(err, "Failed to reduce memory limit")
 
 	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.MondooOperatorDegraded, corev1.ConditionFalse, "")
 	s.Require().NoError(err, "Failed to find degraded condition")
