@@ -126,10 +126,6 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		}
 	}
 
-	if err := n.syncGCCronjob(ctx, mondooOperatorImage, clusterUid); err != nil {
-		return err
-	}
-
 	// Delete dangling CronJobs for nodes that have been deleted from the cluster.
 	if err := n.cleanupCronJobsForDeletedNodes(ctx, *nodes); err != nil {
 		return err
@@ -156,6 +152,10 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	updateNodeConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs), pods)
+
+	if err := n.syncGCCronjob(ctx, mondooOperatorImage, clusterUid); err != nil {
+		return err
+	}
 	return nil
 }
 
