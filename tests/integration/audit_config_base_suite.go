@@ -179,7 +179,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	})
 	s.NoError(err, "Kubernetes resources scanning CronJob was not created.")
 
-	time.Sleep(60 * time.Second)
+	time.Sleep(20 * time.Second)
 
 	cronJobLabels := k8s_scan.CronJobLabels(auditConfig)
 	s.True(
@@ -196,9 +196,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	workloadNames, err := s.testCluster.K8sHelper.GetWorkloadNames(s.ctx)
 	s.NoError(err, "Failed to get workload names.")
 	zap.S().Info("number of workload", " amount ", len(workloadNames))
-
-	// Wait a bit to longer, to later check, whether the CronJob schedule was changed.
-	time.Sleep(61 * time.Second)
 
 	currentCronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{Name: k8s_scan.CronJobName(auditConfig.Name), Namespace: auditConfig.Namespace},
@@ -224,10 +221,10 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 
 	// TODO: the cluster name is non-deterministic currently so we cannot test for it
 	assetsExceptCluster := utils.ExcludeClusterAsset(assets)
-	s.Equal(len(assets)-1, len(assetsExceptCluster), "Cluster asset was sent upstream.")
+	s.Equalf(len(assets)-1, len(assetsExceptCluster), "Cluster asset was sent upstream.")
 
 	assetNames := utils.AssetNames(assetsExceptCluster)
-	s.ElementsMatch(workloadNames, assetNames, "Workloads were not sent upstream.")
+	s.ElementsMatchf(workloadNames, assetNames, "Workloads were not sent upstream.")
 
 	s.AssetsNotUnscored(assets)
 
@@ -287,9 +284,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 
 	containerImages, err := utils.ContainerImages(pods.Items, auditConfig)
 	s.NoError(err, "Failed to get container image names")
-
-	// Wait a bit to longer, to later check, whether the CronJob schedule was changed.
-	time.Sleep(61 * time.Second)
 
 	currentCronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{Name: container_image.CronJobName(auditConfig.Name), Namespace: auditConfig.Namespace},
@@ -412,9 +406,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	for _, node := range nodes.Items {
 		nodeNames = append(nodeNames, node.Name)
 	}
-
-	// Wait a bit to longer, to later check, whether the CronJob schedule was changed.
-	time.Sleep(61 * time.Second)
 
 	currentCronJobs := &batchv1.CronJobList{}
 	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
@@ -1121,6 +1112,24 @@ func (s *AuditConfigBaseSuite) createPortForwardCmd(webhookService *corev1.Servi
 	return exec.Command("kubectl", kubectlArgs...)
 }
 
+var (
+	defaultK8sPolicyMrns = []string{
+		"//policy.api.mondoo.app/policies/mondoo-kubernetes-best-practices",
+		"//policy.api.mondoo.app/policies/mondoo-kubernetes-security",
+	}
+	defaultK8sNodePolicyMrns = []string{
+		"//policy.api.mondoo.app/policies/platform-eol",
+		"//policy.api.mondoo.app/policies/platform-vulnerability",
+		"//policy.api.mondoo.app/policies/mondoo-kubernetes-security",
+		"//policy.api.mondoo.app/policies/mondoo-linux-security",
+	}
+	defaultOsPolicyMrns = []string{
+		"//policy.api.mondoo.app/policies/platform-eol",
+		"//policy.api.mondoo.app/policies/platform-vulnerability",
+		"//policy.api.mondoo.app/policies/mondoo-linux-security",
+	}
+)
+
 func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []assets.AssetWithScore) {
 	for _, asset := range assets {
 		// We don't score scratch containers at the moment so they are always unscored.
@@ -1130,7 +1139,21 @@ func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []assets.AssetWithScore)
 				zap.S().Infof("Asset %s has no score", asset.Name)
 			}
 			s.NotEqualf("U", asset.Grade, "Asset %s should not be unscored", asset.Name)
-			// s.NotEqualf(uint32(policy.ScoreType_UNSCORED), asset.Score.Type, "Asset %s should not be unscored", asset.Asset.Name)
+
+			// Check which were the scored policies
+			scoredPolicies := []string{}
+			for _, p := range asset.PolicyScores {
+				if p.Grade != "U" {
+					scoredPolicies = append(scoredPolicies, p.Mrn)
+				}
+			}
+			expectedPolicies := defaultK8sNodePolicyMrns
+			if strings.Contains(asset.Platform.Name, "k8s") {
+				expectedPolicies = defaultK8sPolicyMrns
+			} else if strings.Contains(asset.Name, "nginx") || strings.Contains(asset.Name, "redis") {
+				expectedPolicies = defaultOsPolicyMrns
+			}
+			s.ElementsMatchf(expectedPolicies, scoredPolicies, "Scored policies for asset %s should be the default k8s policies", asset.Name)
 		}
 	}
 }
