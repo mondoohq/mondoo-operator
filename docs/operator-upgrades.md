@@ -57,7 +57,7 @@ If there **is** more than one major version difference between the installed Mon
 
 ## Update an operator deployed with Helm
 
-Two update your operator installed with Helm, you have two options:
+To update your operator installed with Helm, you have two options:
 
 - Upgrade the Helm chart to the [latest release](https://github.com/mondoohq/mondoo-operator/releases/latest)
 - Update the [values](https://github.com/mondoohq/mondoo-operator/blob/main/charts/mondoo-operator/values.yaml#L17) for the Helm chart to the latest image tag which matched the latest Helm chart release.
