@@ -34,8 +34,8 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 
 	cmd := []string{
 		"cnspec", "scan", "k8s",
-		"--config", "/etc/opt/mondoo/mondoo.yml",
-		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
+		"--config", "/etc/opt/mondoo/config/mondoo.yml",
+		"--inventory-file", "/etc/opt/mondoo/config/inventory.yml",
 		"--score-threshold", "0",
 	}
 
@@ -89,7 +89,7 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 										{
 											Name:      "config",
 											ReadOnly:  true,
-											MountPath: "/etc/opt/",
+											MountPath: "/etc/opt/mondoo/config",
 										},
 										{
 											Name:      "temp",
@@ -118,7 +118,7 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 														LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name)},
 														Items: []corev1.KeyToPath{{
 															Key:  "inventory",
-															Path: "mondoo/inventory.yml",
+															Path: "inventory.yml",
 														}},
 													},
 												},
@@ -127,7 +127,7 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 														LocalObjectReference: m.Spec.MondooCredsSecretRef,
 														Items: []corev1.KeyToPath{{
 															Key:  "config",
-															Path: "mondoo/mondoo.yml",
+															Path: "mondoo.yml",
 														}},
 													},
 												},
