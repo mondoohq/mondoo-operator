@@ -26,7 +26,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -74,9 +73,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMap() {
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 		// Set some fields that the kube client sets
-		gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
-		s.NoError(err)
-		expected.SetGroupVersionKind(gvk)
 		expected.ResourceVersion = "1"
 
 		created := &corev1.ConfigMap{}
@@ -126,9 +122,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 		// Set some fields that the kube client sets
-		gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
-		s.NoError(err)
-		expected.SetGroupVersionKind(gvk)
 		expected.ResourceVersion = "1"
 
 		created := &corev1.ConfigMap{}
@@ -165,10 +158,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
 		s.Require().NoError(err, "unexpected error while generating ConfigMap")
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
-		// Set some fields that the kube client sets
-		gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
-		s.NoError(err)
-		expected.SetGroupVersionKind(gvk)
+		// // Set some fields that the kube client sets
 		expected.ResourceVersion = "2"
 
 		created := &corev1.ConfigMap{}
@@ -212,9 +202,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanConfigMapsForDeletedNodes() 
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
-	gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
-	s.NoError(err)
-	expected.SetGroupVersionKind(gvk)
 	expected.ResourceVersion = "1"
 
 	created := &corev1.ConfigMap{}
@@ -247,9 +234,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 		// Set some fields that the kube client sets
-		gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
-		s.NoError(err)
-		expected.SetGroupVersionKind(gvk)
 		expected.ResourceVersion = "1"
 
 		created := &batchv1.CronJob{}
@@ -268,9 +252,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
-	gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
-	s.NoError(err)
-	expected.SetGroupVersionKind(gvk)
 	expected.ResourceVersion = "1"
 
 	created := &batchv1.CronJob{}
@@ -305,11 +286,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	for i, n := range nodes.Items {
 		expected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
-
-		// Set some fields that the kube client sets
-		gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
-		s.NoError(err)
-		expected.SetGroupVersionKind(gvk)
 
 		// The second node has an updated cron job so resource version is +1
 		expected.ResourceVersion = fmt.Sprintf("%d", 1+i)
@@ -362,9 +338,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
-	gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
-	s.NoError(err)
-	expected.SetGroupVersionKind(gvk)
 	expected.ResourceVersion = "1"
 
 	created := &batchv1.CronJob{}
