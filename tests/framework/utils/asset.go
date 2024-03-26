@@ -5,7 +5,8 @@ package utils
 
 import (
 	"github.com/google/go-containerregistry/pkg/name"
-	"go.mondoo.com/cnquery/v10/providers/os/resources/discovery/container_registry"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"go.mondoo.com/cnquery/v10/providers/os/id/containerid"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
@@ -54,7 +55,6 @@ func ContainerImages(pods []v1.Pod, auditConfig v1alpha2.MondooAuditConfig) ([]s
 		}
 	}
 
-	ccresolver := container_registry.NewContainerRegistryResolver()
 	images := make([]string, 0, len(runningImages))
 	for i := range runningImages {
 		ref, err := name.ParseReference(i, name.WeakValidation)
@@ -62,11 +62,16 @@ func ContainerImages(pods []v1.Pod, auditConfig v1alpha2.MondooAuditConfig) ([]s
 			return nil, err
 		}
 
-		a, err := ccresolver.GetImage(ref, nil)
+		repoName := ref.Context().Name()
+		img, err := remote.Image(ref)
 		if err != nil {
-			return images, err
+			return nil, err
 		}
-		images = append(images, a.Name)
+		digest, err := img.Digest()
+		if err != nil {
+			return nil, err
+		}
+		images = append(images, repoName+"@"+containerid.ShortContainerImageID(digest.String()))
 	}
 
 	return images, nil
