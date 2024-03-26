@@ -42,7 +42,6 @@ require (
 	github.com/GaijinEntertainment/go-exhaustruct/v3 v3.2.0 // indirect
 	github.com/GoogleCloudPlatform/berglas v1.0.3 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
-	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/OpenPeeDeeP/depguard/v2 v2.2.0 // indirect
 	github.com/alecthomas/go-check-sumtype v0.1.4 // indirect
 	github.com/alecthomas/participle v0.3.0 // indirect
@@ -62,8 +61,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.4 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.0 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ecr v1.27.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ecrpublic v1.23.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.11.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.3.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.6 // indirect
@@ -75,7 +72,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.23.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.5 // indirect
 	github.com/aws/smithy-go v1.20.1 // indirect
-	github.com/awslabs/amazon-ecr-credential-helper/ecr-login v0.0.0-20240318154307-a1a918375412 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bkielbasa/cyclop v1.2.1 // indirect
 	github.com/blizzy78/varnamelen v0.8.0 // indirect
@@ -103,13 +99,10 @@ require (
 	github.com/daixiang0/gci v0.13.0 // indirect
 	github.com/danieljoos/wincred v1.2.1 // indirect
 	github.com/denis-tingaikin/go-header v0.5.0 // indirect
-	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/cli v25.0.4+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker v25.0.4+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.8.1 // indirect
-	github.com/docker/go-connections v0.4.0 // indirect
-	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/esimonov/ifshort v1.0.4 // indirect
