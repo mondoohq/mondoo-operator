@@ -20,7 +20,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -96,9 +95,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
-	gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
-	s.NoError(err)
-	expected.SetGroupVersionKind(gvk)
 	expected.ResourceVersion = "1"
 
 	created := &batchv1.CronJob{}
@@ -152,9 +148,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
-	gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
-	s.NoError(err)
-	expected.SetGroupVersionKind(gvk)
 	expected.ResourceVersion = "1"
 
 	created := &batchv1.CronJob{}
@@ -188,11 +181,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 
 	expected := CronJob(image, "", test.KubeSystemNamespaceUid, &s.auditConfig)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
-
-	// Set some fields that the kube client sets
-	gvk, err := apiutil.GVKForObject(expected, d.KubeClient.Scheme())
-	s.NoError(err)
-	expected.SetGroupVersionKind(gvk)
 
 	// The second node has an updated cron job so resource version is +1
 	expected.ResourceVersion = fmt.Sprintf("%d", 2)
