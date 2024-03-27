@@ -59,6 +59,7 @@ func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes, admissio
 			Nodes: mondoov2.Nodes{
 				Enable:   nodes,
 				Schedule: schedule,
+				Style:    mondoov2.NodeScanStyle_CronJob,
 			},
 			Admission: mondoov2.Admission{Enable: admission},
 		},

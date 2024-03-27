@@ -97,13 +97,21 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 			return err
 		}
 
-		if op == controllerutil.OperationResultCreated {
-			err = mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger)
-			if err != nil {
+		switch op {
+		case controllerutil.OperationResultCreated:
+			if err = mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger); err != nil {
 				logger.Error(err, "Failed to update MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
 				return err
 			}
 			continue
+		case controllerutil.OperationResultUpdated:
+			// Remove any old jobs because they won't be updated when the cronjob changes
+			if err := n.KubeClient.DeleteAllOf(ctx, &batchv1.Job{},
+				client.InNamespace(n.Mondoo.Namespace),
+				client.MatchingLabels(CronJobLabels(*n.Mondoo)),
+				client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
+				return err
+			}
 		}
 	}
 

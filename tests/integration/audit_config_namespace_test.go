@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
 
@@ -95,10 +96,18 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Containers() {
 	s.testMondooAuditConfigContainers(auditConfig)
 }
 
-func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes() {
+func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes_CronJobs() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true, false)
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
-	s.testMondooAuditConfigNodes(auditConfig)
+	s.testMondooAuditConfigNodesCronjobs(auditConfig)
+}
+
+func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes_Deployments() {
+	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true, false)
+	auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment
+	auditConfig.Spec.Nodes.IntervalTimer = 1
+	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
+	s.testMondooAuditConfigNodesDeployments(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Admission() {

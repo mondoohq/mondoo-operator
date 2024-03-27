@@ -123,6 +123,9 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 					Value: "false",
 				},
 			},
+			TerminationMessagePath:   "/dev/termination-log",
+			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+			ImagePullPolicy:          corev1.PullIfNotPresent,
 		},
 	}
 	cj.Spec.JobTemplate.Spec.Template.Spec.Volumes = []corev1.Volume{
@@ -225,6 +228,9 @@ func UpdateDeployment(
 				// is not privileged, then we have no access to /proc.
 				Privileged: ptr.To(isOpenshift),
 			},
+			TerminationMessagePath:   "/dev/termination-log",
+			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+			ImagePullPolicy:          corev1.PullIfNotPresent,
 			VolumeMounts: []corev1.VolumeMount{
 				{
 					Name:      "root",
@@ -301,7 +307,7 @@ func UpdateDeployment(
 	}
 }
 
-func UpdateGarbageCollectCronJob(cj *batchv1.CronJob, image, clusterUid string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+func UpdateGarbageCollectCronJob(cj *batchv1.CronJob, image, clusterUid string, m v1alpha2.MondooAuditConfig) {
 	ls := CronJobLabels(m)
 
 	cronTab := fmt.Sprintf("%d */12 * * *", time.Now().Add(1*time.Minute).Minute())
@@ -336,11 +342,13 @@ func UpdateGarbageCollectCronJob(cj *batchv1.CronJob, image, clusterUid string, 
 	cj.Spec.JobTemplate.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
 	cj.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{
 		{
-			Image:           image,
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			Name:            "gc",
-			Command:         []string{"/mondoo-operator"},
-			Args:            containerArgs,
+			Image:                    image,
+			ImagePullPolicy:          corev1.PullIfNotPresent,
+			Name:                     "gc",
+			Command:                  []string{"/mondoo-operator"},
+			Args:                     containerArgs,
+			TerminationMessagePath:   "/dev/termination-log",
+			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 			Resources: corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -381,70 +389,6 @@ func UpdateGarbageCollectCronJob(cj *batchv1.CronJob, image, clusterUid string, 
 					SecretName:  scanapi.TokenSecretName(m.Name),
 				},
 			},
-		},
-	}
-
-	return &batchv1.CronJob{
-		Spec: batchv1.CronJobSpec{
-			JobTemplate: batchv1.JobTemplateSpec{
-				Spec: batchv1.JobSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Image:           image,
-									ImagePullPolicy: corev1.PullIfNotPresent,
-									Name:            "gc",
-									Command:         []string{"/mondoo-operator"},
-									Args:            containerArgs,
-									Resources: corev1.ResourceRequirements{
-										Limits: corev1.ResourceList{
-											corev1.ResourceCPU:    resource.MustParse("100m"),
-											corev1.ResourceMemory: resource.MustParse("30Mi"),
-										},
-										Requests: corev1.ResourceList{
-											corev1.ResourceCPU:    resource.MustParse("50m"),
-											corev1.ResourceMemory: resource.MustParse("20Mi"),
-										},
-									},
-									SecurityContext: &corev1.SecurityContext{
-										AllowPrivilegeEscalation: ptr.To(false),
-										ReadOnlyRootFilesystem:   ptr.To(true),
-										RunAsNonRoot:             ptr.To(true),
-										Capabilities: &corev1.Capabilities{
-											Drop: []corev1.Capability{
-												"ALL",
-											},
-										},
-										Privileged: ptr.To(false),
-									},
-									VolumeMounts: []corev1.VolumeMount{
-										{
-											Name:      "token",
-											MountPath: "/etc/scanapi",
-											ReadOnly:  true,
-										},
-									},
-									Env: feature_flags.AllFeatureFlagsAsEnv(),
-								},
-							},
-							Volumes: []corev1.Volume{
-								{
-									Name: "token",
-									VolumeSource: corev1.VolumeSource{
-										Secret: &corev1.SecretVolumeSource{
-											DefaultMode: ptr.To(int32(0o444)),
-											SecretName:  scanapi.TokenSecretName(m.Name),
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
-			FailedJobsHistoryLimit:     ptr.To(int32(1)),
 		},
 	}
 }
