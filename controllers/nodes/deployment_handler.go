@@ -74,6 +74,15 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 
 	// Create/update CronJobs for nodes
 	for _, node := range nodes.Items {
+		// Delete Deployment if it exists
+		dep := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace},
+		}
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, dep); err != nil {
+			logger.Error(err, "Failed to clean up node scanning Deployment", "namespace", dep.Namespace, "name", dep.Name)
+			return err
+		}
+
 		updated, err := n.syncConfigMap(ctx, node, clusterUid)
 		if err != nil {
 			return err
@@ -176,6 +185,15 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 
 	// Create/update Deployments for nodes
 	for _, node := range nodes.Items {
+		// Delete CronJob if it exists
+		cronJob := &batchv1.CronJob{
+			ObjectMeta: metav1.ObjectMeta{Name: CronJobName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace},
+		}
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, cronJob); err != nil {
+			logger.Error(err, "Failed to clean up node scanning CronJob", "namespace", cronJob.Namespace, "name", cronJob.Name)
+			return err
+		}
+
 		updated, err := n.syncConfigMap(ctx, node, clusterUid)
 		if err != nil {
 			return err

@@ -271,6 +271,58 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	s.True(equality.Semantic.DeepEqual(gcCjExpected, gcCj))
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_Switch() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
+
+	image, err := s.containerImageResolver.CnspecImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	for _, n := range nodes.Items {
+		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
+		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
+
+		cjExpected := cj.DeepCopy()
+		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
+	}
+
+	mondooAuditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	listOpts := &client.ListOptions{
+		Namespace:     s.auditConfig.Namespace,
+		LabelSelector: labels.SelectorFromSet(CronJobLabels(s.auditConfig)),
+	}
+	cronjobs := &batchv1.CronJobList{}
+	s.NoError(d.KubeClient.List(s.ctx, cronjobs, listOpts))
+
+	s.Empty(cronjobs.Items)
+
+	operatorImage, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
+	s.NoError(err)
+
+	// Verify node garbage collection cronjob
+	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
+
+	gcCjExpected := gcCj.DeepCopy()
+	UpdateGarbageCollectCronJob(gcCjExpected, operatorImage, "abcdefg", s.auditConfig)
+	s.True(equality.Semantic.DeepEqual(gcCjExpected, gcCj))
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
@@ -373,6 +425,59 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDeployments() {
 		UpdateDeployment(depExpected, n, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
 		s.True(equality.Semantic.DeepEqual(depExpected, dep))
 	}
+
+	operatorImage, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
+	s.NoError(err)
+
+	// Verify node garbage collection cronjob
+	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
+
+	gcCjExpected := gcCj.DeepCopy()
+	UpdateGarbageCollectCronJob(gcCjExpected, operatorImage, "abcdefg", s.auditConfig)
+	s.True(equality.Semantic.DeepEqual(gcCjExpected, gcCj))
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_CreateDeployments_Switch() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
+
+	image, err := s.containerImageResolver.CnspecImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	for _, n := range nodes.Items {
+		dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
+		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(dep), dep))
+
+		depExpected := dep.DeepCopy()
+		UpdateDeployment(depExpected, n, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
+		s.True(equality.Semantic.DeepEqual(depExpected, dep))
+	}
+
+	mondooAuditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_CronJob
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	listOpts := &client.ListOptions{
+		Namespace:     s.auditConfig.Namespace,
+		LabelSelector: labels.SelectorFromSet(CronJobLabels(s.auditConfig)),
+	}
+	deployments := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, deployments, listOpts))
+
+	s.Empty(deployments.Items)
 
 	operatorImage, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
 	s.NoError(err)
