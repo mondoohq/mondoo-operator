@@ -10,12 +10,12 @@
 
     - Continuous validation of deployed workloads
     - Continuous validation of Kubernetes nodes **without** privileged access
-    - Admission Controller 
+    - Admission Controller
 
     It is backed by Mondoo's powerful policy-as-code engine [cnspec](https://mondoo.com/docs/cnspec/cnspec-about/) and [MQL](https://mondoo.com/docs/mql/resources/). Mondoo ships out-of-the-box security policies for:
 
     - CIS Kubernetes Benchmarks
-    - CIS AKS/EKS/GKE/OpenShift Benchmarks 
+    - CIS AKS/EKS/GKE/OpenShift Benchmarks
     - NSA/CISA Kubernetes Hardening Guide
     - Kubernetes Cluster and Workload Security
     - Kubernetes Best Practices
@@ -26,7 +26,7 @@
 
     2. Configure the Mondoo Secret
 
-    - Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/console/access/service_accounts/)
+    - Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/maintain/access/service_accounts/)
     - Store the service account json into a local file `creds.json`
     - Store service account as a secret in the mondoo namespace via:
 
