@@ -301,7 +301,7 @@ func UpdateDeployment(
 	}
 }
 
-func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+func UpdateGarbageCollectCronJob(cj *batchv1.CronJob, image, clusterUid string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
 	ls := CronJobLabels(m)
 
 	cronTab := fmt.Sprintf("%d */12 * * *", time.Now().Add(1*time.Minute).Minute())
@@ -323,29 +323,73 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 		containerArgs = append(containerArgs, []string{"--filter-managed-by", scannedAssetsManagedBy}...)
 	}
 
-	return &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      GarbageCollectCronJobName(m.Name),
-			Namespace: m.Namespace,
-			Labels:    GarbageCollectCronJobLabels(m),
-		},
-		Spec: batchv1.CronJobSpec{
-			Schedule:          cronTab,
-			ConcurrencyPolicy: batchv1.ForbidConcurrent,
-			JobTemplate: batchv1.JobTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: ls,
+	cj.Labels = GarbageCollectCronJobLabels(m)
+	cj.Spec.Schedule = cronTab
+	cj.Spec.ConcurrencyPolicy = batchv1.ForbidConcurrent
+	cj.Spec.SuccessfulJobsHistoryLimit = ptr.To(int32(1))
+	cj.Spec.FailedJobsHistoryLimit = ptr.To(int32(1))
+	cj.Spec.JobTemplate.Labels = ls
+	cj.Spec.JobTemplate.Spec.Template.Labels = ls
+	cj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+	// The node scanning does not use the Kubernetes API at all, therefore the service account token
+	// should not be mounted at all.
+	cj.Spec.JobTemplate.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
+	cj.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{
+		{
+			Image:           image,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Name:            "gc",
+			Command:         []string{"/mondoo-operator"},
+			Args:            containerArgs,
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("30Mi"),
 				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("50m"),
+					corev1.ResourceMemory: resource.MustParse("20Mi"),
+				},
+			},
+			SecurityContext: &corev1.SecurityContext{
+				AllowPrivilegeEscalation: ptr.To(false),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				RunAsNonRoot:             ptr.To(true),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{
+						"ALL",
+					},
+				},
+				Privileged: ptr.To(false),
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "token",
+					MountPath: "/etc/scanapi",
+					ReadOnly:  true,
+				},
+			},
+			Env: feature_flags.AllFeatureFlagsAsEnv(),
+		},
+	}
+	cj.Spec.JobTemplate.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{
+			Name: "token",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					DefaultMode: ptr.To(int32(0o444)),
+					SecretName:  scanapi.TokenSecretName(m.Name),
+				},
+			},
+		},
+	}
+
+	return &batchv1.CronJob{
+		Spec: batchv1.CronJobSpec{
+			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: ls,
-						},
 						Spec: corev1.PodSpec{
-							RestartPolicy: corev1.RestartPolicyOnFailure,
-							// The node scanning does not use the Kubernetes API at all, therefore the service account token
-							// should not be mounted at all.
-							AutomountServiceAccountToken: ptr.To(false),
 							Containers: []corev1.Container{
 								{
 									Image:           image,

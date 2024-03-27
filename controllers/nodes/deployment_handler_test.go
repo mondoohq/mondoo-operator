@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -263,17 +262,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	s.NoError(err)
 
 	// Verify node garbage collection cronjob
-	expected := GarbageCollectCronJob(operatorImage, "abcdefg", s.auditConfig)
-	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
 
-	// Set some fields that the kube client sets
-	expected.ResourceVersion = "1"
-
-	created := &batchv1.CronJob{}
-	created.Name = expected.Name
-	created.Namespace = expected.Namespace
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
-	s.Equal(expected, created)
+	gcCjExpected := gcCj.DeepCopy()
+	UpdateGarbageCollectCronJob(gcCjExpected, operatorImage, "abcdefg", s.auditConfig)
+	s.True(equality.Semantic.DeepEqual(gcCjExpected, gcCj))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
@@ -383,17 +377,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDeployments() {
 	s.NoError(err)
 
 	// Verify node garbage collection cronjob
-	expected := GarbageCollectCronJob(operatorImage, "abcdefg", s.auditConfig)
-	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
 
-	// Set some fields that the kube client sets
-	expected.ResourceVersion = "1"
-
-	created := &batchv1.CronJob{}
-	created.Name = expected.Name
-	created.Namespace = expected.Namespace
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
-	s.Equal(expected, created)
+	gcCjExpected := gcCj.DeepCopy()
+	UpdateGarbageCollectCronJob(gcCjExpected, operatorImage, "abcdefg", s.auditConfig)
+	s.True(equality.Semantic.DeepEqual(gcCjExpected, gcCj))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_UpdateDeployments() {

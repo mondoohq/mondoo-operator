@@ -342,36 +342,12 @@ func (n *DeploymentHandler) cleanupDeploymentsForDeletedNodes(ctx context.Contex
 }
 
 func (n *DeploymentHandler) syncGCCronjob(ctx context.Context, mondooOperatorImage, clusterUid string) error {
-	existing := &batchv1.CronJob{}
-	desired := GarbageCollectCronJob(mondooOperatorImage, clusterUid, *n.Mondoo)
-
-	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
-		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
-		return err
-	}
-
-	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
-	if err != nil {
-		logger.Error(err, "Failed to create garbage collect CronJob", "namespace", desired.Namespace, "name", desired.Name)
-		return err
-	}
-
-	if created {
-		logger.Info("Created garbage collect CronJob", "namespace", desired.Namespace, "name", desired.Name)
+	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
+	_, err := k8s.CreateOrUpdate(ctx, n.KubeClient, cj, n.Mondoo, logger, func() error {
+		UpdateGarbageCollectCronJob(cj, mondooOperatorImage, clusterUid, *n.Mondoo)
 		return nil
-	}
-
-	if !k8s.AreCronJobsEqual(*existing, *desired) {
-		existing.Spec.JobTemplate = desired.Spec.JobTemplate
-		existing.Spec.ConcurrencyPolicy = desired.Spec.ConcurrencyPolicy
-		existing.SetOwnerReferences(desired.GetOwnerReferences())
-
-		if err := n.KubeClient.Update(ctx, existing); err != nil {
-			logger.Error(err, "Failed to update garbage collect CronJob", "namespace", existing.Namespace, "name", existing.Name)
-			return err
-		}
-	}
-	return nil
+	})
+	return err
 }
 
 func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]batchv1.CronJob, error) {
