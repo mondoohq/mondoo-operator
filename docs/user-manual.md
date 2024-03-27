@@ -126,7 +126,7 @@ Preconditions:
 
 Follow these steps to configure the Mondoo Secret:
 
-1. Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts).
+1. Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/maintain/access/service_accounts/).
 2. Store the service account json into a local file `creds.json`. The `creds.json` file should look like this:
 
    ```json
@@ -167,6 +167,7 @@ Once the Secret is configured, configure the operator to define the scan targets
    ```
 
 2. Apply the configuration:
+
    ```bash
    kubectl apply -f mondoo-config.yaml
    ```
@@ -238,7 +239,7 @@ If a workload is dependent on another workload, the admission controller only sc
 For example, if a Deployment creates a Pod, the admission controller skips the Pod and scans the Deployment.
 The owner workload is the definition where you can fix issues permanently.
 
-For more information on how you can configure this, have a look at [this tutorial](https://mondoo.com/docs/tutorials/kubernetes/scan-kubernetes-with-operator/).
+For more information on how you can configure this, have a look at [this tutorial](https://mondoo.com/docs/platform/infra/cloud/kubernetes/scan-kubernetes-with-operator/).
 
 ### Different modes of operation
 
@@ -262,7 +263,7 @@ You configure the mode via the `MondooAuditConfig`:
 When admission is enabled, the default mode is `permissive` with one replica.
 In permissive mode, the webhook checks objects like Deployments or Pods against policies and reports problems to the Mondoo Backend.
 Mondoo shows the results in the CI/CD view.
-For more details, have a look at the [docs](https://mondoo.com/docs/supplychain/overview/).
+For more details, have a look at the [docs](https://mondoo.com/docs/platform/infra/supply/overview/).
 In enforcing mode, the operator automatically sets the `failurePolicy` of the `ValidatingWebhookConfiguration` to `Fail`.
 The webhook then will deny objects not passing the policy.
 The details are reported to the Mondoo Backend.
@@ -289,6 +290,7 @@ Please increase the replicas count according to your needs.
 1. Install cert-manger on the cluster if it isn't already installed. ([See instructions](https://cert-manager.io/docs/installation/).)
 
 2. Update MondooAuditConfig so that the webhook section requests TLS certificates from cert-manager:
+
    ```yaml
    apiVersion: k8s.mondoo.com/v1alpha2
    kind: MondooAuditConfig
