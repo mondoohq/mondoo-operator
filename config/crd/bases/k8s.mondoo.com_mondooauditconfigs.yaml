@@ -266,6 +266,14 @@ spec:
                     description: Specify a custom crontab schedule for the node scanning
                       job. If not specified, the default schedule is used.
                     type: string
+                  style:
+                    default: cronjob
+                    description: Style is the style of the node scanning. The default
+                      is "cronjob" which will create a CronJob for the node scanning.
+                    enum:
+                    - cronjob
+                    - deployment
+                    type: string
                 type: object
               scanner:
                 description: Scanner defines the settings for the Mondoo scanner that

@@ -9,6 +9,7 @@ import (
 	"math"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -28,6 +29,7 @@ import (
 
 const (
 	CronJobNameBase               = "-node-"
+	DeploymentNameBase            = "-node-"
 	GarbageCollectCronJobNameBase = "-node-gc"
 	InventoryConfigMapBase        = "-node-inventory-"
 
@@ -38,7 +40,6 @@ const (
 
 func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(*m)
-	unsetHostPath := corev1.HostPathUnset
 
 	name := "cnspec"
 	cmd := []string{
@@ -142,7 +143,7 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 								{
 									Name: "root",
 									VolumeSource: corev1.VolumeSource{
-										HostPath: &corev1.HostPathVolumeSource{Path: "/", Type: &unsetHostPath},
+										HostPath: &corev1.HostPathVolumeSource{Path: "/", Type: ptr.To(corev1.HostPathUnset)},
 									},
 								},
 								{
@@ -186,6 +187,137 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 			},
 			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
 			FailedJobsHistoryLimit:     ptr.To(int32(1)),
+		},
+	}
+}
+
+func UpdateDeployment(
+	dep *appsv1.Deployment,
+	node corev1.Node,
+	m v1alpha2.MondooAuditConfig,
+	isOpenshift bool,
+	image string,
+	cfg v1alpha2.MondooOperatorConfig,
+) {
+	labels := CronJobLabels(m)
+	cmd := []string{
+		"cnspec", "serve",
+		"--config", "/etc/opt/mondoo/mondoo.yml",
+		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
+		// TODO: specify interval
+	}
+	if cfg.Spec.HttpProxy != nil {
+		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
+	}
+
+	dep.Labels = labels
+	dep.Annotations = map[string]string{
+		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-deployment-runasnonroot": ignoreAnnotationValue,
+	}
+	dep.Spec.Replicas = ptr.To(int32(1))
+	dep.Spec.Selector = &metav1.LabelSelector{
+		MatchLabels: labels,
+	}
+	dep.Spec.Template.Labels = labels
+	dep.Spec.Template.Annotations = map[string]string{
+		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-pod-runasnonroot": ignoreAnnotationValue,
+	}
+	dep.Spec.Template.Spec.NodeName = node.Name
+	// The node scanning does not use the Kubernetes API at all, therefore the service account token
+	// should not be mounted at all.
+	dep.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
+	dep.Spec.Template.Spec.Containers = []corev1.Container{
+		{
+			Image:     image,
+			Name:      "cnspec",
+			Command:   cmd,
+			Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources),
+			SecurityContext: &corev1.SecurityContext{
+				AllowPrivilegeEscalation: ptr.To(isOpenshift),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				RunAsNonRoot:             ptr.To(false),
+				RunAsUser:                ptr.To(int64(0)),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{
+						"ALL",
+					},
+				},
+				// RHCOS requires to run as privileged to properly do node scanning. If the container
+				// is not privileged, then we have no access to /proc.
+				Privileged: ptr.To(isOpenshift),
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "root",
+					ReadOnly:  true,
+					MountPath: "/mnt/host/",
+				},
+				{
+					Name:      "config",
+					ReadOnly:  true,
+					MountPath: "/etc/opt/",
+				},
+				{
+					Name:      "temp",
+					MountPath: "/tmp",
+				},
+			},
+			Env: []corev1.EnvVar{
+				{
+					Name:  "DEBUG",
+					Value: "false",
+				},
+				{
+					Name:  "MONDOO_PROCFS",
+					Value: "on",
+				},
+				{
+					Name:  "MONDOO_AUTO_UPDATE",
+					Value: "false",
+				},
+			},
+		},
+	}
+	dep.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{
+			Name: "root",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/", Type: ptr.To(corev1.HostPathUnset)},
+			},
+		},
+		{
+			Name: "config",
+			VolumeSource: corev1.VolumeSource{
+				Projected: &corev1.ProjectedVolumeSource{
+					DefaultMode: ptr.To(corev1.ProjectedVolumeSourceDefaultMode),
+					Sources: []corev1.VolumeProjection{
+						{
+							ConfigMap: &corev1.ConfigMapProjection{
+								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name, node.Name)},
+								Items: []corev1.KeyToPath{{
+									Key:  "inventory",
+									Path: "mondoo/inventory.yml",
+								}},
+							},
+						},
+						{
+							Secret: &corev1.SecretProjection{
+								LocalObjectReference: m.Spec.MondooCredsSecretRef,
+								Items: []corev1.KeyToPath{{
+									Key:  "config",
+									Path: "mondoo/mondoo.yml",
+								}},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "temp",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
 		},
 	}
 }
@@ -294,19 +426,13 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 	}
 }
 
-func ConfigMap(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (*corev1.ConfigMap, error) {
+func UpdateConfigMap(cm *corev1.ConfigMap, node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) error {
 	inv, err := Inventory(node, integrationMRN, clusterUID, m)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: m.Namespace,
-			Name:      ConfigMapName(m.Name, node.Name),
-		},
-		Data: map[string]string{"inventory": inv},
-	}, nil
+	cm.Data = map[string]string{"inventory": inv}
+	return nil
 }
 
 func CronJobName(prefix, suffix string) string {
@@ -314,6 +440,14 @@ func CronJobName(prefix, suffix string) string {
 	// it such that the full name fits within 52 chars. This is needed because in
 	// manager Kubernetes services such as EKS or GKE the node names can be very long.
 	base := fmt.Sprintf("%s%s", prefix, CronJobNameBase)
+	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), suffix))
+}
+
+func DeploymentName(prefix, suffix string) string {
+	// If the name becomes longer than 52 chars, then we hash the suffix and trim
+	// it such that the full name fits within 52 chars. This is needed because in
+	// manager Kubernetes services such as EKS or GKE the node names can be very long.
+	base := fmt.Sprintf("%s%s", prefix, DeploymentNameBase)
 	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), suffix))
 }
 
