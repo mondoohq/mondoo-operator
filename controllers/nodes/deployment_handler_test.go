@@ -5,17 +5,21 @@ package nodes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/suite"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -51,163 +55,145 @@ func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
 	s.seedKubeSystemNamespace()
 }
 
-// func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMap() {
-// 	s.seedNodes()
-// 	d := s.createDeploymentHandler()
-// 	mondooAuditConfig := &s.auditConfig
-// 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMap() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
-// 	result, err := d.Reconcile(s.ctx)
-// 	s.NoError(err)
-// 	s.True(result.IsZero())
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
 
-// 	nodes := &corev1.NodeList{}
-// 	s.NoError(d.KubeClient.List(s.ctx, nodes))
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-// 	for _, node := range nodes.Items {
-// 		expected, err := ConfigMap(node, "", testClusterUID, s.auditConfig)
-// 		s.Require().NoError(err, "unexpected error while generating ConfigMap")
-// 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+	for _, node := range nodes.Items {
+		cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+			Name: ConfigMapName(s.auditConfig.Name, node.Name), Namespace: s.auditConfig.Namespace,
+		}}
+		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
-// 		// Set some fields that the kube client sets
-// 		expected.ResourceVersion = "1"
+		cfgMapExpected := cfgMap.DeepCopy()
+		s.Require().NoError(UpdateConfigMap(cfgMapExpected, node, "", testClusterUID, s.auditConfig))
+		s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
+	}
+}
 
-// 		created := &corev1.ConfigMap{}
-// 		created.Name = expected.Name
-// 		created.Namespace = expected.Namespace
-// 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN() {
+	const testIntegrationMRN = "//test-integration-MRN"
 
-// 		s.Equal(expected, created)
-// 	}
-// }
+	s.seedNodes()
 
-// func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN() {
-// 	const testIntegrationMRN = "//test-integration-MRN"
+	sa, err := json.Marshal(mondooclient.ServiceAccountCredentials{Mrn: "test-mrn"})
+	s.NoError(err)
 
-// 	s.seedNodes()
+	s.auditConfig.Spec.ConsoleIntegration.Enable = true
+	credsWithIntegration := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      utils.MondooClientSecret,
+			Namespace: testNamespace,
+		},
+		Data: map[string][]byte{
+			constants.MondooCredsSecretIntegrationMRNKey: []byte(testIntegrationMRN),
+			constants.MondooCredsSecretServiceAccountKey: sa,
+		},
+	}
+	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(credsWithIntegration)
 
-// 	sa, err := json.Marshal(mondooclient.ServiceAccountCredentials{Mrn: "test-mrn"})
-// 	s.NoError(err)
+	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
-// 	s.auditConfig.Spec.ConsoleIntegration.Enable = true
-// 	credsWithIntegration := &corev1.Secret{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name:      utils.MondooClientSecret,
-// 			Namespace: testNamespace,
-// 		},
-// 		Data: map[string][]byte{
-// 			constants.MondooCredsSecretIntegrationMRNKey: []byte(testIntegrationMRN),
-// 			constants.MondooCredsSecretServiceAccountKey: sa,
-// 		},
-// 	}
-// 	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(credsWithIntegration)
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
 
-// 	d := s.createDeploymentHandler()
-// 	mondooAuditConfig := &s.auditConfig
-// 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-// 	result, err := d.Reconcile(s.ctx)
-// 	s.NoError(err)
-// 	s.True(result.IsZero())
+	for _, node := range nodes.Items {
+		cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+			Name: ConfigMapName(s.auditConfig.Name, node.Name), Namespace: s.auditConfig.Namespace,
+		}}
+		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
-// 	nodes := &corev1.NodeList{}
-// 	s.NoError(d.KubeClient.List(s.ctx, nodes))
+		cfgMapExpected := cfgMap.DeepCopy()
+		s.Require().NoError(UpdateConfigMap(cfgMapExpected, node, testIntegrationMRN, testClusterUID, s.auditConfig))
+		s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
+	}
+}
 
-// 	for _, node := range nodes.Items {
-// 		expected, err := ConfigMap(node, testIntegrationMRN, testClusterUID, s.auditConfig)
-// 		s.Require().NoError(err, "unexpected error while generating ConfigMap")
-// 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
-// 		// Set some fields that the kube client sets
-// 		expected.ResourceVersion = "1"
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-// 		created := &corev1.ConfigMap{}
-// 		created.Name = expected.Name
-// 		created.Namespace = expected.Namespace
-// 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+	for _, node := range nodes.Items {
+		cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+			Name: ConfigMapName(s.auditConfig.Name, node.Name), Namespace: s.auditConfig.Namespace,
+		}}
+		s.Require().NoError(UpdateConfigMap(cfgMap, node, "", testClusterUID, s.auditConfig))
+		cfgMap.Data["inventory"] = ""
+		s.NoError(d.KubeClient.Create(s.ctx, cfgMap))
+	}
 
-// 		s.Equal(expected, created)
-// 	}
-// }
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
 
-// func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
-// 	s.seedNodes()
-// 	d := s.createDeploymentHandler()
-// 	mondooAuditConfig := &s.auditConfig
-// 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+	for _, node := range nodes.Items {
+		cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+			Name: ConfigMapName(s.auditConfig.Name, node.Name), Namespace: s.auditConfig.Namespace,
+		}}
+		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
-// 	nodes := &corev1.NodeList{}
-// 	s.NoError(d.KubeClient.List(s.ctx, nodes))
+		cfgMapExpected := cfgMap.DeepCopy()
+		s.Require().NoError(UpdateConfigMap(cfgMapExpected, node, "", testClusterUID, s.auditConfig))
+		s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
+	}
+}
 
-// 	for _, node := range nodes.Items {
-// 		existing, err := ConfigMap(node, "", testClusterUID, s.auditConfig)
-// 		s.Require().NoError(err, "unexpected error while generating ConfigMap")
-// 		existing.Data["inventory"] = ""
-// 		s.NoError(d.KubeClient.Create(s.ctx, existing))
-// 	}
+func (s *DeploymentHandlerSuite) TestReconcile_CleanConfigMapsForDeletedNodes() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
-// 	result, err := d.Reconcile(s.ctx)
-// 	s.NoError(err)
-// 	s.True(result.IsZero())
+	// Reconcile to create the initial cron jobs
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
 
-// 	for _, node := range nodes.Items {
-// 		expected, err := ConfigMap(node, "", testClusterUID, s.auditConfig)
-// 		s.Require().NoError(err, "unexpected error while generating ConfigMap")
-// 		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-// 		// // Set some fields that the kube client sets
-// 		expected.ResourceVersion = "2"
+	// Delete one node
+	s.NoError(d.KubeClient.Delete(s.ctx, &nodes.Items[1]))
 
-// 		created := &corev1.ConfigMap{}
-// 		created.Name = expected.Name
-// 		created.Namespace = expected.Namespace
-// 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+	// Reconcile again to delete the cron job for the deleted node
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
 
-// 		s.Equal(expected, created)
-// 	}
-// }
+	configMaps := &corev1.ConfigMapList{}
+	s.NoError(d.KubeClient.List(s.ctx, configMaps))
 
-// func (s *DeploymentHandlerSuite) TestReconcile_CleanConfigMapsForDeletedNodes() {
-// 	s.seedNodes()
-// 	d := s.createDeploymentHandler()
-// 	mondooAuditConfig := &s.auditConfig
-// 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+	s.Equal(1, len(configMaps.Items))
 
-// 	// Reconcile to create the initial cron jobs
-// 	result, err := d.Reconcile(s.ctx)
-// 	s.NoError(err)
-// 	s.True(result.IsZero())
+	cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: ConfigMapName(s.auditConfig.Name, nodes.Items[0].Name), Namespace: s.auditConfig.Namespace,
+	}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
-// 	nodes := &corev1.NodeList{}
-// 	s.NoError(d.KubeClient.List(s.ctx, nodes))
-
-// 	// Delete one node
-// 	s.NoError(d.KubeClient.Delete(s.ctx, &nodes.Items[1]))
-
-// 	// Reconcile again to delete the cron job for the deleted node
-// 	result, err = d.Reconcile(s.ctx)
-// 	s.NoError(err)
-// 	s.True(result.IsZero())
-
-// 	configMaps := &corev1.ConfigMapList{}
-// 	s.NoError(d.KubeClient.List(s.ctx, configMaps))
-
-// 	s.Equal(1, len(configMaps.Items))
-
-// 	expected, err := ConfigMap(nodes.Items[0], "", testClusterUID, s.auditConfig)
-// 	s.Require().NoError(err, "unexpected error while generating ConfigMap")
-// 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
-
-// 	// Set some fields that the kube client sets
-// 	expected.ResourceVersion = "1"
-
-// 	created := &corev1.ConfigMap{}
-// 	created.Name = expected.Name
-// 	created.Namespace = expected.Namespace
-// 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
-
-// 	s.Equal(expected, created)
-// }
+	cfgMapExpected := cfgMap.DeepCopy()
+	s.Require().NoError(UpdateConfigMap(cfgMapExpected, nodes.Items[0], "", testClusterUID, s.auditConfig))
+	s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
+}
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	s.seedNodes()
