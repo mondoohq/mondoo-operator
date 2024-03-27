@@ -6,6 +6,7 @@ package nodes
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -739,7 +740,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_DisableNodeScanning() {
 	s.Equal(0, len(deployments.Items))
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
+func (s *DeploymentHandlerSuite) TestReconcile_CronJob_CustomSchedule() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
 	mondooAuditConfig := &s.auditConfig
@@ -759,6 +760,29 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
 	s.Equal(cj.Spec.Schedule, customSchedule)
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_Deployment_CustomInterval() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+
+	s.auditConfig.Spec.Nodes.IntervalTimer = 1034
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
+
+	dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(s.auditConfig.Name, nodes.Items[0].Name), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(dep), dep))
+
+	s.Contains(dep.Spec.Template.Spec.Containers[0].Command, "--timer")
+	s.Contains(dep.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("%d", s.auditConfig.Spec.Nodes.IntervalTimer))
 }
 
 func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {

@@ -101,8 +101,13 @@ const (
 type Nodes struct {
 	Enable    bool                        `json:"enable,omitempty"`
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
-	// Specify a custom crontab schedule for the node scanning job. If not specified, the default schedule is used.
+	// Schedule specifies a custom crontab schedule for the node scanning job. If not specified, the default schedule is
+	// used. Only applicable for CronJob style
 	Schedule string `json:"schedule,omitempty"`
+	// IntervalTimer is the interval (in minutes) for the node scanning. The default is "60". Only applicable for Deployment
+	// style.
+	// +kubebuilder:default=60
+	IntervalTimer int `json:"intervalTimer,omitempty"`
 	// Style is the style of the node scanning. The default is "cronjob" which will create a CronJob for the node scanning.
 	// +kubebuilder:validation:Enum=cronjob;deployment
 	// +kubebuilder:default=cronjob

@@ -182,7 +182,7 @@ func UpdateDeployment(
 		"cnspec", "serve",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
 		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
-		// TODO: specify interval
+		"--timer", fmt.Sprintf("%d", m.Spec.Nodes.IntervalTimer),
 	}
 	if cfg.Spec.HttpProxy != nil {
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)

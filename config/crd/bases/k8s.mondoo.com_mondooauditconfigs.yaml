@@ -212,6 +212,12 @@ spec:
                 properties:
                   enable:
                     type: boolean
+                  intervalTimer:
+                    default: 60
+                    description: IntervalTimer is the interval (in minutes) for the
+                      node scanning. The default is "60". Only applicable for Deployment
+                      style.
+                    type: integer
                   resources:
                     description: ResourceRequirements describes the compute resource
                       requirements.
@@ -263,8 +269,9 @@ spec:
                         type: object
                     type: object
                   schedule:
-                    description: Specify a custom crontab schedule for the node scanning
-                      job. If not specified, the default schedule is used.
+                    description: Schedule specifies a custom crontab schedule for
+                      the node scanning job. If not specified, the default schedule
+                      is used. Only applicable for CronJob style
                     type: string
                   style:
                     default: cronjob
