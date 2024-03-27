@@ -77,6 +77,7 @@ Preconditions:
    ```
 
 2. Deploy the operator using Helm:
+
    ```bash
    helm install mondoo-operator mondoo/mondoo-operator --namespace mondoo-operator --create-namespace
    ```
@@ -116,6 +117,7 @@ Preconditions:
    ```
 
 3. Verify that the operator is properly installed:
+
    ```bash
    kubectl get csv -n operators
    ```
@@ -138,6 +140,7 @@ Follow these steps to configure the Mondoo Secret:
    ```
 
 3. Store the service account as a Secret in the Mondoo namespace:
+
    ```bash
    kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
    ```
@@ -377,6 +380,7 @@ You can manually create the TLS certificate required for the admission controlle
    ```
 
 8. Add the certificate authority as base64 encoded CA data (`base64 ./ca.crt`) to the ValidatingWebhookConfiguration under the `webhooks[].clientConfig.caBundle` field:
+
    ```bash
    kubectl edit validatingwebhookconfiguration mondoo-operator-mondoo-webhook
    ```
@@ -443,40 +447,40 @@ We assume you already have the operator running inside the default namespace.
 Now you want to send the data from a different namespace into another Mondoo Space.
 To do so, follow these steps:
 
-1. Create an additional [Space in Mondoo](https://mondoo.com/docs/platform/spaces/)
-2. Create a [Mondoo Service Account](https://mondoo.com/docs/platform/service_accounts/) for this space
+1. Create an additional [Space in Mondoo](https://mondoo.com/docs/platform/start/organize/spaces/)
+2. Create a [Mondoo Service Account](https://mondoo.com/docs/platform/maintain/access/service_accounts/) for this space
 3. Create the new namespace in Kubernetes:
 
-```
-kubectl create namespace 2nd-namespace
-```
+  ```bash
+  kubectl create namespace 2nd-namespace
+  ```
 
 4. Create a Kubernetes Service Account in this namespace:
 
-```yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: mondoo-operator-k8s-resources-scanning
-  namespace: 2nd-namespace
-```
+  ```yaml
+  apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: mondoo-operator-k8s-resources-scanning
+    namespace: 2nd-namespace
+  ```
 
 5. Bind this Service Account to a Cluster Role which was created during the installation of the operator:
 
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: k8s-resources-scanning
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: mondoo-operator-k8s-resources-scanning
-subjects:
-  - kind: ServiceAccount
+  ```yaml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: k8s-resources-scanning
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
     name: mondoo-operator-k8s-resources-scanning
-    namespace: 2nd-namespace
-```
+  subjects:
+    - kind: ServiceAccount
+      name: mondoo-operator-k8s-resources-scanning
+      namespace: 2nd-namespace
+  ```
 
 6. Add the Mondoo Service Account as a secret to the namespace as described [here](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual.md#configuring-the-mondoo-secret)
 7. Create a `MondooAuditConfig` in `2nd-namespace` as described [here](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual.md#creating-a-mondooauditconfig)
@@ -488,7 +492,8 @@ After some seconds, you should see that the operator picked up the new `MondooAu
 
 You can adjust the interval for scans triggered via a CronJob.
 Edit the `MondooAuditConfig` to adjust the interval:
-```
+
+```bash
 kubectl -n mondoo-operator edit mondooauditconfigs.k8s.mondoo.com mondoo-client
 ```
 
