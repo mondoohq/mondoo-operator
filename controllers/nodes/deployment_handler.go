@@ -400,6 +400,14 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 			return err
 		}
 
+		dep := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace},
+		}
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, dep); err != nil {
+			logger.Error(err, "Failed to clean up node scanning Deployment", "namespace", dep.Namespace, "name", dep.Name)
+			return err
+		}
+
 		configMap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace},
 		}
