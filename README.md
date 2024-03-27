@@ -47,7 +47,7 @@ The following Kubernetes environments are tested:
 
 ## Documentation
 
-Please see the [docs](/docs) directory for more in-depth information.
+Please see the [docs](./docs) directory for more in-depth information.
 
 ## Contributing
 

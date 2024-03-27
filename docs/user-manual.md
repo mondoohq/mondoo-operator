@@ -834,7 +834,7 @@ Note: This is not possible immediately after performing the operator upgrade.
    kubectl get mondooauditconfigs.v1alpha1.k8s.mondoo.com mondoo-client -n mondoo-operator -o yaml > audit-config.yaml
    ```
 
-2. Map the old `v1alpha1` config to the new `v1alpha2` and save the new `MondooAuditConfig`. Find the mapping from `v1alpha1` to `v1alpha2` [here](../api/v1alpha1/mondooauditconfig_types.go#L155-L199).
+2. Map the old `v1alpha1` config to the new `v1alpha2` and save the new `MondooAuditConfig`. Find the mapping from `v1alpha1` to `v1alpha2`.
 
 3. Disable the `webhook` conversion for the `MondooAuditConfig` CRD:
 
