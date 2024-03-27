@@ -216,7 +216,6 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		}
 
 		if op == controllerutil.OperationResultCreated {
-			// TODO: fix the status update
 			err = mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger)
 			if err != nil {
 				logger.Error(err, "Failed to update MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
@@ -251,7 +250,15 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		}
 	}
 
-	// updateNodeConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs), pods)
+	deploymentsDegraded := false
+	for _, d := range deployments {
+		if d.Status.ReadyReplicas < *d.Spec.Replicas {
+			deploymentsDegraded = true
+			break
+		}
+	}
+
+	updateNodeConditions(n.Mondoo, deploymentsDegraded, pods)
 
 	if err := n.syncGCCronjob(ctx, mondooOperatorImage, clusterUid); err != nil {
 		return err
