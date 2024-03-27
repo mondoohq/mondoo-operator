@@ -6,7 +6,6 @@ package nodes
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -252,18 +251,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	s.NoError(err)
 
 	for _, n := range nodes.Items {
-		expected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
-		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
+		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		// Set some fields that the kube client sets
-		expected.ResourceVersion = "1"
-
-		created := &batchv1.CronJob{}
-		created.Name = expected.Name
-		created.Namespace = expected.Namespace
-		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
-
-		s.Equal(expected, created)
+		cjExpected := cj.DeepCopy()
+		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 	}
 
 	operatorImage, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
@@ -297,27 +290,22 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	s.NoError(err)
 
 	// Make sure a cron job exists for one of the nodes
-	cronJob := CronJob(image, nodes.Items[1], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
-	cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
-	s.NoError(d.KubeClient.Create(s.ctx, cronJob))
+	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, nodes.Items[1].Name), Namespace: s.auditConfig.Namespace}}
+	UpdateCronJob(cj, image, nodes.Items[1], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
+	s.NoError(d.KubeClient.Create(s.ctx, cj))
 
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	for i, n := range nodes.Items {
-		expected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
-		s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+	for _, n := range nodes.Items {
+		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
+		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		// The second node has an updated cron job so resource version is +1
-		expected.ResourceVersion = fmt.Sprintf("%d", 1+i)
-
-		created := &batchv1.CronJob{}
-		created.Name = expected.Name
-		created.Namespace = expected.Namespace
-		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
-
-		s.Equal(expected, created)
+		cjExpected := cj.DeepCopy()
+		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 	}
 }
 
@@ -356,18 +344,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 
 	s.Equal(1, len(cronJobs.Items))
 
-	expected := CronJob(image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
-	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, nodes.Items[0].Name), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-	// Set some fields that the kube client sets
-	expected.ResourceVersion = "1"
-
-	created := &batchv1.CronJob{}
-	created.Name = expected.Name
-	created.Namespace = expected.Namespace
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
-
-	s.Equal(expected, created)
+	cjExpected := cj.DeepCopy()
+	UpdateCronJob(cjExpected, image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateDeployments() {
@@ -784,17 +766,10 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 	nodes := &corev1.NodeList{}
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-	image, err := s.containerImageResolver.CnspecImage("", "", false)
-	s.NoError(err)
+	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, nodes.Items[0].Name), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-	expected := CronJob(image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
-
-	created := &batchv1.CronJob{}
-	created.Name = expected.Name
-	created.Namespace = expected.Namespace
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
-
-	s.Equal(created.Spec.Schedule, customSchedule)
+	s.Equal(cj.Spec.Schedule, customSchedule)
 }
 
 func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {

@@ -88,48 +88,22 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 				"name", CronJobName(n.Mondoo.Name, node.Name))
 		}
 
-		existing := &batchv1.CronJob{}
-		desired := CronJob(mondooClientImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
-
-		if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
-			logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
-			return err
-		}
-
-		created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
+		cronJob := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace}}
+		op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, cronJob, n.Mondoo, logger, func() error {
+			UpdateCronJob(cronJob, mondooClientImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
+			return nil
+		})
 		if err != nil {
-			logger.Error(err, "Failed to create CronJob", "namespace", desired.Namespace, "name", desired.Name)
 			return err
 		}
 
-		if created {
-			logger.Info("Created CronJob", "namespace", desired.Namespace, "name", desired.Name)
+		if op == controllerutil.OperationResultCreated {
 			err = mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger)
 			if err != nil {
 				logger.Error(err, "Failed to update MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
 				return err
 			}
 			continue
-		}
-
-		if !k8s.AreCronJobsEqual(*existing, *desired) {
-			existing.Spec.JobTemplate = desired.Spec.JobTemplate
-			existing.Spec.Schedule = desired.Spec.Schedule
-			existing.Spec.ConcurrencyPolicy = desired.Spec.ConcurrencyPolicy
-			existing.SetOwnerReferences(desired.GetOwnerReferences())
-
-			// Remove any old jobs because they won't be updated when the cronjob changes
-			if err := n.KubeClient.DeleteAllOf(ctx, &batchv1.Job{},
-				client.InNamespace(n.Mondoo.Namespace),
-				client.MatchingLabels(CronJobLabels(*n.Mondoo)),
-				client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
-				return err
-			}
-
-			if err := n.KubeClient.Update(ctx, existing); err != nil {
-				logger.Error(err, "Failed to update CronJob", "namespace", existing.Namespace, "name", existing.Name)
-				return err
-			}
 		}
 	}
 
