@@ -13,6 +13,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -148,8 +149,9 @@ func TestResources(t *testing.T) {
 				},
 			}
 			mac := *test.mondooauditconfig()
-			cronJobSepc := CronJob("test123", *testNode, &mac, false, v1alpha2.MondooOperatorConfig{})
-			assert.Equal(t, test.expectedResources, cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Resources)
+			cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: mac.Namespace}}
+			UpdateCronJob(cj, "test123", *testNode, &mac, false, v1alpha2.MondooOperatorConfig{})
+			assert.Equal(t, test.expectedResources, cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Resources)
 		})
 	}
 }
@@ -161,9 +163,10 @@ func TestCronJob_PrivilegedOpenshift(t *testing.T) {
 		},
 	}
 	mac := testMondooAuditConfig()
-	cronJobSepc := CronJob("test123", *testNode, mac, true, v1alpha2.MondooOperatorConfig{})
-	assert.True(t, *cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.Privileged)
-	assert.True(t, *cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
+	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: mac.Namespace}}
+	UpdateCronJob(cj, "test123", *testNode, mac, true, v1alpha2.MondooOperatorConfig{})
+	assert.True(t, *cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.Privileged)
+	assert.True(t, *cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
 }
 
 func TestCronJob_Privileged(t *testing.T) {
@@ -173,9 +176,10 @@ func TestCronJob_Privileged(t *testing.T) {
 		},
 	}
 	mac := testMondooAuditConfig()
-	cronJobSepc := CronJob("test123", *testNode, mac, false, v1alpha2.MondooOperatorConfig{})
-	assert.False(t, *cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.Privileged)
-	assert.False(t, *cronJobSepc.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
+	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: mac.Namespace}}
+	UpdateCronJob(cj, "test123", *testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	assert.False(t, *cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.Privileged)
+	assert.False(t, *cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
 }
 
 func TestInventory(t *testing.T) {

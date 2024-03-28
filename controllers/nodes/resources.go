@@ -9,6 +9,7 @@ import (
 	"math"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -28,6 +29,7 @@ import (
 
 const (
 	CronJobNameBase               = "-node-"
+	DeploymentNameBase            = "-node-"
 	GarbageCollectCronJobNameBase = "-node-gc"
 	InventoryConfigMapBase        = "-node-inventory-"
 
@@ -36,11 +38,8 @@ const (
 	ignoreAnnotationValue = "ignore"
 )
 
-func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
-	ls := CronJobLabels(*m)
-	unsetHostPath := corev1.HostPathUnset
-
-	name := "cnspec"
+func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) {
+	ls := NodeScanningLabels(*m)
 	cmd := []string{
 		"cnspec", "scan", "local",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
@@ -52,146 +51,267 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
-	return &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-cronjob-runasnonroot": ignoreAnnotationValue,
+	cj.Labels = ls
+	cj.Annotations = map[string]string{
+		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-cronjob-runasnonroot": ignoreAnnotationValue,
+	}
+	cj.Spec.Schedule = m.Spec.Nodes.Schedule
+	cj.Spec.ConcurrencyPolicy = batchv1.ForbidConcurrent
+	cj.Spec.SuccessfulJobsHistoryLimit = ptr.To(int32(1))
+	cj.Spec.FailedJobsHistoryLimit = ptr.To(int32(1))
+	cj.Spec.JobTemplate.Annotations = map[string]string{
+		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-job-runasnonroot": ignoreAnnotationValue,
+	}
+	cj.Spec.JobTemplate.Labels = ls
+	cj.Spec.JobTemplate.Spec.Template.Annotations = map[string]string{
+		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-pod-runasnonroot": ignoreAnnotationValue,
+	}
+	cj.Spec.JobTemplate.Spec.Template.Labels = ls
+	cj.Spec.JobTemplate.Spec.Template.Spec.NodeName = node.Name
+	cj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+	cj.Spec.JobTemplate.Spec.Template.Spec.Tolerations = k8s.TaintsToTolerations(node.Spec.Taints)
+	// The node scanning does not use the Kubernetes API at all, therefore the service account token
+	// should not be mounted at all.
+	cj.Spec.JobTemplate.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
+	cj.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{
+		{
+			Image:     image,
+			Name:      "cnspec",
+			Command:   cmd,
+			Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources),
+			SecurityContext: &corev1.SecurityContext{
+				AllowPrivilegeEscalation: ptr.To(isOpenshift),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				RunAsNonRoot:             ptr.To(false),
+				RunAsUser:                ptr.To(int64(0)),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{
+						"ALL",
+					},
+				},
+				// RHCOS requires to run as privileged to properly do node scanning. If the container
+				// is not privileged, then we have no access to /proc.
+				Privileged: ptr.To(isOpenshift),
 			},
-			Name:      CronJobName(m.Name, node.Name),
-			Namespace: m.Namespace,
-			Labels:    CronJobLabels(*m),
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "root",
+					ReadOnly:  true,
+					MountPath: "/mnt/host/",
+				},
+				{
+					Name:      "config",
+					ReadOnly:  true,
+					MountPath: "/etc/opt/",
+				},
+				{
+					Name:      "temp",
+					MountPath: "/tmp",
+				},
+			},
+			Env: []corev1.EnvVar{
+				{
+					Name:  "DEBUG",
+					Value: "false",
+				},
+				{
+					Name:  "MONDOO_PROCFS",
+					Value: "on",
+				},
+				{
+					Name:  "MONDOO_AUTO_UPDATE",
+					Value: "false",
+				},
+			},
+			TerminationMessagePath:   "/dev/termination-log",
+			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+			ImagePullPolicy:          corev1.PullIfNotPresent,
 		},
-		Spec: batchv1.CronJobSpec{
-			Schedule:          m.Spec.Nodes.Schedule,
-			ConcurrencyPolicy: batchv1.ForbidConcurrent,
-			JobTemplate: batchv1.JobTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-job-runasnonroot": ignoreAnnotationValue,
-					},
-					Labels: ls,
-				},
-				Spec: batchv1.JobSpec{
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-pod-runasnonroot": ignoreAnnotationValue,
+	}
+	cj.Spec.JobTemplate.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{
+			Name: "root",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/", Type: ptr.To(corev1.HostPathUnset)},
+			},
+		},
+		{
+			Name: "config",
+			VolumeSource: corev1.VolumeSource{
+				Projected: &corev1.ProjectedVolumeSource{
+					DefaultMode: ptr.To(corev1.ProjectedVolumeSourceDefaultMode),
+					Sources: []corev1.VolumeProjection{
+						{
+							ConfigMap: &corev1.ConfigMapProjection{
+								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name, node.Name)},
+								Items: []corev1.KeyToPath{{
+									Key:  "inventory",
+									Path: "mondoo/inventory.yml",
+								}},
 							},
-							Labels: ls,
 						},
-						Spec: corev1.PodSpec{
-							NodeName:      node.Name,
-							RestartPolicy: corev1.RestartPolicyOnFailure,
-							Tolerations:   k8s.TaintsToTolerations(node.Spec.Taints),
-							// The node scanning does not use the Kubernetes API at all, therefore the service account token
-							// should not be mounted at all.
-							AutomountServiceAccountToken: ptr.To(false),
-							Containers: []corev1.Container{
-								{
-									Image:     image,
-									Name:      name,
-									Command:   cmd,
-									Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources),
-									SecurityContext: &corev1.SecurityContext{
-										AllowPrivilegeEscalation: ptr.To(isOpenshift),
-										ReadOnlyRootFilesystem:   ptr.To(true),
-										RunAsNonRoot:             ptr.To(false),
-										RunAsUser:                ptr.To(int64(0)),
-										Capabilities: &corev1.Capabilities{
-											Drop: []corev1.Capability{
-												"ALL",
-											},
-										},
-										// RHCOS requires to run as privileged to properly do node scanning. If the container
-										// is not privileged, then we have no access to /proc.
-										Privileged: ptr.To(isOpenshift),
-									},
-									VolumeMounts: []corev1.VolumeMount{
-										{
-											Name:      "root",
-											ReadOnly:  true,
-											MountPath: "/mnt/host/",
-										},
-										{
-											Name:      "config",
-											ReadOnly:  true,
-											MountPath: "/etc/opt/",
-										},
-										{
-											Name:      "temp",
-											MountPath: "/tmp",
-										},
-									},
-									Env: []corev1.EnvVar{
-										{
-											Name:  "DEBUG",
-											Value: "false",
-										},
-										{
-											Name:  "MONDOO_PROCFS",
-											Value: "on",
-										},
-										{
-											Name:  "MONDOO_AUTO_UPDATE",
-											Value: "false",
-										},
-									},
-								},
-							},
-							Volumes: []corev1.Volume{
-								{
-									Name: "root",
-									VolumeSource: corev1.VolumeSource{
-										HostPath: &corev1.HostPathVolumeSource{Path: "/", Type: &unsetHostPath},
-									},
-								},
-								{
-									Name: "config",
-									VolumeSource: corev1.VolumeSource{
-										Projected: &corev1.ProjectedVolumeSource{
-											DefaultMode: ptr.To(corev1.ProjectedVolumeSourceDefaultMode),
-											Sources: []corev1.VolumeProjection{
-												{
-													ConfigMap: &corev1.ConfigMapProjection{
-														LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name, node.Name)},
-														Items: []corev1.KeyToPath{{
-															Key:  "inventory",
-															Path: "mondoo/inventory.yml",
-														}},
-													},
-												},
-												{
-													Secret: &corev1.SecretProjection{
-														LocalObjectReference: m.Spec.MondooCredsSecretRef,
-														Items: []corev1.KeyToPath{{
-															Key:  "config",
-															Path: "mondoo/mondoo.yml",
-														}},
-													},
-												},
-											},
-										},
-									},
-								},
-								{
-									Name: "temp",
-									VolumeSource: corev1.VolumeSource{
-										EmptyDir: &corev1.EmptyDirVolumeSource{},
-									},
-								},
+						{
+							Secret: &corev1.SecretProjection{
+								LocalObjectReference: m.Spec.MondooCredsSecretRef,
+								Items: []corev1.KeyToPath{{
+									Key:  "config",
+									Path: "mondoo/mondoo.yml",
+								}},
 							},
 						},
 					},
 				},
 			},
-			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
-			FailedJobsHistoryLimit:     ptr.To(int32(1)),
+		},
+		{
+			Name: "temp",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
 		},
 	}
 }
 
-func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfig) *batchv1.CronJob {
-	ls := CronJobLabels(m)
+func UpdateDeployment(
+	dep *appsv1.Deployment,
+	node corev1.Node,
+	m v1alpha2.MondooAuditConfig,
+	isOpenshift bool,
+	image string,
+	cfg v1alpha2.MondooOperatorConfig,
+) {
+	labels := NodeScanningLabels(m)
+	cmd := []string{
+		"cnspec", "serve",
+		"--config", "/etc/opt/mondoo/mondoo.yml",
+		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
+		"--timer", fmt.Sprintf("%d", m.Spec.Nodes.IntervalTimer),
+	}
+	if cfg.Spec.HttpProxy != nil {
+		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
+	}
+
+	dep.Labels = labels
+	dep.Annotations = map[string]string{
+		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-deployment-runasnonroot": ignoreAnnotationValue,
+	}
+	dep.Spec.Replicas = ptr.To(int32(1))
+	dep.Spec.Selector = &metav1.LabelSelector{
+		MatchLabels: labels,
+	}
+	dep.Spec.Template.Labels = labels
+	dep.Spec.Template.Annotations = map[string]string{
+		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-pod-runasnonroot": ignoreAnnotationValue,
+	}
+	dep.Spec.Template.Spec.PriorityClassName = m.Spec.Nodes.PriorityClassName
+	dep.Spec.Template.Spec.NodeSelector = map[string]string{
+		"kubernetes.io/hostname": node.Name,
+	}
+	dep.Spec.Template.Spec.Tolerations = k8s.TaintsToTolerations(node.Spec.Taints)
+	// The node scanning does not use the Kubernetes API at all, therefore the service account token
+	// should not be mounted at all.
+	dep.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
+	dep.Spec.Template.Spec.Containers = []corev1.Container{
+		{
+			Image:     image,
+			Name:      "cnspec",
+			Command:   cmd,
+			Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources),
+			SecurityContext: &corev1.SecurityContext{
+				AllowPrivilegeEscalation: ptr.To(isOpenshift),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				RunAsNonRoot:             ptr.To(false),
+				RunAsUser:                ptr.To(int64(0)),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{
+						"ALL",
+					},
+				},
+				// RHCOS requires to run as privileged to properly do node scanning. If the container
+				// is not privileged, then we have no access to /proc.
+				Privileged: ptr.To(isOpenshift),
+			},
+			TerminationMessagePath:   "/dev/termination-log",
+			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+			ImagePullPolicy:          corev1.PullIfNotPresent,
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "root",
+					ReadOnly:  true,
+					MountPath: "/mnt/host/",
+				},
+				{
+					Name:      "config",
+					ReadOnly:  true,
+					MountPath: "/etc/opt/",
+				},
+				{
+					Name:      "temp",
+					MountPath: "/tmp",
+				},
+			},
+			Env: []corev1.EnvVar{
+				{
+					Name:  "DEBUG",
+					Value: "false",
+				},
+				{
+					Name:  "MONDOO_PROCFS",
+					Value: "on",
+				},
+				{
+					Name:  "MONDOO_AUTO_UPDATE",
+					Value: "false",
+				},
+			},
+		},
+	}
+	dep.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{
+			Name: "root",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/", Type: ptr.To(corev1.HostPathUnset)},
+			},
+		},
+		{
+			Name: "config",
+			VolumeSource: corev1.VolumeSource{
+				Projected: &corev1.ProjectedVolumeSource{
+					DefaultMode: ptr.To(corev1.ProjectedVolumeSourceDefaultMode),
+					Sources: []corev1.VolumeProjection{
+						{
+							ConfigMap: &corev1.ConfigMapProjection{
+								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name, node.Name)},
+								Items: []corev1.KeyToPath{{
+									Key:  "inventory",
+									Path: "mondoo/inventory.yml",
+								}},
+							},
+						},
+						{
+							Secret: &corev1.SecretProjection{
+								LocalObjectReference: m.Spec.MondooCredsSecretRef,
+								Items: []corev1.KeyToPath{{
+									Key:  "config",
+									Path: "mondoo/mondoo.yml",
+								}},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "temp",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+	}
+}
+
+func UpdateGarbageCollectCronJob(cj *batchv1.CronJob, image, clusterUid string, m v1alpha2.MondooAuditConfig) {
+	ls := NodeScanningLabels(m)
 
 	cronTab := fmt.Sprintf("%d */12 * * *", time.Now().Add(1*time.Minute).Minute())
 	scanApiUrl := scanapi.ScanApiServiceUrl(m)
@@ -212,101 +332,77 @@ func GarbageCollectCronJob(image, clusterUid string, m v1alpha2.MondooAuditConfi
 		containerArgs = append(containerArgs, []string{"--filter-managed-by", scannedAssetsManagedBy}...)
 	}
 
-	return &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      GarbageCollectCronJobName(m.Name),
-			Namespace: m.Namespace,
-			Labels:    GarbageCollectCronJobLabels(m),
-		},
-		Spec: batchv1.CronJobSpec{
-			Schedule:          cronTab,
-			ConcurrencyPolicy: batchv1.ForbidConcurrent,
-			JobTemplate: batchv1.JobTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: ls,
+	cj.Labels = GarbageCollectCronJobLabels(m)
+	cj.Spec.Schedule = cronTab
+	cj.Spec.ConcurrencyPolicy = batchv1.ForbidConcurrent
+	cj.Spec.SuccessfulJobsHistoryLimit = ptr.To(int32(1))
+	cj.Spec.FailedJobsHistoryLimit = ptr.To(int32(1))
+	cj.Spec.JobTemplate.Labels = ls
+	cj.Spec.JobTemplate.Spec.Template.Labels = ls
+	cj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+	// The node scanning does not use the Kubernetes API at all, therefore the service account token
+	// should not be mounted at all.
+	cj.Spec.JobTemplate.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
+	cj.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{
+		{
+			Image:                    image,
+			ImagePullPolicy:          corev1.PullIfNotPresent,
+			Name:                     "gc",
+			Command:                  []string{"/mondoo-operator"},
+			Args:                     containerArgs,
+			TerminationMessagePath:   "/dev/termination-log",
+			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("30Mi"),
 				},
-				Spec: batchv1.JobSpec{
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: ls,
-						},
-						Spec: corev1.PodSpec{
-							RestartPolicy: corev1.RestartPolicyOnFailure,
-							// The node scanning does not use the Kubernetes API at all, therefore the service account token
-							// should not be mounted at all.
-							AutomountServiceAccountToken: ptr.To(false),
-							Containers: []corev1.Container{
-								{
-									Image:           image,
-									ImagePullPolicy: corev1.PullIfNotPresent,
-									Name:            "gc",
-									Command:         []string{"/mondoo-operator"},
-									Args:            containerArgs,
-									Resources: corev1.ResourceRequirements{
-										Limits: corev1.ResourceList{
-											corev1.ResourceCPU:    resource.MustParse("100m"),
-											corev1.ResourceMemory: resource.MustParse("30Mi"),
-										},
-										Requests: corev1.ResourceList{
-											corev1.ResourceCPU:    resource.MustParse("50m"),
-											corev1.ResourceMemory: resource.MustParse("20Mi"),
-										},
-									},
-									SecurityContext: &corev1.SecurityContext{
-										AllowPrivilegeEscalation: ptr.To(false),
-										ReadOnlyRootFilesystem:   ptr.To(true),
-										RunAsNonRoot:             ptr.To(true),
-										Capabilities: &corev1.Capabilities{
-											Drop: []corev1.Capability{
-												"ALL",
-											},
-										},
-										Privileged: ptr.To(false),
-									},
-									VolumeMounts: []corev1.VolumeMount{
-										{
-											Name:      "token",
-											MountPath: "/etc/scanapi",
-											ReadOnly:  true,
-										},
-									},
-									Env: feature_flags.AllFeatureFlagsAsEnv(),
-								},
-							},
-							Volumes: []corev1.Volume{
-								{
-									Name: "token",
-									VolumeSource: corev1.VolumeSource{
-										Secret: &corev1.SecretVolumeSource{
-											DefaultMode: ptr.To(int32(0o444)),
-											SecretName:  scanapi.TokenSecretName(m.Name),
-										},
-									},
-								},
-							},
-						},
-					},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("50m"),
+					corev1.ResourceMemory: resource.MustParse("20Mi"),
 				},
 			},
-			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
-			FailedJobsHistoryLimit:     ptr.To(int32(1)),
+			SecurityContext: &corev1.SecurityContext{
+				AllowPrivilegeEscalation: ptr.To(false),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				RunAsNonRoot:             ptr.To(true),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{
+						"ALL",
+					},
+				},
+				Privileged: ptr.To(false),
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "token",
+					MountPath: "/etc/scanapi",
+					ReadOnly:  true,
+				},
+			},
+			Env: feature_flags.AllFeatureFlagsAsEnv(),
+		},
+	}
+	cj.Spec.JobTemplate.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{
+			Name: "token",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					DefaultMode: ptr.To(int32(0o444)),
+					SecretName:  scanapi.TokenSecretName(m.Name),
+				},
+			},
 		},
 	}
 }
 
-func ConfigMap(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (*corev1.ConfigMap, error) {
+func UpdateConfigMap(cm *corev1.ConfigMap, node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) error {
 	inv, err := Inventory(node, integrationMRN, clusterUID, m)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: m.Namespace,
-			Name:      ConfigMapName(m.Name, node.Name),
-		},
-		Data: map[string]string{"inventory": inv},
-	}, nil
+	cm.Data = map[string]string{"inventory": inv}
+	return nil
 }
 
 func CronJobName(prefix, suffix string) string {
@@ -314,6 +410,14 @@ func CronJobName(prefix, suffix string) string {
 	// it such that the full name fits within 52 chars. This is needed because in
 	// manager Kubernetes services such as EKS or GKE the node names can be very long.
 	base := fmt.Sprintf("%s%s", prefix, CronJobNameBase)
+	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), suffix))
+}
+
+func DeploymentName(prefix, suffix string) string {
+	// If the name becomes longer than 52 chars, then we hash the suffix and trim
+	// it such that the full name fits within 52 chars. This is needed because in
+	// manager Kubernetes services such as EKS or GKE the node names can be very long.
+	base := fmt.Sprintf("%s%s", prefix, DeploymentNameBase)
 	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), suffix))
 }
 
@@ -369,7 +473,7 @@ func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.M
 	return string(invBytes), nil
 }
 
-func CronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {
+func NodeScanningLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 	return map[string]string{
 		"app":       "mondoo",
 		"scan":      "nodes",

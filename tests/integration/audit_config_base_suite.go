@@ -135,7 +135,7 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(containerScanListOpts)
 		s.NoErrorf(err, "Failed to wait for container scan pods to be gone")
 
-		nodeScanListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(nodes.CronJobLabels(s.auditConfig))}
+		nodeScanListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(nodes.NodeScanningLabels(s.auditConfig))}
 		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(nodeScanListOpts)
 		s.NoErrorf(err, "Failed to wait for node scan pods to be gone")
 
@@ -317,7 +317,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 	s.Equal("ACTIVE", status)
 }
 
-func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.MondooAuditConfig) {
+func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesCronjobs(auditConfig mondoov2.MondooAuditConfig) {
 	s.auditConfig = auditConfig
 
 	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
@@ -334,7 +334,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 	zap.S().Info("Verify the nodes scanning cron jobs are created.")
 
 	cronJobs := &batchv1.CronJobList{}
-	cronJobLabels := nodes.CronJobLabels(auditConfig)
+	cronJobLabels := nodes.NodeScanningLabels(auditConfig)
 
 	// List only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
 	listOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(cronJobLabels)}
@@ -424,6 +424,121 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodes(auditConfig mondoov2.M
 
 	// The number of assets from upstream is limited by paganiation.
 	// In case we have more than 100 workloads, we need to call this mutlple times, with different page numbers.
+	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
+	s.NoError(err, "Failed to list assets")
+	assetNames := utils.AssetNames(assets)
+
+	s.ElementsMatch(assetNames, nodeNames, "Node names do not match")
+	s.AssetsNotUnscored(assets)
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
+}
+
+func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesDeployments(auditConfig mondoov2.MondooAuditConfig) {
+	s.auditConfig = auditConfig
+
+	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
+
+	zap.S().Info("Create an audit config that enables only nodes scanning.")
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
+		"Failed to create Mondoo audit config.")
+
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
+
+	zap.S().Info("Verify the nodes scanning deployments are created.")
+
+	deployments := &appsv1.DeploymentList{}
+	lbls := nodes.NodeScanningLabels(auditConfig)
+
+	// List only the Deployments in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
+	listOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(lbls)}
+
+	nodeList := &corev1.NodeList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodeList))
+
+	// Verify the amount of Deployments created is equal to the amount of nodes
+	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
+		if len(nodeList.Items) == len(deployments.Items) {
+			return true, nil
+		}
+		return false, nil
+	})
+	s.NoErrorf(
+		err,
+		"The amount of node scanning Deployments is not equal to the amount of cluster nodes. expected: %d; actual: %d",
+		len(nodeList.Items), len(deployments.Items))
+
+	for _, d := range deployments.Items {
+		found := false
+		for _, n := range nodeList.Items {
+			if n.Name == d.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"] {
+				found = true
+			}
+		}
+		s.Truef(found, "Deployment %s/%s does not have a corresponding cluster node.", d.Namespace, d.Name)
+	}
+
+	// Verify the garbage collect cron job
+	gcCronJobs := &batchv1.CronJobList{}
+	gcCronJobLabels := nodes.GarbageCollectCronJobLabels(auditConfig)
+
+	// List only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
+	gcListOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(gcCronJobLabels)}
+
+	// Verify the amount of CronJobs created is 1
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, gcCronJobs, gcListOpts))
+		if len(gcCronJobs.Items) == 1 {
+			return true, nil
+		}
+		return false, nil
+	})
+	s.NoErrorf(
+		err,
+		"The amount of garbage collect CronJobs is not 1 expected: 1; actual: %d", len(gcCronJobs.Items))
+
+	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
+	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+
+	// Sleep for a while since the scan happens only in about 1min since the deployment has started.
+	time.Sleep(40 * time.Second)
+
+	// Verify nodes are sent upstream and have scores.
+	nodes := &corev1.NodeList{}
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodes))
+
+	nodeNames := make([]string, 0, len(nodes.Items))
+	for _, node := range nodes.Items {
+		nodeNames = append(nodeNames, node.Name)
+	}
+
+	// Retry until we see the assets in the space. We have no other way of checking whether the scan happened,
+	// since the deployment provides us with no feedback.
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
+		if err != nil {
+			return false, err
+		}
+		if len(assets) == len(nodes.Items) {
+			for _, asset := range assets {
+				if asset.Grade == "U" {
+					return false, nil
+				}
+			}
+			return true, nil
+		}
+		return false, nil
+	})
+	s.Require().NoError(err)
+
+	// The number of assets from upstream is limited by paganiation.
+	// In case we have more than 100 workloads, we need to call this multiple times, with different page numbers.
 	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
 	s.NoError(err, "Failed to list assets")
 	assetNames := utils.AssetNames(assets)

@@ -375,7 +375,7 @@ func isCronJobScanPod(a v1alpha2.MondooAuditConfig, podLabels map[string]string)
 
 	// Check whether it is a Pod for node scanning
 	if a.Spec.Nodes.Enable {
-		nodeCronJobLabels := nodes.CronJobLabels(a)
+		nodeCronJobLabels := nodes.NodeScanningLabels(a)
 		// podLabels should include all of the labels from type of the CronJobs
 		for k, v := range nodeCronJobLabels {
 			if val, ok := podLabels[k]; ok {

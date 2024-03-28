@@ -90,11 +90,30 @@ type KubernetesResources struct {
 	Schedule string `json:"schedule,omitempty"`
 }
 
+// NodeScanStyle specifies the scan style for nodes
+type NodeScanStyle string
+
+const (
+	NodeScanStyle_CronJob    NodeScanStyle = "cronjob"
+	NodeScanStyle_Deployment NodeScanStyle = "deployment"
+)
+
 type Nodes struct {
 	Enable    bool                        `json:"enable,omitempty"`
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
-	// Specify a custom crontab schedule for the node scanning job. If not specified, the default schedule is used.
+	// Schedule specifies a custom crontab schedule for the node scanning job. If not specified, the default schedule is
+	// used. Only applicable for CronJob style
 	Schedule string `json:"schedule,omitempty"`
+	// IntervalTimer is the interval (in minutes) for the node scanning. The default is "60". Only applicable for Deployment
+	// style.
+	// +kubebuilder:default=60
+	IntervalTimer int `json:"intervalTimer,omitempty"`
+	// Style specifies how node scanning is deployed. The default is "cronjob" which will create a CronJob for the node scanning.
+	// +kubebuilder:validation:Enum=cronjob;deployment
+	// +kubebuilder:default=cronjob
+	Style NodeScanStyle `json:"style,omitempty"`
+	// PriorityClassName specifies the name of the PriorityClass for the node scanning workloads.
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 type Admission struct {

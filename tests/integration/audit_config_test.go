@@ -41,9 +41,16 @@ func (s *AuditConfigSuite) TestReconcile_Containers() {
 	s.testMondooAuditConfigContainers(auditConfig)
 }
 
-func (s *AuditConfigSuite) TestReconcile_Nodes() {
+func (s *AuditConfigSuite) TestReconcile_Nodes_CronJobs() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true, false)
-	s.testMondooAuditConfigNodes(auditConfig)
+	s.testMondooAuditConfigNodesCronjobs(auditConfig)
+}
+
+func (s *AuditConfigSuite) TestReconcile_Nodes_Deployments() {
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true, false)
+	auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment
+	auditConfig.Spec.Nodes.IntervalTimer = 1
+	s.testMondooAuditConfigNodesDeployments(auditConfig)
 }
 
 func (s *AuditConfigSuite) TestReconcile_AdmissionPermissive() {
