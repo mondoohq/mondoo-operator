@@ -11,12 +11,12 @@ import (
 // DefaultCnspecResources for cnspec container
 var DefaultCnspecResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("400M"),
-		corev1.ResourceCPU:    resource.MustParse("600m"),
+		corev1.ResourceMemory: resource.MustParse("450M"),
+		corev1.ResourceCPU:    resource.MustParse("1"),
 	},
 
 	Requests: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("150M"),
+		corev1.ResourceMemory: resource.MustParse("250M"),
 		corev1.ResourceCPU:    resource.MustParse("300m"),
 	},
 }
@@ -29,7 +29,7 @@ var DefaultContainerScanningResources corev1.ResourceRequirements = corev1.Resou
 	},
 
 	Requests: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("150M"),
+		corev1.ResourceMemory: resource.MustParse("250M"),
 		corev1.ResourceCPU:    resource.MustParse("400m"),
 	},
 }
@@ -37,13 +37,13 @@ var DefaultContainerScanningResources corev1.ResourceRequirements = corev1.Resou
 // DefaultNodeScanningResources for cnspec container when scanning nodes
 var DefaultNodeScanningResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("160M"),
-		corev1.ResourceCPU:    resource.MustParse("200m"),
+		corev1.ResourceMemory: resource.MustParse("250M"),
+		corev1.ResourceCPU:    resource.MustParse("300m"),
 	},
 
 	Requests: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("100M"),
-		corev1.ResourceCPU:    resource.MustParse("50m"),
+		corev1.ResourceMemory: resource.MustParse("150M"),
+		corev1.ResourceCPU:    resource.MustParse("100m"),
 	},
 }
 
