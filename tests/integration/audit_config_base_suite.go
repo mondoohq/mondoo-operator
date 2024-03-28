@@ -477,7 +477,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesDeployments(auditConfig
 	for _, d := range deployments.Items {
 		found := false
 		for _, n := range nodeList.Items {
-			if n.Name == d.Spec.Template.Spec.NodeName {
+			if n.Name == d.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"] {
 				found = true
 			}
 		}

@@ -357,7 +357,7 @@ func (n *DeploymentHandler) cleanupDeploymentsForDeletedNodes(ctx context.Contex
 		logger.Info("Deleted Deployment", "namespace", d.Namespace, "name", d.Name)
 
 		configMap := &corev1.ConfigMap{}
-		configMap.Name = ConfigMapName(n.Mondoo.Name, d.Spec.Template.Spec.NodeName)
+		configMap.Name = ConfigMapName(n.Mondoo.Name, d.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"])
 		configMap.Namespace = n.Mondoo.Namespace
 		if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
 			logger.Error(err, "Failed to delete ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
