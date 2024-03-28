@@ -203,7 +203,10 @@ func UpdateDeployment(
 	dep.Spec.Template.Annotations = map[string]string{
 		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-pod-runasnonroot": ignoreAnnotationValue,
 	}
-	dep.Spec.Template.Spec.NodeName = node.Name
+	dep.Spec.Template.Spec.PriorityClassName = m.Spec.Nodes.PriorityClassName
+	dep.Spec.Template.Spec.NodeSelector = map[string]string{
+		"kubernetes.io/hostname": node.Name,
+	}
 	dep.Spec.Template.Spec.Tolerations = k8s.TaintsToTolerations(node.Spec.Taints)
 	// The node scanning does not use the Kubernetes API at all, therefore the service account token
 	// should not be mounted at all.

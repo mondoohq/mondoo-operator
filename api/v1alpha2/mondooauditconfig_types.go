@@ -112,6 +112,8 @@ type Nodes struct {
 	// +kubebuilder:validation:Enum=cronjob;deployment
 	// +kubebuilder:default=cronjob
 	Style NodeScanStyle `json:"style,omitempty"`
+	// PriorityClassName specifies the name of the PriorityClass for the node scanning workloads.
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 type Admission struct {
