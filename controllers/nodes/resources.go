@@ -39,7 +39,7 @@ const (
 )
 
 func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) {
-	ls := CronJobLabels(*m)
+	ls := NodeScanningLabels(*m)
 	cmd := []string{
 		"cnspec", "scan", "local",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
@@ -180,7 +180,7 @@ func UpdateDeployment(
 	image string,
 	cfg v1alpha2.MondooOperatorConfig,
 ) {
-	labels := CronJobLabels(m)
+	labels := NodeScanningLabels(m)
 	cmd := []string{
 		"cnspec", "serve",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
@@ -308,7 +308,7 @@ func UpdateDeployment(
 }
 
 func UpdateGarbageCollectCronJob(cj *batchv1.CronJob, image, clusterUid string, m v1alpha2.MondooAuditConfig) {
-	ls := CronJobLabels(m)
+	ls := NodeScanningLabels(m)
 
 	cronTab := fmt.Sprintf("%d */12 * * *", time.Now().Add(1*time.Minute).Minute())
 	scanApiUrl := scanapi.ScanApiServiceUrl(m)
@@ -470,7 +470,7 @@ func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.M
 	return string(invBytes), nil
 }
 
-func CronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {
+func NodeScanningLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 	return map[string]string{
 		"app":       "mondoo",
 		"scan":      "nodes",

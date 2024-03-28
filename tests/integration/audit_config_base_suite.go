@@ -135,7 +135,7 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(containerScanListOpts)
 		s.NoErrorf(err, "Failed to wait for container scan pods to be gone")
 
-		nodeScanListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(nodes.CronJobLabels(s.auditConfig))}
+		nodeScanListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(nodes.NodeScanningLabels(s.auditConfig))}
 		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(nodeScanListOpts)
 		s.NoErrorf(err, "Failed to wait for node scan pods to be gone")
 
@@ -334,7 +334,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesCronjobs(auditConfig mo
 	zap.S().Info("Verify the nodes scanning cron jobs are created.")
 
 	cronJobs := &batchv1.CronJobList{}
-	cronJobLabels := nodes.CronJobLabels(auditConfig)
+	cronJobLabels := nodes.NodeScanningLabels(auditConfig)
 
 	// List only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
 	listOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(cronJobLabels)}
@@ -453,7 +453,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesDeployments(auditConfig
 	zap.S().Info("Verify the nodes scanning deployments are created.")
 
 	deployments := &appsv1.DeploymentList{}
-	lbls := nodes.CronJobLabels(auditConfig)
+	lbls := nodes.NodeScanningLabels(auditConfig)
 
 	// List only the Deployments in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
 	listOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(lbls)}
@@ -483,17 +483,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesDeployments(auditConfig
 		}
 		s.Truef(found, "Deployment %s/%s does not have a corresponding cluster node.", d.Namespace, d.Name)
 	}
-
-	// Make sure we have 1 successful run for each CronJob
-	// selector := utils.LabelsToLabelSelector(lbls)
-	// s.True(s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(selector, auditConfig.Namespace), "Not all CronJobs have run successfully.")
-
-	// base := fmt.Sprintf("%s%s", auditConfig.Name, nodes.CronJobNameBase)
-	// for _, node := range nodeList.Items {
-	// 	nodeIdentifier := nodes.NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), node.Name)
-	// 	err := s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-node-"+nodeIdentifier)
-	// 	s.NoErrorf(err, "Couldn't find NodeScan Pod for node "+node.Name+" in Podlist of the MondooAuditConfig Status")
-	// }
 
 	// Verify the garbage collect cron job
 	gcCronJobs := &batchv1.CronJobList{}

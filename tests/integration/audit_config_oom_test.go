@@ -205,7 +205,7 @@ func (s *AuditConfigOOMSuite) TestOOMNodeScan_CronJob() {
 	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
 
 	cronJobs := &batchv1.CronJobList{}
-	cronJobLabels := nodes.CronJobLabels(auditConfig)
+	cronJobLabels := nodes.NodeScanningLabels(auditConfig)
 
 	// List only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
 	listOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(cronJobLabels)}
@@ -298,7 +298,7 @@ func (s *AuditConfigOOMSuite) TestOOMNodeScan_Deployment() {
 	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
 
 	deployments := &appsv1.DeploymentList{}
-	lbls := nodes.CronJobLabels(auditConfig)
+	lbls := nodes.NodeScanningLabels(auditConfig)
 
 	// List only the Deployments in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
 	listOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(lbls)}

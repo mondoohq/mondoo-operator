@@ -304,7 +304,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_Switch() {
 
 	listOpts := &client.ListOptions{
 		Namespace:     s.auditConfig.Namespace,
-		LabelSelector: labels.SelectorFromSet(CronJobLabels(s.auditConfig)),
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
 	}
 	cronjobs := &batchv1.CronJobList{}
 	s.NoError(d.KubeClient.List(s.ctx, cronjobs, listOpts))
@@ -384,7 +384,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 
 	listOpts := &client.ListOptions{
 		Namespace:     s.auditConfig.Namespace,
-		LabelSelector: labels.SelectorFromSet(CronJobLabels(s.auditConfig)),
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
 	}
 	cronJobs := &batchv1.CronJobList{}
 	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
@@ -472,7 +472,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDeployments_Switch() {
 
 	listOpts := &client.ListOptions{
 		Namespace:     s.auditConfig.Namespace,
-		LabelSelector: labels.SelectorFromSet(CronJobLabels(s.auditConfig)),
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
 	}
 	deployments := &appsv1.DeploymentList{}
 	s.NoError(d.KubeClient.List(s.ctx, deployments, listOpts))
@@ -554,7 +554,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanDeploymentsForDeletedNodes()
 
 	listOpts := &client.ListOptions{
 		Namespace:     s.auditConfig.Namespace,
-		LabelSelector: labels.SelectorFromSet(CronJobLabels(s.auditConfig)),
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
 	}
 	deployments := &appsv1.DeploymentList{}
 	s.NoError(d.KubeClient.List(s.ctx, deployments, listOpts))
@@ -590,7 +590,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_NodeScanningStatus() {
 
 	listOpts := &client.ListOptions{
 		Namespace:     s.auditConfig.Namespace,
-		LabelSelector: labels.SelectorFromSet(CronJobLabels(s.auditConfig)),
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
 	}
 	cronJobs := &batchv1.CronJobList{}
 	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
@@ -665,7 +665,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Deployment_NodeScanningStatus() {
 
 	listOpts := &client.ListOptions{
 		Namespace:     s.auditConfig.Namespace,
-		LabelSelector: labels.SelectorFromSet(CronJobLabels(s.auditConfig)),
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
 	}
 	deployments := &appsv1.DeploymentList{}
 	s.NoError(d.KubeClient.List(s.ctx, deployments, listOpts))
@@ -738,7 +738,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
 
 	listOpts := &client.ListOptions{
 		Namespace:     s.auditConfig.Namespace,
-		LabelSelector: labels.SelectorFromSet(CronJobLabels(s.auditConfig)),
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
 	}
 	cronJobs := &batchv1.CronJobList{}
 	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
@@ -747,7 +747,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "node-scan-123",
 			Namespace: s.auditConfig.Namespace,
-			Labels:    CronJobLabels(s.auditConfig),
+			Labels:    NodeScanningLabels(s.auditConfig),
 			CreationTimestamp: metav1.Time{
 				Time: time.Now(),
 			},

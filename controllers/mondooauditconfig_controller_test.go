@@ -654,7 +654,7 @@ func TestIsCronJobScanPod(t *testing.T) {
 		},
 	}
 
-	nodeCronJobLabels := nodes.CronJobLabels(a)
+	nodeCronJobLabels := nodes.NodeScanningLabels(a)
 	resourceCronJobLabels := k8s_scan.CronJobLabels(a)
 	imageCronJobLabels := container_image.CronJobLabels(a)
 

@@ -117,7 +117,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 			// Remove any old jobs because they won't be updated when the cronjob changes
 			if err := n.KubeClient.DeleteAllOf(ctx, &batchv1.Job{},
 				client.InNamespace(n.Mondoo.Namespace),
-				client.MatchingLabels(CronJobLabels(*n.Mondoo)),
+				client.MatchingLabels(NodeScanningLabels(*n.Mondoo)),
 				client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
 				return err
 			}
@@ -140,7 +140,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	if len(cronJobs) > 0 {
 		opts := &client.ListOptions{
 			Namespace:     n.Mondoo.Namespace,
-			LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
+			LabelSelector: labels.SelectorFromSet(NodeScanningLabels(*n.Mondoo)),
 		}
 		err = n.KubeClient.List(ctx, pods, opts)
 		if err != nil {
@@ -241,7 +241,7 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	if len(deployments) > 0 {
 		opts := &client.ListOptions{
 			Namespace:     n.Mondoo.Namespace,
-			LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
+			LabelSelector: labels.SelectorFromSet(NodeScanningLabels(*n.Mondoo)),
 		}
 		err = n.KubeClient.List(ctx, pods, opts)
 		if err != nil {
@@ -378,7 +378,7 @@ func (n *DeploymentHandler) syncGCCronjob(ctx context.Context, mondooOperatorIma
 
 func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]batchv1.CronJob, error) {
 	cronJobs := &batchv1.CronJobList{}
-	cronJobLabels := CronJobLabels(*n.Mondoo)
+	cronJobLabels := NodeScanningLabels(*n.Mondoo)
 
 	// Lists only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
 	listOpts := &client.ListOptions{Namespace: n.Mondoo.Namespace, LabelSelector: labels.SelectorFromSet(cronJobLabels)}
@@ -391,7 +391,7 @@ func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]ba
 
 func (n *DeploymentHandler) getDeploymentsForAuditConfig(ctx context.Context) ([]appsv1.Deployment, error) {
 	deps := &appsv1.DeploymentList{}
-	depLabels := CronJobLabels(*n.Mondoo)
+	depLabels := NodeScanningLabels(*n.Mondoo)
 
 	// Lists only the Deployments in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
 	listOpts := &client.ListOptions{Namespace: n.Mondoo.Namespace, LabelSelector: labels.SelectorFromSet(depLabels)}
