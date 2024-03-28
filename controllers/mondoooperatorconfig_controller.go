@@ -6,7 +6,12 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"net/url"
+	"time"
 
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -52,6 +57,27 @@ func (r *MondooOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl
 	if config.DeletionTimestamp != nil {
 		// Object being deleted; nothing to do
 		return ctrl.Result{}, nil
+	}
+
+	if config.Spec.HttpProxy != nil {
+		urlParsed, err := url.Parse(*config.Spec.HttpProxy)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		remote.DefaultTransport = &http.Transport{
+			Proxy: http.ProxyURL(urlParsed),
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			// We usually are dealing with 2 hosts (at most), split MaxIdleConns between them.
+			MaxIdleConnsPerHost: 50,
+		}
 	}
 
 	namespace, err := k8s.GetRunningNamespace()
