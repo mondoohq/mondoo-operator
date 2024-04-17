@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.10.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: mondooauditconfigs.k8s.mondoo.com
 spec:
   group: k8s.mondoo.com
@@ -21,14 +20,19 @@ spec:
         description: MondooAuditConfig is the Schema for the mondooauditconfigs API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -62,26 +66,28 @@ spec:
                     type: object
                   mode:
                     default: permissive
-                    description: Mode represents whether the webhook will behave in
-                      a "permissive" mode (the default) which will only scan and report
-                      on k8s resources or "enforcing" mode where depending on the
-                      scan results may reject the k8s resource creation/modification.
+                    description: |-
+                      Mode represents whether the webhook will behave in a "permissive" mode (the default) which
+                      will only scan and report on k8s resources or "enforcing" mode where depending
+                      on the scan results may reject the k8s resource creation/modification.
                     enum:
                     - permissive
                     - enforcing
                     type: string
                   replicas:
                     default: 1
-                    description: Number of replicas for the admission webhook. For
-                      enforcing mode, the minimum should be two to prevent problems
-                      during Pod failures, e.g. node failure, node scaling, etc.
+                    description: |-
+                      Number of replicas for the admission webhook.
+                      For enforcing mode, the minimum should be two to prevent problems during Pod failures,
+                      e.g. node failure, node scaling, etc.
                     format: int32
                     minimum: 1
                     type: integer
                   serviceAccountName:
                     default: mondoo-operator-webhook
-                    description: ServiceAccountName specifies the Kubernetes ServiceAccount
-                      the webhook should use during its operation.
+                    description: |-
+                      ServiceAccountName specifies the Kubernetes ServiceAccount the webhook should use
+                      during its operation.
                     type: string
                 type: object
               consoleIntegration:
@@ -98,19 +104,24 @@ spec:
                       requirements.
                     properties:
                       claims:
-                        description: "Claims lists the names of resources, defined
-                          in spec.resourceClaims, that are used by this container.
-                          \n This is an alpha field and requires enabling the DynamicResourceAllocation
-                          feature gate. \n This field is immutable. It can only be
-                          set for containers."
+                        description: |-
+                          Claims lists the names of resources, defined in spec.resourceClaims,
+                          that are used by this container.
+
+
+                          This is an alpha field and requires enabling the
+                          DynamicResourceAllocation feature gate.
+
+
+                          This field is immutable. It can only be set for containers.
                         items:
                           description: ResourceClaim references one entry in PodSpec.ResourceClaims.
                           properties:
                             name:
-                              description: Name must match the name of one entry in
-                                pod.spec.resourceClaims of the Pod where this field
-                                is used. It makes that resource available inside a
-                                container.
+                              description: |-
+                                Name must match the name of one entry in pod.spec.resourceClaims of
+                                the Pod where this field is used. It makes that resource available
+                                inside a container.
                               type: string
                           required:
                           - name
@@ -126,8 +137,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -136,11 +148,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   schedule:
@@ -154,17 +166,17 @@ spec:
                   namespaces:
                     properties:
                       exclude:
-                        description: Exclude is the list of resources to ignore for
-                          any watching/scanning actions. Use this if the goal is to
-                          watch/scan all resources except for this Exclude list.
+                        description: |-
+                          Exclude is the list of resources to ignore for any watching/scanning actions. Use this if
+                          the goal is to watch/scan all resources except for this Exclude list.
                         items:
                           type: string
                         type: array
                       include:
-                        description: Include is the list of resources to watch/scan.
-                          Setting Include overrides anything in the Exclude list as
-                          specifying an Include list is effectively excluding everything
-                          except for what is on the Include list.
+                        description: |-
+                          Include is the list of resources to watch/scan. Setting Include overrides anything in the
+                          Exclude list as specifying an Include list is effectively excluding everything except for what
+                          is on the Include list.
                         items:
                           type: string
                         type: array
@@ -173,10 +185,9 @@ spec:
               kubernetesResources:
                 properties:
                   containerImageScanning:
-                    description: 'DEPRECATED: ContainerImageScanning determines whether
-                      container images are being scanned. The current implementation
-                      runs a separate job once every 24h that scans the container
-                      images running in the cluster.'
+                    description: |-
+                      DEPRECATED: ContainerImageScanning determines whether container images are being scanned. The current implementation
+                      runs a separate job once every 24h that scans the container images running in the cluster.
                     type: boolean
                   enable:
                     type: boolean
@@ -191,20 +202,24 @@ spec:
                   mondooauditconfig_types.go to remove/update
                 properties:
                   name:
-                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
               mondooTokenSecretRef:
-                description: MondooTokenSecretRef can optionally hold a time-limited
-                  token that the mondoo-operator will use to create a Mondoo service
-                  account saved to the Secret specified in .spec.mondooCredsSecretRef
+                description: |-
+                  MondooTokenSecretRef can optionally hold a time-limited token that the mondoo-operator will use
+                  to create a Mondoo service account saved to the Secret specified in .spec.mondooCredsSecretRef
                   if that Secret does not exist.
                 properties:
                   name:
-                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
@@ -214,8 +229,8 @@ spec:
                     type: boolean
                   intervalTimer:
                     default: 60
-                    description: IntervalTimer is the interval (in minutes) for the
-                      node scanning. The default is "60". Only applicable for Deployment
+                    description: |-
+                      IntervalTimer is the interval (in minutes) for the node scanning. The default is "60". Only applicable for Deployment
                       style.
                     type: integer
                   priorityClassName:
@@ -227,19 +242,24 @@ spec:
                       requirements.
                     properties:
                       claims:
-                        description: "Claims lists the names of resources, defined
-                          in spec.resourceClaims, that are used by this container.
-                          \n This is an alpha field and requires enabling the DynamicResourceAllocation
-                          feature gate. \n This field is immutable. It can only be
-                          set for containers."
+                        description: |-
+                          Claims lists the names of resources, defined in spec.resourceClaims,
+                          that are used by this container.
+
+
+                          This is an alpha field and requires enabling the
+                          DynamicResourceAllocation feature gate.
+
+
+                          This field is immutable. It can only be set for containers.
                         items:
                           description: ResourceClaim references one entry in PodSpec.ResourceClaims.
                           properties:
                             name:
-                              description: Name must match the name of one entry in
-                                pod.spec.resourceClaims of the Pod where this field
-                                is used. It makes that resource available inside a
-                                container.
+                              description: |-
+                                Name must match the name of one entry in pod.spec.resourceClaims of
+                                the Pod where this field is used. It makes that resource available
+                                inside a container.
                               type: string
                           required:
                           - name
@@ -255,8 +275,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -265,17 +286,17 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   schedule:
-                    description: Schedule specifies a custom crontab schedule for
-                      the node scanning job. If not specified, the default schedule
-                      is used. Only applicable for CronJob style
+                    description: |-
+                      Schedule specifies a custom crontab schedule for the node scanning job. If not specified, the default schedule is
+                      used. Only applicable for CronJob style
                     type: string
                   style:
                     default: cronjob
@@ -288,14 +309,14 @@ spec:
                     type: string
                 type: object
               scanner:
-                description: Scanner defines the settings for the Mondoo scanner that
-                  will be running in the cluster. The same scanner is used for scanning
-                  the Kubernetes API, the nodes and for serving the admission controller.
+                description: |-
+                  Scanner defines the settings for the Mondoo scanner that will be running in the cluster. The same scanner
+                  is used for scanning the Kubernetes API, the nodes and for serving the admission controller.
                 properties:
                   env:
-                    description: Env allows setting extra environment variables for
-                      the scanner. If the operator sets already an env variable with
-                      the same name, the value specified here will override it.
+                    description: |-
+                      Env allows setting extra environment variables for the scanner. If the operator sets already an env
+                      variable with the same name, the value specified here will override it.
                     items:
                       description: EnvVar represents an environment variable present
                         in a Container.
@@ -305,15 +326,16 @@ spec:
                             C_IDENTIFIER.
                           type: string
                         value:
-                          description: 'Variable references $(VAR_NAME) are expanded
-                            using the previously defined environment variables in
-                            the container and any service environment variables. If
-                            a variable cannot be resolved, the reference in the input
-                            string will be unchanged. Double $$ are reduced to a single
-                            $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                          description: |-
+                            Variable references $(VAR_NAME) are expanded
+                            using the previously defined environment variables in the container and
+                            any service environment variables. If a variable cannot be resolved,
+                            the reference in the input string will be unchanged. Double $$ are reduced
+                            to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
                             "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
-                            Escaped references will never be expanded, regardless
-                            of whether the variable exists or not. Defaults to "".'
+                            Escaped references will never be expanded, regardless of whether the variable
+                            exists or not.
+                            Defaults to "".
                           type: string
                         valueFrom:
                           description: Source for the environment variable's value.
@@ -326,9 +348,10 @@ spec:
                                   description: The key to select.
                                   type: string
                                 name:
-                                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    TODO: Add other useful fields. apiVersion, kind,
-                                    uid?'
+                                  description: |-
+                                    Name of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    TODO: Add other useful fields. apiVersion, kind, uid?
                                   type: string
                                 optional:
                                   description: Specify whether the ConfigMap or its
@@ -339,11 +362,9 @@ spec:
                               type: object
                               x-kubernetes-map-type: atomic
                             fieldRef:
-                              description: 'Selects a field of the pod: supports metadata.name,
-                                metadata.namespace, `metadata.labels[''<KEY>'']`,
-                                `metadata.annotations[''<KEY>'']`, spec.nodeName,
-                                spec.serviceAccountName, status.hostIP, status.podIP,
-                                status.podIPs.'
+                              description: |-
+                                Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                                spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
                               properties:
                                 apiVersion:
                                   description: Version of the schema the FieldPath
@@ -358,10 +379,9 @@ spec:
                               type: object
                               x-kubernetes-map-type: atomic
                             resourceFieldRef:
-                              description: 'Selects a resource of the container: only
-                                resources limits and requests (limits.cpu, limits.memory,
-                                limits.ephemeral-storage, requests.cpu, requests.memory
-                                and requests.ephemeral-storage) are currently supported.'
+                              description: |-
+                                Selects a resource of the container: only resources limits and requests
+                                (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
                               properties:
                                 containerName:
                                   description: 'Container name: required for volumes,
@@ -391,9 +411,10 @@ spec:
                                     be a valid secret key.
                                   type: string
                                 name:
-                                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    TODO: Add other useful fields. apiVersion, kind,
-                                    uid?'
+                                  description: |-
+                                    Name of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    TODO: Add other useful fields. apiVersion, kind, uid?
                                   type: string
                                 optional:
                                   description: Specify whether the Secret or its key
@@ -416,21 +437,24 @@ spec:
                         type: string
                     type: object
                   privateRegistriesPullSecretRef:
-                    description: PrivateRegistryScanning defines the name of a secret
-                      that contains the credentials for the private registries we
-                      have to pull images from.
+                    description: |-
+                      PrivateRegistryScanning defines the name of a secret that contains the credentials for the private
+                      registries we have to pull images from.
                     properties:
                       name:
-                        description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                          TODO: Add other useful fields. apiVersion, kind, uid?'
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          TODO: Add other useful fields. apiVersion, kind, uid?
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
                   replicas:
                     default: 1
-                    description: Number of replicas for the scanner. For enforcing
-                      mode, the minimum should be two to prevent problems during Pod
-                      failures, e.g. node failure, node scaling, etc.
+                    description: |-
+                      Number of replicas for the scanner.
+                      For enforcing mode, the minimum should be two to prevent problems during Pod failures,
+                      e.g. node failure, node scaling, etc.
                     format: int32
                     minimum: 1
                     type: integer
@@ -439,19 +463,24 @@ spec:
                       requirements.
                     properties:
                       claims:
-                        description: "Claims lists the names of resources, defined
-                          in spec.resourceClaims, that are used by this container.
-                          \n This is an alpha field and requires enabling the DynamicResourceAllocation
-                          feature gate. \n This field is immutable. It can only be
-                          set for containers."
+                        description: |-
+                          Claims lists the names of resources, defined in spec.resourceClaims,
+                          that are used by this container.
+
+
+                          This is an alpha field and requires enabling the
+                          DynamicResourceAllocation feature gate.
+
+
+                          This field is immutable. It can only be set for containers.
                         items:
                           description: ResourceClaim references one entry in PodSpec.ResourceClaims.
                           properties:
                             name:
-                              description: Name must match the name of one entry in
-                                pod.spec.resourceClaims of the Pod where this field
-                                is used. It makes that resource available inside a
-                                container.
+                              description: |-
+                                Name must match the name of one entry in pod.spec.resourceClaims of
+                                the Pod where this field is used. It makes that resource available
+                                inside a container.
                               type: string
                           required:
                           - name
@@ -467,8 +496,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -477,11 +507,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   serviceAccountName:
