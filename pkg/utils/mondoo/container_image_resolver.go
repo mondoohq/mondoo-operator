@@ -20,8 +20,8 @@ import (
 
 const (
 	CnspecImage              = "ghcr.io/mondoohq/mondoo-operator/cnspec"
-	CnspecTag                = "10-rootless"
-	OpenShiftMondooClientTag = "10-ubi-rootless"
+	CnspecTag                = "11-rootless"
+	OpenShiftMondooClientTag = "11-ubi-rootless"
 	MondooOperatorImage      = "ghcr.io/mondoohq/mondoo-operator"
 	PodNameEnvVar            = "POD_NAME"
 	PodNamespaceEnvVar       = "POD_NAMESPACE"
