@@ -110,7 +110,7 @@ spec:
                 properties:
                   enable:
                     type: boolean
-                  envVar:
+                  env:
                     description: |-
                       Env allows setting extra environment variables for the node scanner. If the operator sets already an env
                       variable with the same name, the value specified here will override it.
@@ -352,7 +352,7 @@ spec:
                 properties:
                   enable:
                     type: boolean
-                  envVar:
+                  env:
                     description: |-
                       Env allows setting extra environment variables for the node scanner. If the operator sets already an env
                       variable with the same name, the value specified here will override it.
