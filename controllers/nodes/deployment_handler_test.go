@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"testing"
 	"time"
 
@@ -256,6 +257,52 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 
 		cjExpected := cj.DeepCopy()
 		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
+	}
+
+	operatorImage, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
+	s.NoError(err)
+
+	// Verify node garbage collection cronjob
+	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
+
+	gcCjExpected := gcCj.DeepCopy()
+	UpdateGarbageCollectCronJob(gcCjExpected, operatorImage, "abcdefg", s.auditConfig)
+	s.True(equality.Semantic.DeepEqual(gcCjExpected, gcCj))
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_CustomEnvVars() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	mondooAuditConfig.Spec.Nodes.Env = []corev1.EnvVar{{Name: "TEST_ENV", Value: "TEST_VALUE"}}
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
+
+	image, err := s.containerImageResolver.CnspecImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	for _, n := range nodes.Items {
+		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
+		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
+
+		cjExpected := cj.DeepCopy()
+		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		// Make sure the env vars for both are sorted
+		sort.Slice(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env, func(i, j int) bool {
+			return cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[i].Name < cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[j].Name
+		})
+		sort.Slice(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env, func(i, j int) bool {
+			return cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[i].Name < cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[j].Name
+		})
 		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 	}
 

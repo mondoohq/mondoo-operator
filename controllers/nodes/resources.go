@@ -109,7 +109,7 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 					MountPath: "/tmp",
 				},
 			},
-			Env: []corev1.EnvVar{
+			Env: k8s.MergeEnv([]corev1.EnvVar{
 				{
 					Name:  "DEBUG",
 					Value: "false",
@@ -122,7 +122,7 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 					Name:  "MONDOO_AUTO_UPDATE",
 					Value: "false",
 				},
-			},
+			}, m.Spec.Nodes.Env),
 			TerminationMessagePath:   "/dev/termination-log",
 			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 			ImagePullPolicy:          corev1.PullIfNotPresent,
