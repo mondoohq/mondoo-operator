@@ -116,7 +116,7 @@ type Nodes struct {
 	PriorityClassName string `json:"priorityClassName,omitempty"`
 	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.
-	Env []corev1.EnvVar `json:"envVar,omitempty"`
+	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
 type Admission struct {
@@ -148,7 +148,7 @@ type Containers struct {
 	Schedule string `json:"schedule,omitempty"`
 	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.
-	Env []corev1.EnvVar `json:"envVar,omitempty"`
+	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
 type Image struct {
