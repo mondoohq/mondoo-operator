@@ -6,7 +6,6 @@ package container_image
 import (
 	"context"
 	"fmt"
-	"sort"
 	"testing"
 	"time"
 
@@ -103,12 +102,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_CustomEnvVars() {
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
 
 	// Make sure the env vars for both are sorted
-	sort.Slice(expected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env, func(i, j int) bool {
-		return expected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[i].Name < expected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[j].Name
-	})
-	sort.Slice(created.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env, func(i, j int) bool {
-		return created.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[i].Name < created.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[j].Name
-	})
+	utils.SortEnvVars(expected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+	utils.SortEnvVars(created.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 
 	s.Equal(expected, created)
 }

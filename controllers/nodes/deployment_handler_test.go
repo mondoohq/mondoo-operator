@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"testing"
 	"time"
 
@@ -257,6 +256,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 
 		cjExpected := cj.DeepCopy()
 		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		// Make sure the env vars for both are sorted
+		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 	}
 
@@ -297,12 +299,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_CustomEnvVars() {
 		cjExpected := cj.DeepCopy()
 		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		// Make sure the env vars for both are sorted
-		sort.Slice(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env, func(i, j int) bool {
-			return cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[i].Name < cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[j].Name
-		})
-		sort.Slice(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env, func(i, j int) bool {
-			return cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[i].Name < cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env[j].Name
-		})
+		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 	}
 
@@ -341,6 +339,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_Switch() {
 
 		cjExpected := cj.DeepCopy()
 		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		// Make sure the env vars for both are sorted
+		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 	}
 
@@ -399,6 +400,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 
 		cjExpected := cj.DeepCopy()
 		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		// Make sure the env vars for both are sorted
+		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 	}
 }
@@ -443,6 +447,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 
 	cjExpected := cj.DeepCopy()
 	UpdateCronJob(cjExpected, image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	// Make sure the env vars for both are sorted
+	utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+	utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 	s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 }
 
@@ -470,6 +477,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDeployments() {
 
 		depExpected := dep.DeepCopy()
 		UpdateDeployment(depExpected, n, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
+		// Make sure the env vars for both are sorted
+		utils.SortEnvVars(depExpected.Spec.Template.Spec.Containers[0].Env)
+		utils.SortEnvVars(dep.Spec.Template.Spec.Containers[0].Env)
 		s.True(equality.Semantic.DeepEqual(depExpected, dep))
 	}
 
