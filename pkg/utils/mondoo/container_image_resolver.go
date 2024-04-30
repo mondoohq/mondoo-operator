@@ -90,20 +90,18 @@ func (c *containerImageResolver) MondooOperatorImage(ctx context.Context, userIm
 	// If we have no user image or tag, we read the image from the operator pod
 	if userImage == "" || userTag == "" {
 		operatorPod := &corev1.Pod{}
-		if err := c.kubeClient.Get(ctx, client.ObjectKey{Namespace: c.operatorPodNamespace, Name: c.operatorPodName}, operatorPod); err != nil {
-			return "", err
-		}
-
-		for _, container := range operatorPod.Spec.Containers {
-			if container.Name == "manager" {
-				image = container.Image
-				break
+		if err := c.kubeClient.Get(ctx, client.ObjectKey{Namespace: c.operatorPodNamespace, Name: c.operatorPodName}, operatorPod); err == nil {
+			for _, container := range operatorPod.Spec.Containers {
+				if container.Name == "manager" {
+					image = container.Image
+					break
+				}
 			}
-		}
 
-		// If at this point we don't have an image, then something went wrong
-		if image == "" {
-			return "", fmt.Errorf("failed to get mondoo-operator image from operator pod")
+			// If at this point we don't have an image, then something went wrong
+			if image == "" {
+				return "", fmt.Errorf("failed to get mondoo-operator image from operator pod")
+			}
 		}
 	}
 
