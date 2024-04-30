@@ -256,6 +256,51 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 
 		cjExpected := cj.DeepCopy()
 		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		// Make sure the env vars for both are sorted
+		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
+	}
+
+	operatorImage, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
+	s.NoError(err)
+
+	// Verify node garbage collection cronjob
+	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
+
+	gcCjExpected := gcCj.DeepCopy()
+	UpdateGarbageCollectCronJob(gcCjExpected, operatorImage, "abcdefg", s.auditConfig)
+	s.True(equality.Semantic.DeepEqual(gcCjExpected, gcCj))
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_CustomEnvVars() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	mondooAuditConfig.Spec.Nodes.Env = []corev1.EnvVar{{Name: "TEST_ENV", Value: "TEST_VALUE"}}
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
+
+	image, err := s.containerImageResolver.CnspecImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+	s.NoError(err)
+
+	for _, n := range nodes.Items {
+		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
+		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
+
+		cjExpected := cj.DeepCopy()
+		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		// Make sure the env vars for both are sorted
+		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 	}
 
@@ -294,6 +339,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_Switch() {
 
 		cjExpected := cj.DeepCopy()
 		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		// Make sure the env vars for both are sorted
+		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 	}
 
@@ -352,6 +400,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 
 		cjExpected := cj.DeepCopy()
 		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		// Make sure the env vars for both are sorted
+		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 	}
 }
@@ -396,6 +447,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 
 	cjExpected := cj.DeepCopy()
 	UpdateCronJob(cjExpected, image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	// Make sure the env vars for both are sorted
+	utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+	utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 	s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 }
 
@@ -423,6 +477,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDeployments() {
 
 		depExpected := dep.DeepCopy()
 		UpdateDeployment(depExpected, n, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
+		// Make sure the env vars for both are sorted
+		utils.SortEnvVars(depExpected.Spec.Template.Spec.Containers[0].Env)
+		utils.SortEnvVars(dep.Spec.Template.Spec.Containers[0].Env)
 		s.True(equality.Semantic.DeepEqual(depExpected, dep))
 	}
 

@@ -114,6 +114,9 @@ type Nodes struct {
 	Style NodeScanStyle `json:"style,omitempty"`
 	// PriorityClassName specifies the name of the PriorityClass for the node scanning workloads.
 	PriorityClassName string `json:"priorityClassName,omitempty"`
+	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env
+	// variable with the same name, the value specified here will override it.
+	Env []corev1.EnvVar `json:"envVar,omitempty"`
 }
 
 type Admission struct {
@@ -143,6 +146,9 @@ type Containers struct {
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 	// Specify a custom crontab schedule for the container image scanning job. If not specified, the default schedule is used.
 	Schedule string `json:"schedule,omitempty"`
+	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env
+	// variable with the same name, the value specified here will override it.
+	Env []corev1.EnvVar `json:"envVar,omitempty"`
 }
 
 type Image struct {

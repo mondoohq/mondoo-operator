@@ -77,6 +77,37 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	s.Equal(expected, created)
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_Create_CustomEnvVars() {
+	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	mondooAuditConfig.Spec.Containers.Env = []corev1.EnvVar{{Name: "TEST_ENV", Value: "TEST_VALUE"}}
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	s.NoError(err)
+
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
+
+	// Set some fields that the kube client sets
+	expected.ResourceVersion = "1"
+
+	created := &batchv1.CronJob{}
+	created.Name = expected.Name
+	created.Namespace = expected.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+
+	// Make sure the env vars for both are sorted
+	utils.SortEnvVars(expected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+	utils.SortEnvVars(created.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+
+	s.Equal(expected, created)
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomImage() {
 	d := s.createDeploymentHandler()
 	mondooAuditConfig := &s.auditConfig
