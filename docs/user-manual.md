@@ -35,7 +35,6 @@ This user manual describes how to install and use the Mondoo Operator.
     - [Why is there a deployment marked as unschedulable?](#why-is-there-a-deployment-marked-as-unschedulable)
     - [Why are (some of) my nodes unscored?](#why-are-some-of-my-nodes-unscored)
     - [How can I trigger a new scan?](#how-can-i-trigger-a-new-scan)
-    - [I had a `MondooAuditConfig` in my cluster with version `v1alpha1` and now I can no longer access it. What should I do?](#i-had-a-mondooauditconfig-in-my-cluster-with-version-v1alpha1-and-now-i-can-no-longer-access-it-what-should-i-do)
 
 ## Mondoo Operator Installation
 
@@ -815,62 +814,3 @@ spec:
 ```
 
 5. The scan cron jobs will be re-created and their initial run will occur within the next minute.
-
-### I had a `MondooAuditConfig` in my cluster with version `v1alpha1` and now I can no longer access it. What should I do?
-
-Mondoo recently upgraded our CRDs version to `v1alpha2`. You need to manually migrate to the new version. You can list the CRDs with the old version by running:
-
-```bash
-kubectl get mondooauditconfigs.v1alpha1.k8s.mondoo.com -A
-```
-
-Manually edit each of the CRDs in the list to map it to the new version.
-
-Note: This is not possible immediately after performing the operator upgrade.
-
-1. Back up your old `MondooAuditConfig`:
-
-   ```bash
-   kubectl get mondooauditconfigs.v1alpha1.k8s.mondoo.com mondoo-client -n mondoo-operator -o yaml > audit-config.yaml
-   ```
-
-2. Map the old `v1alpha1` config to the new `v1alpha2` and save the new `MondooAuditConfig`. Find the mapping from `v1alpha1` to `v1alpha2`.
-
-3. Disable the `webhook` conversion for the `MondooAuditConfig` CRD:
-
-   ```bash
-   kubectl edit crd mondooauditconfigs.k8s.mondoo.com
-   ```
-
-   Delete or comment out this section:
-
-   ```yaml
-   spec:
-     # conversion:
-     #   strategy: Webhook
-     #   webhook:
-     #     clientConfig:
-     #       service:
-     #         name: webhook-service
-     #         namespace: mondoo-operator
-     #         path: /convert
-     #     conversionReviewVersions:
-     #     - v1
-     group: k8s.mondoo.com
-     names:
-       kind: MondooAuditConfig
-       listKind: MondooAuditConfigList
-       plural: mondooauditconfigs
-       singular: mondooauditconfig
-   ```
-
-4. Apply the updated `MondooAuditConfig`:
-
-   ```bash
-   kubectl apply -f audit-config.yaml
-   ```
-
-5. Restore the original CRD definition. The easiest way to do that is to apply the manifests from our latest release:
-   ```bash
-   kubectl apply -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml
-   ```
