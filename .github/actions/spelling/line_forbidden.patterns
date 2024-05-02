@@ -78,6 +78,9 @@
 # s.b. email
 \be-mail\b
 
+# s.b. APIs
+\bapis\b
+
 #
 # Product Names
 #

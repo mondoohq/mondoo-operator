@@ -35,7 +35,6 @@ This user manual describes how to install and use the Mondoo Operator.
     - [Why is there a deployment marked as unschedulable?](#why-is-there-a-deployment-marked-as-unschedulable)
     - [Why are (some of) my nodes unscored?](#why-are-some-of-my-nodes-unscored)
     - [How can I trigger a new scan?](#how-can-i-trigger-a-new-scan)
-    - [I had a `MondooAuditConfig` in my cluster with version `v1alpha1` and now I can no longer access it. What should I do?](#i-had-a-mondooauditconfig-in-my-cluster-with-version-v1alpha1-and-now-i-can-no-longer-access-it-what-should-i-do)
 
 ## Mondoo Operator Installation
 
@@ -77,6 +76,7 @@ Preconditions:
    ```
 
 2. Deploy the operator using Helm:
+
    ```bash
    helm install mondoo-operator mondoo/mondoo-operator --namespace mondoo-operator --create-namespace
    ```
@@ -116,6 +116,7 @@ Preconditions:
    ```
 
 3. Verify that the operator is properly installed:
+
    ```bash
    kubectl get csv -n operators
    ```
@@ -124,7 +125,7 @@ Preconditions:
 
 Follow these steps to configure the Mondoo Secret:
 
-1. Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts).
+1. Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/maintain/access/service_accounts/).
 2. Store the service account json into a local file `creds.json`. The `creds.json` file should look like this:
 
    ```json
@@ -138,6 +139,7 @@ Follow these steps to configure the Mondoo Secret:
    ```
 
 3. Store the service account as a Secret in the Mondoo namespace:
+
    ```bash
    kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=creds.json
    ```
@@ -164,6 +166,7 @@ Once the Secret is configured, configure the operator to define the scan targets
    ```
 
 2. Apply the configuration:
+
    ```bash
    kubectl apply -f mondoo-config.yaml
    ```
@@ -235,7 +238,7 @@ If a workload is dependent on another workload, the admission controller only sc
 For example, if a Deployment creates a Pod, the admission controller skips the Pod and scans the Deployment.
 The owner workload is the definition where you can fix issues permanently.
 
-For more information on how you can configure this, have a look at [this tutorial](https://mondoo.com/docs/tutorials/kubernetes/scan-kubernetes-with-operator/).
+For more information on how you can configure this, have a look at [this tutorial](https://mondoo.com/docs/platform/infra/cloud/kubernetes/scan-kubernetes-with-operator/).
 
 ### Different modes of operation
 
@@ -259,7 +262,7 @@ You configure the mode via the `MondooAuditConfig`:
 When admission is enabled, the default mode is `permissive` with one replica.
 In permissive mode, the webhook checks objects like Deployments or Pods against policies and reports problems to the Mondoo Backend.
 Mondoo shows the results in the CI/CD view.
-For more details, have a look at the [docs](https://mondoo.com/docs/supplychain/overview/).
+For more details, have a look at the [docs](https://mondoo.com/docs/platform/infra/supply/overview/).
 In enforcing mode, the operator automatically sets the `failurePolicy` of the `ValidatingWebhookConfiguration` to `Fail`.
 The webhook then will deny objects not passing the policy.
 The details are reported to the Mondoo Backend.
@@ -286,6 +289,7 @@ Please increase the replicas count according to your needs.
 1. Install cert-manger on the cluster if it isn't already installed. ([See instructions](https://cert-manager.io/docs/installation/).)
 
 2. Update MondooAuditConfig so that the webhook section requests TLS certificates from cert-manager:
+
    ```yaml
    apiVersion: k8s.mondoo.com/v1alpha2
    kind: MondooAuditConfig
@@ -377,6 +381,7 @@ You can manually create the TLS certificate required for the admission controlle
    ```
 
 8. Add the certificate authority as base64 encoded CA data (`base64 ./ca.crt`) to the ValidatingWebhookConfiguration under the `webhooks[].clientConfig.caBundle` field:
+
    ```bash
    kubectl edit validatingwebhookconfiguration mondoo-operator-mondoo-webhook
    ```
@@ -443,40 +448,40 @@ We assume you already have the operator running inside the default namespace.
 Now you want to send the data from a different namespace into another Mondoo Space.
 To do so, follow these steps:
 
-1. Create an additional [Space in Mondoo](https://mondoo.com/docs/platform/spaces/)
-2. Create a [Mondoo Service Account](https://mondoo.com/docs/platform/service_accounts/) for this space
+1. Create an additional [Space in Mondoo](https://mondoo.com/docs/platform/start/organize/spaces/)
+2. Create a [Mondoo Service Account](https://mondoo.com/docs/platform/maintain/access/service_accounts/) for this space
 3. Create the new namespace in Kubernetes:
 
-```
-kubectl create namespace 2nd-namespace
-```
+  ```bash
+  kubectl create namespace 2nd-namespace
+  ```
 
 4. Create a Kubernetes Service Account in this namespace:
 
-```yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: mondoo-operator-k8s-resources-scanning
-  namespace: 2nd-namespace
-```
+  ```yaml
+  apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: mondoo-operator-k8s-resources-scanning
+    namespace: 2nd-namespace
+  ```
 
 5. Bind this Service Account to a Cluster Role which was created during the installation of the operator:
 
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: k8s-resources-scanning
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: mondoo-operator-k8s-resources-scanning
-subjects:
-  - kind: ServiceAccount
+  ```yaml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: k8s-resources-scanning
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
     name: mondoo-operator-k8s-resources-scanning
-    namespace: 2nd-namespace
-```
+  subjects:
+    - kind: ServiceAccount
+      name: mondoo-operator-k8s-resources-scanning
+      namespace: 2nd-namespace
+  ```
 
 6. Add the Mondoo Service Account as a secret to the namespace as described [here](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual.md#configuring-the-mondoo-secret)
 7. Create a `MondooAuditConfig` in `2nd-namespace` as described [here](https://github.com/mondoohq/mondoo-operator/blob/main/docs/user-manual.md#creating-a-mondooauditconfig)
@@ -488,7 +493,8 @@ After some seconds, you should see that the operator picked up the new `MondooAu
 
 You can adjust the interval for scans triggered via a CronJob.
 Edit the `MondooAuditConfig` to adjust the interval:
-```
+
+```bash
 kubectl -n mondoo-operator edit mondooauditconfigs.k8s.mondoo.com mondoo-client
 ```
 
@@ -808,62 +814,3 @@ spec:
 ```
 
 5. The scan cron jobs will be re-created and their initial run will occur within the next minute.
-
-### I had a `MondooAuditConfig` in my cluster with version `v1alpha1` and now I can no longer access it. What should I do?
-
-Mondoo recently upgraded our CRDs version to `v1alpha2`. You need to manually migrate to the new version. You can list the CRDs with the old version by running:
-
-```bash
-kubectl get mondooauditconfigs.v1alpha1.k8s.mondoo.com -A
-```
-
-Manually edit each of the CRDs in the list to map it to the new version.
-
-Note: This is not possible immediately after performing the operator upgrade.
-
-1. Back up your old `MondooAuditConfig`:
-
-   ```bash
-   kubectl get mondooauditconfigs.v1alpha1.k8s.mondoo.com mondoo-client -n mondoo-operator -o yaml > audit-config.yaml
-   ```
-
-2. Map the old `v1alpha1` config to the new `v1alpha2` and save the new `MondooAuditConfig`. Find the mapping from `v1alpha1` to `v1alpha2` [here](../api/v1alpha1/mondooauditconfig_types.go#L155-L199).
-
-3. Disable the `webhook` conversion for the `MondooAuditConfig` CRD:
-
-   ```bash
-   kubectl edit crd mondooauditconfigs.k8s.mondoo.com
-   ```
-
-   Delete or comment out this section:
-
-   ```yaml
-   spec:
-     # conversion:
-     #   strategy: Webhook
-     #   webhook:
-     #     clientConfig:
-     #       service:
-     #         name: webhook-service
-     #         namespace: mondoo-operator
-     #         path: /convert
-     #     conversionReviewVersions:
-     #     - v1
-     group: k8s.mondoo.com
-     names:
-       kind: MondooAuditConfig
-       listKind: MondooAuditConfigList
-       plural: mondooauditconfigs
-       singular: mondooauditconfig
-   ```
-
-4. Apply the updated `MondooAuditConfig`:
-
-   ```bash
-   kubectl apply -f audit-config.yaml
-   ```
-
-5. Restore the original CRD definition. The easiest way to do that is to apply the manifests from our latest release:
-   ```bash
-   kubectl apply -f https://github.com/mondoohq/mondoo-operator/releases/latest/download/mondoo-operator-manifests.yaml
-   ```

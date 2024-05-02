@@ -65,7 +65,7 @@ kubectl create namespace mondoo-operator
 
 2. Configure the Mondoo secret:
 
-- Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/service_accounts)
+- Create a new Mondoo service account to report assessments to [Mondoo Platform](https://mondoo.com/docs/platform/maintain/access/service_accounts/)
 - Store the service account json into a local file `creds.json`
 - Store service account as a secret in the mondoo namespace via:
 
