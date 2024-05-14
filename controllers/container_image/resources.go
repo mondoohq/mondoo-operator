@@ -43,6 +43,10 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
+	if cfg.Spec.ContainerProxy != nil {
+		cmd = append(cmd, []string{"--container-proxy", *cfg.Spec.ContainerProxy}...)
+	}
+
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 	envVars = k8s.MergeEnv(envVars, m.Spec.Containers.Env)
