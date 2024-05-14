@@ -9,7 +9,7 @@ import (
 
 	// That's the mod k8s relies on https://github.com/kubernetes/kubernetes/blob/master/go.mod#L63
 
-	"go.mondoo.com/cnquery/v10/providers-sdk/v1/inventory"
+	"go.mondoo.com/cnquery/v11/providers-sdk/v1/inventory"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
@@ -204,8 +204,8 @@ func CronJobName(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, CronJobNameSuffix)
 }
 
-func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (*corev1.ConfigMap, error) {
-	inv, err := Inventory(integrationMRN, clusterUID, m)
+func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (*corev1.ConfigMap, error) {
+	inv, err := Inventory(integrationMRN, clusterUID, m, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +223,7 @@ func ConfigMapName(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
 }
 
-func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
+func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (string, error) {
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-k8s-containers-inventory",
@@ -255,6 +255,12 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 	if integrationMRN != "" {
 		for i := range inv.Spec.Assets {
 			inv.Spec.Assets[i].Labels[constants.MondooAssetsIntegrationLabel] = integrationMRN
+		}
+	}
+
+	if cfg.Spec.ContainerProxy != nil {
+		for i := range inv.Spec.Assets {
+			inv.Spec.Assets[i].Connections[0].Options["container-proxy"] = *cfg.Spec.ContainerProxy
 		}
 	}
 

@@ -59,8 +59,8 @@ func (r *MondooOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl
 		return ctrl.Result{}, nil
 	}
 
-	if config.Spec.HttpProxy != nil {
-		urlParsed, err := url.Parse(*config.Spec.HttpProxy)
+	if config.Spec.ContainerProxy != nil {
+		urlParsed, err := url.Parse(*config.Spec.ContainerProxy)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

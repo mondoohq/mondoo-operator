@@ -28,6 +28,8 @@ type MondooOperatorConfigSpec struct {
 	SkipContainerResolution bool `json:"skipContainerResolution,omitempty"`
 	// HttpProxy specifies a proxy to use for HTTP requests to the Mondoo Platform.
 	HttpProxy *string `json:"httpProxy,omitempty"`
+	// ContainerProxy specifies a proxy to use for container images.
+	ContainerProxy *string `json:"containerProxy,omitempty"`
 }
 
 type Metrics struct {
