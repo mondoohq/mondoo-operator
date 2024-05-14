@@ -180,7 +180,7 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string
 		return false, err
 	}
 
-	desired, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo)
+	desired, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo, *n.MondooOperatorConfig)
 	if err != nil {
 		logger.Error(err, "failed to generate desired ConfigMap with inventory")
 		return false, err
