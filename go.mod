@@ -11,8 +11,8 @@ require (
 	github.com/rs/zerolog v1.32.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.9.0
-	go.mondoo.com/cnquery/v11 v11.4.1
-	go.mondoo.com/cnspec/v11 v11.4.1
+	go.mondoo.com/cnquery/v11 v11.4.3
+	go.mondoo.com/cnspec/v11 v11.4.3
 	go.mondoo.com/mondoo-go v0.0.0-20240507081602-aa7a34bcb66d
 	k8s.io/api v0.29.3
 	k8s.io/apimachinery v0.29.3
@@ -37,7 +37,7 @@ require (
 	github.com/99designs/keyring v1.2.2 // indirect
 	github.com/Abirdcfly/dupword v0.0.14 // indirect
 	github.com/Antonboom/errname v0.1.13 // indirect
-	github.com/Antonboom/nilnil v0.1.8 // indirect
+	github.com/Antonboom/nilnil v0.1.9 // indirect
 	github.com/Antonboom/testifylint v1.2.0 // indirect
 	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/Crocmagnon/fatcontext v0.2.2 // indirect
@@ -69,7 +69,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.3.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.17.5 // indirect
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.53.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.53.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.28.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.50.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.20.6 // indirect
@@ -149,7 +149,6 @@ require (
 	github.com/golangci/revgrep v0.5.3 // indirect
 	github.com/golangci/unconvert v0.0.0-20240309020433-c5143eacb3ed // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
-	github.com/google/pprof v0.0.0-20221118152302-e6195bd50e26 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.4 // indirect
@@ -192,7 +191,7 @@ require (
 	github.com/kulti/thelper v0.6.3 // indirect
 	github.com/kunwardeep/paralleltest v1.0.10 // indirect
 	github.com/kyoh86/exportloopref v0.1.11 // indirect
-	github.com/lasiar/canonicalheader v1.0.6 // indirect
+	github.com/lasiar/canonicalheader v1.1.1 // indirect
 	github.com/ldez/gomoddirectives v0.2.4 // indirect
 	github.com/ldez/tagliatelle v0.5.0 // indirect
 	github.com/leonklingele/grouper v1.1.2 // indirect
@@ -250,7 +249,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
 	github.com/sashamelentyev/interfacebloat v1.1.0 // indirect
 	github.com/sashamelentyev/usestdlibvars v1.25.0 // indirect
-	github.com/securego/gosec/v2 v2.19.0 // indirect
+	github.com/securego/gosec/v2 v2.20.0 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/sethvargo/go-retry v0.2.4 // indirect
@@ -286,8 +285,8 @@ require (
 	github.com/yeya24/promlinter v0.3.0 // indirect
 	github.com/ykadowak/zerologlint v0.1.5 // indirect
 	gitlab.com/bosi/decorder v0.4.2 // indirect
-	go-simpler.org/musttag v0.12.1 // indirect
-	go-simpler.org/sloglint v0.6.0 // indirect
+	go-simpler.org/musttag v0.12.2 // indirect
+	go-simpler.org/sloglint v0.7.0 // indirect
 	go.mondoo.com/ranger-rpc v0.6.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.51.0 // indirect
@@ -298,7 +297,7 @@ require (
 	go.uber.org/automaxprocs v1.5.3 // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
-	golang.org/x/exp/typeparams v0.0.0-20240325151524-a685a6edb6d8 // indirect
+	golang.org/x/exp/typeparams v0.0.0-20240506185415-9bf2ced13842 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/tools v0.21.0 // indirect
@@ -318,7 +317,7 @@ require (
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/evanphx/json-patch v5.7.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
@@ -338,8 +337,8 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.19.1
 	github.com/prometheus/client_model v0.6.1
-	github.com/prometheus/common v0.51.1 // indirect
-	github.com/prometheus/procfs v0.13.0 // indirect
+	github.com/prometheus/common v0.53.0 // indirect
+	github.com/prometheus/procfs v0.15.0 // indirect
 	github.com/spf13/pflag v1.0.6-0.20201009195203-85dd5c8bc61c // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0
