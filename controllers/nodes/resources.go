@@ -192,17 +192,19 @@ func UpdateDeployment(
 	}
 
 	dep.Labels = labels
-	dep.Annotations = map[string]string{
-		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-deployment-runasnonroot": ignoreAnnotationValue,
+	if dep.Annotations == nil {
+		dep.Annotations = map[string]string{}
 	}
+	dep.Annotations[ignoreQueryAnnotationPrefix+"mondoo-kubernetes-security-deployment-runasnonroot"] = ignoreAnnotationValue
 	dep.Spec.Replicas = ptr.To(int32(1))
 	dep.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: labels,
 	}
 	dep.Spec.Template.Labels = labels
-	dep.Spec.Template.Annotations = map[string]string{
-		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-pod-runasnonroot": ignoreAnnotationValue,
+	if dep.Spec.Template.Annotations == nil {
+		dep.Spec.Template.Annotations = map[string]string{}
 	}
+	dep.Spec.Template.Annotations[ignoreQueryAnnotationPrefix+"mondoo-kubernetes-security-pod-runasnonroot"] = ignoreAnnotationValue
 	dep.Spec.Template.Spec.PriorityClassName = m.Spec.Nodes.PriorityClassName
 	dep.Spec.Template.Spec.NodeSelector = map[string]string{
 		"kubernetes.io/hostname": node.Name,
