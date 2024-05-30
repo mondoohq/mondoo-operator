@@ -549,6 +549,12 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesDeployments(auditConfig
 	status, err := s.integration.GetStatus(s.ctx)
 	s.NoError(err, "Failed to get status")
 	s.Equal("ACTIVE", status)
+
+	// Verify that the node scanning deployments aren't constantly updating
+	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
+	for _, d := range deployments.Items {
+		s.Less(d.Generation, int64(10))
+	}
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
