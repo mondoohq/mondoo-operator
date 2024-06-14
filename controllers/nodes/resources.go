@@ -252,7 +252,7 @@ func UpdateDeployment(
 					MountPath: "/tmp",
 				},
 			},
-			Env: []corev1.EnvVar{
+			Env: k8s.MergeEnv([]corev1.EnvVar{
 				{
 					Name:  "DEBUG",
 					Value: "false",
@@ -265,7 +265,7 @@ func UpdateDeployment(
 					Name:  "MONDOO_AUTO_UPDATE",
 					Value: "false",
 				},
-			},
+			}, m.Spec.Nodes.Env),
 		},
 	}
 	dep.Spec.Template.Spec.Volumes = []corev1.Volume{
