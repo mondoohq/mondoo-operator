@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   mondoo-operator:
   - apiVersion: v2
+    appVersion: 11.2.2
+    created: "2024-06-14T09:36:38.867204109Z"
+    description: A Helm chart for installing mondoo-operator on Kubernetes
+    digest: e11c6f05b0f8030d3602e5eae4d419590436accbac00300148c4d6effd7b6589
+    name: mondoo-operator
+    type: application
+    urls:
+    - https://github.com/mondoohq/mondoo-operator/releases/download/mondoo-operator-11.2.2/mondoo-operator-11.2.2.tgz
+    version: 11.2.2
+  - apiVersion: v2
     appVersion: 11.2.1
     created: "2024-05-30T09:48:11.28945287Z"
     description: A Helm chart for installing mondoo-operator on Kubernetes
@@ -891,4 +901,4 @@ entries:
     urls:
     - https://github.com/mondoohq/mondoo-operator/releases/download/mondoo-operator-0.1.0/mondoo-operator-0.1.0.tgz
     version: 0.1.0
-generated: "2024-05-30T09:48:11.290000998Z"
+generated: "2024-06-14T09:36:38.867586836Z"
