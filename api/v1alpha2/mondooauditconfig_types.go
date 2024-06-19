@@ -96,6 +96,7 @@ type NodeScanStyle string
 const (
 	NodeScanStyle_CronJob    NodeScanStyle = "cronjob"
 	NodeScanStyle_Deployment NodeScanStyle = "deployment"
+	NodeScanStyle_DaemonSet  NodeScanStyle = "daemonset"
 )
 
 type Nodes struct {

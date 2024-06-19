@@ -38,8 +38,8 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		if err := n.syncCronJob(ctx); err != nil {
 			return ctrl.Result{}, err
 		}
-	} else if n.Mondoo.Spec.Nodes.Style == v1alpha2.NodeScanStyle_Deployment {
-		if err := n.syncDeployment(ctx); err != nil {
+	} else if n.Mondoo.Spec.Nodes.Style == v1alpha2.NodeScanStyle_Deployment || n.Mondoo.Spec.Nodes.Style == v1alpha2.NodeScanStyle_DaemonSet {
+		if err := n.syncDaemonSet(ctx); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -83,7 +83,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 			return err
 		}
 
-		updated, err := n.syncConfigMap(ctx, node, clusterUid)
+		updated, err := n.syncConfigMap(ctx, clusterUid)
 		if err != nil {
 			return err
 		}
@@ -157,7 +157,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	return nil
 }
 
-func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
+func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 	mondooClientImage, err := n.ContainerImageResolver.CnspecImage(
 		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
@@ -194,7 +194,7 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 			return err
 		}
 
-		updated, err := n.syncConfigMap(ctx, node, clusterUid)
+		updated, err := n.syncConfigMap(ctx, clusterUid)
 		if err != nil {
 			return err
 		}
@@ -269,16 +269,16 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 // syncConfigMap syncs the inventory ConfigMap. Returns a boolean indicating whether the ConfigMap has been updated. It
 // can only be "true", if the ConfigMap existed before this reconcile cycle and the inventory was different from the
 // desired state.
-func (n *DeploymentHandler) syncConfigMap(ctx context.Context, node corev1.Node, clusterUid string) (bool, error) {
+func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string) (bool, error) {
 	integrationMrn, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
 	if err != nil {
 		logger.Error(err, "failed to retrieve IntegrationMRN")
 		return false, err
 	}
 
-	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace}}
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
 	op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, cm, n.Mondoo, logger, func() error {
-		return UpdateConfigMap(cm, node, integrationMrn, clusterUid, *n.Mondoo)
+		return UpdateConfigMap(cm, integrationMrn, clusterUid, *n.Mondoo)
 	})
 	if err != nil {
 		return false, err
@@ -315,14 +315,6 @@ func (n *DeploymentHandler) cleanupCronJobsForDeletedNodes(ctx context.Context, 
 			return err
 		}
 		logger.Info("Deleted CronJob", "namespace", c.Namespace, "name", c.Name)
-
-		configMap := &corev1.ConfigMap{}
-		configMap.Name = ConfigMapName(n.Mondoo.Name, c.Spec.JobTemplate.Spec.Template.Spec.NodeName)
-		configMap.Namespace = n.Mondoo.Namespace
-		if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
-			logger.Error(err, "Failed to delete ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
-			return err
-		}
 	}
 	return nil
 }
@@ -355,14 +347,6 @@ func (n *DeploymentHandler) cleanupDeploymentsForDeletedNodes(ctx context.Contex
 			return err
 		}
 		logger.Info("Deleted Deployment", "namespace", d.Namespace, "name", d.Name)
-
-		configMap := &corev1.ConfigMap{}
-		configMap.Name = ConfigMapName(n.Mondoo.Name, d.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"])
-		configMap.Namespace = n.Mondoo.Namespace
-		if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
-			logger.Error(err, "Failed to delete ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
-			return err
-		}
 	}
 	return nil
 }
@@ -427,7 +411,7 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		}
 
 		configMap := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace},
+			ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
 		}
 		if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
 			logger.Error(err, "Failed to clean up inventory ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)

@@ -68,14 +68,14 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMap() {
 	nodes := &corev1.NodeList{}
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-	for _, node := range nodes.Items {
+	for range nodes.Items {
 		cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-			Name: ConfigMapName(s.auditConfig.Name, node.Name), Namespace: s.auditConfig.Namespace,
+			Name: ConfigMapName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace,
 		}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
 		cfgMapExpected := cfgMap.DeepCopy()
-		s.Require().NoError(UpdateConfigMap(cfgMapExpected, node, "", testClusterUID, s.auditConfig))
+		s.Require().NoError(UpdateConfigMap(cfgMapExpected, "", testClusterUID, s.auditConfig))
 		s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
 	}
 }
@@ -112,14 +112,14 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN
 	nodes := &corev1.NodeList{}
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-	for _, node := range nodes.Items {
+	for range nodes.Items {
 		cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-			Name: ConfigMapName(s.auditConfig.Name, node.Name), Namespace: s.auditConfig.Namespace,
+			Name: ConfigMapName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace,
 		}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
 		cfgMapExpected := cfgMap.DeepCopy()
-		s.Require().NoError(UpdateConfigMap(cfgMapExpected, node, testIntegrationMRN, testClusterUID, s.auditConfig))
+		s.Require().NoError(UpdateConfigMap(cfgMapExpected, testIntegrationMRN, testClusterUID, s.auditConfig))
 		s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
 	}
 }
@@ -133,29 +133,25 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
 	nodes := &corev1.NodeList{}
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-	for _, node := range nodes.Items {
-		cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-			Name: ConfigMapName(s.auditConfig.Name, node.Name), Namespace: s.auditConfig.Namespace,
-		}}
-		s.Require().NoError(UpdateConfigMap(cfgMap, node, "", testClusterUID, s.auditConfig))
-		cfgMap.Data["inventory"] = ""
-		s.NoError(d.KubeClient.Create(s.ctx, cfgMap))
-	}
+	cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: ConfigMapName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace,
+	}}
+	s.Require().NoError(UpdateConfigMap(cfgMap, "", testClusterUID, s.auditConfig))
+	cfgMap.Data["inventory"] = ""
+	s.NoError(d.KubeClient.Create(s.ctx, cfgMap))
 
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	for _, node := range nodes.Items {
-		cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-			Name: ConfigMapName(s.auditConfig.Name, node.Name), Namespace: s.auditConfig.Namespace,
-		}}
-		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
+	cfgMap = &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: ConfigMapName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace,
+	}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
-		cfgMapExpected := cfgMap.DeepCopy()
-		s.Require().NoError(UpdateConfigMap(cfgMapExpected, node, "", testClusterUID, s.auditConfig))
-		s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
-	}
+	cfgMapExpected := cfgMap.DeepCopy()
+	s.Require().NoError(UpdateConfigMap(cfgMapExpected, "", testClusterUID, s.auditConfig))
+	s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CronJob_CleanConfigMapsForDeletedNodes() {
@@ -186,12 +182,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_CleanConfigMapsForDeleted
 	s.Equal(1, len(configMaps.Items))
 
 	cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name: ConfigMapName(s.auditConfig.Name, nodes.Items[0].Name), Namespace: s.auditConfig.Namespace,
+		Name: ConfigMapName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace,
 	}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
 	cfgMapExpected := cfgMap.DeepCopy()
-	s.Require().NoError(UpdateConfigMap(cfgMapExpected, nodes.Items[0], "", testClusterUID, s.auditConfig))
+	s.Require().NoError(UpdateConfigMap(cfgMapExpected, "", testClusterUID, s.auditConfig))
 	s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
 }
 
@@ -224,12 +220,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_Deployment_CleanConfigMapsForDele
 	s.Equal(1, len(configMaps.Items))
 
 	cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name: ConfigMapName(s.auditConfig.Name, nodes.Items[0].Name), Namespace: s.auditConfig.Namespace,
+		Name: ConfigMapName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace,
 	}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
 	cfgMapExpected := cfgMap.DeepCopy()
-	s.Require().NoError(UpdateConfigMap(cfgMapExpected, nodes.Items[0], "", testClusterUID, s.auditConfig))
+	s.Require().NoError(UpdateConfigMap(cfgMapExpected, "", testClusterUID, s.auditConfig))
 	s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
 }
 

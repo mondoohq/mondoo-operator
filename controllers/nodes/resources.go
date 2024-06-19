@@ -31,7 +31,7 @@ const (
 	CronJobNameBase               = "-node-"
 	DeploymentNameBase            = "-node-"
 	GarbageCollectCronJobNameBase = "-node-gc"
-	InventoryConfigMapBase        = "-node-inventory-"
+	InventoryConfigMapBase        = "-node-inventory"
 
 	ignoreQueryAnnotationPrefix = "policies.k8s.mondoo.com/"
 
@@ -122,6 +122,14 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 					Name:  "MONDOO_AUTO_UPDATE",
 					Value: "false",
 				},
+				{
+					Name: "NODE_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "spec.nodeName",
+						},
+					},
+				},
 			}, m.Spec.Nodes.Env),
 			TerminationMessagePath:   "/dev/termination-log",
 			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
@@ -143,7 +151,7 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 					Sources: []corev1.VolumeProjection{
 						{
 							ConfigMap: &corev1.ConfigMapProjection{
-								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name, node.Name)},
+								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name)},
 								Items: []corev1.KeyToPath{{
 									Key:  "inventory",
 									Path: "mondoo/inventory.yml",
@@ -265,6 +273,14 @@ func UpdateDeployment(
 					Name:  "MONDOO_AUTO_UPDATE",
 					Value: "false",
 				},
+				{
+					Name: "NODE_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "spec.nodeName",
+						},
+					},
+				},
 			}, m.Spec.Nodes.Env),
 		},
 	}
@@ -283,7 +299,7 @@ func UpdateDeployment(
 					Sources: []corev1.VolumeProjection{
 						{
 							ConfigMap: &corev1.ConfigMapProjection{
-								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name, node.Name)},
+								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name)},
 								Items: []corev1.KeyToPath{{
 									Key:  "inventory",
 									Path: "mondoo/inventory.yml",
@@ -398,8 +414,8 @@ func UpdateGarbageCollectCronJob(cj *batchv1.CronJob, image, clusterUid string, 
 	}
 }
 
-func UpdateConfigMap(cm *corev1.ConfigMap, node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) error {
-	inv, err := Inventory(node, integrationMRN, clusterUID, m)
+func UpdateConfigMap(cm *corev1.ConfigMap, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) error {
+	inv, err := Inventory(integrationMRN, clusterUID, m)
 	if err != nil {
 		return err
 	}
@@ -427,12 +443,11 @@ func GarbageCollectCronJobName(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, GarbageCollectCronJobNameBase)
 }
 
-func ConfigMapName(prefix, nodeName string) string {
-	base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
-	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), nodeName))
+func ConfigMapName(prefix string) string {
+	return fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
 }
 
-func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
+func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-node-inventory",
@@ -444,12 +459,12 @@ func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.M
 			Assets: []*inventory.Asset{
 				{
 					Id:   "host",
-					Name: node.Name,
+					Name: `{{ getenv "NODE_NAME" }}`,
 					Connections: []*inventory.Config{
 						{
 							Type:       "filesystem",
 							Host:       "/mnt/host",
-							PlatformId: fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/%s", clusterUID, node.UID),
+							PlatformId: fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/{{- getenv NODE_NAME -}}", clusterUID),
 						},
 					},
 					Labels: map[string]string{
