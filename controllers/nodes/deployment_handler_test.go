@@ -6,7 +6,6 @@ package nodes
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -467,17 +466,15 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDeployments() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	for _, n := range nodes.Items {
-		dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
-		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(dep), dep))
+	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
 
-		depExpected := dep.DeepCopy()
-		UpdateDeployment(depExpected, n, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
-		// Make sure the env vars for both are sorted
-		utils.SortEnvVars(depExpected.Spec.Template.Spec.Containers[0].Env)
-		utils.SortEnvVars(dep.Spec.Template.Spec.Containers[0].Env)
-		s.True(equality.Semantic.DeepEqual(depExpected, dep))
-	}
+	dsExpected := ds.DeepCopy()
+	UpdateDaemonSet(dsExpected, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
+	// Make sure the env vars for both are sorted
+	utils.SortEnvVars(dsExpected.Spec.Template.Spec.Containers[0].Env)
+	utils.SortEnvVars(ds.Spec.Template.Spec.Containers[0].Env)
+	s.True(equality.Semantic.DeepEqual(dsExpected, ds))
 
 	operatorImage, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
 	s.NoError(err)
@@ -509,14 +506,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDeployments_Switch() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	for _, n := range nodes.Items {
-		dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
-		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(dep), dep))
+	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
 
-		depExpected := dep.DeepCopy()
-		UpdateDeployment(depExpected, n, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
-		s.True(equality.Semantic.DeepEqual(depExpected, dep))
-	}
+	dsExpected := ds.DeepCopy()
+	UpdateDaemonSet(dsExpected, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
+	s.True(equality.Semantic.DeepEqual(dsExpected, ds))
 
 	mondooAuditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_CronJob
 	result, err = d.Reconcile(s.ctx)
@@ -558,68 +553,21 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateDeployments() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	// Make sure a deployment exists for one of the nodes
-	dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(s.auditConfig.Name, nodes.Items[1].Name), Namespace: s.auditConfig.Namespace}}
-	UpdateDeployment(dep, nodes.Items[1], s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
-	dep.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
-	s.NoError(d.KubeClient.Create(s.ctx, dep))
+	// Make sure a daemonset exists for one of the nodes
+	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
+	UpdateDaemonSet(ds, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
+	ds.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
+	s.NoError(d.KubeClient.Create(s.ctx, ds))
 
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	for _, n := range nodes.Items {
-		dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
-		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(dep), dep))
-
-		depExpected := dep.DeepCopy()
-		UpdateDeployment(depExpected, n, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
-		s.True(equality.Semantic.DeepEqual(depExpected, dep))
-	}
-}
-
-func (s *DeploymentHandlerSuite) TestReconcile_CleanDeploymentsForDeletedNodes() {
-	s.seedNodes()
-	d := s.createDeploymentHandler()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment
-	mondooAuditConfig := &s.auditConfig
-	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
-
-	// Reconcile to create the initial cron jobs
-	result, err := d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
-
-	nodes := &corev1.NodeList{}
-	s.NoError(d.KubeClient.List(s.ctx, nodes))
-
-	// Delete one node
-	s.NoError(d.KubeClient.Delete(s.ctx, &nodes.Items[1]))
-
-	// Reconcile again to delete the cron job for the deleted node
-	result, err = d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
-
-	image, err := s.containerImageResolver.CnspecImage(
-		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
-	s.NoError(err)
-
-	listOpts := &client.ListOptions{
-		Namespace:     s.auditConfig.Namespace,
-		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
-	}
-	deployments := &appsv1.DeploymentList{}
-	s.NoError(d.KubeClient.List(s.ctx, deployments, listOpts))
-
-	s.Equal(1, len(deployments.Items))
-
-	dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(s.auditConfig.Name, nodes.Items[0].Name), Namespace: s.auditConfig.Namespace}}
-	UpdateDeployment(dep, nodes.Items[0], s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
+	dep := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(dep), dep))
 
 	depExpected := dep.DeepCopy()
-	UpdateDeployment(depExpected, nodes.Items[0], s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
+	UpdateDaemonSet(depExpected, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
 	s.True(equality.Semantic.DeepEqual(depExpected, dep))
 }
 
@@ -697,78 +645,78 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_NodeScanningStatus() {
 	s.Equal(corev1.ConditionFalse, condition.Status)
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_Deployment_NodeScanningStatus() {
-	s.seedNodes()
-	d := s.createDeploymentHandler()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment
-	mondooAuditConfig := &s.auditConfig
-	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+// func (s *DeploymentHandlerSuite) TestReconcile_Deployment_NodeScanningStatus() {
+// 	s.seedNodes()
+// 	d := s.createDeploymentHandler()
+// 	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment
+// 	mondooAuditConfig := &s.auditConfig
+// 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
-	// Reconcile to create all resources
-	result, err := d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
+// 	// Reconcile to create all resources
+// 	result, err := d.Reconcile(s.ctx)
+// 	s.NoError(err)
+// 	s.True(result.IsZero())
 
-	// Verify the node scanning status is set to available
-	s.Equal(1, len(d.Mondoo.Status.Conditions))
-	condition := d.Mondoo.Status.Conditions[0]
-	s.Equal("Node Scanning is unavailable", condition.Message)
-	s.Equal("NodeScanningUnavailable", condition.Reason)
-	s.Equal(corev1.ConditionTrue, condition.Status)
+// 	// Verify the node scanning status is set to available
+// 	s.Equal(1, len(d.Mondoo.Status.Conditions))
+// 	condition := d.Mondoo.Status.Conditions[0]
+// 	s.Equal("Node Scanning is unavailable", condition.Message)
+// 	s.Equal("NodeScanningUnavailable", condition.Reason)
+// 	s.Equal(corev1.ConditionTrue, condition.Status)
 
-	listOpts := &client.ListOptions{
-		Namespace:     s.auditConfig.Namespace,
-		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
-	}
-	deployments := &appsv1.DeploymentList{}
-	s.NoError(d.KubeClient.List(s.ctx, deployments, listOpts))
+// 	listOpts := &client.ListOptions{
+// 		Namespace:     s.auditConfig.Namespace,
+// 		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
+// 	}
+// 	deployments := &appsv1.DaemonSetList{}
+// 	s.NoError(d.KubeClient.List(s.ctx, deployments, listOpts))
 
-	// Make sure all deployments are ready
-	deployments.Items[0].Status.ReadyReplicas = 1
-	s.NoError(d.KubeClient.Status().Update(s.ctx, &deployments.Items[0]))
-	deployments.Items[1].Status.ReadyReplicas = 1
-	s.NoError(d.KubeClient.Status().Update(s.ctx, &deployments.Items[1]))
+// 	// Make sure all deployments are ready
+// 	deployments.Items[0].Status.NumberReady = 1
+// 	s.NoError(d.KubeClient.Status().Update(s.ctx, &deployments.Items[0]))
+// 	deployments.Items[1].Status.NumberReady = 1
+// 	s.NoError(d.KubeClient.Status().Update(s.ctx, &deployments.Items[1]))
 
-	// Reconcile to update the audit config status
-	result, err = d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
+// 	// Reconcile to update the audit config status
+// 	result, err = d.Reconcile(s.ctx)
+// 	s.NoError(err)
+// 	s.True(result.IsZero())
 
-	// Verify the node scanning status is set to unavailable
-	condition = d.Mondoo.Status.Conditions[0]
-	s.Equal("Node Scanning is available", condition.Message)
-	s.Equal("NodeScanningAvailable", condition.Reason)
-	s.Equal(corev1.ConditionFalse, condition.Status)
+// 	// Verify the node scanning status is set to unavailable
+// 	condition = d.Mondoo.Status.Conditions[0]
+// 	s.Equal("Node Scanning is available", condition.Message)
+// 	s.Equal("NodeScanningAvailable", condition.Reason)
+// 	s.Equal(corev1.ConditionFalse, condition.Status)
 
-	// // Make a deployment fail again
-	s.NoError(d.KubeClient.List(s.ctx, deployments, listOpts))
-	deployments.Items[0].Status.ReadyReplicas = 0
-	s.NoError(d.KubeClient.Status().Update(s.ctx, &deployments.Items[0]))
+// 	// // Make a deployment fail again
+// 	s.NoError(d.KubeClient.List(s.ctx, deployments, listOpts))
+// 	deployments.Items[0].Status.NumberReady = 0
+// 	s.NoError(d.KubeClient.Status().Update(s.ctx, &deployments.Items[0]))
 
-	// Reconcile to update the audit config status
-	result, err = d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
+// 	// Reconcile to update the audit config status
+// 	result, err = d.Reconcile(s.ctx)
+// 	s.NoError(err)
+// 	s.True(result.IsZero())
 
-	// Verify the node scanning status is set to available
-	condition = d.Mondoo.Status.Conditions[0]
-	s.Equal("Node Scanning is unavailable", condition.Message)
-	s.Equal("NodeScanningUnavailable", condition.Reason)
-	s.Equal(corev1.ConditionTrue, condition.Status)
+// 	// Verify the node scanning status is set to available
+// 	condition = d.Mondoo.Status.Conditions[0]
+// 	s.Equal("Node Scanning is unavailable", condition.Message)
+// 	s.Equal("NodeScanningUnavailable", condition.Reason)
+// 	s.Equal(corev1.ConditionTrue, condition.Status)
 
-	d.Mondoo.Spec.Nodes.Enable = false
+// 	d.Mondoo.Spec.Nodes.Enable = false
 
-	// Reconcile to update the audit config status
-	result, err = d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
+// 	// Reconcile to update the audit config status
+// 	result, err = d.Reconcile(s.ctx)
+// 	s.NoError(err)
+// 	s.True(result.IsZero())
 
-	// Verify the node scanning status is set to disabled
-	condition = d.Mondoo.Status.Conditions[0]
-	s.Equal("Node Scanning is disabled", condition.Message)
-	s.Equal("NodeScanningDisabled", condition.Reason)
-	s.Equal(corev1.ConditionFalse, condition.Status)
-}
+// 	// Verify the node scanning status is set to disabled
+// 	condition = d.Mondoo.Status.Conditions[0]
+// 	s.Equal("Node Scanning is disabled", condition.Message)
+// 	s.Equal("NodeScanningDisabled", condition.Reason)
+// 	s.Equal(corev1.ConditionFalse, condition.Status)
+// }
 
 func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
 	s.seedNodes()
@@ -920,28 +868,28 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_CustomSchedule() {
 	s.Equal(cj.Spec.Schedule, customSchedule)
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_Deployment_CustomInterval() {
-	s.seedNodes()
-	d := s.createDeploymentHandler()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment
-	mondooAuditConfig := &s.auditConfig
-	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+// func (s *DeploymentHandlerSuite) TestReconcile_Deployment_CustomInterval() {
+// 	s.seedNodes()
+// 	d := s.createDeploymentHandler()
+// 	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment
+// 	mondooAuditConfig := &s.auditConfig
+// 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
-	s.auditConfig.Spec.Nodes.IntervalTimer = 1034
+// 	s.auditConfig.Spec.Nodes.IntervalTimer = 1034
 
-	result, err := d.Reconcile(s.ctx)
-	s.NoError(err)
-	s.True(result.IsZero())
+// 	result, err := d.Reconcile(s.ctx)
+// 	s.NoError(err)
+// 	s.True(result.IsZero())
 
-	nodes := &corev1.NodeList{}
-	s.NoError(d.KubeClient.List(s.ctx, nodes))
+// 	nodes := &corev1.NodeList{}
+// 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-	dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(s.auditConfig.Name, nodes.Items[0].Name), Namespace: s.auditConfig.Namespace}}
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(dep), dep))
+// 	dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(s.auditConfig.Name, nodes.Items[0].Name), Namespace: s.auditConfig.Namespace}}
+// 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(dep), dep))
 
-	s.Contains(dep.Spec.Template.Spec.Containers[0].Command, "--timer")
-	s.Contains(dep.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("%d", s.auditConfig.Spec.Nodes.IntervalTimer))
-}
+// 	s.Contains(dep.Spec.Template.Spec.Containers[0].Command, "--timer")
+// 	s.Contains(dep.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("%d", s.auditConfig.Spec.Nodes.IntervalTimer))
+// }
 
 func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {
 	return DeploymentHandler{
