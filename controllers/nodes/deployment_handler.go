@@ -206,22 +206,28 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 				"name", DeploymentName(n.Mondoo.Name, node.Name))
 		}
 
-		dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace}}
-		op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, dep, n.Mondoo, logger, func() error {
-			UpdateDeployment(dep, node, *n.Mondoo, n.IsOpenshift, mondooClientImage, *n.MondooOperatorConfig)
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-
-		if op == controllerutil.OperationResultCreated {
-			err = mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger)
-			if err != nil {
-				logger.Error(err, "Failed to update MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
-				return err
+		if n.Mondoo.Spec.Nodes.Style == v1alpha2.NodeScanStyle_Deployment {
+			dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace}}
+			if err := k8s.DeleteIfExists(ctx, n.KubeClient, dep); err != nil {
+				logger.Error(err, "Failed to clean up node scanning Deployment", "namespace", dep.Namespace, "name", dep.Name)
 			}
-			continue
+		}
+	}
+
+	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
+	op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, ds, n.Mondoo, logger, func() error {
+		UpdateDaemonSet(ds, *n.Mondoo, n.IsOpenshift, mondooClientImage, *n.MondooOperatorConfig)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if op == controllerutil.OperationResultCreated {
+		err = mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger)
+		if err != nil {
+			logger.Error(err, "Failed to update MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
+			return err
 		}
 	}
 
