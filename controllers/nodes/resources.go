@@ -192,7 +192,7 @@ func UpdateDaemonSet(
 	cmd := []string{
 		"cnspec", "serve",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
-		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
+		"--inventory-template", "/etc/opt/mondoo/inventory_template.yml",
 		"--timer", fmt.Sprintf("%d", m.Spec.Nodes.IntervalTimer),
 	}
 	if cfg.Spec.HttpProxy != nil {
@@ -297,7 +297,7 @@ func UpdateDaemonSet(
 								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name)},
 								Items: []corev1.KeyToPath{{
 									Key:  "inventory",
-									Path: "mondoo/inventory.yml",
+									Path: "mondoo/inventory_template.yml",
 								}},
 							},
 						},
@@ -466,7 +466,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 						{
 							Type:       "filesystem",
 							Host:       "/mnt/host",
-							PlatformId: fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/{{- getenv NODE_NAME -}}", clusterUID),
+							PlatformId: fmt.Sprintf(`{{ printf "//platformid.api.mondoo.app/runtime/k8s/uid/%%s/node/%%s" "%s" (getenv "NODE_NAME")}}`, clusterUID),
 						},
 					},
 					Labels: map[string]string{
