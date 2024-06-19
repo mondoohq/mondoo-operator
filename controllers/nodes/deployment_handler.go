@@ -231,11 +231,6 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		}
 	}
 
-	// Delete dangling Deployments for nodes that have been deleted from the cluster.
-	if err := n.cleanupDeploymentsForDeletedNodes(ctx, *nodes); err != nil {
-		return err
-	}
-
 	// List the Deployments again after they have been synced.
 	deployments, err := n.getDeploymentsForAuditConfig(ctx)
 	if err != nil {
@@ -321,38 +316,6 @@ func (n *DeploymentHandler) cleanupCronJobsForDeletedNodes(ctx context.Context, 
 			return err
 		}
 		logger.Info("Deleted CronJob", "namespace", c.Namespace, "name", c.Name)
-	}
-	return nil
-}
-
-// cleanupDeploymentsForDeletedNodes deletes dangling Deployments for nodes that have been deleted from the cluster.
-func (n *DeploymentHandler) cleanupDeploymentsForDeletedNodes(ctx context.Context, currentNodes corev1.NodeList) error {
-	deployments, err := n.getDeploymentsForAuditConfig(ctx)
-	if err != nil {
-		return err
-	}
-
-	for _, d := range deployments {
-		// Check if the node for that Deployment is still present in the cluster.
-		found := false
-		for _, node := range currentNodes.Items {
-			if DeploymentName(n.Mondoo.Name, node.Name) == d.Name {
-				found = true
-				break
-			}
-		}
-
-		// If the node is still there, there is nothing to update.
-		if found {
-			continue
-		}
-
-		// If the node for the Deployment has been deleted from the cluster, the Deployment needs to be deleted.
-		if err := k8s.DeleteIfExists(ctx, n.KubeClient, &d); err != nil {
-			logger.Error(err, "Failed to deleted Deployment", "namespace", d.Namespace, "name", d.Name)
-			return err
-		}
-		logger.Info("Deleted Deployment", "namespace", d.Namespace, "name", d.Name)
 	}
 	return nil
 }
