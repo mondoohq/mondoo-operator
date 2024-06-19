@@ -231,36 +231,6 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		}
 	}
 
-	// List the Deployments again after they have been synced.
-	deployments, err := n.getDeploymentsForAuditConfig(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Get Pods for these Deployments
-	pods := &corev1.PodList{}
-	if len(deployments) > 0 {
-		opts := &client.ListOptions{
-			Namespace:     n.Mondoo.Namespace,
-			LabelSelector: labels.SelectorFromSet(NodeScanningLabels(*n.Mondoo)),
-		}
-		err = n.KubeClient.List(ctx, pods, opts)
-		if err != nil {
-			logger.Error(err, "Failed to list Pods for Node Scanning")
-			return err
-		}
-	}
-
-	deploymentsDegraded := false
-	for _, d := range deployments {
-		if d.Status.ReadyReplicas < *d.Spec.Replicas {
-			deploymentsDegraded = true
-			break
-		}
-	}
-
-	updateNodeConditions(n.Mondoo, deploymentsDegraded, pods)
-
 	if err := n.syncGCCronjob(ctx, mondooOperatorImage, clusterUid); err != nil {
 		return err
 	}
