@@ -44,7 +44,7 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 	cmd := []string{
 		"cnspec", "scan", "local",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
-		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
+		"--inventory-template", "/etc/opt/mondoo/inventory_template.yml",
 		"--score-threshold", "0",
 	}
 
@@ -124,12 +124,8 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 					Value: "false",
 				},
 				{
-					Name: "NODE_NAME",
-					ValueFrom: &corev1.EnvVarSource{
-						FieldRef: &corev1.ObjectFieldSelector{
-							FieldPath: "spec.nodeName",
-						},
-					},
+					Name:  "NODE_NAME",
+					Value: node.Name,
 				},
 			}, m.Spec.Nodes.Env),
 			TerminationMessagePath:   "/dev/termination-log",
@@ -155,7 +151,7 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name)},
 								Items: []corev1.KeyToPath{{
 									Key:  "inventory",
-									Path: "mondoo/inventory.yml",
+									Path: "mondoo/inventory_template.yml",
 								}},
 							},
 						},
