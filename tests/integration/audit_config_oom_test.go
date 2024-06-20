@@ -18,6 +18,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -277,9 +278,9 @@ func (s *AuditConfigOOMSuite) TestOOMNodeScan_CronJob() {
 	s.Equal("ACTIVE", status)
 }
 
-func (s *AuditConfigOOMSuite) TestOOMNodeScan_Deployment() {
+func (s *AuditConfigOOMSuite) TestOOMNodeScan_DaemonSet() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true, false)
-	auditConfig.Spec.Nodes.Style = mondoov2.NodeScanStyle_Deployment
+	auditConfig.Spec.Nodes.Style = mondoov2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
 	s.auditConfig = auditConfig
 
 	auditConfig.Spec.Nodes.Resources.Limits = corev1.ResourceList{
@@ -297,27 +298,16 @@ func (s *AuditConfigOOMSuite) TestOOMNodeScan_Deployment() {
 
 	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
 
-	deployments := &appsv1.DeploymentList{}
-	lbls := nodes.NodeScanningLabels(auditConfig)
+	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: nodes.DaemonSetName(auditConfig.Name), Namespace: auditConfig.Namespace}}
 
-	// List only the Deployments in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
-	listOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(lbls)}
-
-	nodeList := &corev1.NodeList{}
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodeList))
-
-	// Verify the amount of Deployments created is equal to the amount of nodes
+	// Verify that DaemonSet was created
 	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
-		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
-		if len(nodeList.Items) == len(deployments.Items) {
-			return true, nil
+		if err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(ds), ds); err != nil {
+			return false, nil
 		}
-		return false, nil
+		return true, nil
 	})
-	s.NoErrorf(
-		err,
-		"The amount of node scanning Deployments is not equal to the amount of cluster nodes. expected: %d; actual: %d",
-		len(nodeList.Items), len(deployments.Items))
+	s.NoError(err, "DaemonSet was not created.")
 
 	// This will take some time, because:
 	// reconcile needs to happen
