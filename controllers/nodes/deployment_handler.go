@@ -231,6 +231,24 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		}
 	}
 
+	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(ds), ds); err != nil {
+		logger.Error(err, "Failed to get DaemonSet", "namespace", ds.Namespace, "name", ds.Name)
+	}
+
+	// Get Pods for these Deployments
+	pods := &corev1.PodList{}
+	opts := &client.ListOptions{
+		Namespace:     n.Mondoo.Namespace,
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(*n.Mondoo)),
+	}
+	err = n.KubeClient.List(ctx, pods, opts)
+	if err != nil {
+		logger.Error(err, "Failed to list Pods for Node Scanning")
+		return err
+	}
+
+	updateNodeConditions(n.Mondoo, ds.Status.CurrentNumberScheduled < ds.Status.DesiredNumberScheduled, pods)
+
 	if err := n.syncGCCronjob(ctx, mondooOperatorImage, clusterUid); err != nil {
 		return err
 	}
