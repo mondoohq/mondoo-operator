@@ -80,7 +80,7 @@ func (s *AuditConfigCustomNamespaceSuite) TearDownSuite() {
 	s.AuditConfigBaseSuite.TearDownSuite()
 }
 
-func (s *AuditConfigCustomNamespaceSuite) TestReconcile_KubernetesResources() {
+func (s *AuditConfigCustomNamespaceSuite) TestReconcile_KubernetesResources2() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, true, false, false, false)
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
 	s.testMondooAuditConfigKubernetesResources(auditConfig)
