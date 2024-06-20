@@ -312,19 +312,6 @@ func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]ba
 	return cronJobs.Items, nil
 }
 
-func (n *DeploymentHandler) getDeploymentsForAuditConfig(ctx context.Context) ([]appsv1.Deployment, error) {
-	deps := &appsv1.DeploymentList{}
-	depLabels := NodeScanningLabels(*n.Mondoo)
-
-	// Lists only the Deployments in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
-	listOpts := &client.ListOptions{Namespace: n.Mondoo.Namespace, LabelSelector: labels.SelectorFromSet(depLabels)}
-	if err := n.KubeClient.List(ctx, deps, listOpts); err != nil {
-		logger.Error(err, "Failed to list Deployments in namespace", "namespace", n.Mondoo.Namespace)
-		return nil, err
-	}
-	return deps.Items, nil
-}
-
 func (n *DeploymentHandler) down(ctx context.Context) error {
 	nodes := &corev1.NodeList{}
 	if err := n.KubeClient.List(ctx, nodes); err != nil {
