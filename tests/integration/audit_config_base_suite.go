@@ -223,7 +223,15 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	assetsExceptCluster := utils.ExcludeClusterAsset(assets)
 
 	// TODO: this number should exclude services and the cluster asset
-	s.Equalf(len(assets)-4, len(assetsExceptCluster), "Cluster asset was sent upstream.")
+	srvs := &corev1.ServiceList{}
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		if err := s.testCluster.K8sHelper.Clientset.List(s.ctx, srvs); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	s.NoError(err, "Failed to list Kubernetes Services")
+	s.Equalf(len(assets)-1-len(srvs.Items), len(assetsExceptCluster), "Cluster asset was sent upstream.")
 
 	assetNames := utils.AssetNames(assetsExceptCluster)
 	s.ElementsMatchf(workloadNames, assetNames, "Workloads were not sent upstream.")
