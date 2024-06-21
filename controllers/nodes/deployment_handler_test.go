@@ -65,19 +65,14 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMap() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	nodes := &corev1.NodeList{}
-	s.NoError(d.KubeClient.List(s.ctx, nodes))
+	cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: ConfigMapName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace,
+	}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
-	for range nodes.Items {
-		cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-			Name: ConfigMapName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace,
-		}}
-		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
-
-		cfgMapExpected := cfgMap.DeepCopy()
-		s.Require().NoError(UpdateConfigMap(cfgMapExpected, "", testClusterUID, s.auditConfig))
-		s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
-	}
+	cfgMapExpected := cfgMap.DeepCopy()
+	s.Require().NoError(UpdateConfigMap(cfgMapExpected, "", testClusterUID, s.auditConfig))
+	s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN() {
@@ -109,19 +104,14 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	nodes := &corev1.NodeList{}
-	s.NoError(d.KubeClient.List(s.ctx, nodes))
+	cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: ConfigMapName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace,
+	}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
-	for range nodes.Items {
-		cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-			Name: ConfigMapName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace,
-		}}
-		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
-
-		cfgMapExpected := cfgMap.DeepCopy()
-		s.Require().NoError(UpdateConfigMap(cfgMapExpected, testIntegrationMRN, testClusterUID, s.auditConfig))
-		s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
-	}
+	cfgMapExpected := cfgMap.DeepCopy()
+	s.Require().NoError(UpdateConfigMap(cfgMapExpected, testIntegrationMRN, testClusterUID, s.auditConfig))
+	s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
