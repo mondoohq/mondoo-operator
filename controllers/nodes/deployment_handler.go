@@ -83,6 +83,12 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 
 	// Create/update CronJobs for nodes
 	for _, node := range nodes.Items {
+		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ConfigMapNameWithNode(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace}}
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, cm); err != nil {
+			logger.Error(err, "Failed to clean up old ConfigMap for node scanning", "namespace", cm.Namespace, "name", cm.Name)
+			return err
+		}
+
 		updated, err := n.syncConfigMap(ctx, clusterUid)
 		if err != nil {
 			return err
@@ -191,6 +197,12 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		}
 		if err := k8s.DeleteIfExists(ctx, n.KubeClient, cronJob); err != nil {
 			logger.Error(err, "Failed to clean up node scanning CronJob", "namespace", cronJob.Namespace, "name", cronJob.Name)
+			return err
+		}
+
+		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ConfigMapNameWithNode(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace}}
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, cm); err != nil {
+			logger.Error(err, "Failed to clean up old ConfigMap for node scanning", "namespace", cm.Namespace, "name", cm.Name)
 			return err
 		}
 

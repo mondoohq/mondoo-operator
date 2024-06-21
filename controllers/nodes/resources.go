@@ -28,11 +28,12 @@ import (
 )
 
 const (
-	CronJobNameBase               = "-node-"
-	DeploymentNameBase            = "-node-"
-	DaemonSetNameBase             = "-node"
-	GarbageCollectCronJobNameBase = "-node-gc"
-	InventoryConfigMapBase        = "-node-inventory"
+	CronJobNameBase                = "-node-"
+	DeploymentNameBase             = "-node-"
+	DaemonSetNameBase              = "-node"
+	GarbageCollectCronJobNameBase  = "-node-gc"
+	InventoryConfigMapBase         = "-node-inventory"
+	InventoryConfigMapWithNodeBase = "-node-inventory-"
 
 	ignoreQueryAnnotationPrefix = "policies.k8s.mondoo.com/"
 
@@ -440,6 +441,11 @@ func GarbageCollectCronJobName(prefix string) string {
 
 func ConfigMapName(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
+}
+
+func ConfigMapNameWithNode(prefix, nodeName string) string {
+	base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapWithNodeBase)
+	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), nodeName))
 }
 
 func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
