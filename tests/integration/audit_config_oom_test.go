@@ -284,7 +284,7 @@ func (s *AuditConfigOOMSuite) TestOOMNodeScan_DaemonSet() {
 	s.auditConfig = auditConfig
 
 	auditConfig.Spec.Nodes.Resources.Limits = corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("200Mi"), // this should be low enough to trigger an OOMkilled
+		corev1.ResourceMemory: resource.MustParse("200Mi"),
 	}
 
 	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
@@ -319,7 +319,7 @@ func (s *AuditConfigOOMSuite) TestOOMNodeScan_DaemonSet() {
 	zap.S().Info("Decreasing memory limit to get node Scans running again.")
 	err = s.testCluster.K8sHelper.UpdateAuditConfigWithRetries(auditConfig.Name, auditConfig.Namespace, func(config *mondoov2.MondooAuditConfig) {
 		config.Spec.Nodes.Resources.Limits = corev1.ResourceList{
-			corev1.ResourceMemory: resource.MustParse("10Mi"), // this should be enough to get the ScanAPI running again
+			corev1.ResourceMemory: resource.MustParse("10Mi"), // this should be low enough to trigger an OOMkilled
 		}
 	})
 	s.Require().NoError(err)
