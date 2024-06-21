@@ -72,17 +72,17 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
+	// Delete DaemonSet if it exists
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
+	}
+	if err := k8s.DeleteIfExists(ctx, n.KubeClient, ds); err != nil {
+		logger.Error(err, "Failed to clean up node scanning DaemonSet", "namespace", ds.Namespace, "name", ds.Name)
+		return err
+	}
+
 	// Create/update CronJobs for nodes
 	for _, node := range nodes.Items {
-		// Delete Deployment if it exists
-		dep := &appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace},
-		}
-		if err := k8s.DeleteIfExists(ctx, n.KubeClient, dep); err != nil {
-			logger.Error(err, "Failed to clean up node scanning Deployment", "namespace", dep.Namespace, "name", dep.Name)
-			return err
-		}
-
 		updated, err := n.syncConfigMap(ctx, clusterUid)
 		if err != nil {
 			return err
@@ -201,7 +201,7 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 
 		if updated {
 			logger.Info(
-				"Inventory ConfigMap was just updated. The deployment will use the new config during the next scheduled run.",
+				"Inventory ConfigMap was just updated. The daemonset will use the new config during the next scheduled run.",
 				"namespace", n.Mondoo.Namespace,
 				"name", DeploymentName(n.Mondoo.Name, node.Name))
 		}
@@ -345,22 +345,22 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 			logger.Error(err, "Failed to clean up node scanning CronJob", "namespace", cronJob.Namespace, "name", cronJob.Name)
 			return err
 		}
+	}
 
-		dep := &appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace},
-		}
-		if err := k8s.DeleteIfExists(ctx, n.KubeClient, dep); err != nil {
-			logger.Error(err, "Failed to clean up node scanning Deployment", "namespace", dep.Namespace, "name", dep.Name)
-			return err
-		}
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
+	}
+	if err := k8s.DeleteIfExists(ctx, n.KubeClient, ds); err != nil {
+		logger.Error(err, "Failed to clean up node scanning DaemonSet", "namespace", ds.Namespace, "name", ds.Name)
+		return err
+	}
 
-		configMap := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
-		}
-		if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
-			logger.Error(err, "Failed to clean up inventory ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
-			return err
-		}
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
+	}
+	if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
+		logger.Error(err, "Failed to clean up inventory ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
+		return err
 	}
 
 	gcCronJob := &batchv1.CronJob{
