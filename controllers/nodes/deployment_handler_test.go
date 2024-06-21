@@ -554,12 +554,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateDaemonSets() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	dep := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(dep), dep))
+	ds = &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
 
-	depExpected := dep.DeepCopy()
+	depExpected := ds.DeepCopy()
 	UpdateDaemonSet(depExpected, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
-	s.True(equality.Semantic.DeepEqual(depExpected, dep))
+	s.True(equality.Semantic.DeepEqual(depExpected, ds))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CronJob_NodeScanningStatus() {
