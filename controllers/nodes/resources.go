@@ -431,9 +431,6 @@ func DeploymentName(prefix, suffix string) string {
 }
 
 func DaemonSetName(prefix string) string {
-	// If the name becomes longer than 52 chars, then we hash the suffix and trim
-	// it such that the full name fits within 52 chars. This is needed because in
-	// manager Kubernetes services such as EKS or GKE the node names can be very long.
 	return fmt.Sprintf("%s%s", prefix, DaemonSetNameBase)
 }
 
