@@ -342,6 +342,16 @@ func (s *AuditConfigOOMSuite) TestOOMNodeScan_DaemonSet() {
 	// Wait for the next run of the CronJob
 	time.Sleep(30 * time.Second)
 
+	err = s.testCluster.K8sHelper.CheckForDegradedCondition(&auditConfig, mondoov2.NodeScanningDegraded, corev1.ConditionFalse, "")
+	s.Require().NoError(err, "Failed to find degraded condition")
+	foundMondooAuditConfig, err := s.testCluster.K8sHelper.GetMondooAuditConfigFromCluster(auditConfig.Name, auditConfig.Namespace)
+	s.NoError(err, "Failed to find MondooAuditConfig")
+	cond := mondoo.FindMondooAuditConditions(foundMondooAuditConfig.Status.Conditions, mondoov2.ScanAPIDegraded)
+	s.Require().NotNil(cond)
+	s.NotContains(cond.Message, "OOM", "Found OOMKilled message in condition")
+
+	s.Len(cond.AffectedPods, 0, "Found a pod in condition")
+
 	status, err = s.integration.GetStatus(s.ctx)
 	s.NoError(err, "Failed to get status")
 	s.Equal("ACTIVE", status)
