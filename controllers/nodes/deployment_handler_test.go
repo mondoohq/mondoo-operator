@@ -544,7 +544,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateDaemonSets() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	// Make sure a daemonset exists for one of the nodes
+	// Make sure a daemonset exists
 	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
 	UpdateDaemonSet(ds, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
 	ds.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
