@@ -391,6 +391,22 @@ func (k8sh *K8sHelper) UpdateDeploymentWithRetries(ctx context.Context, listOpts
 	})
 }
 
+func (k8sh *K8sHelper) UpdateDaemonSetWithRetries(ctx context.Context, key types.NamespacedName, update func(*appsv1.DaemonSet)) error {
+	ds := &appsv1.DaemonSet{}
+	return k8sh.ExecuteWithRetries(func() (bool, error) {
+		if err := k8sh.Clientset.Get(ctx, key, ds); err != nil {
+			return false, err
+		}
+
+		// update the daemonset
+		update(ds)
+		if err := k8sh.Clientset.Update(ctx, ds); err != nil {
+			return false, nil // retry
+		}
+		return true, nil
+	})
+}
+
 func (k8sh *K8sHelper) ExecuteWithRetries(f func() (bool, error)) error {
 	for i := 0; i < RetryLoop; i++ {
 		success, err := f()

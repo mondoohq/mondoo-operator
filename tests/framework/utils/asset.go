@@ -14,10 +14,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-func ExcludeClusterAsset(as []assets.AssetWithScore) []assets.AssetWithScore {
+func ExcludeNonDetermenisticAssets(as []assets.AssetWithScore) []assets.AssetWithScore {
 	var newAssets []assets.AssetWithScore
 	for _, asset := range as {
-		if asset.AssetType != "k8s.cluster" {
+		if asset.AssetType != "k8s.cluster" && asset.AssetType != "k8s.service" {
 			newAssets = append(newAssets, asset)
 		}
 	}

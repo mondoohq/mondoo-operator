@@ -220,10 +220,20 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	zap.S().Info("number of assets from upstream: ", len(assets))
 
 	// TODO: the cluster name is non-deterministic currently so we cannot test for it
-	assetsExceptCluster := utils.ExcludeClusterAsset(assets)
-	s.Equalf(len(assets)-1, len(assetsExceptCluster), "Cluster asset was sent upstream.")
+	nonDetermenisticAssets := utils.ExcludeNonDetermenisticAssets(assets)
 
-	assetNames := utils.AssetNames(assetsExceptCluster)
+	// TODO: this number should exclude services and the cluster asset
+	srvs := &corev1.ServiceList{}
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		if err := s.testCluster.K8sHelper.Clientset.List(s.ctx, srvs); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	s.NoError(err, "Failed to list Kubernetes Services")
+	s.Equalf(len(assets)-1-len(srvs.Items), len(nonDetermenisticAssets), "Cluster and/or Services assets were sent upstream.")
+
+	assetNames := utils.AssetNames(nonDetermenisticAssets)
 	s.ElementsMatchf(workloadNames, assetNames, "Workloads were not sent upstream.")
 
 	s.AssetsNotUnscored(assets)
@@ -436,7 +446,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesCronjobs(auditConfig mo
 	s.Equal("ACTIVE", status)
 }
 
-func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesDeployments(auditConfig mondoov2.MondooAuditConfig) {
+func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesDaemonSets(auditConfig mondoov2.MondooAuditConfig) {
 	s.auditConfig = auditConfig
 
 	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
@@ -450,39 +460,20 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesDeployments(auditConfig
 
 	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
 
-	zap.S().Info("Verify the nodes scanning deployments are created.")
-
-	deployments := &appsv1.DeploymentList{}
-	lbls := nodes.NodeScanningLabels(auditConfig)
-
-	// List only the Deployments in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
-	listOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(lbls)}
+	zap.S().Info("Verify the nodes scanning daemonset is created.")
 
 	nodeList := &corev1.NodeList{}
 	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, nodeList))
 
-	// Verify the amount of Deployments created is equal to the amount of nodes
+	// Verify DaemonSet is created
+	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: nodes.DaemonSetName(auditConfig.Name), Namespace: auditConfig.Namespace}}
 	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
-		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
-		if len(nodeList.Items) == len(deployments.Items) {
-			return true, nil
+		if err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(ds), ds); err != nil {
+			return false, nil
 		}
-		return false, nil
+		return true, nil
 	})
-	s.NoErrorf(
-		err,
-		"The amount of node scanning Deployments is not equal to the amount of cluster nodes. expected: %d; actual: %d",
-		len(nodeList.Items), len(deployments.Items))
-
-	for _, d := range deployments.Items {
-		found := false
-		for _, n := range nodeList.Items {
-			if n.Name == d.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"] {
-				found = true
-			}
-		}
-		s.Truef(found, "Deployment %s/%s does not have a corresponding cluster node.", d.Namespace, d.Name)
-	}
+	s.NoError(err, "DaemonSet was not created.")
 
 	// Verify the garbage collect cron job
 	gcCronJobs := &batchv1.CronJobList{}
@@ -550,11 +541,9 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesDeployments(auditConfig
 	s.NoError(err, "Failed to get status")
 	s.Equal("ACTIVE", status)
 
-	// Verify that the node scanning deployments aren't constantly updating
-	s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, deployments, listOpts))
-	for _, d := range deployments.Items {
-		s.Less(d.Generation, int64(10))
-	}
+	// Verify that the node scanning daemonset isn't constantly updating
+	s.NoError(s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
+	s.Less(ds.Generation, int64(10))
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAdmission(auditConfig mondoov2.MondooAuditConfig) {
@@ -1253,7 +1242,7 @@ func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []assets.AssetWithScore)
 	for _, asset := range assets {
 		// We don't score scratch containers at the moment so they are always unscored.
 		// We don't have policies for a cluster asset enabled at the moment so they are always unscored.
-		if asset.Platform.Name != "scratch" && asset.Platform.Name != "k8s-cluster" && asset.Platform.Name != "k8s-namespace" {
+		if asset.Platform.Name != "scratch" && asset.Platform.Name != "k8s-cluster" && asset.Platform.Name != "k8s-namespace" && asset.Platform.Name != "k8s-service" {
 			if asset.Grade == "U" || asset.Grade == "" {
 				zap.S().Infof("Asset %s has no score", asset.Name)
 			}

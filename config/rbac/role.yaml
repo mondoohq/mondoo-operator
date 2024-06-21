@@ -21,16 +21,6 @@ rules:
   resources:
   - daemonsets
   - deployments
-  - replicasets
-  - statefulsets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - deployments
   verbs:
   - create
   - delete
@@ -38,6 +28,17 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  - deployments
+  - replicasets
+  - statefulsets
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - batch

@@ -64,40 +64,6 @@ func TestGarbageCollectCronJobName(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("%s%s", prefix, GarbageCollectCronJobNameBase), GarbageCollectCronJobName(prefix))
 }
 
-func TestConfigMapName(t *testing.T) {
-	prefix := "mondoo-client"
-	tests := []struct {
-		name string
-		data func() (suffix, expected string)
-	}{
-		{
-			name: "should be prefix+base+suffix when shorter than 52 chars",
-			data: func() (suffix, expected string) {
-				base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
-				suffix = utils.RandString(k8s.ResourceNameMaxLength - len(base))
-				return suffix, fmt.Sprintf("%s%s", base, suffix)
-			},
-		},
-		{
-			name: "should be prefix+base+hash when longer than 52 chars",
-			data: func() (suffix, expected string) {
-				base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
-				suffix = utils.RandString(53 - len(base))
-
-				hash := fmt.Sprintf("%x", sha256.Sum256([]byte(suffix)))
-				return suffix, fmt.Sprintf("%s%s", base, hash[:k8s.ResourceNameMaxLength-len(base)])
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			suffix, expected := test.data()
-			assert.Equal(t, expected, ConfigMapName(prefix, suffix))
-		})
-	}
-}
-
 func TestResources(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -183,18 +149,15 @@ func TestCronJob_Privileged(t *testing.T) {
 }
 
 func TestInventory(t *testing.T) {
-	randName := utils.RandString(10)
 	auditConfig := v1alpha2.MondooAuditConfig{ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"}}
 
-	inventory, err := Inventory(corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: randName}}, "", testClusterUID, auditConfig)
+	inventory, err := Inventory("", testClusterUID, auditConfig)
 	assert.NoError(t, err, "unexpected error generating inventory")
-	assert.Contains(t, inventory, randName)
 	assert.NotContains(t, inventory, constants.MondooAssetsIntegrationLabel)
 
 	const integrationMRN = "//test-MRN"
-	inventory, err = Inventory(corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: randName}}, integrationMRN, testClusterUID, auditConfig)
+	inventory, err = Inventory(integrationMRN, testClusterUID, auditConfig)
 	assert.NoError(t, err, "unexpected error generating inventory")
-	assert.Contains(t, inventory, randName)
 	assert.Contains(t, inventory, constants.MondooAssetsIntegrationLabel)
 	assert.Contains(t, inventory, integrationMRN)
 }

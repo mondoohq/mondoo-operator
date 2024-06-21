@@ -102,12 +102,12 @@ func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes_CronJobs() {
 	s.testMondooAuditConfigNodesCronjobs(auditConfig)
 }
 
-func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes_Deployments() {
+func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Nodes_DaemonSet() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.ns.Name, false, false, true, false)
-	auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment
+	auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
 	auditConfig.Spec.Nodes.IntervalTimer = 1
 	auditConfig.Spec.Scanner.ServiceAccountName = s.sa.Name
-	s.testMondooAuditConfigNodesDeployments(auditConfig)
+	s.testMondooAuditConfigNodesDaemonSets(auditConfig)
 }
 
 func (s *AuditConfigCustomNamespaceSuite) TestReconcile_Admission() {

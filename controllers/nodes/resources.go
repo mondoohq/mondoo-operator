@@ -28,10 +28,12 @@ import (
 )
 
 const (
-	CronJobNameBase               = "-node-"
-	DeploymentNameBase            = "-node-"
-	GarbageCollectCronJobNameBase = "-node-gc"
-	InventoryConfigMapBase        = "-node-inventory-"
+	CronJobNameBase                = "-node-"
+	DeploymentNameBase             = "-node-"
+	DaemonSetNameBase              = "-node"
+	GarbageCollectCronJobNameBase  = "-node-gc"
+	InventoryConfigMapBase         = "-node-inventory"
+	InventoryConfigMapWithNodeBase = "-node-inventory-"
 
 	ignoreQueryAnnotationPrefix = "policies.k8s.mondoo.com/"
 
@@ -43,7 +45,7 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 	cmd := []string{
 		"cnspec", "scan", "local",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
-		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
+		"--inventory-template", "/etc/opt/mondoo/inventory_template.yml",
 		"--score-threshold", "0",
 	}
 
@@ -122,6 +124,10 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 					Name:  "MONDOO_AUTO_UPDATE",
 					Value: "false",
 				},
+				{
+					Name:  "NODE_NAME",
+					Value: node.Name,
+				},
 			}, m.Spec.Nodes.Env),
 			TerminationMessagePath:   "/dev/termination-log",
 			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
@@ -143,10 +149,10 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 					Sources: []corev1.VolumeProjection{
 						{
 							ConfigMap: &corev1.ConfigMapProjection{
-								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name, node.Name)},
+								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name)},
 								Items: []corev1.KeyToPath{{
 									Key:  "inventory",
-									Path: "mondoo/inventory.yml",
+									Path: "mondoo/inventory_template.yml",
 								}},
 							},
 						},
@@ -172,9 +178,8 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 	}
 }
 
-func UpdateDeployment(
-	dep *appsv1.Deployment,
-	node corev1.Node,
+func UpdateDaemonSet(
+	ds *appsv1.DaemonSet,
 	m v1alpha2.MondooAuditConfig,
 	isOpenshift bool,
 	image string,
@@ -184,36 +189,31 @@ func UpdateDeployment(
 	cmd := []string{
 		"cnspec", "serve",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
-		"--inventory-file", "/etc/opt/mondoo/inventory.yml",
+		"--inventory-template", "/etc/opt/mondoo/inventory_template.yml",
 		"--timer", fmt.Sprintf("%d", m.Spec.Nodes.IntervalTimer),
 	}
 	if cfg.Spec.HttpProxy != nil {
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
-	dep.Labels = labels
-	if dep.Annotations == nil {
-		dep.Annotations = map[string]string{}
+	ds.Labels = labels
+	if ds.Annotations == nil {
+		ds.Annotations = map[string]string{}
 	}
-	dep.Annotations[ignoreQueryAnnotationPrefix+"mondoo-kubernetes-security-deployment-runasnonroot"] = ignoreAnnotationValue
-	dep.Spec.Replicas = ptr.To(int32(1))
-	dep.Spec.Selector = &metav1.LabelSelector{
+	ds.Annotations[ignoreQueryAnnotationPrefix+"mondoo-kubernetes-security-deployment-runasnonroot"] = ignoreAnnotationValue
+	ds.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: labels,
 	}
-	dep.Spec.Template.Labels = labels
-	if dep.Spec.Template.Annotations == nil {
-		dep.Spec.Template.Annotations = map[string]string{}
+	ds.Spec.Template.Labels = labels
+	if ds.Spec.Template.Annotations == nil {
+		ds.Spec.Template.Annotations = map[string]string{}
 	}
-	dep.Spec.Template.Annotations[ignoreQueryAnnotationPrefix+"mondoo-kubernetes-security-pod-runasnonroot"] = ignoreAnnotationValue
-	dep.Spec.Template.Spec.PriorityClassName = m.Spec.Nodes.PriorityClassName
-	dep.Spec.Template.Spec.NodeSelector = map[string]string{
-		"kubernetes.io/hostname": node.Name,
-	}
-	dep.Spec.Template.Spec.Tolerations = k8s.TaintsToTolerations(node.Spec.Taints)
+	ds.Spec.Template.Annotations[ignoreQueryAnnotationPrefix+"mondoo-kubernetes-security-pod-runasnonroot"] = ignoreAnnotationValue
+	ds.Spec.Template.Spec.PriorityClassName = m.Spec.Nodes.PriorityClassName
 	// The node scanning does not use the Kubernetes API at all, therefore the service account token
 	// should not be mounted at all.
-	dep.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
-	dep.Spec.Template.Spec.Containers = []corev1.Container{
+	ds.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
+	ds.Spec.Template.Spec.Containers = []corev1.Container{
 		{
 			Image:     image,
 			Name:      "cnspec",
@@ -265,10 +265,18 @@ func UpdateDeployment(
 					Name:  "MONDOO_AUTO_UPDATE",
 					Value: "false",
 				},
+				{
+					Name: "NODE_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "spec.nodeName",
+						},
+					},
+				},
 			}, m.Spec.Nodes.Env),
 		},
 	}
-	dep.Spec.Template.Spec.Volumes = []corev1.Volume{
+	ds.Spec.Template.Spec.Volumes = []corev1.Volume{
 		{
 			Name: "root",
 			VolumeSource: corev1.VolumeSource{
@@ -283,10 +291,10 @@ func UpdateDeployment(
 					Sources: []corev1.VolumeProjection{
 						{
 							ConfigMap: &corev1.ConfigMapProjection{
-								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name, node.Name)},
+								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name)},
 								Items: []corev1.KeyToPath{{
 									Key:  "inventory",
-									Path: "mondoo/inventory.yml",
+									Path: "mondoo/inventory_template.yml",
 								}},
 							},
 						},
@@ -398,8 +406,8 @@ func UpdateGarbageCollectCronJob(cj *batchv1.CronJob, image, clusterUid string, 
 	}
 }
 
-func UpdateConfigMap(cm *corev1.ConfigMap, node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) error {
-	inv, err := Inventory(node, integrationMRN, clusterUID, m)
+func UpdateConfigMap(cm *corev1.ConfigMap, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) error {
+	inv, err := Inventory(integrationMRN, clusterUID, m)
 	if err != nil {
 		return err
 	}
@@ -423,16 +431,24 @@ func DeploymentName(prefix, suffix string) string {
 	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), suffix))
 }
 
+func DaemonSetName(prefix string) string {
+	return fmt.Sprintf("%s%s", prefix, DaemonSetNameBase)
+}
+
 func GarbageCollectCronJobName(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, GarbageCollectCronJobNameBase)
 }
 
-func ConfigMapName(prefix, nodeName string) string {
-	base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
+func ConfigMapName(prefix string) string {
+	return fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
+}
+
+func ConfigMapNameWithNode(prefix, nodeName string) string {
+	base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapWithNodeBase)
 	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), nodeName))
 }
 
-func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
+func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-node-inventory",
@@ -444,12 +460,12 @@ func Inventory(node corev1.Node, integrationMRN, clusterUID string, m v1alpha2.M
 			Assets: []*inventory.Asset{
 				{
 					Id:   "host",
-					Name: node.Name,
+					Name: `{{ getenv "NODE_NAME" }}`,
 					Connections: []*inventory.Config{
 						{
 							Type:       "filesystem",
 							Host:       "/mnt/host",
-							PlatformId: fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/%s", clusterUID, node.UID),
+							PlatformId: fmt.Sprintf(`{{ printf "//platformid.api.mondoo.app/runtime/k8s/uid/%%s/node/%%s" "%s" (getenv "NODE_NAME")}}`, clusterUID),
 						},
 					},
 					Labels: map[string]string{
