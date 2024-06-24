@@ -69,7 +69,7 @@ jobs:
 
       - name: Build and push cnspec image
         id: build-and-push-operator
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: cnspec.Dockerfile
