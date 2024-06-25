@@ -18,6 +18,9 @@ env:
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
+  
+  GHCR_IMAGE: ghcr.io/${{ github.repository }}
+  GCP_IMAGE:  us-docker.pkg.dev/mondoohq/release/${{ github.repository }}
   RELEASE: ${{ github.ref_name }}
 
 jobs:
@@ -69,13 +72,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Authenticate with Google Cloud
+        uses: "google-github-actions/auth@v2"
+        with:
+          credentials_json: "${{ secrets.GCP_ARTIFACT_REGISTRY_SA }}"
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v2"
+
+      - name: Docker Login (GCR)
+        run: |
+          gcloud auth configure-docker us-docker.pkg.dev
+
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.GHCR_IMAGE }}
+            ${{ env.GCP_IMAGE }}
           tags: |
             type=schedule,pattern=main
             type=ref,event=branch
@@ -90,7 +107,9 @@ jobs:
         id: meta_clean
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.GHCR_IMAGE }}
+            ${{ env.GCP_IMAGE }}
           tags: |
             type=schedule,pattern=main
             type=ref,event=branch
@@ -160,13 +179,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Authenticate with Google Cloud
+        uses: "google-github-actions/auth@v2"
+        with:
+          credentials_json: "${{ secrets.GCP_ARTIFACT_REGISTRY_SA }}"
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v2"
+
+      - name: Docker Login (GCR)
+        run: |
+          gcloud auth configure-docker us-docker.pkg.dev
+
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.GHCR_IMAGE }}
+            ${{ env.GCP_IMAGE }}
 
       - name: Push multi-platform virtual tag and sign
         run: bash scripts/push-virtual-tag.sh
