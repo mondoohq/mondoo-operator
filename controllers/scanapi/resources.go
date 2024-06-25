@@ -15,6 +15,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/gomemlimit"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
@@ -56,6 +57,8 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alp
 	}
 
 	healthcheckEndpoint := "/Scan/HealthCheck"
+	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources, k8s.DefaultCnspecResources)
+	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
 
 	scanApiDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -78,7 +81,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alp
 						ImagePullPolicy: corev1.PullAlways,
 						Name:            name,
 						Command:         cmd,
-						Resources:       k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources, k8s.DefaultCnspecResources),
+						Resources:       containerResources,
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{
@@ -153,6 +156,7 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alp
 
 							// Required so the scan API knows it is running as a Kubernetes integration
 							{Name: "KUBERNETES_ADMISSION_CONTROLLER", Value: "true"},
+							{Name: "GOMEMLIMIT", Value: gcLimit},
 						},
 					}},
 					ServiceAccountName: m.Spec.Scanner.ServiceAccountName,
