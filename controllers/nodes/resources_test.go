@@ -13,6 +13,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -118,6 +119,85 @@ func TestResources(t *testing.T) {
 			cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: mac.Namespace}}
 			UpdateCronJob(cj, "test123", *testNode, &mac, false, v1alpha2.MondooOperatorConfig{})
 			assert.Equal(t, test.expectedResources, cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Resources)
+		})
+	}
+}
+
+func TestResources_GOMEMLIMIT(t *testing.T) {
+	tests := []struct {
+		name               string
+		mondooauditconfig  func() *v1alpha2.MondooAuditConfig
+		expectedGoMemLimit string
+	}{
+		{
+			name: "resources should match default",
+			mondooauditconfig: func() *v1alpha2.MondooAuditConfig {
+				return testMondooAuditConfig()
+			},
+			expectedGoMemLimit: "225000000",
+		},
+		{
+			name: "resources should match spec",
+			mondooauditconfig: func() *v1alpha2.MondooAuditConfig {
+				mac := testMondooAuditConfig()
+				mac.Spec.Nodes.Resources = corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				}
+				return mac
+			},
+			expectedGoMemLimit: "94371840",
+		},
+		{
+			name: "resources should match off",
+			mondooauditconfig: func() *v1alpha2.MondooAuditConfig {
+				mac := testMondooAuditConfig()
+				mac.Spec.Nodes.Resources = corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("100m"),
+					},
+				}
+				return mac
+			},
+			expectedGoMemLimit: "off",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testNode := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node-name",
+				},
+			}
+			mac := *test.mondooauditconfig()
+			cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: mac.Namespace}}
+			UpdateCronJob(cj, "test123", *testNode, &mac, false, v1alpha2.MondooOperatorConfig{})
+			goMemLimitEnv := corev1.EnvVar{}
+			for _, env := range cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
+				if env.Name == "GOMEMLIMIT" {
+					goMemLimitEnv = env
+					break
+				}
+			}
+			assert.Equal(t, test.expectedGoMemLimit, goMemLimitEnv.Value)
+		})
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mac := *test.mondooauditconfig()
+			ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: mac.Namespace}}
+			UpdateDaemonSet(ds, mac, false, "test123", v1alpha2.MondooOperatorConfig{})
+			goMemLimitEnv := corev1.EnvVar{}
+			for _, env := range ds.Spec.Template.Spec.Containers[0].Env {
+				if env.Name == "GOMEMLIMIT" {
+					goMemLimitEnv = env
+					break
+				}
+			}
+			assert.Equal(t, test.expectedGoMemLimit, goMemLimitEnv.Value)
 		})
 	}
 }

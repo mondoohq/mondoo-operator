@@ -24,6 +24,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
+	"go.mondoo.com/mondoo-operator/pkg/utils/gomemlimit"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
@@ -75,12 +76,15 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 	// The node scanning does not use the Kubernetes API at all, therefore the service account token
 	// should not be mounted at all.
 	cj.Spec.JobTemplate.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
+	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
+	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
+
 	cj.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{
 		{
 			Image:     image,
 			Name:      "cnspec",
 			Command:   cmd,
-			Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources),
+			Resources: containerResources,
 			SecurityContext: &corev1.SecurityContext{
 				AllowPrivilegeEscalation: ptr.To(isOpenshift),
 				ReadOnlyRootFilesystem:   ptr.To(true),
@@ -127,6 +131,10 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 				{
 					Name:  "NODE_NAME",
 					Value: node.Name,
+				},
+				{
+					Name:  "GOMEMLIMIT",
+					Value: gcLimit,
 				},
 			}, m.Spec.Nodes.Env),
 			TerminationMessagePath:   "/dev/termination-log",
@@ -213,12 +221,15 @@ func UpdateDaemonSet(
 	// The node scanning does not use the Kubernetes API at all, therefore the service account token
 	// should not be mounted at all.
 	ds.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
+	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
+	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
+
 	ds.Spec.Template.Spec.Containers = []corev1.Container{
 		{
 			Image:     image,
 			Name:      "cnspec",
 			Command:   cmd,
-			Resources: k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources),
+			Resources: containerResources,
 			SecurityContext: &corev1.SecurityContext{
 				AllowPrivilegeEscalation: ptr.To(isOpenshift),
 				ReadOnlyRootFilesystem:   ptr.To(true),
@@ -264,6 +275,10 @@ func UpdateDaemonSet(
 				{
 					Name:  "MONDOO_AUTO_UPDATE",
 					Value: "false",
+				},
+				{
+					Name:  "GOMEMLIMIT",
+					Value: gcLimit,
 				},
 				{
 					Name: "NODE_NAME",
