@@ -16,7 +16,7 @@ on:
 env:
   REGISTRY: ghcr.io
   GHCR_IMAGE: ghcr.io/${{ github.repository }}
-  GCP_IMAGE:  us-docker.pkg.dev/mondoohq/release/${{ github.repository }}
+  GCP_IMAGE:  us-docker.pkg.dev/mondoohq/release/mondoo-operator
   RELEASE: ${{ github.ref_name }}
 
 jobs:
