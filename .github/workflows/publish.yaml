@@ -14,10 +14,8 @@ on:
     tags: ["v*.*.*"]
 
 env:
-  # Use docker.io for Docker Hub if empty
-  REGISTRY: ghcr.io
-  # github.repository as <account>/<repo>
-  IMAGE_NAME: ${{ github.repository }}
+  GHCR_IMAGE: ghcr.io/${{ github.repository }}
+  GCP_IMAGE:  us-docker.pkg.dev/mondoohq/release/${{ github.repository }}
   RELEASE: ${{ github.ref_name }}
 
 jobs:
@@ -69,13 +67,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Authenticate with Google Cloud
+        uses: "google-github-actions/auth@v2"
+        with:
+          credentials_json: "${{ secrets.GCP_ARTIFACT_REGISTRY_SA }}"
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v2"
+
+      - name: Docker Login (GCR)
+        run: |
+          gcloud auth configure-docker us-docker.pkg.dev
+
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.GHCR_IMAGE }}
+            ${{ env.GCP_IMAGE }}
           tags: |
             type=schedule,pattern=main
             type=ref,event=branch
@@ -90,7 +102,9 @@ jobs:
         id: meta_clean
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.GHCR_IMAGE }}
+            ${{ env.GCP_IMAGE }}
           tags: |
             type=schedule,pattern=main
             type=ref,event=branch
@@ -117,7 +131,7 @@ jobs:
         env:
           MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
         with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push-operator.outputs.digest }}
+          image: ${{ env.GHCR_IMAGE }}@${{ steps.build-and-push-operator.outputs.digest }}
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
@@ -127,7 +141,7 @@ jobs:
       - name: Sign the published Docker image
         # This step uses the identity token to provision an ephemeral certificate
         # against the sigstore community Fulcio instance.
-        run: cosign sign -y ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push-operator.outputs.digest }}
+        run: cosign sign -y ${{ env.GHCR_IMAGE }}@${{ steps.build-and-push-operator.outputs.digest }}
 
   push-virtual-tag:
     name: Push multi-platform virtual tag
@@ -160,13 +174,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Authenticate with Google Cloud
+        uses: "google-github-actions/auth@v2"
+        with:
+          credentials_json: "${{ secrets.GCP_ARTIFACT_REGISTRY_SA }}"
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v2"
+
+      - name: Docker Login (GCR)
+        run: |
+          gcloud auth configure-docker us-docker.pkg.dev
+
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.GHCR_IMAGE }}
+            ${{ env.GCP_IMAGE }}
 
       - name: Push multi-platform virtual tag and sign
         run: bash scripts/push-virtual-tag.sh
@@ -231,7 +259,7 @@ jobs:
           gpg -u "Operator SDK (release) <cncf-operator-sdk@cncf.io>" --verify checksums.txt.asc
           grep operator-sdk_${OS}_${ARCH} checksums.txt | sha256sum -c -
           chmod +x operator-sdk_${OS}_${ARCH} && sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
-          make bundle IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE }}' VERSION='${{ env.RELEASE }}'
+          make bundle IMG='${{ env.GHCR_IMAGE }}:${{ env.RELEASE }}' VERSION='${{ env.RELEASE }}'
 
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
@@ -239,7 +267,7 @@ jobs:
         id: meta-bundle
         uses: docker/metadata-action@v5
         with:
-          images: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle"
+          images: "${{ env.GHCR_IMAGE }}-bundle"
 
       # Build and push Docker image bundle with Buildx
       - name: Build and push bundle image
@@ -261,7 +289,7 @@ jobs:
       - name: Sign the published Docker image
         # This step uses the identity token to provision an ephemeral certificate
         # against the sigstore community Fulcio instance.
-        run: cosign sign -y ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle@${{ steps.build-and-push-bundle.outputs.digest }}
+        run: cosign sign -y ${{ env.GHCR_IMAGE }}-bundle@${{ steps.build-and-push-bundle.outputs.digest }}
 
   # run olm e2e tests
   run-olm-e2e:
@@ -332,7 +360,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.GHCR_IMAGE }}
 
       - name: Run integration tests
         env:
