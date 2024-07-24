@@ -1256,7 +1256,7 @@ func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []assets.AssetWithScore)
 			expectedPolicies := defaultK8sNodePolicyMrns
 			if strings.Contains(asset.Platform.Name, "k8s") {
 				expectedPolicies = defaultK8sPolicyMrns
-			} else if strings.Contains(asset.Name, "nginx") || strings.Contains(asset.Name, "redis") || strings.Contains(asset.Name, "k3d") {
+			} else if strings.Contains(asset.Name, "nginx") || strings.Contains(asset.Name, "redis") || strings.Contains(asset.Name, "k3d") || asset.Platform.Runtime == "docker-image" {
 				expectedPolicies = defaultOsPolicyMrns
 			}
 			s.ElementsMatchf(expectedPolicies, scoredPolicies, "Scored policies for asset %s should be the default k8s policies", asset.Name)
