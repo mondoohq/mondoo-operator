@@ -15,7 +15,8 @@ type AssetWithScore struct {
 	Labels   map[string]string
 	Grade    string
 	Platform struct {
-		Name string
+		Name    string
+		Runtime string
 	}
 	PolicyScores []PolicyScore
 	AssetType    string
@@ -45,7 +46,8 @@ func ListAssetsWithScores(
 						Grade string
 					}
 					Platform struct {
-						Name string
+						Name    string
+						Runtime string
 					}
 					AssetType string `graphql:"asset_type"`
 				}
