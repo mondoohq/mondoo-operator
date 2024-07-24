@@ -1228,12 +1228,10 @@ var (
 		"//policy.api.mondoo.app/policies/mondoo-kubernetes-security",
 	}
 	defaultK8sNodePolicyMrns = []string{
-		"//policy.api.mondoo.app/policies/platform-eol",
 		"//policy.api.mondoo.app/policies/mondoo-kubernetes-security",
 		"//policy.api.mondoo.app/policies/mondoo-linux-security",
 	}
 	defaultOsPolicyMrns = []string{
-		"//policy.api.mondoo.app/policies/platform-eol",
 		"//policy.api.mondoo.app/policies/mondoo-linux-security",
 	}
 )
