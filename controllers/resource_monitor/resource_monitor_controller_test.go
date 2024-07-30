@@ -42,15 +42,25 @@ func (s *ResourceMonitorControllerSuite) AfterTest(suiteName, testName string) {
 func (s *ResourceMonitorControllerSuite) TestReconcile_Pod() {
 	ctx := context.Background()
 	scanApiStore := scanapistoremock.NewMockScanApiStore(s.mockCtrl)
+
+	ns := utils.RandString(10)
+	name := utils.RandString(10)
+	createRes := func() client.Object {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: ns,
+			},
+		}
+	}
+
 	r, err := NewResourceMonitorController(
-		s.fakeClientBuilder.Build(),
-		func() client.Object { return &corev1.Pod{} },
+		s.fakeClientBuilder.WithObjects(createRes()).Build(),
+		createRes,
 		scanApiStore)
 	s.Require().NoError(err)
 	r.debouncer = s.debouncerMock
 
-	ns := utils.RandString(10)
-	name := utils.RandString(10)
 	scanApiStore.EXPECT().GetAll().Return([]scan_api_store.ClientConfiguration{{}}).Times(1)
 	s.debouncerMock.EXPECT().Add(fmt.Sprintf("pod:%s:%s", ns, name)).Times(1)
 
@@ -67,15 +77,25 @@ func (s *ResourceMonitorControllerSuite) TestReconcile_Pod() {
 func (s *ResourceMonitorControllerSuite) TestReconcile_Pod_NoScanApi() {
 	ctx := context.Background()
 	scanApiStore := scanapistoremock.NewMockScanApiStore(s.mockCtrl)
+
+	ns := utils.RandString(10)
+	name := utils.RandString(10)
+	createRes := func() client.Object {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: ns,
+			},
+		}
+	}
+
 	r, err := NewResourceMonitorController(
-		s.fakeClientBuilder.Build(),
-		func() client.Object { return &corev1.Pod{} },
+		s.fakeClientBuilder.WithObjects(createRes()).Build(),
+		createRes,
 		scanApiStore)
 	s.Require().NoError(err)
 	r.debouncer = s.debouncerMock
 
-	ns := utils.RandString(10)
-	name := utils.RandString(10)
 	scanApiStore.EXPECT().GetAll().Return(nil)
 
 	res, err := r.Reconcile(ctx, controllerruntime.Request{
