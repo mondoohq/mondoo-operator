@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	cnquery_k8s "go.mondoo.com/cnquery/v11/providers/k8s/resources"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	api "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -754,6 +755,9 @@ func (k8sh *K8sHelper) GetWorkloadNames(ctx context.Context) ([]string, error) {
 	}
 
 	for _, w := range pods.Items {
+		if cnquery_k8s.PodOwnerReferencesFilter(w.GetOwnerReferences()) {
+			continue
+		}
 		names = append(names, fmt.Sprintf("%s/%s", w.GetNamespace(), w.GetName()))
 	}
 
@@ -763,6 +767,9 @@ func (k8sh *K8sHelper) GetWorkloadNames(ctx context.Context) ([]string, error) {
 	}
 
 	for _, w := range jobs.Items {
+		if cnquery_k8s.JobOwnerReferencesFilter(w.GetOwnerReferences()) {
+			continue
+		}
 		names = append(names, fmt.Sprintf("%s/%s", w.Namespace, w.Name))
 	}
 
@@ -813,6 +820,9 @@ func (k8sh *K8sHelper) GetWorkloadNames(ctx context.Context) ([]string, error) {
 	}
 
 	for _, w := range replicasets.Items {
+		if cnquery_k8s.ReplicaSetOwnerReferencesFilter(w.GetOwnerReferences()) {
+			continue
+		}
 		names = append(names, fmt.Sprintf("%s/%s", w.Namespace, w.Name))
 	}
 

@@ -15,6 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	cnquery_k8s "go.mondoo.com/cnquery/v11/providers/k8s/resources"
 )
 
 var logger = log.Log.WithName("resource-monitor")
@@ -82,8 +84,23 @@ func (r *ResourceMonitorController) Start(ctx context.Context) error {
 }
 
 func (r *ResourceMonitorController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	obj := r.createRes()
+	if err := r.Client.Get(ctx, req.NamespacedName, obj); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	refs := obj.GetOwnerReferences()
+	if r.resourceType == "job" && cnquery_k8s.JobOwnerReferencesFilter(refs) {
+		return ctrl.Result{}, nil
+	} else if r.resourceType == "pod" && cnquery_k8s.PodOwnerReferencesFilter(refs) {
+		return ctrl.Result{}, nil
+	} else if r.resourceType == "replicaset" && cnquery_k8s.ReplicaSetOwnerReferencesFilter(refs) {
+		return ctrl.Result{}, nil
+	}
+
 	if len(r.scanApiStore.GetAll()) > 0 {
 		r.debouncer.Add(fmt.Sprintf("%s:%s:%s", r.resourceType, req.Namespace, req.Name))
 	}
+
 	return ctrl.Result{}, nil
 }
