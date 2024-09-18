@@ -48,7 +48,7 @@ func (s *AuditConfigSuite) TestReconcile_Nodes_CronJobs() {
 
 func (s *AuditConfigSuite) TestReconcile_Nodes_DaemonSet() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true, false)
-	auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_DaemonSet
 	auditConfig.Spec.Nodes.IntervalTimer = 1
 	s.testMondooAuditConfigNodesDaemonSets(auditConfig)
 }
