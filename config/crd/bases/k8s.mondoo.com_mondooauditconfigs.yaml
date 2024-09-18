@@ -538,6 +538,7 @@ spec:
                     enum:
                     - cronjob
                     - deployment
+                    - daemonset
                     type: string
                 type: object
               scanner:

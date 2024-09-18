@@ -110,7 +110,7 @@ type Nodes struct {
 	// +kubebuilder:default=60
 	IntervalTimer int `json:"intervalTimer,omitempty"`
 	// Style specifies how node scanning is deployed. The default is "cronjob" which will create a CronJob for the node scanning.
-	// +kubebuilder:validation:Enum=cronjob;deployment
+	// +kubebuilder:validation:Enum=cronjob;deployment;daemonset
 	// +kubebuilder:default=cronjob
 	Style NodeScanStyle `json:"style,omitempty"`
 	// PriorityClassName specifies the name of the PriorityClass for the node scanning workloads.
