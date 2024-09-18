@@ -10,7 +10,7 @@ resources:
 images:
 - name: controller
   newName: ghcr.io/mondoohq/mondoo-operator
-  newTag: v11.4.0
+  newTag: v11.4.1
 
 patchesStrategicMerge:
 - webhook_patch.yaml
