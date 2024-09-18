@@ -4,6 +4,7 @@
 package operator
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -103,7 +104,7 @@ func init() {
 		if !passed {
 			msg := "required API(s) not found"
 			setupLog.Info(msg)
-			return fmt.Errorf(msg)
+			return errors.New(msg)
 		}
 
 		isOpenShift, err := k8s.IsOpenshift()
