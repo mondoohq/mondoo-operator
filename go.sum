@@ -177,8 +177,8 @@ github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.2 h1:s7NA1SOw8
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.2/go.mod h1:fnjjWyAW/Pj5HYOxl9LJqWtEwS7W2qgcRLWP+uWbss0=
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.2 h1:t7iUP9+4wdc5lt3E41huP+GvQZJD38WLsgVp4iOtAjg=
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.2/go.mod h1:/niFCtmuQNxqx9v8WAPq5qh7EH25U4BF6tjoyq9bObM=
-github.com/aws/aws-sdk-go-v2/service/s3 v1.65.3 h1:xxHGZ+wUgZNACQmxtdvP5tgzfsxGS3vPpTP5Hy3iToE=
-github.com/aws/aws-sdk-go-v2/service/s3 v1.65.3/go.mod h1:cB6oAuus7YXRZhWCc1wIwPywwZ1XwweNp2TVAEGYeB8=
+github.com/aws/aws-sdk-go-v2/service/s3 v1.66.0 h1:xA6XhTF7PE89BCNHJbQi8VvPzcgMtmGC5dr8S8N7lHk=
+github.com/aws/aws-sdk-go-v2/service/s3 v1.66.0/go.mod h1:cB6oAuus7YXRZhWCc1wIwPywwZ1XwweNp2TVAEGYeB8=
 github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.34.2 h1:Rrqru2wYkKQCS2IM5/JrgKUQIoNTqA6y/iuxkjzxC6M=
 github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.34.2/go.mod h1:QuCURO98Sqee2AXmqDNxKXYFm2OEDAVAPApMqO0Vqnc=
 github.com/aws/aws-sdk-go-v2/service/ssm v1.55.2 h1:z6Pq4+jtKlhK4wWJGHRGwMLGjC1HZwAO3KJr/Na0tSU=
@@ -921,8 +921,8 @@ go.etcd.io/etcd/client/pkg/v3 v3.5.1/go.mod h1:IJHfcCEKxYu1Os13ZdwCwIUTUVGYTSAM3
 go.etcd.io/etcd/client/v2 v2.305.1/go.mod h1:pMEacxZW7o8pg4CrFE7pquyCJJzZvkvdD2RibOCCCGs=
 go.mondoo.com/cnquery/v11 v11.27.0 h1:Lz/KiT8J2wZWiJ2Z3JDQAcFR3502Mn56BsYqCQYyTHs=
 go.mondoo.com/cnquery/v11 v11.27.0/go.mod h1:UnZbUwIdWvFJDO8F0BJDMKjb17BO0TJzOOssB8HV9IM=
-go.mondoo.com/cnspec/v11 v11.26.0 h1:eVgesda2Rqk5yKdrHq8mF1DC8qhiQARGvTBvzoT1Z4w=
-go.mondoo.com/cnspec/v11 v11.26.0/go.mod h1:/Gdk2ji24g3H4+3af/qTzhn64uWjSBN3tfbjLImQZfA=
+go.mondoo.com/cnspec/v11 v11.27.0 h1:Ci4zHF2tZnOzqH4m4QZm/gIl/WfGCY02OX+ZN6lz93k=
+go.mondoo.com/cnspec/v11 v11.27.0/go.mod h1:aYzcGzRyvRCwNpI+Rtq2kPVCjZNst+U/gheS87vOslA=
 go.mondoo.com/mondoo-go v0.0.0-20241019084804-ed418047ea3a h1:cUxWFQKt1bVFPXwckKzHrmr8qnVml01rKILv0uSLcf0=
 go.mondoo.com/mondoo-go v0.0.0-20241019084804-ed418047ea3a/go.mod h1:dun0t/zVJCSB/u9dhSO4FXn13moiH7JSwS2m8Ucxx50=
 go.mondoo.com/ranger-rpc v0.6.4 h1:q01kjESvF2HSnbFO+TjpUQSiI2IM8JWGJLH3u0vNxZA=

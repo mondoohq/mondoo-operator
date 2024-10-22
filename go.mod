@@ -1,6 +1,7 @@
 module go.mondoo.com/mondoo-operator
 
-go 1.22.0
+go 1.23.0
+
 toolchain go1.23.2
 
 replace go.mondoo.com/cnquery/v11/providers/k8s => github.com/mondoohq/cnquery/providers/k8s v0.0.0-20240730122727-3ad8a202a925
@@ -25,7 +26,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	go.mondoo.com/cnquery/v11 v11.27.0
 	go.mondoo.com/cnquery/v11/providers/k8s v0.0.0-00010101000000-000000000000
-	go.mondoo.com/cnspec/v11 v11.26.0
+	go.mondoo.com/cnspec/v11 v11.27.0
 	go.mondoo.com/mondoo-go v0.0.0-20241019084804-ed418047ea3a
 	// pin v0.28.9
 	k8s.io/api v0.31.1
@@ -77,7 +78,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.4.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.65.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.66.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.34.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.55.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.24.2 // indirect
