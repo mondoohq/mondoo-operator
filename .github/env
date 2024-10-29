@@ -1,4 +1,4 @@
-golang-version=1.23.1
+golang-version=1.23.2
 operator-sdk-version=v1.33.0
 MONDOO_ORG_MRN=//captain.api.mondoo.app/organizations/mondoo-operator-testing
 MONDOO_GQL_ENDPOINT=https://api.mondoo.com/query
