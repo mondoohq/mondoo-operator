@@ -6,6 +6,7 @@ package operator
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
@@ -15,6 +16,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/utils/ptr"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -75,6 +77,8 @@ func init() {
 			HealthProbeBindAddress: *probeAddr,
 			LeaderElection:         *enableLeaderElection,
 			LeaderElectionID:       "60679458.mondoo.com",
+			LeaseDuration:          ptr.To(30 * time.Second),
+			RenewDeadline:          ptr.To(20 * time.Second),
 			Client: client.Options{
 				Cache: &client.CacheOptions{
 					DisableFor: []client.Object{
