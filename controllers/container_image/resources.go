@@ -45,6 +45,7 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
+	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_DISABLE_PROVIDER_UPDATES", Value: "true"})
 	envVars = k8s.MergeEnv(envVars, m.Spec.Containers.Env)
 
 	cronjob := &batchv1.CronJob{

@@ -129,6 +129,10 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 					Value: "false",
 				},
 				{
+					Name:  "MONDOO_DISABLE_PROVIDER_UPDATES",
+					Value: "true",
+				},
+				{
 					Name:  "NODE_NAME",
 					Value: node.Name,
 				},
@@ -275,6 +279,10 @@ func UpdateDaemonSet(
 				{
 					Name:  "MONDOO_AUTO_UPDATE",
 					Value: "false",
+				},
+				{
+					Name:  "MONDOO_DISABLE_PROVIDER_UPDATES",
+					Value: "true",
 				},
 				{
 					Name:  "GOMEMLIMIT",
