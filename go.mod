@@ -1,8 +1,8 @@
 module go.mondoo.com/mondoo-operator
 
-go 1.22.0
+go 1.24
 
-toolchain go1.22.4
+toolchain go1.24.3
 
 replace go.mondoo.com/cnquery/v11/providers/k8s => github.com/mondoohq/cnquery/providers/k8s v0.0.0-20240730122727-3ad8a202a925
 
@@ -23,11 +23,11 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.74.0
 	github.com/rs/zerolog v1.33.0
 	github.com/spf13/cobra v1.8.1
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	go.mondoo.com/cnquery/v11 v11.15.0
 	go.mondoo.com/cnquery/v11/providers/k8s v0.0.0-00010101000000-000000000000
 	go.mondoo.com/cnspec/v11 v11.15.0
-	go.mondoo.com/mondoo-go v0.0.0-20240716062427-ec95d879cbe7
+	go.mondoo.com/mondoo-go v0.0.0-20250604000435-11732353461f
 	// pin v0.28.9
 	k8s.io/api v0.29.5
 	// pin v0.28.9
@@ -114,7 +114,7 @@ require (
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.5.0 // indirect
 	github.com/go-git/go-git/v5 v5.12.0 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
@@ -259,7 +259,7 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.25.0 // indirect
 	golang.org/x/net v0.27.0 // indirect
-	golang.org/x/oauth2 v0.21.0 // indirect
+	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/term v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect

@@ -748,6 +748,15 @@ func (k8sh *K8sHelper) CheckForReconciledOperatorVersion(auditConfig *api.Mondoo
 func (k8sh *K8sHelper) GetWorkloadNames(ctx context.Context) ([]string, error) {
 	var names []string
 
+	nss := &v1.NamespaceList{}
+	if err := k8sh.Clientset.List(ctx, nss); err != nil {
+		return nil, err
+	}
+
+	for _, ns := range nss.Items {
+		names = append(names, ns.Name)
+	}
+
 	// pods
 	pods := &v1.PodList{}
 	if err := k8sh.Clientset.List(ctx, pods); err != nil {
