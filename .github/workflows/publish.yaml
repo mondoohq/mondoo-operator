@@ -44,7 +44,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
@@ -159,7 +159,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
@@ -215,7 +215,7 @@ jobs:
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
       - name: Install Go
@@ -306,7 +306,7 @@ jobs:
         k8s-version: [v1.28.9, v1.29.4, v1.30.0]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
       - name: Import environment variables from file
@@ -415,7 +415,7 @@ jobs:
 
   #   steps:
   #     - name: Checkout
-  #       uses: actions/checkout@v4
+  #       uses: actions/checkout@v5
   #       with:
   #         fetch-depth: 0
 
@@ -509,7 +509,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 

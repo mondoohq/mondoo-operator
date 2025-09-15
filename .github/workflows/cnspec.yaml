@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Sanitize version input (Workflow Dispatch)
         if: github.event_name == 'workflow_dispatch'

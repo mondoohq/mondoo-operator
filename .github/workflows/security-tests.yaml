@@ -21,7 +21,7 @@ jobs:
       IMAGE_NAME: ${{ github.repository }}
       RELEASE: ${{ github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
