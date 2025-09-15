@@ -1,19 +1,20 @@
 ---
-    name: Link Checking
+name: Link Checking
 
-    "on":
-      pull_request:
-      push:
-        branches: [main]
+"on":
+  pull_request:
+  push:
+    branches: [main]
 
-    jobs:
-      md-links:
-        name: Run markdown link check
-        runs-on: ubuntu-latest
-        steps:
-          - name: Check out code
-            uses: actions/checkout@v4
-          - name: markdown-link-check
-            uses: gaurav-nelson/github-action-markdown-link-check@v1
-            with:
-              use-verbose-mode: "yes"
+jobs:
+  md-links:
+    name: Run markdown link check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+      - name: markdown-link-check
+        uses: gaurav-nelson/github-action-markdown-link-check@5c5dfc0ac2e225883c0e5f03a85311ec2830d368
+        with:
+          use-verbose-mode: "yes"
+          config-file: ".github/actions/link-check/config.json"

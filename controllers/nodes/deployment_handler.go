@@ -5,6 +5,8 @@ package nodes
 
 import (
 	"context"
+	"maps"
+	"slices"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -226,9 +228,17 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		}
 	}
 
+	tolerations := make(map[corev1.Toleration]struct{})
+	for _, node := range nodes.Items {
+		for _, toleration := range k8s.TaintsToTolerations(node.Spec.Taints) {
+			tolerations[toleration] = struct{}{}
+		}
+	}
+
 	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
 	op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, ds, n.Mondoo, logger, func() error {
-		UpdateDaemonSet(ds, *n.Mondoo, n.IsOpenshift, mondooClientImage, *n.MondooOperatorConfig)
+		UpdateDaemonSet(ds, *n.Mondoo, n.IsOpenshift, mondooClientImage, *n.MondooOperatorConfig,
+			slices.Collect(maps.Keys(tolerations)))
 		return nil
 	})
 	if err != nil {

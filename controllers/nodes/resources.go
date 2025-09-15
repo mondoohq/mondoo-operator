@@ -192,6 +192,7 @@ func UpdateDaemonSet(
 	isOpenshift bool,
 	image string,
 	cfg v1alpha2.MondooOperatorConfig,
+	tolerations []corev1.Toleration,
 ) {
 	labels := NodeScanningLabels(m)
 	cmd := []string{
@@ -222,6 +223,9 @@ func UpdateDaemonSet(
 	// should not be mounted at all.
 	ds.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
 	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
+
+	ds.Spec.Template.Spec.Tolerations = tolerations
+
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
 
 	ds.Spec.Template.Spec.Containers = []corev1.Container{

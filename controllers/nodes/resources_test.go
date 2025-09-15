@@ -189,7 +189,7 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mac := *test.mondooauditconfig()
 			ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: mac.Namespace}}
-			UpdateDaemonSet(ds, mac, false, "test123", v1alpha2.MondooOperatorConfig{})
+			UpdateDaemonSet(ds, mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
 			goMemLimitEnv := corev1.EnvVar{}
 			for _, env := range ds.Spec.Template.Spec.Containers[0].Env {
 				if env.Name == "GOMEMLIMIT" {
