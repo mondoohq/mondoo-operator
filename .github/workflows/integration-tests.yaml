@@ -30,7 +30,7 @@ jobs:
         k8s-distro: [minikube, k3d]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
