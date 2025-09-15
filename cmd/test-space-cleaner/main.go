@@ -22,7 +22,6 @@ func main() {
 	spaces, err := ListSpaces(ctx, nexusClient.Client, "//captain.api.mondoo.app/organizations/mondoo-operator-testing")
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to list spaces")
-
 	}
 	for _, space := range spaces.Edges {
 		if space.Node.Name == "mondoo-operator-tests" {
