@@ -55,7 +55,7 @@ jobs:
         k8s-version: ["1.27", "1.28", "1.29"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
 
@@ -63,7 +63,7 @@ jobs:
         run: cat ".github/env" >> $GITHUB_ENV
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
 
       - name: Terraform init
         run: terraform init
@@ -81,7 +81,7 @@ jobs:
           TF_VAR_k8s_version: ${{ matrix.k8s-version }}
         working-directory: .github/terraform/aks
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version: "${{ env.golang-version }}"
           cache: true
@@ -106,7 +106,7 @@ jobs:
         if: success() || failure()
 
       - name: Upload cloud test results
-        uses: actions/upload-artifact@v4  # upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: cloud-test-results-aks-${{ matrix.k8s-version }}
@@ -115,7 +115,7 @@ jobs:
             .github/terraform/aks/aks-${{ matrix.k8s-version }}.json
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: test-logs-aks-${{ matrix.k8s-version }}
@@ -138,7 +138,7 @@ jobs:
       AWS_REGION: us-east-2
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
 
@@ -146,7 +146,7 @@ jobs:
         run: cat ".github/env" >> $GITHUB_ENV
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
 
       - run: terraform init
         working-directory: .github/terraform/aws
@@ -163,7 +163,7 @@ jobs:
           TF_VAR_kubernetes_version: ${{ matrix.k8s-version }}
         working-directory: .github/terraform/aws
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version: "${{ env.golang-version }}"
           cache: true
@@ -188,14 +188,14 @@ jobs:
         if: success() || failure()
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4  # upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: cloud-test-results-eks-${{ matrix.k8s-version }}
           path: integration-tests-eks-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: test-logs-eks-${{ matrix.k8s-version }}
@@ -215,7 +215,7 @@ jobs:
       KUBECONFIG: ${{ format('{0}/{1}', github.workspace, '.github/terraform/gke/kubeconfig') }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
 
@@ -226,7 +226,7 @@ jobs:
         run: echo ${{ secrets.GCP_SERVICE_ACCOUNT }} | base64 -d > gcp_sa.json
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
 
       - run: terraform init
         working-directory: .github/terraform/gke
@@ -243,7 +243,7 @@ jobs:
           TF_VAR_k8s_version: ${{ matrix.k8s-version }}
         working-directory: .github/terraform/gke
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version: "${{ env.golang-version }}"
           cache: true
@@ -272,14 +272,14 @@ jobs:
         if: success() || failure()
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4  # upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: cloud-test-results-gke-${{ matrix.k8s-version }}
           path: integration-tests-gke-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: test-logs-gke-${{ matrix.k8s-version }}
@@ -292,13 +292,13 @@ jobs:
     if: always()
     steps:
     - name: Download test results
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
       with:
         pattern: cloud-test-results-*
         merge-multiple: true
 
     - name: Publish Test Results
-      uses: EnricoMi/publish-unit-test-result-action@v2
+      uses: EnricoMi/publish-unit-test-result-action@3a74b2957438d0b6e2e61d67b05318aa25c9e6c6 # v2.20.0
       with:
         commit: ${{ github.event.workflow_run.head_sha }}
         event_file: ${{ github.event_path }}
@@ -312,7 +312,7 @@ jobs:
     # Run only if the previous job has failed and only if it's running against the main branch
     if: ${{ always() && contains(join(needs.*.result, ','), 'fail') && github.ref_name == 'main' }}
     steps:
-      - uses: sarisia/actions-status-discord@v1
+      - uses: sarisia/actions-status-discord@11a0bfe3b50977e38aa2bd4a4ebd296415e83c19 # v1.15.4
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           status: Failure

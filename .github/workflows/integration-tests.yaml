@@ -30,7 +30,7 @@ jobs:
         k8s-distro: [minikube, k3d]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
@@ -46,13 +46,13 @@ jobs:
           kubernetes-version: ${{ matrix.k8s-version }}
 
       - name: Start k3d
-        uses: nolar/setup-k3d-k3s@v1
+        uses: nolar/setup-k3d-k3s@293b8e5822a20bc0d5bcdd4826f1a665e72aba96 # v1.0.9
         if: matrix.k8s-distro == 'k3d'
         with:
           version: ${{ matrix.k8s-version }}
           k3d-args: --k3s-arg=--disable=traefik@server:*
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version: "${{ env.golang-version }}"
 
@@ -76,14 +76,14 @@ jobs:
       - run: mv integration-tests.xml integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
         if: success() || failure()
 
-      - uses: actions/upload-artifact@v4  # upload test results
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: test-results-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
           path: integration-tests-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: test-logs-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
@@ -96,7 +96,7 @@ jobs:
     # Run only if the previous job has failed and only if it's running against the main branch
     if: ${{ always() && contains(join(needs.*.result, ','), 'fail') && github.ref_name == 'main' }}
     steps:
-      - uses: sarisia/actions-status-discord@v1
+      - uses: sarisia/actions-status-discord@11a0bfe3b50977e38aa2bd4a4ebd296415e83c19 # v1.15.4
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           status: Failure
