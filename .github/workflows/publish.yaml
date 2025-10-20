@@ -16,7 +16,7 @@ on:
 env:
   REGISTRY: ghcr.io
   GHCR_IMAGE: ghcr.io/${{ github.repository }}
-  GCP_IMAGE:  us-docker.pkg.dev/mondoohq/release/mondoo-operator
+  GCP_IMAGE: us-docker.pkg.dev/mondoohq/release/mondoo-operator
   RELEASE: ${{ github.ref_name }}
 
 jobs:
@@ -303,7 +303,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: [v1.28.9, v1.29.4, v1.30.0]
+        k8s-version: [v1.31.9, v1.32.9, v1.33.5, v1.34.1]
 
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -374,8 +374,8 @@ jobs:
           operator-sdk olm uninstall
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: success() || failure()        # run this step even if previous step failed
-        with:                             # upload a combined archive with unit and integration test results
+        if: success() || failure() # run this step even if previous step failed
+        with: # upload a combined archive with unit and integration test results
           name: test-results-olm-${{ matrix.k8s-version }}
           path: integration-tests-olm-${{ matrix.k8s-version }}.xml
 
@@ -392,7 +392,7 @@ jobs:
     uses: ./.github/workflows/release-manifests.yaml
     needs:
       - push-virtual-tag
-# this should ensure the manifest is tagged latest, which is required for the install automation
+      # this should ensure the manifest is tagged latest, which is required for the install automation
       - release-helm
 
   # publish helm chart after the release of container images is complete
@@ -479,9 +479,9 @@ jobs:
       - run-olm-e2e
       #- run-helm-tests
     permissions:
-      actions: read        # Required to read the artifact
-      contents: read       # Required to read the source
-      checks: write        # Required to write the results
+      actions: read # Required to read the artifact
+      contents: read # Required to read the source
+      checks: write # Required to write the results
       pull-requests: write # Required to write comments
     steps:
       - name: Download test results
@@ -501,7 +501,7 @@ jobs:
   release-helm:
     name: Release helm chart
     needs:
-    - push-virtual-tag
+      - push-virtual-tag
     runs-on: ubuntu-latest
 
     permissions:
