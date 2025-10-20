@@ -9,13 +9,13 @@ jobs:
   spelling:
     name: Run spell check
     permissions:
+      actions: read
       contents: read
       pull-requests: read
-      actions: read
     outputs:
       followup: ${{ steps.spelling.outputs.followup }}
     runs-on: ubuntu-latest
-    if: "contains(github.event_name, 'pull_request') || github.event_name == 'push'"
+    if: "${{ contains(github.event_name, 'pull_request') || github.event_name == 'push' }}"
     concurrency:
       group: spelling-${{ github.event.pull_request.number || github.ref }}
       # note: If you use only_check_changed_files, you do not want cancel-in-progress
@@ -30,12 +30,12 @@ jobs:
           checkout: true
           post_comment: 0
           dictionary_source_prefixes: '{"mondoo": "https://raw.githubusercontent.com/mondoohq/spellcheck-dictionary/main/", "cspell": "https://raw.githubusercontent.com/check-spelling/cspell-dicts/v20230509/dictionaries/"}'
-          extra_dictionaries:
-            cspell:aws/aws.txt
+          extra_dictionaries: cspell:aws/aws.txt
+            cspell:companies/src/companies.txt
             cspell:filetypes/filetypes.txt
             cspell:software-terms/src/software-terms.txt
             cspell:software-terms/src/software-tools.txt
-            cspell:companies/src/companies.txt
+            cspell:k8s/dict/k8s.txt
             mondoo:mondoo_dictionary.txt
 
   comment:
