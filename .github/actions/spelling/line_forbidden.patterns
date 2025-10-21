@@ -8,35 +8,46 @@
 \b[Ll]orem [Ii]psum\b
 
 #
+# Overly formal style
+#
+
+# s.b. Whether
+\bIndicates whether\b
+\bIndicates if\b
+\bIndicates\b
+\bWhether or not\b
+\bDenotes if\b
+
+#
 # Terms to avoid
 #
 
 # s.b. Allow list
-\s[Ww]hitelist\b
-\s[Ww]hitelisting\b
-\s[Ww]hitelisted\b
-\s[Ww]hite list\b
-\s[Ww]hite listing\b
-\s[Ww]hite listed\b
+\b[Ww]hitelist\b
+\b[Ww]hitelisting\b
+\b[Ww]hitelisted\b
+\b[Ww]hite list\b
+\b[Ww]hite listing\b
+\b[Ww]hite listed\b
 
 # s.b. Block list
-\s[Bb]lacklist\b
-\s[Bb]lacklisting\b
-\s[Bb]lacklisted\b
-\s[Bb]lack list\b
-\s[Bb]lack listing\b
-\s[Bb]lack listed\b
+\b[Bb]lacklist\b
+\b[Bb]lacklisting\b
+\b[Bb]lacklisted\b
+\b[Bb]lack list\b
+\b[Bb]lack listing\b
+\b[Bb]lack listed\b
 
 #
 # Our Terms
 #
 
 # s.b. Mondoo Platform
-\sthe Mondoo Platform\b
-\sMondoo platform\b
+\bthe Mondoo Platform\b
+\bMondoo platform\b
 
 # s.b. Compliance Hub
-\s[Cc]ompliance hub\b
+\b[Cc]ompliance hub\b
 
 #
 # Compliance Terms
@@ -45,12 +56,21 @@
 # s.b. SOC 2
 \bSOC2\b
 
+# s.b. NIS2
+\bNIS 2\b
+
 # s.b. ISO 270001
 \bISO270001\b
 
 #
 # Industry Terms
 #
+
+# s.b. NetFlow
+\bNetflow\b
+
+# s.b. IPsec
+\bIPSec\b
 
 # s.b. Side scanning
 \b[Ss]idescanning\b
@@ -64,6 +84,7 @@
 
 # s.b. Docker Hub
 \bDocker[Hh]ub\b
+\bdocker hub\b
 
 # s.b. REST API
 \b[Rr]est API\b
@@ -81,9 +102,151 @@
 # s.b. APIs
 \bapis\b
 
+# s.b. Base64
+\bBase 64\b
+
+# s.b. CRC32
+\bCRC 32\b
+
+# s.b. IaC
+\bIAC\b
+
+# s.b. Wi-Fi
+\bWi[Ff]i\b
+
+# s.b. screensaver
+\bscreen saver\b
+
+# s.b. SmartCard
+\bSmartcard\b
+\bSmart Card\b
+
+# s.b. 802.1Q, etc. Letter is always uppercase
+\b802.1[a-f]\b
+
+# s.b. LAN
+\bLan\b
+
+# s.b. IP
+\bIp\b
+
 #
 # Product Names
 #
+
+# s.b. Webex
+\bWebEx\b
+
+# s.b. TeamViewer
+\bTeam Viewer\b
+\bTeamviewer\b
+
+# s.b. LibreOffice
+\bLibre Office\b
+\bLibreoffice\b
+
+# s.b. JetBrains
+\bJet Brains\b
+\bJetbrains\b
+
+# s.b. EulerOS
+\bEuler OS\b
+
+# s.b. openEuler
+\bOpen[Ee]uler\b
+
+# s.b. OpenWrt
+\b[Oo]penWRT\b
+
+# s.b. SUSE Linux Micro
+\bSLES Micro OS\b
+\bSLES Micro\b
+
+# s.b. DragonFly BSD
+\bDragon[Ff]lyBSD\b
+\bDragonfly BSD\b
+
+# s.b. PLCnext
+\bPLCNext\b
+
+# s.b. SteamOS
+\bSteam OS\b
+
+# s.b. Smart Net Total Care
+\bSMARTnet\b
+
+# s.b. YubiKey
+\bYubikey\b
+\bYubi Key\b
+
+# s.b. ChatGPT
+\bChat GPT\b
+
+# s.b. Copilot
+\bCoPilot\b
+
+# s.b. OpenAI
+\bOpen AI\b
+
+# s.b. auditd
+\bAuditd\b
+
+# s.b. WatchGuard
+\bWatchguard\b
+
+# s.b. Airtable
+\bAirTable\b
+
+# s.b. Tailscale
+\bTailScale\b
+
+# s.b. TeamCity
+\bTeamcity\b
+
+# s.b. Bitbucket
+\bBitBucket\b
+
+# s.b. Logstash
+\bLogStash\b
+
+# s.b. CyberArk
+\bCyberark\b
+
+# s.b. Chef Infra Server
+\bChef Server\b
+
+# s.b. Chef Infra Client
+\bChef Client\b
+
+# s.b. containerd
+\bContainerd\b
+
+# s.b. systemd
+\bSystemd\b
+
+# s.b. journald
+\bJournald\b
+
+# s.b. OpenLDAP
+\bOpen LDAP\b
+
+# s.b. WebSphere
+\bWebsphere\b
+
+# s.b. JBoss
+\bJboss\b
+
+# s.b. WildFly
+\bWildfly\b
+
+# s.b. DigiCert
+\bDigicert\b
+
+# s.b. Cloudflare
+\bCloudFlare\b
+
+# s.b. Memcached
+\bMemCached\b
 
 # s.b. Jira
 \bJIRA\b
@@ -104,10 +267,14 @@
 \bCent OS\b
 \bcentOS\b
 
-# s.b. macOS
-\bOS X\b
-\bMacOS\b
-\bMac OS\b
+# s.b. Bluetooth
+\bBlueTooth\b
+
+# s.b. Jamf
+\bJAMF\b
+
+# s.b. POSIX
+\b[Pp]osix\b
 
 # s.b. Okta
 \bOcta\b
@@ -147,6 +314,10 @@
 
 # s.b. AlmaLinux
 \bAlma Linux\b
+
+# s.b. CloudLinux
+\bCloud Linux\b
+\bCloudlinux\b
 
 # s.b. openSUSE
 \bOpenSUSE\b
@@ -194,12 +365,90 @@
 
 # s.b. SentinelOne
 \bSentinal[Oo]ne\b
-\bSentinelone\b
-\bSentinal One\b
+\bSentin[ae]lone\b
+\bSentin[ae]l One\b
 
 # s.b. CrowdStrike
 \bCrowd Strike\b
 \b[Cc]rowdstrike\b
+
+# s.b. Zendesk
+\bZenDesk\b
+
+# s.b. ServiceNow
+\bService Now\b
+\bServicenow\b
+
+# s.b. Nmap
+\b[Nn]Map\b
+
+# s.b. NX-OS
+\bNX OS\b
+\bNXOS\b
+
+#
+# Fortinet Terms
+#
+
+# s.b. FortiSwitch
+\bForti Switch\b
+\bFortiswitch\b
+
+# s.b. FortiClient
+\bForti Client\b
+\bForticlient\b
+
+# s.b. FortiGate
+\bFortigate\b
+
+# s.b. Fortinet
+\bFortiNet\b
+
+# s.b. FortiGuard
+\bFortiguard\b
+
+# s.b. FortiAnalyzer
+\bFortianalyzer\b
+
+# s.b. FortiManager
+\bFortimanager\b
+
+# s.b. FortiOS
+\bForti OS\b
+
+#
+# Apple Terms
+#
+
+# s.b. macOS
+\bOS X\b
+\bMacOS\b
+\b[Mm]ac OS\b
+
+# s.b. AirDrop
+\bAirdrop\b
+
+# s.b. iPadOS
+\biPad OS\b
+
+# s.b. AppleScript
+\bApplescript\b
+
+# s.b. FileVault
+\bFilevault\b
+\bFile Vault\b
+
+# s.b. Apple Pay
+\bApplePay\b
+
+# s.b. Touch ID
+\bTouchID\b
+
+# s.b. AppleID
+\bAppleID\b
+
+# s.b. XProtect
+\bX Protect\b
 
 #
 # Kubernetes Terms
@@ -241,6 +490,16 @@
 #
 # Microsoft Products
 #
+
+# s.b. M365
+\bMS365\b
+
+# s.b. Entra ID
+\bEntraID\b
+
+# s.b. WinRM
+\bwinRM\b
+\bWin RM\b
 
 # s.b. Microsoft
 \bMicroSoft\b
@@ -287,6 +546,13 @@
 # s.b. LinkedIn
 \bLinked In\b
 \bLinkedin\b
+
+# s.b. Microsoft IIS
+\bIIS Server\b
+
+# s.b. Microsoft SQL Server
+\bSQL server\b
+\bMSSQL\b
 
 #
 # VMware Products
@@ -457,7 +723,7 @@
 \bWorkmail\b
 
 #
-# GCP Products
+# Google Cloud Products
 #
 
 # s.b. AlloyDB
@@ -468,9 +734,11 @@
 
 # s.b. BigLake
 \bBig Lake\b
+\bBiglake\b
 
 # s.b. BigQuery
 \bBig Query\b
+\bBigquery\b
 
 # s.b. Cloud Build
 \bCloudBuild\b
@@ -529,9 +797,26 @@
 \bVMware engine\b
 \bVMWare Engine\b
 
+# s.b. Bigtable
+\bBigTable\b
+\bBig Table\b
+
+# s.b. Datastore
+\bDataStore\b
+
 #
 # Azure Products
 #
+
+# s.b. VNet
+\bVnet\b
+
+# s.b. ExpressRoute
+\bExpress Route\b
+\bExpressroute\b
+
+# s.b. Databricks
+\bDataBricks\b
 
 # s.b. Azure Pipelines
 \bAzure DevOps Pipelines\b
