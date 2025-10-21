@@ -120,7 +120,7 @@ generate: controller-gen gomockgen prep/tools ## Generate code containing DeepCo
 fmt: ## Run go fmt against code.
 	go fmt ./...
 
-vet: ## Run go vet against code. 
+vet: ## Run go vet against code.
 	go vet ./...
 
 lint: golangci-lint generate
@@ -234,7 +234,7 @@ generate-manifests: manifests kustomize ## Generates manifests and pipes into a 
 	mv config/manager/kustomization.yaml.before_kustomize config/manager/kustomization.yaml
 
 .PHONY: deploy-olm
-deploy-olm: manifests kustomize ## Deploy using operator-sdk OLM 
+deploy-olm: manifests kustomize ## Deploy using operator-sdk OLM
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | operator-sdk run bundle --index-image=quay.io/operator-framework/opm:v1.23.0 ${BUNDLE_IMG}
 
@@ -276,7 +276,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
-	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.21.0
 
 GOTESTSUM = $(LOCALBIN)/gotestsum
 gotestsum: $(GOTESTSUM) ## Download gotestsum locally if necessary.
