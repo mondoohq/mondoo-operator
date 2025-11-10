@@ -16,7 +16,7 @@ on:
 env:
   REGISTRY: ghcr.io
   GHCR_IMAGE: ghcr.io/${{ github.repository }}
-  GCP_IMAGE:  us-docker.pkg.dev/mondoohq/release/mondoo-operator
+  GCP_IMAGE: us-docker.pkg.dev/mondoohq/release/mondoo-operator
   RELEASE: ${{ github.ref_name }}
 
 jobs:
@@ -44,12 +44,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version: "${{ env.golang-version }}"
           cache: true
@@ -57,24 +57,24 @@ jobs:
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
 
       # Login against a Docker registry except on PR
       # https://github.com/docker/login-action
       - name: Log into registry ${{ env.REGISTRY }}
-        uses: docker/login-action@v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Authenticate with Google Cloud
-        uses: "google-github-actions/auth@v2"
+        uses: "google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093" # v3.0.0
         with:
           credentials_json: "${{ secrets.GCP_ARTIFACT_REGISTRY_SA }}"
 
       - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v2"
+        uses: "google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db" # v3.0.1
 
       - name: Docker Login (GCR)
         run: |
@@ -84,7 +84,7 @@ jobs:
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
           images: |
             ${{ env.GHCR_IMAGE }}
@@ -101,7 +101,7 @@ jobs:
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata (without suffixes)
         id: meta_clean
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
           images: |
             ${{ env.GHCR_IMAGE }}
@@ -119,7 +119,7 @@ jobs:
       # https://github.com/docker/build-push-action
       - name: Build and push operator image
         id: build-and-push-operator
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
           platforms: ${{ matrix.os }}/${{ matrix.arch }}
@@ -159,29 +159,29 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
 
       # Login against a Docker registry except on PR
       # https://github.com/docker/login-action
       - name: Log into registry ${{ env.REGISTRY }}
-        uses: docker/login-action@v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Authenticate with Google Cloud
-        uses: "google-github-actions/auth@v2"
+        uses: "google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093" # v3.0.0
         with:
           credentials_json: "${{ secrets.GCP_ARTIFACT_REGISTRY_SA }}"
 
       - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v2"
+        uses: "google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db" # v3.0.1
 
       - name: Docker Login (GCR)
         run: |
@@ -191,7 +191,7 @@ jobs:
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
           images: |
             ${{ env.GHCR_IMAGE }}
@@ -215,33 +215,33 @@ jobs:
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version: "${{ env.golang-version }}"
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
         with:
           image: tonistiigi/binfmt:latest
           platforms: amd64,arm
 
       # Workaround: https://github.com/docker/build-push-action/issues/461
       - name: Setup Docker buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
       # Login against a Docker registry except on PR
       # https://github.com/docker/login-action
       - name: Log into registry ${{ env.REGISTRY }}
-        uses: docker/login-action@v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -266,14 +266,14 @@ jobs:
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta-bundle
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
           images: "${{ env.GHCR_IMAGE }}-bundle"
 
       # Build and push Docker image bundle with Buildx
       - name: Build and push bundle image
         id: build-and-push-bundle
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
           file: bundle.Dockerfile
@@ -303,17 +303,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: [v1.28.9, v1.29.4, v1.30.0]
+        k8s-version: [v1.31.9, v1.32.9, v1.33.5, v1.34.1]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version: "${{ env.golang-version }}"
       - name: Start minikube
@@ -359,7 +359,7 @@ jobs:
 
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
           images: ${{ env.GHCR_IMAGE }}
 
@@ -373,14 +373,14 @@ jobs:
           operator-sdk cleanup mondoo-operator --namespace mondoo-operator
           operator-sdk olm uninstall
 
-      - uses: actions/upload-artifact@v4  # upload test results
-        if: success() || failure()        # run this step even if previous step failed
-        with:                             # upload a combined archive with unit and integration test results
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: success() || failure() # run this step even if previous step failed
+        with: # upload a combined archive with unit and integration test results
           name: test-results-olm-${{ matrix.k8s-version }}
           path: integration-tests-olm-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: olm-test-logs-${{ matrix.k8s-version }}
@@ -392,7 +392,7 @@ jobs:
     uses: ./.github/workflows/release-manifests.yaml
     needs:
       - push-virtual-tag
-# this should ensure the manifest is tagged latest, which is required for the install automation
+      # this should ensure the manifest is tagged latest, which is required for the install automation
       - release-helm
 
   # publish helm chart after the release of container images is complete
@@ -479,19 +479,19 @@ jobs:
       - run-olm-e2e
       #- run-helm-tests
     permissions:
-      actions: read        # Required to read the artifact
-      contents: read       # Required to read the source
-      checks: write        # Required to write the results
+      actions: read # Required to read the artifact
+      contents: read # Required to read the source
+      checks: write # Required to write the results
       pull-requests: write # Required to write comments
     steps:
       - name: Download test results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           pattern: test-results-*
           merge-multiple: true
 
       - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
+        uses: EnricoMi/publish-unit-test-result-action@3a74b2957438d0b6e2e61d67b05318aa25c9e6c6 # v2.20.0
         with:
           commit: ${{ github.event.workflow_run.head_sha }}
           event_file: ${{ github.event_path }}
@@ -501,7 +501,7 @@ jobs:
   release-helm:
     name: Release helm chart
     needs:
-    - push-virtual-tag
+      - push-virtual-tag
     runs-on: ubuntu-latest
 
     permissions:
@@ -509,7 +509,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
 
@@ -519,7 +519,7 @@ jobs:
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Install Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
         id: install

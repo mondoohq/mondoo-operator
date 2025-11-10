@@ -461,7 +461,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets() {
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
 
 	dsExpected := ds.DeepCopy()
-	UpdateDaemonSet(dsExpected, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
+	UpdateDaemonSet(dsExpected, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{},
+		[]corev1.Toleration{{Key: "node-role.kubernetes.io/master", Value: "true", Effect: corev1.TaintEffectNoExecute}})
 	// Make sure the env vars for both are sorted
 	utils.SortEnvVars(dsExpected.Spec.Template.Spec.Containers[0].Env)
 	utils.SortEnvVars(ds.Spec.Template.Spec.Containers[0].Env)
@@ -501,7 +502,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_Switch() {
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
 
 	dsExpected := ds.DeepCopy()
-	UpdateDaemonSet(dsExpected, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
+	UpdateDaemonSet(dsExpected, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{},
+		[]corev1.Toleration{{Key: "node-role.kubernetes.io/master", Value: "true", Effect: corev1.TaintEffectNoExecute}})
 	s.True(equality.Semantic.DeepEqual(dsExpected, ds))
 
 	mondooAuditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_CronJob
@@ -546,7 +548,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateDaemonSets() {
 
 	// Make sure a daemonset exists
 	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
-	UpdateDaemonSet(ds, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
+	UpdateDaemonSet(ds, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{}, nil)
 	ds.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, ds))
 
@@ -558,7 +560,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateDaemonSets() {
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
 
 	depExpected := ds.DeepCopy()
-	UpdateDaemonSet(depExpected, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{})
+	UpdateDaemonSet(depExpected, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{},
+		[]corev1.Toleration{{Key: "node-role.kubernetes.io/master", Value: "true", Effect: corev1.TaintEffectNoExecute}})
 	s.True(equality.Semantic.DeepEqual(depExpected, ds))
 }
 

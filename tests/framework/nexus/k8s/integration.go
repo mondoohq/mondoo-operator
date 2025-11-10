@@ -203,7 +203,7 @@ func (p *CiCdProject) ListAssets(ctx context.Context) ([]CiCdJob, error) {
 		} `graphql:"cicdProjectJobs(input: $input)"`
 	}
 	err := p.gqlClient.Query(ctx, &q, map[string]interface{}{
-		"input": mondoogql.CicdProjectJobsInput{SpaceMrn: p.spaceMrn, ProjectID: p.id},
+		"input": mondoogql.CicdProjectJobsInput{SpaceMrn: p.spaceMrn, ProjectId: p.id},
 		"first": mondoogql.Int(100),
 	})
 	if err != nil {

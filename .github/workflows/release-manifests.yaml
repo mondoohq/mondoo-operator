@@ -15,17 +15,17 @@ jobs:
     runs-on: ubuntu-latest
     name: Generate manifests
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version: "${{ env.golang-version }}"
       - name: Generate manifests
         run: make generate-manifests IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE }}'
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 # v2.4.1
         with:
           files: mondoo-operator-manifests.yaml
           generate_release_notes: true

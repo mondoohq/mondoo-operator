@@ -60,27 +60,25 @@ func ListAssetsWithScores(
 		return nil, err
 	}
 
-	var assetReportQ struct {
-		AssetReport struct {
-			AssetReport struct {
-				ListPolicies struct {
-					Edges []struct {
-						Node struct {
-							Mrn   string
-							Score struct {
-								Grade string
-							}
+	var assetQ struct {
+		Asset struct {
+			ListPolicies struct {
+				Edges []struct {
+					Node struct {
+						Mrn   string
+						Score struct {
+							Grade string
 						}
 					}
-				} `graphql:"listPolicies"`
-			} `graphql:"... on AssetReport"`
-		} `graphql:"assetReport(input: $input)"`
+				}
+			} `graphql:"listPolicies"`
+		} `graphql:"asset(mrn: $mrn)"`
 	}
 
 	assetScores := make([]AssetWithScore, len(q.AssetsConnection.Edges))
 	for i := range q.AssetsConnection.Edges {
 		a := q.AssetsConnection.Edges[i].Node
-		err := gqlClient.Query(ctx, &assetReportQ, map[string]interface{}{"input": mondoogql.AssetReportInput{AssetMrn: a.Mrn}})
+		err := gqlClient.Query(ctx, &assetQ, map[string]interface{}{"mrn": mondoogql.String(a.Mrn)})
 		if err != nil {
 			return nil, err
 		}
@@ -97,7 +95,7 @@ func ListAssetsWithScores(
 			assetScores[i].Labels[l.Key] = l.Value
 		}
 
-		for _, p := range assetReportQ.AssetReport.AssetReport.ListPolicies.Edges {
+		for _, p := range assetQ.Asset.ListPolicies.Edges {
 			assetScores[i].PolicyScores = append(assetScores[i].PolicyScores, PolicyScore{
 				Mrn:   p.Node.Mrn,
 				Grade: p.Node.Score.Grade,
