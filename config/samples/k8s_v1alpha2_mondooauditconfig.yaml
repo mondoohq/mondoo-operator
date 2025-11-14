@@ -14,8 +14,8 @@ spec:
   scanner:
     serviceAccountName: mondoo-client
     image:
-      name: docker.io/mondoo/client
-      tag: latest
+      name: ghcr.io/mondoo/cnspec
+      tag: latest-rootless
     resources:
       requests:
       limits:
