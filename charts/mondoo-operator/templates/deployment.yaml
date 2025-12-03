@@ -76,7 +76,7 @@ spec:
           }}
         securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
           | nindent 10 }}
-      securityContext:
-        runAsNonRoot: true
+      securityContext: {{- toYaml .Values.controllerManager.manager.podSecurityContext
+        | nindent 10 }}
       serviceAccountName: {{ include "mondoo-operator.fullname" . }}-controller-manager
       terminationGracePeriodSeconds: 10
