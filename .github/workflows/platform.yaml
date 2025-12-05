@@ -1,0 +1,20 @@
+name: Set org owner
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+
+jobs:
+  set-owner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+      - env:
+          MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
+        run: |
+          terraform init
+          terraform apply -auto-approve
+        timeout-minutes: 10
