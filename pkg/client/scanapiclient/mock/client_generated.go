@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	scan "go.mondoo.com/cnspec/v11/policy/scan"
+	scan "go.mondoo.com/cnspec/v12/policy/scan"
 	common "go.mondoo.com/mondoo-operator/pkg/client/common"
 	scanapiclient "go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
 )

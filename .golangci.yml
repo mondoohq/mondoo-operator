@@ -1,6 +1,18 @@
 # Copyright (c) Mondoo, Inc.
 # SPDX-License-Identifier: BUSL-1.1
-
+version: "2"
+run:
+  modules-download-mode: readonly
 linters:
+  default: none
   enable:
-    - gofumpt
+    #- errcheck
+    - govet
+    - ineffassign
+    #- staticcheck
+    - unused
+    #- gosec
+formatters:
+  settings:
+    gofmt:
+      simplify: false

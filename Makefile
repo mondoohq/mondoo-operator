@@ -175,10 +175,7 @@ load-minikube: docker-build ## Build docker image with the manager and load it i
 	minikube image load ${IMG}
 
 load-k3d: docker-build
-	docker save -o operator.tar ${IMG}
-	docker cp operator.tar k3d-k3s-default-server-0:/tmp/operator.tar
-	docker exec k3d-k3s-default-server-0 ctr -a /run/k3s/containerd/containerd.sock -n k8s.io images import /tmp/operator.tar
-	rm operator.tar
+	k3d images import ${IMG}
 
 buildah-build: build ## Build container image
 	buildah build --platform=${TARGET_OS}/${TARGET_ARCH} -t ${IMG} .
@@ -254,7 +251,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v4.5.7
-CONTROLLER_TOOLS_VERSION ?= v0.14.0
+CONTROLLER_TOOLS_VERSION ?= v0.19.0
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 ## we intentionally install kustomize without the script to prevent GitHub API rate limits

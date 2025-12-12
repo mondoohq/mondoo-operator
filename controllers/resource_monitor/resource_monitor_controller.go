@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	cnquery_k8s "go.mondoo.com/cnquery/v11/providers/k8s/resources"
+	cnquery_k8s "go.mondoo.com/cnquery/v12/providers/k8s/resources"
 )
 
 var logger = log.Log.WithName("resource-monitor")
