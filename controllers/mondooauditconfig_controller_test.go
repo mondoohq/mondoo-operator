@@ -43,7 +43,7 @@ const (
 	testMondooAuditConfigName = "mondoo-config"
 	testNamespace             = "mondoo-operator"
 	testMondooCredsSecretName = "mondoo-client"
-	testMondooTokenSecretName = "mondoo-token'"
+	testMondooTokenSecretName = "mondoo-token'" //nolint:gosec
 
 	testServiceAccountData = `SERVICE ACCOUNT DATA HERE`
 

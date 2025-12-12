@@ -41,11 +41,11 @@ var handlerlog = logf.Log.WithName("webhook-validator")
 
 const (
 	// defaultScanPass is our default Allowed result in the event that we never even made it to the scan
-	defaultScanPass = "DEFAULT MONDOO PASSED"
+	defaultScanPass = "DEFAULT MONDOO PASSED" // #nosec G101
 	// defaultScanFail is our default Failed result in the event that we never even made it to the scan
 	defaultScanFail = "DEFAULT MONDOO FAILED"
 	// passedScan is the Allowed result when the sacn came back with a passing result
-	passedScan = "PASSED MONDOO SCAN"
+	passedScan = "PASSED MONDOO SCAN" // #nosec G101
 	// failedScanPermitted is the Allowed result when in Permissive mode but the scan result was a failing result
 	failedScanPermitted = "PERMITTING FAILED SCAN"
 	// failedScan is the Denied result when in Enforcing mode and the scan result was a failing result
@@ -154,7 +154,7 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 	// it is fixed in k8s 1.25, but we need to support older versions
 	// not skipping these updates floods our CI/CD with GKE, AKS, ... addon updates
 	// SSA also changes the managedFields metadata, so we drop them also to get rid of the noise
-	if req.AdmissionRequest.Operation == admissionv1.Update && req.AdmissionRequest.OldObject.Raw != nil {
+	if req.Operation == admissionv1.Update && req.OldObject.Raw != nil {
 		skip, err := objectsOnlyDifferInSSAFields(req.AdmissionRequest)
 		if err != nil {
 			handlerlog.Error(err, "failed to get difference between objects")
@@ -214,7 +214,7 @@ func (a *webhookValidator) Handle(ctx context.Context, req admission.Request) (r
 		return
 	}
 
-	passed := false
+	passed := false // nolint:staticcheck
 	if result.WorstScore != nil && result.WorstScore.Type == scanapiclient.ValidScanResult && result.WorstScore.Value == 100 {
 		passed = true
 	}

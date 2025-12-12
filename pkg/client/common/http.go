@@ -75,7 +75,9 @@ func Request(ctx context.Context, client http.Client, url, token string, reqBody
 	}
 
 	defer func() {
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("failed to close response body: %s", err)
+		}
 	}()
 
 	respBody, err := io.ReadAll(resp.Body)

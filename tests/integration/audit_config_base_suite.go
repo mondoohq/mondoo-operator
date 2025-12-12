@@ -776,7 +776,7 @@ func (s *AuditConfigBaseSuite) testUpgradePreviousReleaseToLatest(auditConfig mo
 		fmt.Sprintf("%s-webhook-service.%s.svc.cluster.local", auditConfig.Name, auditConfig.Namespace),
 	}
 	secretName := mondooadmission.GetTLSCertificatesSecretName(auditConfig.Name)
-	_, err := s.testCluster.MondooInstaller.GenerateServiceCerts(&auditConfig, secretName, serviceDNSNames)
+	_, err := s.testCluster.GenerateServiceCerts(&auditConfig, secretName, serviceDNSNames)
 
 	// Don't bother with further webhook tests if we couldnt' save the certificates
 	s.Require().NoErrorf(err, "Error while generating/saving certificates for webhook service")
@@ -946,8 +946,8 @@ func (s *AuditConfigBaseSuite) getFailingDeployment() *appsv1.Deployment {
 		"admission-result": "fail",
 	}
 	deployment := s.getPassingDeployment().DeepCopy()
-	deployment.ObjectMeta.Name = "failing-deployment"
-	deployment.ObjectMeta.Labels = labels
+	deployment.Name = "failing-deployment"
+	deployment.Labels = labels
 	deployment.Spec.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
 		Privileged: ptr.To(true),
 	}
@@ -1033,7 +1033,7 @@ func (s *AuditConfigBaseSuite) manuallyCreateCertificates() (*bytes.Buffer, erro
 		fmt.Sprintf("%s-webhook-service.%s.svc.cluster.local", s.auditConfig.Name, s.auditConfig.Namespace),
 	}
 	secretName := mondooadmission.GetTLSCertificatesSecretName(s.auditConfig.Name)
-	return s.testCluster.MondooInstaller.GenerateServiceCerts(&s.auditConfig, secretName, serviceDNSNames)
+	return s.testCluster.GenerateServiceCerts(&s.auditConfig, secretName, serviceDNSNames)
 }
 
 // verifyWebhookAndStart Checks the ValidatingWebhookConfiguration, adds the CA data and waits for webhook to start working
@@ -1119,12 +1119,12 @@ func (s *AuditConfigBaseSuite) verifyWebhookAndStart(webhookListOpts *client.Lis
 	// Sometime the Pod restart takes longer than 1 second, so we wait for the endpoints to be ready
 	// when accessing the endpoints later on, we came across such errors:
 	// ... pod mondoo-client-webhook-manager-6c5ccc449d-d7zn9 and container webhook. Container is in state ContainerCreating
-	endpoints := &corev1.Endpoints{
+	endpoints := &corev1.Endpoints{ // nolint:staticcheck
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-webhook-service", s.auditConfig.Name),
 			Namespace: s.auditConfig.Namespace,
 		},
-		Subsets: []corev1.EndpointSubset{},
+		Subsets: []corev1.EndpointSubset{}, // nolint:staticcheck
 	}
 	zap.S().Info("Getting endpoints for webhook.")
 	for i := 0; i < maxRetriesCreate; i++ {
@@ -1165,7 +1165,7 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 
 	webhookUrl := fmt.Sprintf("https://127.0.0.1:%d/readyz", webhookLocalPort)
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
-	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
 	client := &http.Client{Transport: customTransport}
 	client.Timeout = 500 * time.Millisecond
 	var resp *http.Response
@@ -1175,7 +1175,7 @@ func (s *AuditConfigBaseSuite) checkWebhookAvailability() error {
 		resp, webhookErr = client.Post(webhookUrl, "application/json", strings.NewReader("{}"))
 		if webhookErr == nil {
 			zap.S().Infof("Webhook is available: %s", resp.Status)
-			resp.Body.Close()
+			s.NoError(resp.Body.Close())
 			return nil
 		} else {
 			zap.S().Debug("Webhook is not available yet: ", webhookErr)
@@ -1219,7 +1219,7 @@ func (s *AuditConfigBaseSuite) createPortForwardCmd(webhookService *corev1.Servi
 		fmt.Sprintf("%d:%d", webhookLocalPort, webhookService.Spec.Ports[0].Port),
 	}
 
-	return exec.Command("kubectl", kubectlArgs...)
+	return exec.Command("kubectl", kubectlArgs...) // #nosec G204
 }
 
 var (

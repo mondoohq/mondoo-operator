@@ -15,10 +15,10 @@ func GetNewestPodFromList(pods []corev1.Pod) corev1.Pod {
 	podCreationTime := time.Unix(0, 0)
 	currentPod := corev1.Pod{}
 	for _, pod := range pods {
-		if pod.ObjectMeta.CreationTimestamp.Time.Before(podCreationTime) {
+		if pod.CreationTimestamp.Time.Before(podCreationTime) {
 			continue
 		}
-		podCreationTime = pod.ObjectMeta.CreationTimestamp.Time
+		podCreationTime = pod.CreationTimestamp.Time
 		currentPod = pod
 	}
 	return currentPod

@@ -29,7 +29,7 @@ type AuditConfigOOMSuite struct {
 
 func (s *AuditConfigOOMSuite) SetupSuite() {
 	s.AuditConfigBaseSuite.SetupSuite()
-	s.testCluster.MondooInstaller.Settings.SuiteName = "AuditConfigOOMSuite"
+	s.testCluster.Settings.SuiteName = "AuditConfigOOMSuite"
 }
 
 func (s *AuditConfigOOMSuite) TestOOMControllerReporting() {

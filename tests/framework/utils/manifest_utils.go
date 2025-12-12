@@ -52,7 +52,7 @@ func ReadFile(filename string) string {
 	}
 	manifest := path.Join(rootDir, filename)
 	zap.S().Infof("Reading file: %s", manifest)
-	contents, err := os.ReadFile(manifest)
+	contents, err := os.ReadFile(manifest) //nolint:gosec
 	if err != nil {
 		panic(fmt.Errorf("failed to read file at %s. %v", manifest, err))
 	}

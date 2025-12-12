@@ -23,14 +23,12 @@ import (
 	"time"
 
 	cnquery_k8s "go.mondoo.com/cnquery/v12/providers/k8s/resources"
-	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	api "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -200,7 +198,7 @@ func (k8sh *K8sHelper) WaitUntilMondooClientSecretExists(ctx context.Context, ns
 	err := k8sh.ExecuteWithRetries(func() (bool, error) {
 		secret := &v1.Secret{}
 		if err := k8sh.Clientset.Get(ctx, types.NamespacedName{Namespace: ns, Name: MondooClientSecret}, secret); err != nil {
-			if k8sErrors.IsNotFound(err) {
+			if kerrors.IsNotFound(err) {
 				return false, nil
 			}
 			return false, err
@@ -276,7 +274,7 @@ func (k8sh *K8sHelper) GetDescribeFromNamespace(namespace, suiteName, testName s
 	if err != nil {
 		return
 	}
-	defer file.Close()
+	defer file.Close() //nolint:errcheck
 
 	for _, p := range pods.Items {
 		k8sh.appendPodDescribe(file, namespace, p.Name)
@@ -302,7 +300,7 @@ func (k8sh *K8sHelper) GetDescribeFromNamespace(namespace, suiteName, testName s
 		k8sh.appendCronJobDescribe(file, namespace, p.Name)
 	}
 
-	auditConfigs, err := k8sh.dynamicClient.Resource(v1alpha2.GroupVersion.WithResource("mondooauditconfigs")).
+	auditConfigs, err := k8sh.dynamicClient.Resource(api.GroupVersion.WithResource("mondooauditconfigs")).
 		Namespace(namespace).
 		List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -323,7 +321,7 @@ func (k8sh *K8sHelper) GetEventsFromNamespace(namespace, suiteName, testName str
 		zap.S().Errorf("failed to create event file. %v", err)
 		return
 	}
-	defer file.Close()
+	defer file.Close() //nolint:errcheck
 
 	args := []string{"get", "events", "-n", namespace}
 	events, err := k8sh.Kubectl(args...)
@@ -356,7 +354,7 @@ func (k8sh *K8sHelper) WaitForResourceDeletion(r client.Object) error {
 	})
 }
 
-func (k8sh *K8sHelper) UpdateAuditConfigWithRetries(name, namespace string, update func(auditConfig *v1alpha2.MondooAuditConfig)) error {
+func (k8sh *K8sHelper) UpdateAuditConfigWithRetries(name, namespace string, update func(auditConfig *api.MondooAuditConfig)) error {
 	err := k8sh.ExecuteWithRetries(func() (bool, error) {
 		auditConfig, err := k8sh.GetMondooAuditConfigFromCluster(name, namespace)
 		if err != nil {
@@ -525,7 +523,7 @@ func (k8sh *K8sHelper) createTestLogFile(name, namespace, suiteName, testName, s
 	dir, _ := os.Getwd()
 	logDir := path.Join(dir, "_output/tests/")
 	if _, err := os.Stat(logDir); os.IsNotExist(err) {
-		err := os.MkdirAll(logDir, 0o777)
+		err := os.MkdirAll(logDir, 0o777) //nolint:gosec
 		if err != nil {
 			zap.S().Errorf("Cannot get logs files dir for app : %v in namespace %v, err: %v", name, namespace, err)
 			return nil, err
@@ -534,7 +532,7 @@ func (k8sh *K8sHelper) createTestLogFile(name, namespace, suiteName, testName, s
 
 	suiteDir := path.Join(logDir, suiteName)
 	if _, err := os.Stat(suiteDir); os.IsNotExist(err) {
-		err := os.MkdirAll(suiteDir, 0o777)
+		err := os.MkdirAll(suiteDir, 0o777) //nolint:gosec
 		if err != nil {
 			zap.S().Errorf("Cannot get suite files dir for app : %v in namespace %v, err: %v", name, namespace, err)
 			return nil, err
@@ -543,7 +541,7 @@ func (k8sh *K8sHelper) createTestLogFile(name, namespace, suiteName, testName, s
 
 	testDir := path.Join(suiteDir, testName)
 	if _, err := os.Stat(testDir); os.IsNotExist(err) {
-		err := os.MkdirAll(testDir, 0o777)
+		err := os.MkdirAll(testDir, 0o777) //nolint:gosec
 		if err != nil {
 			zap.S().Errorf("Cannot get test files dir for app : %v in namespace %v, err: %v", name, namespace, err)
 			return nil, err
@@ -553,7 +551,7 @@ func (k8sh *K8sHelper) createTestLogFile(name, namespace, suiteName, testName, s
 	fileName := fmt.Sprintf("%s_%s%s_%d.log", namespace, name, suffix, time.Now().Unix())
 	fileName = strings.ReplaceAll(fileName, "/", "")
 	filePath := path.Join(testDir, fileName)
-	file, err := os.Create(filePath)
+	file, err := os.Create(filePath) //nolint:gosec
 	if err != nil {
 		zap.S().Errorf("Cannot create file %s. %v", filePath, err)
 		return nil, err
@@ -572,7 +570,7 @@ func (k8sh *K8sHelper) getPodLogs(pod v1.Pod, namespace, suiteName, testName str
 	if err != nil {
 		return
 	}
-	defer file.Close()
+	defer file.Close() //nolint:errcheck
 
 	for _, container := range pod.Spec.InitContainers {
 		k8sh.appendContainerLogs(file, pod, container.Name, previousLog, true)

@@ -250,7 +250,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if reconcileError != nil {
 		log.Error(reconcileError, "Failed to set up scan API")
 	}
-	if reconcileError != nil || result.Requeue {
+	if reconcileError != nil || result.RequeueAfter > 0 {
 		return result, reconcileError
 	}
 
@@ -266,7 +266,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if reconcileError != nil {
 		log.Error(reconcileError, "Failed to set up nodes scanning")
 	}
-	if reconcileError != nil || result.Requeue {
+	if reconcileError != nil || result.RequeueAfter > 0 {
 		return result, reconcileError
 	}
 
@@ -281,7 +281,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if reconcileError != nil {
 		log.Error(reconcileError, "Failed to set up container scanning")
 	}
-	if reconcileError != nil || result.Requeue {
+	if reconcileError != nil || result.RequeueAfter > 0 {
 		return result, reconcileError
 	}
 
@@ -297,7 +297,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if reconcileError != nil {
 		log.Error(reconcileError, "Failed to set up Kubernetes resources scanning")
 	}
-	if reconcileError != nil || result.Requeue {
+	if reconcileError != nil || result.RequeueAfter > 0 {
 		return result, reconcileError
 	}
 
@@ -313,7 +313,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if reconcileError != nil {
 		log.Error(reconcileError, "Failed to set up webhooks")
 	}
-	if reconcileError != nil || result.Requeue {
+	if reconcileError != nil || result.RequeueAfter > 0 {
 		return result, reconcileError
 	}
 
@@ -329,7 +329,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *MondooAuditConfigReconciler) nodeEventsRequestMapper(ctx context.Context, o client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 	auditConfigs := &v1alpha2.MondooAuditConfigList{}
-	if err := r.Client.List(ctx, auditConfigs); err != nil {
+	if err := r.List(ctx, auditConfigs); err != nil {
 		logger := ctrllog.Log.WithName("node-watcher")
 		logger.Error(err, "Failed to list MondooAuditConfigs")
 		return requests
@@ -349,7 +349,7 @@ func (r *MondooAuditConfigReconciler) nodeEventsRequestMapper(ctx context.Contex
 func (r *MondooAuditConfigReconciler) cronJobPodsRequestMapper(ctx context.Context, o client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 	auditConfigs := &v1alpha2.MondooAuditConfigList{}
-	if err := r.Client.List(ctx, auditConfigs); err != nil {
+	if err := r.List(ctx, auditConfigs); err != nil {
 		logger := ctrllog.Log.WithName("cronjob-pod-watcher")
 		logger.Error(err, "Failed to list MondooAuditConfigs")
 		return requests

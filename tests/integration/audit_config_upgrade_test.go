@@ -18,7 +18,7 @@ type AuditConfigUpgradeSuite struct {
 
 func (s *AuditConfigUpgradeSuite) SetupSuite() {
 	s.AuditConfigBaseSuite.SetupSuite()
-	s.testCluster.MondooInstaller.Settings.SuiteName = "AuditConfigUpgradeSuite"
+	s.testCluster.Settings.SuiteName = "AuditConfigUpgradeSuite"
 }
 
 func (s *AuditConfigUpgradeSuite) AfterTest(suiteName, testName string) {

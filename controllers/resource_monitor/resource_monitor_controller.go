@@ -85,7 +85,7 @@ func (r *ResourceMonitorController) Start(ctx context.Context) error {
 
 func (r *ResourceMonitorController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	obj := r.createRes()
-	if err := r.Client.Get(ctx, req.NamespacedName, obj); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, obj); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
