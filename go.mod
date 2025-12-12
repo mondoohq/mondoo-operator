@@ -5,11 +5,11 @@ go 1.25.1
 replace go.mondoo.com/cnquery/v12/providers/k8s => github.com/mondoohq/cnquery/providers/k8s v0.0.0-20251212084727-587f21e53534
 
 require (
-	github.com/cert-manager/cert-manager v1.18.4
+	github.com/cert-manager/cert-manager v1.19.2
 	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang/mock v1.6.0
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.85.0
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.87.1
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
@@ -18,7 +18,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.35.0-beta.0 // indirect
 	k8s.io/apimachinery v0.35.0-beta.0
 	k8s.io/client-go v0.35.0-beta.0
-	sigs.k8s.io/controller-runtime v0.22.1-0.20251210110131-607e772f5d95
+	sigs.k8s.io/controller-runtime v0.22.3
 )
 
 require (
@@ -246,7 +246,7 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
 	moul.io/http2curl v1.0.0 // indirect
-	sigs.k8s.io/gateway-api v1.4.0-rc.1 // indirect
+	sigs.k8s.io/gateway-api v1.4.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/release-utils v0.12.1 // indirect
