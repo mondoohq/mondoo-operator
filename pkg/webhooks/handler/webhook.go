@@ -24,7 +24,7 @@ import (
 
 	serializerYaml "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 
-	"go.mondoo.com/cnquery/v11/providers-sdk/v1/inventory"
+	"go.mondoo.com/cnquery/v12/providers-sdk/v1/inventory"
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/common"
 	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
@@ -67,7 +67,7 @@ const (
 
 type webhookValidator struct {
 	client            client.Client
-	decoder           *admission.Decoder
+	decoder           admission.Decoder
 	mode              mondoov1alpha2.AdmissionMode
 	scanner           scanapiclient.ScanApiClient
 	integrationMRN    string

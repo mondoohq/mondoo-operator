@@ -420,7 +420,7 @@ func testExampleDeployment() runtime.RawExtension {
 	}
 }
 
-func setupDecoder(t *testing.T) *admission.Decoder {
+func setupDecoder(t *testing.T) admission.Decoder {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	decoder := admission.NewDecoder(scheme)
