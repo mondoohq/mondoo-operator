@@ -303,29 +303,6 @@ $(GOMOCKGEN): $(LOCALBIN)
 
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 
-.PHONY: bundle
-bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
-	operator-sdk generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	cd config/webhook && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/manifests | operator-sdk generate --channels "stable-v1" bundle $(BUNDLE_GEN_FLAGS)
-	sed -i -e 's|containerImage: .*|containerImage: $(IMG)|' bundle/manifests/*.clusterserviceversion.yaml
-	# TODO: find a portable way to in-place sed edit a file between Linux/MacOS
-	# MacOS sed requires a '-i""' to avoid making backup files when doing in-place edits, but that
-	# causes trouble for GNU sed which only needs '-i'.
-	# Just remove the MacOS-generated backup file in a way that doesn't error on Linux so that the
-	# 'validate' step below doesn't complain about multiple CSV files in the generated bundle.
-	rm -f bundle/manifests/*-e
-	operator-sdk bundle validate ./bundle
-
-.PHONY: bundle-build
-bundle-build: ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
-
-.PHONY: bundle-push
-bundle-push: ## Push the bundle image.
-	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
-
 .PHONY: opm
 OPM = ./bin/opm
 opm: ## Download opm locally if necessary.

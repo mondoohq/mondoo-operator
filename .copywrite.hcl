@@ -16,6 +16,5 @@ project {
     "charts/mondoo-operator/**",
     "config/**/*.yaml",
     "controllers/admission/webhook-manifests.yaml",
-    "bundle.Dockerfile",
   ]
 }
