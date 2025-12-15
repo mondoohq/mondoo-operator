@@ -7,6 +7,6 @@ metadata:
 spec:
   type: {{ .Values.metricsService.type }}
   selector:
-  {{- include "mondoo-operator.selectorLabels" . | nindent 4 }}
+    {{- include "mondoo-operator.selectorLabels" . | nindent 4 }}
   ports:
-	{{- .Values.metricsService.ports | toYaml | nindent 2 -}}
+  {{- .Values.metricsService.ports | toYaml | nindent 2 }}
