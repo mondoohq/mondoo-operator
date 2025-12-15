@@ -20,9 +20,36 @@ permissions:
 # Attention: These jobs still have access to all the secrets.
 
 jobs:
+  build-operator:
+    runs-on: ubuntu-latest
+    name: Build operator container
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: "${{ env.golang-version }}"
+      - name: Build operator container image
+        run: make docker-save
+      - name: Generate manifests
+        run: make manifests generate generate-manifests
+      - uses: actions/upload-artifact@v4
+        with:
+          name: operator-build
+          path: |
+            operator.tar
+            mondoo-operator-manifests.yaml
+          retention-days: 1
+
   integration-tests:
     runs-on: ubuntu-latest
     name: Integration tests
+    needs: [build-operator]
     strategy:
       fail-fast: false
       matrix:
@@ -56,11 +83,16 @@ jobs:
         with:
           go-version: "${{ env.golang-version }}"
 
+      - uses: actions/download-artifact@v5
+        name: Download operator build artifact
+        with:
+          name: operator-build
+
       # Makes it easier to see what was the input for this workflow in case we need to debug.
       - name: Print workflow inputs
         run: echo "${{ toJSON(github.event.inputs) }}"
 
-      - run: sleep 30
+      - run: sleep 10
 
       # Now that dependencies are cached the tests start almost immediately after minikube has started
       # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
@@ -89,17 +121,30 @@ jobs:
           name: test-logs-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
 
-  discord-notification:
+  slack-notification:
     runs-on: ubuntu-latest
-    name: Send Discord notification
+    name: Send Slack notification
     needs: [integration-tests]
     # Run only if the previous job has failed and only if it's running against the main branch
     if: ${{ always() && contains(join(needs.*.result, ','), 'fail') && github.ref_name == 'main' }}
     steps:
-      - uses: sarisia/actions-status-discord@b8381b25576cb341b2af39926ab42c5056cc44ed # v1.15.5
+      - name: Send Slack notification on failure
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        if: ${{ always() && steps.build-providers.outcome != 'success' }}
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          status: Failure
-          url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          description: Workflow ${{ github.workflow }} failed for commit ${{ github.sha }}.
-          color: 0xff4d4d
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          payload: |
+            {
+              "channel": "C07QZDJFF89",
+              "text": "⚠️ Mondoo-operator integration tests failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":x: *Mondoo-operator integration tests failed*:  <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View GitHub Action Run>"
+                  }
+                }
+              ]
+            }

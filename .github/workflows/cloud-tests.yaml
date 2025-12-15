@@ -305,17 +305,30 @@ jobs:
         event_name: ${{ github.event.workflow_run.event }}
         files: "*.xml"
 
-  discord-notification:
+  slack-notification:
     runs-on: ubuntu-latest
-    name: Send Discord notification
+    name: Send Slack notification
     needs: [eks-integration-test,aks-integration-test,gke-integration-test]
     # Run only if the previous job has failed and only if it's running against the main branch
     if: ${{ always() && contains(join(needs.*.result, ','), 'fail') && github.ref_name == 'main' }}
     steps:
-      - uses: sarisia/actions-status-discord@b8381b25576cb341b2af39926ab42c5056cc44ed # v1.15.5
+      - name: Send Slack notification on failure
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        if: ${{ always() && steps.build-providers.outcome != 'success' }}
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          status: Failure
-          url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          description: Workflow ${{ github.workflow }} failed for commit ${{ github.sha }}.
-          color: 0xff4d4d
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          payload: |
+            {
+              "channel": "C07QZDJFF89",
+              "text": "⚠️ Mondoo-operator cloud integration tests failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":x: *Mondoo-operator cloud integration tests failed*:  <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View GitHub Action Run>"
+                  }
+                }
+              ]
+            }
