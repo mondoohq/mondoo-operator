@@ -37,7 +37,7 @@ import (
 const (
 	testNamespace             = "mondoo-operator"
 	testMondooAuditConfigName = "mondoo-client"
-	testCredsSecretName       = "mondoo-client'"
+	testCredsSecretName       = "mondoo-client'" //nolint:gosec
 	testClusterID             = "abcd-1234"
 )
 

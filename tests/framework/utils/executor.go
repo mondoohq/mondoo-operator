@@ -129,8 +129,8 @@ func (*CommandExecutor) ExecuteCommandWithOutputFileTimeout(timeout time.Duratio
 	if err != nil {
 		return "", fmt.Errorf("failed to open output file: %+v", err)
 	}
-	defer outFile.Close()
-	defer os.Remove(outFile.Name())
+	defer outFile.Close()           //nolint:errcheck
+	defer os.Remove(outFile.Name()) //nolint:errcheck
 
 	arg = append(arg, outfileArg, outFile.Name())
 	logCommand(command, arg...)
@@ -172,8 +172,8 @@ func (*CommandExecutor) ExecuteCommandWithOutputFile(command, outfileArg string,
 	if err != nil {
 		return "", fmt.Errorf("failed to open output file: %+v", err)
 	}
-	defer outFile.Close()
-	defer os.Remove(outFile.Name())
+	defer outFile.Close()           //nolint:errcheck
+	defer os.Remove(outFile.Name()) //nolint:errcheck
 
 	// append the output file argument to the list or args
 	arg = append(arg, outfileArg, outFile.Name())

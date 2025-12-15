@@ -96,7 +96,7 @@ func TestScanner_ScanKubernetesResources(t *testing.T) {
 }
 
 func mustRead(file string) []byte {
-	bytes, err := os.ReadFile(file)
+	bytes, err := os.ReadFile(file) // #nosec G304
 	if err != nil {
 		panic("couldn't read in file")
 	}

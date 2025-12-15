@@ -190,10 +190,10 @@ func TestWebhookValidate(t *testing.T) {
 			t.Logf("Handle() response: %+v", response)
 
 			// Assert
-			assert.Equal(t, test.expectAllowed, response.AdmissionResponse.Allowed)
+			assert.Equal(t, test.expectAllowed, response.Allowed)
 
 			if test.expectReason != "" {
-				assert.Equal(t, test.expectReason, string(response.AdmissionResponse.Result.Message))
+				assert.Equal(t, test.expectReason, string(response.Result.Message))
 			}
 		})
 	}
@@ -327,7 +327,7 @@ func TestWebhookNamespaceFiltering(t *testing.T) {
 			t.Logf("Handle() response: %+v", response)
 
 			// Assert
-			assert.Equal(t, test.expectReason, string(response.AdmissionResponse.Result.Message))
+			assert.Equal(t, test.expectReason, string(response.Result.Message))
 		})
 	}
 }
@@ -429,7 +429,7 @@ func setupDecoder(t *testing.T) admission.Decoder {
 }
 
 func mustRead(filePath string) []byte {
-	bytes, err := os.ReadFile(filePath)
+	bytes, err := os.ReadFile(filePath) // #nosec G304
 	if err != nil {
 		panic("failed to read in file")
 	}

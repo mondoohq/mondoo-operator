@@ -36,11 +36,12 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		return ctrl.Result{}, n.down(ctx)
 	}
 
-	if n.Mondoo.Spec.Nodes.Style == v1alpha2.NodeScanStyle_CronJob {
+	switch n.Mondoo.Spec.Nodes.Style {
+	case v1alpha2.NodeScanStyle_CronJob:
 		if err := n.syncCronJob(ctx); err != nil {
 			return ctrl.Result{}, err
 		}
-	} else if n.Mondoo.Spec.Nodes.Style == v1alpha2.NodeScanStyle_Deployment || n.Mondoo.Spec.Nodes.Style == v1alpha2.NodeScanStyle_DaemonSet {
+	case v1alpha2.NodeScanStyle_Deployment, v1alpha2.NodeScanStyle_DaemonSet:
 		if err := n.syncDaemonSet(ctx); err != nil {
 			return ctrl.Result{}, err
 		}

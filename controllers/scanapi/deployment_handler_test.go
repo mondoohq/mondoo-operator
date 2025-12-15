@@ -345,7 +345,7 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
 
 	conditions := s.auditConfig.Status.Conditions
 	foundMissingServiceAccountCondition := false
-	s.Assertions.NotEmpty(conditions)
+	s.NotEmpty(conditions)
 	for _, condition := range conditions {
 		if strings.Contains(condition.Message, "error looking up service account") {
 			foundMissingServiceAccountCondition = true
@@ -427,7 +427,7 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateOOMCondition() {
 
 	// ordering is fixed: 5 => ScanAPI
 	condition := s.auditConfig.Status.Conditions[0]
-	s.Assertions.NotEmpty(condition)
+	s.NotEmpty(condition)
 	s.Contains(condition.Message, " OOM")
 	s.Contains(condition.AffectedPods, "scan-api-123")
 	s.Contains(condition.MemoryLimit, "1")

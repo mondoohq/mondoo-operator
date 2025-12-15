@@ -6,12 +6,12 @@ run:
 linters:
   default: none
   enable:
-    #- errcheck
+    - errcheck
     - govet
     - ineffassign
-    #- staticcheck
+    - staticcheck
     - unused
-    #- gosec
+    - gosec
 formatters:
   settings:
     gofmt:

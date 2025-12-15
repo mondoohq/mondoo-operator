@@ -129,7 +129,7 @@ func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, schem
 		}
 		// Create/Update the ServiceMonitor
 		result, err := s.declareServiceMonitor(ctx, clt, scheme)
-		if err != nil || result.Requeue {
+		if err != nil || result.RequeueAfter > 0 {
 			return result, err
 		}
 	} else {

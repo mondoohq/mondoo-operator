@@ -19,7 +19,7 @@ type AuditConfigSuite struct {
 
 func (s *AuditConfigSuite) SetupSuite() {
 	s.AuditConfigBaseSuite.SetupSuite()
-	s.testCluster.MondooInstaller.Settings.SuiteName = "AuditConfigSuite"
+	s.testCluster.Settings.SuiteName = "AuditConfigSuite"
 }
 
 func (s *AuditConfigSuite) TestReconcile_AllDisabled() {

@@ -47,7 +47,7 @@ var webhookAnnotationList = []string{certManagerAnnotationKey, openShiftWebhookA
 func GetTLSCertificatesSecretName(mondooAuditConfigName string) string {
 	// webhookTLSSecretNameTemplate is intended to store the MondooAuditConfig Name for Secret
 	// name uniqueness per-Namespace.
-	webhookTLSSecretNameTemplate := `%s-webhook-server-cert`
+	webhookTLSSecretNameTemplate := `%s-webhook-server-cert` // #nosec G101
 
 	return fmt.Sprintf(webhookTLSSecretNameTemplate, mondooAuditConfigName)
 }

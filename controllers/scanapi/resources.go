@@ -22,7 +22,7 @@ import (
 const (
 	DeploymentSuffix = "-scan-api"
 	ServiceSuffix    = "-scan-api"
-	SecretSuffix     = "-scan-api-token"
+	SecretSuffix     = "-scan-api-token" // nolint:gosec
 	Port             = 8080
 )
 

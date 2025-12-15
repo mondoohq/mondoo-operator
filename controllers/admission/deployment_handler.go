@@ -423,7 +423,7 @@ func (n *DeploymentHandler) applyWebhooks(ctx context.Context) (ctrl.Result, err
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	if n.Mondoo.Spec.Admission.Enable && n.Mondoo.DeletionTimestamp.IsZero() {
 		result, err := n.applyWebhooks(ctx)
-		if err != nil || result.Requeue {
+		if err != nil || result.RequeueAfter > 0 {
 			return result, err
 		}
 	} else {
@@ -438,7 +438,7 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		}
 
 		result, err := n.down(ctx)
-		if err != nil || result.Requeue {
+		if err != nil || result.RequeueAfter > 0 {
 			return result, err
 		}
 	}

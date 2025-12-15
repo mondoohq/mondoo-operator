@@ -93,7 +93,7 @@ func (r *MondooOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl
 	if err != nil {
 		configLog.Error(err, "Failed to set up serviceMonitor")
 	}
-	if err != nil || result.Requeue {
+	if err != nil || result.RequeueAfter > 0 {
 		return result, err
 	}
 

@@ -60,7 +60,7 @@ func ExecuteCommand(cmdStruct CommandArgs) CommandOut {
 		return CommandOut{Err: err}
 	}
 
-	defer stdOut.Close()
+	defer stdOut.Close() //nolint:errcheck
 
 	scanner := bufio.NewScanner(stdOut)
 	go func() {
@@ -75,7 +75,7 @@ func ExecuteCommand(cmdStruct CommandArgs) CommandOut {
 		return CommandOut{StdErr: errBuffer.String(), StdOut: outBuffer.String(), Err: err}
 	}
 
-	defer stdErr.Close()
+	defer stdErr.Close() //nolint:errcheck
 
 	stdErrScanner := bufio.NewScanner(stdErr)
 	go func() {
@@ -100,7 +100,7 @@ func ExecuteCommand(cmdStruct CommandArgs) CommandOut {
 		if err != nil {
 			return CommandOut{StdErr: errBuffer.String(), StdOut: outBuffer.String(), Err: err}
 		}
-		stdin.Close()
+		stdin.Close() //nolint:errcheck,gosec
 	}
 
 	err = cmd.Wait()
@@ -118,7 +118,7 @@ func ExecuteCommand(cmdStruct CommandArgs) CommandOut {
 func ExitStatus(err error) (int, bool) {
 	exitErr, ok := err.(*exec.ExitError)
 	if ok {
-		waitStatus, ok := exitErr.ProcessState.Sys().(syscall.WaitStatus)
+		waitStatus, ok := exitErr.Sys().(syscall.WaitStatus)
 		if ok {
 			return waitStatus.ExitStatus(), true
 		}
