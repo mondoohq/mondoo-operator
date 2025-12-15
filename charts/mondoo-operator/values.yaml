@@ -23,7 +23,14 @@ controllerManager:
       requests:
         cpu: 100m
         memory: 70Mi
+  podSecurityContext:
+    runAsNonRoot: true
   replicas: 1
+  serviceAccount:
+    annotations: {}
+k8SResourcesScanning:
+  serviceAccount:
+    annotations: {}
 kubernetesClusterDomain: cluster.local
 managerConfig:
   controllerManagerConfigYaml: |-
@@ -47,3 +54,6 @@ metricsService:
     protocol: TCP
     targetPort: metrics
   type: ClusterIP
+webhook:
+  serviceAccount:
+    annotations: {}
