@@ -38,12 +38,11 @@ The **Mondoo Operator** can be installed via different methods depending on your
 
 The following Kubernetes environments are tested:
 
-- AWS EKS 1.23, 1.24, 1.25, and 1.26
+<!-- - AWS EKS 1.23, 1.24, 1.25, and 1.26
 - Azure AKS 1.24, 1.25, and 1.26
-- GCP GKE 1.23, 1.24, 1.25, and 1.26
-- Minikube with Kubernetes versions 1.24, 1.25, 1.26, and 1.27
-- Rancher RKE1 1.22 and 1.23
-- K3S 1.24, 1.25, 1.26, and 1.27
+- GCP GKE 1.23, 1.24, 1.25, and 1.26 -->
+- Minikube with Kubernetes versions 1.31, 1.32, 1.33, and 1.34
+- K3S 1.31, 1.32, 1.33, and 1.34
 
 ## Documentation
 
