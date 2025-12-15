@@ -6,11 +6,10 @@ kind: Kustomization
 namespace: mondoo-operator
 namePrefix: mondoo-operator-
 resources:
-- manifests.yaml
+  - manifests.yaml
 images:
-- name: controller
-  newName: ghcr.io/mondoohq/mondoo-operator
-  newTag: v11.4.2
-
+  - name: controller
+    newName: ghcr.io/mondoohq/mondoo-operator
+    newTag: v12.0.0
 patchesStrategicMerge:
-- webhook_patch.yaml
+  - webhook_patch.yaml

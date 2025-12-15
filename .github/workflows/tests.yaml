@@ -6,7 +6,6 @@ on:
       - 'docs/**'
     branches:
       - "main"
-    tags: ["v*.*.*"]
   schedule:
     - cron: '0 4 * * 3' # Every Wednesday at 4:00 AM
 
