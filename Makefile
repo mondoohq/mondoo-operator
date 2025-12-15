@@ -147,15 +147,15 @@ endif
 	go test -ldflags $(LDFLAGS) -v -timeout 45m -p 1 ./tests/integration/...
 
 ifeq ($(K8S_DISTRO),gke)
-test/integration/ci: manifests generate generate-manifests gotestsum
+test/integration/ci: gotestsum
 else ifeq ($(K8S_DISTRO),aks)
-test/integration/ci: manifests generate generate-manifests gotestsum
+test/integration/ci: gotestsum
 else ifeq ($(K8S_DISTRO),eks)
-test/integration/ci: manifests generate generate-manifests gotestsum
+test/integration/ci: gotestsum
 else ifeq ($(K8S_DISTRO),k3d)
-test/integration/ci: manifests generate generate-manifests gotestsum load-k3d
+test/integration/ci: gotestsum load-k3d/ci
 else
-test/integration/ci: manifests generate generate-manifests gotestsum load-minikube
+test/integration/ci: gotestsum load-minikube/ci
 endif
 	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -ldflags $(LDFLAGS) -v -timeout 45m -p 1
 
@@ -171,11 +171,20 @@ docker-build: TARGET_OS=linux
 docker-build: build ## Build docker image with the manager.
 	docker build --platform=linux/$(TARGET_ARCH) -t ${IMG} .
 
+docker-save: docker-build
+	docker save ${IMG} -o operator.tar
+
 load-minikube: docker-build ## Build docker image with the manager and load it into minikube.
 	minikube image load ${IMG}
 
+load-minikube/ci:
+	minikube image load operator.tar
+
 load-k3d: docker-build
 	k3d images import ${IMG}
+
+load-k3d/ci:
+	k3d images import operator.tar
 
 buildah-build: build ## Build container image
 	buildah build --platform=${TARGET_OS}/${TARGET_ARCH} -t ${IMG} .
