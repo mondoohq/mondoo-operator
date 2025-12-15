@@ -318,6 +318,7 @@ jobs:
     name: Release helm chart
     needs:
       - push-virtual-tag
+      - run-helm-tests
     runs-on: ubuntu-latest
 
     permissions:
