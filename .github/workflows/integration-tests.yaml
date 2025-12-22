@@ -38,7 +38,7 @@ jobs:
         run: make docker-save
       - name: Generate manifests
         run: make manifests generate generate-manifests
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: operator-build
           path: |

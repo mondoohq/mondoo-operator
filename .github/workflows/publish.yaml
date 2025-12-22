@@ -276,14 +276,14 @@ jobs:
           MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
         run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.meta.outputs.version }} make test/integration/ci
 
-      - uses: actions/upload-artifact@v4  # upload test results
+      - uses: actions/upload-artifact@v6  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: test-results-helm-${{ matrix.k8s-version }}
           path: integration-tests-helm-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: failure()
         with:
           name: helm-test-logs-${{ matrix.k8s-version }}
