@@ -196,6 +196,11 @@ jobs:
           images: |
             ${{ env.GHCR_IMAGE }}
             ${{ env.GCP_IMAGE }}
+          tags: |
+            type=schedule,pattern=main
+            type=ref,event=branch
+            type=ref,event=tag
+            type=ref,event=pr
 
       - name: Push multi-platform virtual tag and sign
         run: bash scripts/push-virtual-tag.sh
