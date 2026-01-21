@@ -22,7 +22,6 @@ fi
 make manifests
 
 yq -i ".images[0].newTag=\"v${VERSION}\"" config/manager/kustomization.yaml
-yq -i ".images[0].newTag=\"v${VERSION}\"" config/webhook/kustomization.yaml
 
 yq -i ".appVersion = \"${VERSION}\"" charts/mondoo-operator/Chart.yaml
 yq -i ".version = \"${VERSION}\"" charts/mondoo-operator/Chart.yaml

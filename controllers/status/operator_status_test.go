@@ -43,7 +43,6 @@ func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
 		{Identifier: K8sResourcesScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Kubernetes resources scanning is disabled"},
 		{Identifier: ContainerImageScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Container image scanning is disabled"},
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Node scanning is disabled"},
-		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Admission controller is disabled"},
 		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Scan API is disabled"},
 		{Identifier: MondooOperatorIdentifier, Status: mondooclient.MessageStatus_MESSAGE_UNKNOWN, Message: "No status reported yet"},
 	}
@@ -63,7 +62,6 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 	m.Spec.KubernetesResources.Enable = true
 	m.Spec.Containers.Enable = true
 	m.Spec.Nodes.Enable = true
-	m.Spec.Admission.Enable = true
 	m.Spec.Filtering.Namespaces = v1alpha2.FilteringSpec{
 		Include: []string{"includeA", "includeB"},
 		Exclude: []string{"excludeX", "excludeY"},
@@ -73,7 +71,6 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		{Message: "Kubernetes Resources Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.K8sResourcesScanningDegraded},
 		{Message: "Kubernetes Container Image Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.K8sContainerImageScanningDegraded},
 		{Message: "Node Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.NodeScanningDegraded},
-		{Message: "Admission controller is available", Status: v1.ConditionFalse, Type: v1alpha2.AdmissionDegraded},
 		{Message: "ScanAPI controller is available", Status: v1.ConditionFalse, Type: v1alpha2.ScanAPIDegraded},
 		{Message: "Mondoo Operator controller is available", Status: v1.ConditionFalse, Type: v1alpha2.MondooOperatorDegraded},
 	}
@@ -89,7 +86,6 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		K8sResourcesScanning:   m.Spec.KubernetesResources.Enable,
 		ContainerImageScanning: m.Spec.Containers.Enable,
 		NodeScanning:           m.Spec.Nodes.Enable,
-		AdmissionController:    m.Spec.Admission.Enable,
 		FilteringConfig: v1alpha2.Filtering{
 			Namespaces: v1alpha2.FilteringSpec{
 				Include: []string{"includeA", "includeB"},
@@ -101,9 +97,8 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		{Identifier: K8sResourcesScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[0].Message},
 		{Identifier: ContainerImageScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[1].Message},
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[2].Message},
-		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[3].Message},
-		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[4].Message},
-		{Identifier: MondooOperatorIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[5].Message},
+		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[3].Message},
+		{Identifier: MondooOperatorIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[4].Message},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }
@@ -121,7 +116,6 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_DeprecatedFields(t *testi
 	m.Spec.KubernetesResources.Enable = true
 	m.Spec.KubernetesResources.ContainerImageScanning = true
 	m.Spec.Nodes.Enable = true
-	m.Spec.Admission.Enable = true
 	m.Spec.Filtering.Namespaces = v1alpha2.FilteringSpec{
 		Include: []string{"includeA", "includeB"},
 		Exclude: []string{"excludeX", "excludeY"},
@@ -131,7 +125,6 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_DeprecatedFields(t *testi
 		{Message: "Kubernetes Resources Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.K8sResourcesScanningDegraded},
 		{Message: "Kubernetes Container Image Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.K8sContainerImageScanningDegraded},
 		{Message: "Node Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.NodeScanningDegraded},
-		{Message: "Admission controller is available", Status: v1.ConditionFalse, Type: v1alpha2.AdmissionDegraded},
 		{Message: "ScanAPI controller is available", Status: v1.ConditionFalse, Type: v1alpha2.ScanAPIDegraded},
 		{Message: "Mondoo Operator controller is available", Status: v1.ConditionFalse, Type: v1alpha2.MondooOperatorDegraded},
 	}
@@ -147,7 +140,6 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_DeprecatedFields(t *testi
 		K8sResourcesScanning:   m.Spec.KubernetesResources.Enable,
 		ContainerImageScanning: m.Spec.KubernetesResources.ContainerImageScanning,
 		NodeScanning:           m.Spec.Nodes.Enable,
-		AdmissionController:    m.Spec.Admission.Enable,
 		FilteringConfig: v1alpha2.Filtering{
 			Namespaces: v1alpha2.FilteringSpec{
 				Include: []string{"includeA", "includeB"},
@@ -159,9 +151,8 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_DeprecatedFields(t *testi
 		{Identifier: K8sResourcesScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[0].Message},
 		{Identifier: ContainerImageScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[1].Message},
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[2].Message},
-		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[3].Message},
-		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[4].Message},
-		{Identifier: MondooOperatorIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[5].Message},
+		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[3].Message},
+		{Identifier: MondooOperatorIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[4].Message},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }
@@ -179,13 +170,11 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 	m.Spec.KubernetesResources.Enable = true
 	m.Spec.KubernetesResources.ContainerImageScanning = true
 	m.Spec.Nodes.Enable = true
-	m.Spec.Admission.Enable = true
 
 	m.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{
 		{Message: "Kubernetes Resources Scanning error", Status: v1.ConditionTrue, Type: v1alpha2.K8sResourcesScanningDegraded},
 		{Message: "Kubernetes Container Image Scanning error", Status: v1.ConditionFalse, Type: v1alpha2.K8sContainerImageScanningDegraded},
 		{Message: "Node Scanning error", Status: v1.ConditionTrue, Type: v1alpha2.NodeScanningDegraded},
-		{Message: "Admission controller error", Status: v1.ConditionTrue, Type: v1alpha2.AdmissionDegraded},
 		{Message: "ScanAPI controller error", Status: v1.ConditionTrue, Type: v1alpha2.ScanAPIDegraded},
 		{Message: "Mondoo Operator controller is unavailable", Status: v1.ConditionTrue, Type: v1alpha2.MondooOperatorDegraded},
 	}
@@ -201,16 +190,14 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		K8sResourcesScanning:   m.Spec.KubernetesResources.Enable,
 		ContainerImageScanning: m.Spec.KubernetesResources.ContainerImageScanning,
 		NodeScanning:           m.Spec.Nodes.Enable,
-		AdmissionController:    m.Spec.Admission.Enable,
 		FilteringConfig:        v1alpha2.Filtering{},
 	}, reportStatus.LastState)
 	messages := []mondooclient.IntegrationMessage{
 		{Identifier: K8sResourcesScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[0].Message},
 		{Identifier: ContainerImageScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: m.Status.Conditions[1].Message},
 		{Identifier: NodeScanningIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[2].Message},
-		{Identifier: AdmissionControllerIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[3].Message},
-		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[4].Message},
-		{Identifier: MondooOperatorIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[5].Message},
+		{Identifier: ScanApiIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[3].Message},
+		{Identifier: MondooOperatorIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[4].Message},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }
@@ -237,20 +224,18 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_ScanAPI_OOM(t *testing.T)
 	m.Spec.KubernetesResources.Enable = true
 	m.Spec.Containers.Enable = true
 	m.Spec.Nodes.Enable = true
-	m.Spec.Admission.Enable = true
 
 	m.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{
 		{Message: "Kubernetes Resources Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.K8sResourcesScanningDegraded},
 		{Message: "Kubernetes Container Image Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.K8sContainerImageScanningDegraded},
 		{Message: "Node Scanning is available", Status: v1.ConditionFalse, Type: v1alpha2.NodeScanningDegraded},
-		{Message: "Admission controller is available", Status: v1.ConditionFalse, Type: v1alpha2.AdmissionDegraded},
 		{Message: "ScanAPI controller is degraded due to OOM", Status: v1.ConditionTrue, Type: v1alpha2.ScanAPIDegraded, AffectedPods: []string{"scanapi-1", "scanapi-2"}, MemoryLimit: "300Mi"},
 	}
 
 	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ERROR, reportStatus.Status)
-	extraData := reportStatus.Messages.Messages[4].Extra.(*structpb.Struct)
+	extraData := reportStatus.Messages.Messages[3].Extra.(*structpb.Struct)
 	extraMap := extraData.AsMap()
 	assert.Contains(t, extraMap, "errorCode")
 	assert.Contains(t, extraMap, "affectedPods")

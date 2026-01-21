@@ -104,10 +104,9 @@ help: ## Display this help.
 
 ##@ Development
 
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+manifests: controller-gen ## Generate ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./controllers/..."
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd paths="./api/..." output:crd:artifacts:config=config/crd/bases
-	$(CONTROLLER_GEN) rbac:roleName=manager-role webhook paths="./pkg/webhooks/..."
 
 generate: controller-gen gomockgen prep/tools ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	echo "Running generate"
@@ -233,10 +232,6 @@ generate-manifests: manifests kustomize ## Generates manifests and pipes into a 
 	cp config/manager/kustomization.yaml config/manager/kustomization.yaml.before_kustomize
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > mondoo-operator-manifests.yaml
-	cp config/webhook/kustomization.yaml config/webhook/kustomization.yaml.before_kustomize
-	cd config/webhook && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/webhook > controllers/admission/webhook-manifests.yaml
-	mv config/webhook/kustomization.yaml.before_kustomize config/webhook/kustomization.yaml
 	mv config/manager/kustomization.yaml.before_kustomize config/manager/kustomization.yaml
 
 .PHONY: deploy-olm

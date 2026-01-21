@@ -50,7 +50,7 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 }
 
 func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
-	s.auditConfig = utils.DefaultAuditConfig(testNamespace, false, false, true, false)
+	s.auditConfig = utils.DefaultAuditConfig(testNamespace, false, false, true)
 	s.fakeClientBuilder = fake.NewClientBuilder()
 	s.seedKubeSystemNamespace()
 }

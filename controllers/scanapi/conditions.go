@@ -22,7 +22,7 @@ func updateScanAPIConditions(config *mondoov1alpha2.MondooAuditConfig, degradedS
 	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
 	affectedPods := []string{}
 	memoryLimit := ""
-	if !config.Spec.KubernetesResources.Enable && !config.Spec.Admission.Enable {
+	if !config.Spec.KubernetesResources.Enable {
 		msg = "ScanAPI is disabled"
 		reason = "ScanAPIDisabled"
 		status = corev1.ConditionFalse

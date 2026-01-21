@@ -26,7 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/controllers/admission"
 	"go.mondoo.com/mondoo-operator/controllers/container_image"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
@@ -73,10 +72,7 @@ var MondooClientBuilder = mondooclient.NewClient
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=create;delete
 // Need to be able to check for the existence of Secrets with tokens, Mondoo service accounts, and private image pull secrets without asking for permission to read all Secrets
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get
-//+kubebuilder:rbac:groups=cert-manager.io,resources=certificates;issuers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
-//The last line is required as we cant assign higher permissions that exist for operator serviceaccount
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -138,19 +134,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
 		// deleted should be called here
-
-		webhooks := admission.DeploymentHandler{
-			Mondoo:                 mondooAuditConfig,
-			KubeClient:             r.Client,
-			TargetNamespace:        req.Namespace,
-			MondooOperatorConfig:   config,
-			ContainerImageResolver: r.ContainerImageResolver,
-		}
-		result, reconcileError := webhooks.Reconcile(ctx)
-		if reconcileError != nil {
-			log.Error(reconcileError, "failed to cleanup webhooks")
-			return result, reconcileError
-		}
 
 		controllerutil.RemoveFinalizer(mondooAuditConfig, finalizerString)
 		if reconcileError = r.Update(ctx, mondooAuditConfig); reconcileError != nil {
@@ -296,22 +279,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	result, reconcileError = workloads.Reconcile(ctx)
 	if reconcileError != nil {
 		log.Error(reconcileError, "Failed to set up Kubernetes resources scanning")
-	}
-	if reconcileError != nil || result.RequeueAfter > 0 {
-		return result, reconcileError
-	}
-
-	webhooks := admission.DeploymentHandler{
-		Mondoo:                 mondooAuditConfig,
-		KubeClient:             r.Client,
-		TargetNamespace:        req.Namespace,
-		MondooOperatorConfig:   config,
-		ContainerImageResolver: r.ContainerImageResolver,
-	}
-
-	result, reconcileError = webhooks.Reconcile(ctx)
-	if reconcileError != nil {
-		log.Error(reconcileError, "Failed to set up webhooks")
 	}
 	if reconcileError != nil || result.RequeueAfter > 0 {
 		return result, reconcileError
