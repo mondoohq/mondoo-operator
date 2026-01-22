@@ -17,6 +17,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"k8s.io/utils/ptr"
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -91,7 +92,7 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *mondoov1alpha2.MondooOperato
 					Path: "/metrics",
 					// The named port exposing metrics from the mondoo-operator Deployment
 					Port:   "metrics",
-					Scheme: "http",
+					Scheme: ptr.To(monitoringv1.SchemeHTTP),
 				},
 			},
 			Selector: metav1.LabelSelector{
