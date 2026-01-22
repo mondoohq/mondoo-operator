@@ -3,7 +3,6 @@
 This user manual describes how to install and use the Mondoo Operator.
 
 - [User manual](#user-manual)
-  - [Upgrading from Previous Versions](#upgrading-from-previous-versions)
   - [Mondoo Operator Installation](#mondoo-operator-installation)
     - [Installing with kubectl](#installing-with-kubectl)
     - [Installing with Helm](#installing-with-helm)
@@ -12,7 +11,14 @@ This user manual describes how to install and use the Mondoo Operator.
   - [Configuring the Mondoo Secret](#configuring-the-mondoo-secret)
   - [Creating a MondooAuditConfig](#creating-a-mondooauditconfig)
     - [Filter Kubernetes objects based on namespace](#filter-kubernetes-objects-based-on-namespace)
+  - [Scanning External Clusters](#scanning-external-clusters)
+    - [Creating a kubeconfig Secret](#creating-a-kubeconfig-secret)
+    - [Configuring external cluster scanning](#configuring-external-cluster-scanning)
+    - [Per-cluster configuration](#per-cluster-configuration)
   - [Container Image Scanning](#container-image-scanning)
+    - [Basic container image scanning](#basic-container-image-scanning)
+    - [Scan deduplication](#scan-deduplication)
+    - [SBOM-based scanning](#sbom-based-scanning)
     - [Creating a secret for private image scanning](#creating-a-secret-for-private-image-scanning)
   - [Installing Mondoo into multiple namespaces](#installing-mondoo-into-multiple-namespaces)
   - [Adjust the scan interval](#adjust-the-scan-interval)
@@ -45,6 +51,7 @@ When upgrading from operator versions prior to v12.x, the following changes appl
 **Resource Watcher Changes**: If you have `resourceWatcher.enable: true`:
 - **New rate limiting**: A minimum scan interval of 2 minutes is now enforced by default to prevent excessive scanning.
 - **High-priority resources by default**: The watcher now only monitors Deployments, DaemonSets, StatefulSets, and ReplicaSets by default (previously watched all resources including Pods and Jobs). To restore the previous behavior, set `watchAllResources: true` in your configuration.
+
 
 ## Mondoo Operator Installation
 
@@ -209,9 +216,101 @@ spec:
         - ...
 ```
 
+## Scanning External Clusters
+
+The Mondoo Operator can scan remote Kubernetes clusters from a central installation. This is useful for:
+
+- Scanning clusters where you cannot or do not want to install the operator
+- Centralizing security scanning in a management cluster
+- Scanning development or staging clusters from a single location
+
+### Creating a kubeconfig Secret
+
+First, create a kubeconfig file that has access to the remote cluster. The kubeconfig should have read-only access to the Kubernetes API resources you want to scan.
+
+1. Create a kubeconfig file for the remote cluster:
+
+   ```bash
+   # Example: Export kubeconfig from your current context
+   kubectl config view --minify --flatten > remote-kubeconfig.yaml
+   ```
+
+2. Create a Secret containing the kubeconfig:
+
+   ```bash
+   kubectl create secret generic prod-kubeconfig \
+     --namespace mondoo-operator \
+     --from-file=kubeconfig=remote-kubeconfig.yaml
+   ```
+
+   > **Note**: The Secret must have a key named `kubeconfig` containing the kubeconfig content.
+
+### Configuring external cluster scanning
+
+Add the `externalClusters` field to your `MondooAuditConfig`:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true  # Scan local cluster (optional)
+    externalClusters:
+      - name: production
+        kubeconfigSecretRef:
+          name: prod-kubeconfig
+      - name: staging
+        kubeconfigSecretRef:
+          name: staging-kubeconfig
+```
+
+Each external cluster will have its own CronJob created with the appropriate kubeconfig mounted.
+
+### Per-cluster configuration
+
+You can customize settings for each external cluster:
+
+```yaml
+externalClusters:
+  - name: production
+    kubeconfigSecretRef:
+      name: prod-kubeconfig
+    # Custom schedule for this cluster
+    schedule: "0 */2 * * *"  # Every 2 hours
+    # Cluster-specific namespace filtering
+    filtering:
+      namespaces:
+        exclude:
+          - kube-system
+          - monitoring
+    # Enable container image scanning for this cluster
+    containerImageScanning: true
+    # Private registry credentials for this cluster
+    privateRegistriesPullSecretRef:
+      name: prod-registry-creds
+```
+
+**Configuration options:**
+
+| Field | Description |
+|-------|-------------|
+| `name` | Unique identifier for the cluster (used in CronJob names) |
+| `kubeconfigSecretRef` | Reference to Secret containing kubeconfig |
+| `schedule` | Override the default scan schedule (cron format) |
+| `filtering` | Namespace include/exclude specific to this cluster |
+| `containerImageScanning` | Enable container image scanning for this cluster |
+| `privateRegistriesPullSecretRef` | Registry credentials for private images |
+
 ## Container Image Scanning
 
 The Mondoo Operator can scan container images running in your cluster for vulnerabilities and security issues.
+
+### Basic container image scanning
 
 Enable container image scanning in your `MondooAuditConfig`:
 
@@ -228,6 +327,64 @@ spec:
     enable: true
     schedule: "0 0 * * *"  # Daily at midnight
 ```
+
+### Scan deduplication
+
+To avoid re-scanning the same container images, enable scan deduplication. This uses the image's SHA256 digest to identify already-scanned images:
+
+```yaml
+spec:
+  containers:
+    enable: true
+    scanDeduplication:
+      enable: true      # Skip images that were already scanned
+      cacheTTL: "24h"   # Remember scanned images for 24 hours
+```
+
+**How it works:**
+
+1. Before scanning, the operator checks if the image digest exists in the scan cache
+2. If found and not expired (based on `cacheTTL`), the image is skipped
+3. If not found or expired, the image is scanned and added to the cache
+
+This significantly reduces scan time and resource usage when the same images run across multiple pods or namespaces.
+
+### SBOM-based scanning
+
+When container images have attached SBOMs (Software Bill of Materials), the operator can use them for scanning instead of downloading the full image. This is especially useful for large images.
+
+```yaml
+spec:
+  containers:
+    enable: true
+    sbomScanning:
+      enable: true
+      preferSBOM: true           # Use SBOM when available
+      supportedFormats:          # Accepted SBOM formats
+        - spdx-json
+        - cyclonedx-json
+```
+
+**How it works:**
+
+1. The operator checks if the image has an attached SBOM using the OCI Referrers API
+2. If a supported SBOM format is found:
+   - Only the SBOM is fetched (not the full image)
+   - Scanning is performed using the SBOM data
+3. If no SBOM is found, falls back to downloading the full image
+
+**Benefits:**
+
+- **Reduced memory usage**: No need to download and extract large container images
+- **Faster scans**: SBOMs are typically small (KB) compared to images (GB)
+- **Supply chain integration**: Works with signed SBOMs from your build pipeline
+
+**Attaching SBOMs to images:**
+
+You can attach SBOMs to your container images using tools like:
+
+- [Syft](https://github.com/anchore/syft): `syft packages <image> -o spdx-json | cosign attach sbom --sbom - <image>`
+- [cosign](https://github.com/sigstore/cosign): `cosign attach sbom --sbom sbom.spdx.json <image>`
 
 ### Creating a secret for private image scanning
 

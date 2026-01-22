@@ -44,6 +44,11 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		return ctrl.Result{}, err
 	}
 
+	// Reconcile external cluster CronJobs
+	if err := n.reconcileExternalClusters(ctx); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -180,6 +185,180 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, integrationMrn, c
 	return updated, nil
 }
 
+// reconcileExternalClusters reconciles CronJobs for external clusters
+func (n *DeploymentHandler) reconcileExternalClusters(ctx context.Context) error {
+	mondooClientImage, err := n.ContainerImageResolver.CnspecImage(
+		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	if err != nil {
+		logger.Error(err, "Failed to resolve cnspec container image")
+		return err
+	}
+
+	integrationMrn, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
+	if err != nil {
+		logger.Error(err, "failed to retrieve integration-mrn for MondooAuditConfig")
+		return err
+	}
+
+	clusterUid, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
+	if err != nil {
+		logger.Error(err, "Failed to get cluster's UID")
+		return err
+	}
+
+	// Track which external cluster names are configured
+	configuredClusters := make(map[string]bool)
+
+	for _, cluster := range n.Mondoo.Spec.KubernetesResources.ExternalClusters {
+		configuredClusters[cluster.Name] = true
+
+		// Sync ConfigMap for this external cluster
+		if err := n.syncExternalClusterConfigMap(ctx, integrationMrn, clusterUid, cluster); err != nil {
+			return err
+		}
+
+		// Sync CronJob for this external cluster
+		if err := n.syncExternalClusterCronJob(ctx, mondooClientImage, cluster); err != nil {
+			return err
+		}
+	}
+
+	// Clean up CronJobs and ConfigMaps for external clusters that are no longer configured
+	if err := n.cleanupOrphanedExternalClusterResources(ctx, configuredClusters); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (n *DeploymentHandler) syncExternalClusterConfigMap(ctx context.Context, integrationMrn, clusterUid string, cluster v1alpha2.ExternalCluster) error {
+	existing := &corev1.ConfigMap{}
+
+	desired, err := ExternalClusterConfigMap(integrationMrn, clusterUid, cluster, *n.Mondoo, *n.MondooOperatorConfig)
+	if err != nil {
+		logger.Error(err, "failed to generate desired ConfigMap for external cluster", "cluster", cluster.Name)
+		return err
+	}
+
+	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
+		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
+		return err
+	}
+
+	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
+	if err != nil {
+		logger.Error(err, "Failed to create inventory ConfigMap for external cluster", "cluster", cluster.Name)
+		return err
+	}
+
+	if created {
+		logger.Info("Created inventory ConfigMap for external cluster", "cluster", cluster.Name)
+		return nil
+	}
+
+	if existing.Data["inventory"] != desired.Data["inventory"] ||
+		!reflect.DeepEqual(existing.GetOwnerReferences(), desired.GetOwnerReferences()) {
+		existing.Data["inventory"] = desired.Data["inventory"]
+		existing.SetOwnerReferences(desired.GetOwnerReferences())
+
+		if err := n.KubeClient.Update(ctx, existing); err != nil {
+			logger.Error(err, "Failed to update inventory ConfigMap for external cluster", "cluster", cluster.Name)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (n *DeploymentHandler) syncExternalClusterCronJob(ctx context.Context, image string, cluster v1alpha2.ExternalCluster) error {
+	existing := &batchv1.CronJob{}
+	desired := ExternalClusterCronJob(image, cluster, n.Mondoo, *n.MondooOperatorConfig)
+
+	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
+		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
+		return err
+	}
+
+	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
+	if err != nil {
+		logger.Error(err, "Failed to create CronJob for external cluster", "cluster", cluster.Name)
+		return err
+	}
+
+	if created {
+		logger.Info("Created CronJob for external cluster", "cluster", cluster.Name)
+		return nil
+	}
+
+	if !k8s.AreCronJobsEqual(*existing, *desired) {
+		existing.Spec.JobTemplate = desired.Spec.JobTemplate
+		existing.Spec.Schedule = desired.Spec.Schedule
+		existing.Spec.ConcurrencyPolicy = desired.Spec.ConcurrencyPolicy
+		existing.SetOwnerReferences(desired.GetOwnerReferences())
+
+		// Remove any old jobs
+		if err := n.KubeClient.DeleteAllOf(ctx, &batchv1.Job{},
+			client.InNamespace(n.Mondoo.Namespace),
+			client.MatchingLabels(ExternalClusterCronJobLabels(*n.Mondoo, cluster.Name)),
+			client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
+			return err
+		}
+
+		if err := n.KubeClient.Update(ctx, existing); err != nil {
+			logger.Error(err, "Failed to update CronJob for external cluster", "cluster", cluster.Name)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (n *DeploymentHandler) cleanupOrphanedExternalClusterResources(ctx context.Context, configuredClusters map[string]bool) error {
+	// List all CronJobs with our labels
+	cronJobs := &batchv1.CronJobList{}
+	listOpts := &client.ListOptions{
+		Namespace: n.Mondoo.Namespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"app":       "mondoo-k8s-scan",
+			"mondoo_cr": n.Mondoo.Name,
+		}),
+	}
+	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
+		return err
+	}
+
+	for _, cj := range cronJobs.Items {
+		clusterName, hasClusterLabel := cj.Labels["cluster_name"]
+		if !hasClusterLabel {
+			// This is the main cluster CronJob, not an external cluster
+			continue
+		}
+
+		if !configuredClusters[clusterName] {
+			// This external cluster is no longer configured, delete its resources
+			if err := k8s.DeleteIfExists(ctx, n.KubeClient, &cj); err != nil {
+				logger.Error(err, "failed to delete orphaned CronJob for external cluster", "cluster", clusterName)
+				return err
+			}
+
+			configMap := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ExternalClusterConfigMapName(n.Mondoo.Name, clusterName),
+					Namespace: n.Mondoo.Namespace,
+				},
+			}
+			if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
+				logger.Error(err, "failed to delete orphaned ConfigMap for external cluster", "cluster", clusterName)
+				return err
+			}
+
+			logger.Info("Cleaned up orphaned resources for external cluster", "cluster", clusterName)
+		}
+	}
+
+	return nil
+}
+
 func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]batchv1.CronJob, error) {
 	cronJobs := &batchv1.CronJobList{}
 	cronJobLabels := CronJobLabels(*n.Mondoo)
@@ -194,7 +373,7 @@ func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]ba
 }
 
 func (n *DeploymentHandler) down(ctx context.Context) error {
-	// Delete CronJob
+	// Delete main cluster CronJob
 	cronJob := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, cronJob); err != nil {
 		logger.Error(
@@ -202,11 +381,16 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		return err
 	}
 
-	// Delete ConfigMap
+	// Delete main cluster ConfigMap
 	configMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
 		logger.Error(
 			err, "failed to clean up Kubernetes resource scanning ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
+		return err
+	}
+
+	// Delete all external cluster resources (empty map means none are configured)
+	if err := n.cleanupOrphanedExternalClusterResources(ctx, make(map[string]bool)); err != nil {
 		return err
 	}
 
