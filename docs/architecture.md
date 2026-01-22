@@ -42,6 +42,14 @@ Scans container images running in the cluster for vulnerabilities.
 - **Features**:
   - Private registry support
 
+#### External Cluster Scanning
+
+Scans remote Kubernetes clusters from a central operator installation.
+
+- Uses kubeconfig stored in a Secret
+- Each external cluster gets its own CronJob
+- Supports per-cluster filtering and schedules
+
 ## Data Flow
 
 ```
@@ -77,6 +85,33 @@ Scans container images running in the cluster for vulnerabilities.
                     └──────────────────────────────────────────────────────────┘
 ```
 
+## External Cluster Scanning Architecture
+
+For scanning external/remote clusters:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Management Cluster (Operator)                             │
+│                                                                              │
+│  ┌──────────────────┐     ┌──────────────────────────────────────────────┐ │
+│  │ MondooAuditConfig │     │              CronJobs                        │ │
+│  │                  │     │  ┌────────────┐ ┌────────────┐ ┌──────────┐  │ │
+│  │ externalClusters:│────▶│  │ local-scan │ │ prod-scan  │ │ dev-scan │  │ │
+│  │ - name: prod     │     │  └─────┬──────┘ └─────┬──────┘ └────┬─────┘  │ │
+│  │ - name: dev      │     │        │              │             │        │ │
+│  └──────────────────┘     └────────┼──────────────┼─────────────┼────────┘ │
+│                                    │              │             │          │
+└────────────────────────────────────┼──────────────┼─────────────┼──────────┘
+                                     │              │             │
+                    ┌────────────────┘              │             └────────────┐
+                    │                               │                          │
+                    ▼                               ▼                          ▼
+         ┌──────────────────┐           ┌──────────────────┐       ┌──────────────────┐
+         │  Local Cluster   │           │ Production Cluster│       │  Dev Cluster     │
+         │  (in-cluster)    │           │  (via kubeconfig) │       │  (via kubeconfig)│
+         └──────────────────┘           └──────────────────┘       └──────────────────┘
+```
+
 ## Configuration Resources
 
 ### MondooAuditConfig
@@ -97,6 +132,10 @@ spec:
   kubernetesResources:
     enable: true
     schedule: "0 * * * *"  # Hourly
+    externalClusters:      # Optional: scan remote clusters
+      - name: production
+        kubeconfigSecretRef:
+          name: prod-kubeconfig
 
   # Scan nodes
   nodes:

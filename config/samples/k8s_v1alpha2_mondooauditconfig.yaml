@@ -41,6 +41,19 @@ spec:
     # Cron schedule (default: random minute each hour)
     # schedule: "0 * * * *"
 
+    # External clusters to scan from this operator instance
+    # externalClusters:
+    #   - name: production
+    #     kubeconfigSecretRef:
+    #       name: prod-kubeconfig
+    #     # Optional: override schedule for this cluster
+    #     # schedule: "0 */2 * * *"
+    #     # Optional: cluster-specific filtering
+    #     # filtering:
+    #     #   namespaces:
+    #     #     exclude:
+    #     #       - kube-system
+
   # Container image scanning
   containers:
     enable: true
