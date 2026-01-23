@@ -42,6 +42,9 @@ spec:
     # schedule: "0 * * * *"
 
     # External clusters to scan from this operator instance
+    # Four authentication methods are available (mutually exclusive):
+    #
+    # 1. Kubeconfig (most flexible, works with any cluster):
     # externalClusters:
     #   - name: production
     #     kubeconfigSecretRef:
@@ -53,6 +56,61 @@ spec:
     #     #   namespaces:
     #     #     exclude:
     #     #       - kube-system
+    #
+    # 2. Service Account Token (simpler alternative):
+    # externalClusters:
+    #   - name: production
+    #     serviceAccountAuth:
+    #       server: "https://prod-cluster.example.com:6443"
+    #       credentialsSecretRef:
+    #         name: prod-sa-credentials  # Secret with "token" and "ca.crt" keys
+    #       # skipTLSVerify: false  # NOT recommended for production
+    #
+    # 3. Workload Identity Federation (cloud-native, no static credentials):
+    # GKE example:
+    # externalClusters:
+    #   - name: gke-prod
+    #     workloadIdentity:
+    #       provider: gke
+    #       gke:
+    #         projectId: my-gcp-project
+    #         clusterName: production-cluster
+    #         clusterLocation: us-central1-a
+    #         googleServiceAccount: mondoo-scanner@my-gcp-project.iam.gserviceaccount.com
+    #
+    # EKS example:
+    # externalClusters:
+    #   - name: eks-prod
+    #     workloadIdentity:
+    #       provider: eks
+    #       eks:
+    #         region: us-west-2
+    #         clusterName: production-cluster
+    #         roleArn: arn:aws:iam::123456789012:role/MondooScannerRole
+    #
+    # AKS example:
+    # externalClusters:
+    #   - name: aks-prod
+    #     workloadIdentity:
+    #       provider: aks
+    #       aks:
+    #         subscriptionId: 12345678-1234-1234-1234-123456789012
+    #         resourceGroup: my-resource-group
+    #         clusterName: production-cluster
+    #         clientId: abcdef12-3456-7890-abcd-ef1234567890
+    #         tenantId: fedcba98-7654-3210-fedc-ba9876543210
+    #
+    # 4. SPIFFE/SPIRE (zero-trust, auto-rotating X.509 certificates):
+    # externalClusters:
+    #   - name: spiffe-cluster
+    #     spiffeAuth:
+    #       server: "https://remote-cluster.example.com:6443"
+    #       trustBundleSecretRef:
+    #         name: remote-cluster-ca  # Secret with "ca.crt" key
+    #       # Optional: custom socket path (default: /run/spire/sockets/agent.sock)
+    #       # socketPath: "/run/spire/sockets/agent.sock"
+    #       # Optional: audience for SVID
+    #       # audience: "k8s-api"
 
   # Container image scanning
   containers:
