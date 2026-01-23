@@ -68,6 +68,33 @@ func validateExternalClusterAuth(cluster v1alpha2.ExternalCluster) error {
 			}
 		}
 	}
+
+	// Validation for ServiceAccountAuth
+	if cluster.ServiceAccountAuth != nil {
+		if cluster.ServiceAccountAuth.Server == "" {
+			return fmt.Errorf("externalCluster %q: server is required for serviceAccountAuth", cluster.Name)
+		}
+		if cluster.ServiceAccountAuth.CredentialsSecretRef.Name == "" {
+			return fmt.Errorf("externalCluster %q: credentialsSecretRef.name is required for serviceAccountAuth", cluster.Name)
+		}
+	}
+
+	// Validation for KubeconfigSecretRef
+	if cluster.KubeconfigSecretRef != nil {
+		if cluster.KubeconfigSecretRef.Name == "" {
+			return fmt.Errorf("externalCluster %q: kubeconfigSecretRef.name is required", cluster.Name)
+		}
+	}
+
+	// Validation for SPIFFEAuth
+	if cluster.SPIFFEAuth != nil {
+		if cluster.SPIFFEAuth.Server == "" {
+			return fmt.Errorf("externalCluster %q: server is required for spiffeAuth", cluster.Name)
+		}
+		if cluster.SPIFFEAuth.TrustBundleSecretRef.Name == "" {
+			return fmt.Errorf("externalCluster %q: trustBundleSecretRef.name is required for spiffeAuth", cluster.Name)
+		}
+	}
 	return nil
 }
 
