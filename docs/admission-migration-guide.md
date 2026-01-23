@@ -49,9 +49,29 @@ spec:
     enable: true
 ```
 
-### 2. Clean Up Admission Resources
+### 2. Automatic Resource Cleanup
 
-If you previously had admission scanning enabled, clean up the leftover resources. Replace `<namespace>` with your namespace (e.g., `mondoo-operator`) and `<name>` with your MondooAuditConfig name (e.g., `mondoo-client`):
+Starting with version 12.1.0, the operator automatically cleans up orphaned admission
+resources when it detects deprecated admission configuration in your MondooAuditConfig.
+
+The following resources are automatically removed:
+- ValidatingWebhookConfiguration (`{namespace}-{name}-mondoo`)
+- Webhook Deployment (`{name}-webhook-manager`)
+- Webhook Service (`{name}-webhook-service`)
+- Webhook TLS Secret (`{name}-webhook-server-cert`)
+
+**Note**: If you used cert-manager, you should still manually clean up Certificate
+and Issuer resources:
+
+```bash
+kubectl delete certificate webhook-serving-cert -n <namespace> --ignore-not-found
+kubectl delete issuer mondoo-operator-selfsigned-issuer -n <namespace> --ignore-not-found
+```
+
+### 3. Manual Cleanup (Optional)
+
+If you prefer to manually clean up admission resources, or if you already removed the
+admission configuration from your MondooAuditConfig before upgrading, clean up the leftover resources. Replace `<namespace>` with your namespace (e.g., `mondoo-operator`) and `<name>` with your MondooAuditConfig name (e.g., `mondoo-client`):
 
 ```bash
 # Delete the ValidatingWebhookConfiguration (cluster-scoped)
@@ -83,7 +103,7 @@ kubectl delete certificate webhook-serving-cert -n mondoo-operator --ignore-not-
 kubectl delete issuer mondoo-operator-selfsigned-issuer -n mondoo-operator --ignore-not-found
 ```
 
-### 3. Implement CI/CD Pipeline Scanning
+### 4. Implement CI/CD Pipeline Scanning
 
 To achieve policy enforcement before deployment, integrate cnspec scanning into your CI/CD pipelines.
 

@@ -28,6 +28,12 @@ type MondooAuditConfigSpec struct {
 	ConsoleIntegration  ConsoleIntegration  `json:"consoleIntegration,omitempty"`
 	Filtering           Filtering           `json:"filtering,omitempty"`
 	Containers          Containers          `json:"containers,omitempty"`
+
+	// Admission is DEPRECATED and ignored. Admission webhooks were removed in v12.1.0.
+	// The operator will automatically clean up any orphaned admission resources.
+	// See docs/admission-migration-guide.md for migration instructions.
+	// +optional
+	Admission *DeprecatedAdmission `json:"admission,omitempty"`
 }
 
 type Filtering struct {
@@ -120,6 +126,36 @@ type Containers struct {
 	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.
 	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
+// DeprecatedAdmission exists for backward compatibility during upgrades.
+// This field is ignored and will be removed in a future version.
+type DeprecatedAdmission struct {
+	// Enable is DEPRECATED. Admission webhooks are no longer supported.
+	// +optional
+	Enable bool `json:"enable,omitempty"`
+	// Mode is DEPRECATED.
+	// +optional
+	Mode string `json:"mode,omitempty"`
+	// Replicas is DEPRECATED.
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+	// ServiceAccountName is DEPRECATED.
+	// +optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+	// CertificateProvisioning is DEPRECATED.
+	// +optional
+	CertificateProvisioning *DeprecatedCertificateProvisioning `json:"certificateProvisioning,omitempty"`
+	// Image is DEPRECATED.
+	// +optional
+	Image *Image `json:"image,omitempty"`
+}
+
+// DeprecatedCertificateProvisioning exists for backward compatibility.
+type DeprecatedCertificateProvisioning struct {
+	// Mode is DEPRECATED.
+	// +optional
+	Mode string `json:"mode,omitempty"`
 }
 
 type Image struct {

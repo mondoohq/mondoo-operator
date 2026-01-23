@@ -39,6 +39,42 @@ spec:
           spec:
             description: MondooAuditConfigSpec defines the desired state of MondooAuditConfig
             properties:
+              admission:
+                description: |-
+                  Admission is DEPRECATED and ignored. Admission webhooks were removed in v12.1.0.
+                  The operator will automatically clean up any orphaned admission resources.
+                  See docs/admission-migration-guide.md for migration instructions.
+                properties:
+                  certificateProvisioning:
+                    description: CertificateProvisioning is DEPRECATED.
+                    properties:
+                      mode:
+                        description: Mode is DEPRECATED.
+                        type: string
+                    type: object
+                  enable:
+                    description: Enable is DEPRECATED. Admission webhooks are no longer
+                      supported.
+                    type: boolean
+                  image:
+                    description: Image is DEPRECATED.
+                    properties:
+                      name:
+                        type: string
+                      tag:
+                        type: string
+                    type: object
+                  mode:
+                    description: Mode is DEPRECATED.
+                    type: string
+                  replicas:
+                    description: Replicas is DEPRECATED.
+                    format: int32
+                    type: integer
+                  serviceAccountName:
+                    description: ServiceAccountName is DEPRECATED.
+                    type: string
+                type: object
               consoleIntegration:
                 properties:
                   enable:
