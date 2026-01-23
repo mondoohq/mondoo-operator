@@ -353,43 +353,6 @@ type Containers struct {
 	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.
 	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// ScanDeduplication configures skipping images that have already been scanned (based on SHA digest).
-	// +optional
-	ScanDeduplication *ScanDeduplicationConfig `json:"scanDeduplication,omitempty"`
-
-	// SBOMScanning configures SBOM-based scanning when SBOMs are attached to container images.
-	// +optional
-	SBOMScanning *SBOMScanningConfig `json:"sbomScanning,omitempty"`
-}
-
-// ScanDeduplicationConfig configures image scan deduplication based on SHA256 digest
-type ScanDeduplicationConfig struct {
-	// Enable enables deduplication based on image SHA256 digest.
-	// When enabled, images that have already been scanned will be skipped.
-	// +kubebuilder:default=true
-	Enable bool `json:"enable,omitempty"`
-
-	// CacheTTL specifies how long to remember that an image was scanned.
-	// Uses Go duration format (e.g., "24h", "1h30m").
-	// +kubebuilder:default="24h"
-	CacheTTL string `json:"cacheTTL,omitempty"`
-}
-
-// SBOMScanningConfig configures SBOM-based scanning
-type SBOMScanningConfig struct {
-	// Enable enables SBOM-based scanning when SBOMs are attached to container images.
-	// +kubebuilder:default=false
-	Enable bool `json:"enable,omitempty"`
-
-	// PreferSBOM uses an attached SBOM instead of downloading the full image when available.
-	// This can significantly reduce memory usage and scan time for large images.
-	// +kubebuilder:default=true
-	PreferSBOM bool `json:"preferSBOM,omitempty"`
-
-	// SupportedFormats lists the SBOM formats to accept.
-	// +kubebuilder:default={"spdx-json","cyclonedx-json"}
-	SupportedFormats []string `json:"supportedFormats,omitempty"`
 }
 
 // DeprecatedAdmission exists for backward compatibility during upgrades.

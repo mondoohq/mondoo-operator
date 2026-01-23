@@ -304,47 +304,6 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
-                  sbomScanning:
-                    description: SBOMScanning configures SBOM-based scanning when
-                      SBOMs are attached to container images.
-                    properties:
-                      enable:
-                        default: false
-                        description: Enable enables SBOM-based scanning when SBOMs
-                          are attached to container images.
-                        type: boolean
-                      preferSBOM:
-                        default: true
-                        description: |-
-                          PreferSBOM uses an attached SBOM instead of downloading the full image when available.
-                          This can significantly reduce memory usage and scan time for large images.
-                        type: boolean
-                      supportedFormats:
-                        default:
-                        - spdx-json
-                        - cyclonedx-json
-                        description: SupportedFormats lists the SBOM formats to accept.
-                        items:
-                          type: string
-                        type: array
-                    type: object
-                  scanDeduplication:
-                    description: ScanDeduplication configures skipping images that
-                      have already been scanned (based on SHA digest).
-                    properties:
-                      cacheTTL:
-                        default: 24h
-                        description: |-
-                          CacheTTL specifies how long to remember that an image was scanned.
-                          Uses Go duration format (e.g., "24h", "1h30m").
-                        type: string
-                      enable:
-                        default: true
-                        description: |-
-                          Enable enables deduplication based on image SHA256 digest.
-                          When enabled, images that have already been scanned will be skipped.
-                        type: boolean
-                    type: object
                   schedule:
                     description: Specify a custom crontab schedule for the container
                       image scanning job. If not specified, the default schedule is

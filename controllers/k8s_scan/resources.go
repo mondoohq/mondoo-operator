@@ -18,6 +18,7 @@ import (
 	"gopkg.in/yaml.v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
@@ -536,20 +537,20 @@ func WIFServiceAccountName(prefix, clusterName string) string {
 
 // ExternalClusterSAKubeconfig generates a kubeconfig that references mounted token and CA files
 func ExternalClusterSAKubeconfig(cluster v1alpha2.ExternalCluster) string {
-	insecureSkipTLSVerify := ""
-	certificateAuthority := "certificate-authority: /etc/opt/mondoo/sa-credentials/ca.crt"
+	var clusterConfig string
 	if cluster.ServiceAccountAuth.SkipTLSVerify {
-		insecureSkipTLSVerify = "insecure-skip-tls-verify: true"
-		certificateAuthority = ""
+		clusterConfig = fmt.Sprintf(`    insecure-skip-tls-verify: true
+    server: %s`, cluster.ServiceAccountAuth.Server)
+	} else {
+		clusterConfig = fmt.Sprintf(`    certificate-authority: /etc/opt/mondoo/sa-credentials/ca.crt
+    server: %s`, cluster.ServiceAccountAuth.Server)
 	}
 
 	return fmt.Sprintf(`apiVersion: v1
 kind: Config
 clusters:
 - cluster:
-    %s
-    %s
-    server: %s
+%s
   name: external
 contexts:
 - context:
@@ -561,7 +562,7 @@ users:
 - name: scanner
   user:
     tokenFile: /etc/opt/mondoo/sa-credentials/token
-`, certificateAuthority, insecureSkipTLSVerify, cluster.ServiceAccountAuth.Server)
+`, clusterConfig)
 }
 
 // ExternalClusterSAKubeconfigConfigMap creates a ConfigMap containing the generated kubeconfig for SA auth
@@ -605,57 +606,142 @@ func WIFServiceAccount(cluster v1alpha2.ExternalCluster, m *v1alpha2.MondooAudit
 	return sa
 }
 
+// Container image versions for init containers (pinned for reproducibility)
+const (
+	// Google Cloud SDK image - slim variant for smaller size
+	// https://cloud.google.com/sdk/docs/downloads-docker
+	GCloudSDKImage = "gcr.io/google.com/cloudsdktool/google-cloud-cli:499.0.0-slim"
+
+	// AWS CLI image
+	// https://hub.docker.com/r/amazon/aws-cli
+	AWSCLIImage = "amazon/aws-cli:2.22.0"
+
+	// Azure CLI image
+	// https://mcr.microsoft.com/en-us/artifact/mar/azure-cli/tags
+	AzureCLIImage = "mcr.microsoft.com/azure-cli:2.67.0"
+
+	// SPIFFE Helper image
+	// https://github.com/spiffe/spiffe-helper/releases
+	SPIFFEHelperImage = "ghcr.io/spiffe/spiffe-helper:0.8.0"
+)
+
 // wifInitContainer creates an init container that generates kubeconfig using cloud CLI tools
 func wifInitContainer(cluster v1alpha2.ExternalCluster) corev1.Container {
 	var image, script string
+	var env []corev1.EnvVar
+
+	// Common retry wrapper for transient failures
+	retryWrapper := `
+# Retry wrapper for transient failures
+retry() {
+  local max_attempts=3
+  local delay=5
+  local attempt=1
+  while [ $attempt -le $max_attempts ]; do
+    if "$@"; then
+      return 0
+    fi
+    echo "Attempt $attempt failed, retrying in ${delay}s..."
+    sleep $delay
+    attempt=$((attempt + 1))
+  done
+  echo "All $max_attempts attempts failed"
+  return 1
+}
+`
 
 	switch cluster.WorkloadIdentity.Provider {
 	case v1alpha2.CloudProviderGKE:
-		image = "gcr.io/google.com/cloudsdktool/google-cloud-cli:slim"
-		script = fmt.Sprintf(`
-gcloud container clusters get-credentials %s \
-  --project %s \
-  --location %s
+		image = GCloudSDKImage
+		script = retryWrapper + `
+retry gcloud container clusters get-credentials "$CLUSTER_NAME" \
+  --project "$PROJECT_ID" \
+  --location "$CLUSTER_LOCATION"
 cp ~/.kube/config /etc/opt/mondoo/kubeconfig/kubeconfig
-`, cluster.WorkloadIdentity.GKE.ClusterName,
-			cluster.WorkloadIdentity.GKE.ProjectID,
-			cluster.WorkloadIdentity.GKE.ClusterLocation)
+`
+		env = []corev1.EnvVar{
+			{Name: "HOME", Value: "/tmp"},
+			{Name: "CLUSTER_NAME", Value: cluster.WorkloadIdentity.GKE.ClusterName},
+			{Name: "PROJECT_ID", Value: cluster.WorkloadIdentity.GKE.ProjectID},
+			{Name: "CLUSTER_LOCATION", Value: cluster.WorkloadIdentity.GKE.ClusterLocation},
+		}
 
 	case v1alpha2.CloudProviderEKS:
-		image = "amazon/aws-cli:latest"
-		script = fmt.Sprintf(`
-aws eks update-kubeconfig \
-  --name %s \
-  --region %s \
+		image = AWSCLIImage
+		script = retryWrapper + `
+retry aws eks update-kubeconfig \
+  --name "$CLUSTER_NAME" \
+  --region "$AWS_REGION" \
   --kubeconfig /etc/opt/mondoo/kubeconfig/kubeconfig
-`, cluster.WorkloadIdentity.EKS.ClusterName,
-			cluster.WorkloadIdentity.EKS.Region)
+`
+		env = []corev1.EnvVar{
+			{Name: "HOME", Value: "/tmp"},
+			{Name: "CLUSTER_NAME", Value: cluster.WorkloadIdentity.EKS.ClusterName},
+			{Name: "AWS_REGION", Value: cluster.WorkloadIdentity.EKS.Region},
+		}
 
 	case v1alpha2.CloudProviderAKS:
-		image = "mcr.microsoft.com/azure-cli:latest"
-		script = fmt.Sprintf(`
-az aks get-credentials \
-  --resource-group %s \
-  --name %s \
-  --subscription %s \
+		image = AzureCLIImage
+		script = retryWrapper + `
+retry az aks get-credentials \
+  --resource-group "$RESOURCE_GROUP" \
+  --name "$CLUSTER_NAME" \
+  --subscription "$SUBSCRIPTION_ID" \
   --file /etc/opt/mondoo/kubeconfig/kubeconfig
-`, cluster.WorkloadIdentity.AKS.ResourceGroup,
-			cluster.WorkloadIdentity.AKS.ClusterName,
-			cluster.WorkloadIdentity.AKS.SubscriptionID)
+`
+		env = []corev1.EnvVar{
+			{Name: "HOME", Value: "/tmp"},
+			{Name: "CLUSTER_NAME", Value: cluster.WorkloadIdentity.AKS.ClusterName},
+			{Name: "RESOURCE_GROUP", Value: cluster.WorkloadIdentity.AKS.ResourceGroup},
+			{Name: "SUBSCRIPTION_ID", Value: cluster.WorkloadIdentity.AKS.SubscriptionID},
+		}
+
+	default:
+		// This should never happen if validation is correct, but handle gracefully
+		image = "busybox:1.36"
+		script = `echo "ERROR: Unknown workload identity provider"; exit 1`
+		env = []corev1.EnvVar{}
 	}
 
 	return corev1.Container{
 		Name:    "generate-kubeconfig",
 		Image:   image,
 		Command: []string{"/bin/sh", "-c", script},
+		Env:     env,
 		VolumeMounts: []corev1.VolumeMount{
 			{Name: "kubeconfig", MountPath: "/etc/opt/mondoo/kubeconfig"},
+			{Name: "temp", MountPath: "/tmp"},
+		},
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("50m"),
+				corev1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+		},
+		SecurityContext: &corev1.SecurityContext{
+			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
+			RunAsNonRoot:             ptr.To(true),
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
 		},
 	}
 }
 
 // spiffeInitContainer creates an init container that fetches SPIFFE certificates
-// and generates a kubeconfig for the remote cluster
+// and generates a kubeconfig for the remote cluster.
+//
+// Note: This implementation fetches certificates once during init and does not
+// rotate them during the scan. SPIFFE SVIDs typically have a 1-hour TTL by default.
+// For most K8s resource scans that complete within minutes, this is sufficient.
+// If scans consistently exceed your SVID TTL, consider:
+// - Increasing the SVID TTL in your SPIRE server configuration
+// - Using a different authentication method (kubeconfig, service account token)
 func spiffeInitContainer(cluster v1alpha2.ExternalCluster) corev1.Container {
 	socketPath := cluster.SPIFFEAuth.SocketPath
 	if socketPath == "" {
@@ -663,19 +749,26 @@ func spiffeInitContainer(cluster v1alpha2.ExternalCluster) corev1.Container {
 	}
 	socketFile := filepath.Base(socketPath)
 
-	script := fmt.Sprintf(`#!/bin/sh
+	// Use a static script that references environment variables for safety
+	script := `#!/bin/sh
 set -e
 
-# Wait for SPIRE agent socket
+# Wait for SPIRE agent socket (timeout after 60 seconds)
 echo "Waiting for SPIRE agent socket..."
-while [ ! -S /spire-agent-socket/%s ]; do
+SOCKET_WAIT=0
+while [ ! -S "/spire-agent-socket/${SOCKET_FILE}" ]; do
     sleep 1
+    SOCKET_WAIT=$((SOCKET_WAIT + 1))
+    if [ $SOCKET_WAIT -ge 60 ]; then
+        echo "ERROR: SPIRE agent socket not available within timeout"
+        exit 1
+    fi
 done
 
 # Fetch SVID using spiffe-helper
 # The spiffe-helper writes certs to the specified directory
-cat > /tmp/spiffe-helper.conf << 'CONF'
-agent_address = "/spire-agent-socket/%s"
+cat > /tmp/spiffe-helper.conf << CONF
+agent_address = "/spire-agent-socket/${SOCKET_FILE}"
 cmd = ""
 cert_dir = "/etc/spiffe-certs"
 svid_file_name = "svid.pem"
@@ -707,7 +800,7 @@ kind: Config
 clusters:
 - cluster:
     certificate-authority: /etc/trust-bundle/ca.crt
-    server: %s
+    server: ${K8S_SERVER}
   name: external
 contexts:
 - context:
@@ -726,20 +819,36 @@ echo "Kubeconfig generated successfully"
 
 # Kill spiffe-helper (certs are already fetched)
 kill $HELPER_PID 2>/dev/null || true
-`, socketFile, socketFile, cluster.SPIFFEAuth.Server)
+`
 
 	return corev1.Container{
 		Name:    "fetch-spiffe-certs",
-		Image:   "ghcr.io/spiffe/spiffe-helper:latest",
+		Image:   SPIFFEHelperImage,
 		Command: []string{"/bin/sh", "-c", script},
+		Env: []corev1.EnvVar{
+			{Name: "SOCKET_FILE", Value: socketFile},
+			{Name: "K8S_SERVER", Value: cluster.SPIFFEAuth.Server},
+		},
 		VolumeMounts: []corev1.VolumeMount{
 			{Name: "spire-agent-socket", MountPath: "/spire-agent-socket"},
 			{Name: "spiffe-certs", MountPath: "/etc/spiffe-certs"},
 			{Name: "trust-bundle", MountPath: "/etc/trust-bundle", ReadOnly: true},
 			{Name: "kubeconfig", MountPath: "/etc/opt/mondoo/kubeconfig"},
+			{Name: "temp", MountPath: "/tmp"},
+		},
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("50m"),
+				corev1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("128Mi"),
+			},
 		},
 		SecurityContext: &corev1.SecurityContext{
 			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
 			RunAsNonRoot:             ptr.To(true),
 			RunAsUser:                ptr.To(int64(101)),
 			Capabilities: &corev1.Capabilities{
@@ -774,6 +883,7 @@ func ExternalClusterConfigMap(integrationMRN, operatorClusterUID string, cluster
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: m.Namespace,
 			Name:      ExternalClusterConfigMapName(m.Name, cluster.Name),
+			Labels:    ExternalClusterCronJobLabels(m, cluster.Name),
 		},
 		Data: map[string]string{"inventory": inv},
 	}, nil
@@ -833,7 +943,9 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 	filtering := cluster.Filtering
 
 	// Determine discovery targets based on whether container image scanning is enabled
-	targets := K8sDiscoveryTargets
+	// Make a copy to avoid mutating the shared slice
+	targets := make([]string, len(K8sDiscoveryTargets))
+	copy(targets, K8sDiscoveryTargets)
 	if cluster.ContainerImageScanning {
 		targets = append(targets, "container-images")
 	}
