@@ -5,6 +5,7 @@ package k8s_scan
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	// That's the mod k8s relies on https://github.com/kubernetes/kubernetes/blob/master/go.mod#L63
@@ -195,6 +196,200 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 		schedule = m.Spec.KubernetesResources.Schedule
 	}
 
+	// Base volumes and mounts
+	volumes := []corev1.Volume{
+		{
+			Name: "temp",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "config",
+			VolumeSource: corev1.VolumeSource{
+				Projected: &corev1.ProjectedVolumeSource{
+					DefaultMode: ptr.To(int32(corev1.ProjectedVolumeSourceDefaultMode)),
+					Sources: []corev1.VolumeProjection{
+						{
+							ConfigMap: &corev1.ConfigMapProjection{
+								LocalObjectReference: corev1.LocalObjectReference{Name: ExternalClusterConfigMapName(m.Name, cluster.Name)},
+								Items: []corev1.KeyToPath{{
+									Key:  "inventory",
+									Path: "inventory.yml",
+								}},
+							},
+						},
+						{
+							Secret: &corev1.SecretProjection{
+								LocalObjectReference: m.Spec.MondooCredsSecretRef,
+								Items: []corev1.KeyToPath{{
+									Key:  "config",
+									Path: "mondoo.yml",
+								}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "config",
+			ReadOnly:  true,
+			MountPath: "/etc/opt/mondoo/config",
+		},
+		{
+			Name:      "kubeconfig",
+			ReadOnly:  true,
+			MountPath: "/etc/opt/mondoo/kubeconfig",
+		},
+		{
+			Name:      "temp",
+			MountPath: "/tmp",
+		},
+	}
+
+	var initContainers []corev1.Container
+	serviceAccountName := ""
+	autoMountServiceAccountToken := ptr.To(false)
+
+	// Configure authentication method
+	switch {
+	case cluster.KubeconfigSecretRef != nil:
+		// Kubeconfig auth: mount the kubeconfig secret directly
+		volumes = append(volumes, corev1.Volume{
+			Name: "kubeconfig",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  cluster.KubeconfigSecretRef.Name,
+					DefaultMode: ptr.To(int32(0o440)),
+					Items: []corev1.KeyToPath{{
+						Key:  "kubeconfig",
+						Path: "kubeconfig",
+					}},
+				},
+			},
+		})
+
+	case cluster.ServiceAccountAuth != nil:
+		// SA auth: mount credentials secret + generated kubeconfig ConfigMap
+		volumes = append(volumes,
+			corev1.Volume{
+				Name: "sa-credentials",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName:  cluster.ServiceAccountAuth.CredentialsSecretRef.Name,
+						DefaultMode: ptr.To(int32(0o440)),
+					},
+				},
+			},
+			corev1.Volume{
+				Name: "kubeconfig",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: ExternalClusterSAKubeconfigName(m.Name, cluster.Name),
+						},
+					},
+				},
+			},
+		)
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "sa-credentials",
+			ReadOnly:  true,
+			MountPath: "/etc/opt/mondoo/sa-credentials",
+		})
+
+	case cluster.WorkloadIdentity != nil:
+		// WIF auth: use WIF ServiceAccount, init container to generate kubeconfig
+		serviceAccountName = WIFServiceAccountName(m.Name, cluster.Name)
+		autoMountServiceAccountToken = ptr.To(true)
+
+		// Use emptyDir for kubeconfig since it's generated at runtime
+		volumes = append(volumes, corev1.Volume{
+			Name: "kubeconfig",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
+
+		// Update kubeconfig volume mount to be writable for init container
+		for i := range volumeMounts {
+			if volumeMounts[i].Name == "kubeconfig" {
+				volumeMounts[i].ReadOnly = false
+			}
+		}
+
+		initContainers = append(initContainers, wifInitContainer(cluster))
+
+	case cluster.SPIFFEAuth != nil:
+		// SPIFFE auth: use sidecar to fetch certificates, generate kubeconfig
+		serviceAccountName = m.Spec.Scanner.ServiceAccountName
+		autoMountServiceAccountToken = ptr.To(true)
+
+		socketPath := cluster.SPIFFEAuth.SocketPath
+		if socketPath == "" {
+			socketPath = "/run/spire/sockets/agent.sock"
+		}
+
+		// Mount SPIRE agent socket from host
+		volumes = append(volumes, corev1.Volume{
+			Name: "spire-agent-socket",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: filepath.Dir(socketPath),
+					Type: ptr.To(corev1.HostPathDirectory),
+				},
+			},
+		})
+
+		// Mount trust bundle for remote cluster CA
+		volumes = append(volumes, corev1.Volume{
+			Name: "trust-bundle",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  cluster.SPIFFEAuth.TrustBundleSecretRef.Name,
+					DefaultMode: ptr.To(int32(0o440)),
+				},
+			},
+		})
+
+		// EmptyDir for generated certificates
+		volumes = append(volumes, corev1.Volume{
+			Name: "spiffe-certs",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					Medium: corev1.StorageMediumMemory,
+				},
+			},
+		})
+
+		// EmptyDir for generated kubeconfig
+		volumes = append(volumes, corev1.Volume{
+			Name: "kubeconfig",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
+
+		// Add volume mounts for SPIFFE certs and trust bundle to main container
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{Name: "spiffe-certs", MountPath: "/etc/spiffe-certs", ReadOnly: true},
+			corev1.VolumeMount{Name: "trust-bundle", MountPath: "/etc/trust-bundle", ReadOnly: true},
+		)
+
+		// Update kubeconfig mount to be writable for init container
+		for i := range volumeMounts {
+			if volumeMounts[i].Name == "kubeconfig" {
+				volumeMounts[i].ReadOnly = false
+			}
+		}
+
+		initContainers = append(initContainers, spiffeInitContainer(cluster))
+	}
+
 	cronjob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ExternalClusterCronJobName(m.Name, cluster.Name),
@@ -212,9 +407,10 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: ls},
 						Spec: corev1.PodSpec{
-							RestartPolicy: corev1.RestartPolicyNever,
-							// No need for k8s service account token since we're using kubeconfig
-							AutomountServiceAccountToken: ptr.To(false),
+							RestartPolicy:                corev1.RestartPolicyNever,
+							AutomountServiceAccountToken: autoMountServiceAccountToken,
+							ServiceAccountName:           serviceAccountName,
+							InitContainers:               initContainers,
 							Containers: []corev1.Container{
 								{
 									Image:           image,
@@ -234,74 +430,11 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 										RunAsUser:    ptr.To(int64(101)),
 										Privileged:   ptr.To(false),
 									},
-									VolumeMounts: []corev1.VolumeMount{
-										{
-											Name:      "config",
-											ReadOnly:  true,
-											MountPath: "/etc/opt/mondoo/config",
-										},
-										{
-											Name:      "kubeconfig",
-											ReadOnly:  true,
-											MountPath: "/etc/opt/mondoo/kubeconfig",
-										},
-										{
-											Name:      "temp",
-											MountPath: "/tmp",
-										},
-									},
-									Env: envVars,
+									VolumeMounts: volumeMounts,
+									Env:          envVars,
 								},
 							},
-							Volumes: []corev1.Volume{
-								{
-									Name: "temp",
-									VolumeSource: corev1.VolumeSource{
-										EmptyDir: &corev1.EmptyDirVolumeSource{},
-									},
-								},
-								{
-									Name: "config",
-									VolumeSource: corev1.VolumeSource{
-										Projected: &corev1.ProjectedVolumeSource{
-											DefaultMode: ptr.To(int32(corev1.ProjectedVolumeSourceDefaultMode)),
-											Sources: []corev1.VolumeProjection{
-												{
-													ConfigMap: &corev1.ConfigMapProjection{
-														LocalObjectReference: corev1.LocalObjectReference{Name: ExternalClusterConfigMapName(m.Name, cluster.Name)},
-														Items: []corev1.KeyToPath{{
-															Key:  "inventory",
-															Path: "inventory.yml",
-														}},
-													},
-												},
-												{
-													Secret: &corev1.SecretProjection{
-														LocalObjectReference: m.Spec.MondooCredsSecretRef,
-														Items: []corev1.KeyToPath{{
-															Key:  "config",
-															Path: "mondoo.yml",
-														}},
-													},
-												},
-											},
-										},
-									},
-								},
-								{
-									Name: "kubeconfig",
-									VolumeSource: corev1.VolumeSource{
-										Secret: &corev1.SecretVolumeSource{
-											SecretName:  cluster.KubeconfigSecretRef.Name,
-											DefaultMode: ptr.To(int32(0o440)),
-											Items: []corev1.KeyToPath{{
-												Key:  "kubeconfig",
-												Path: "kubeconfig",
-											}},
-										},
-									},
-								},
-							},
+							Volumes: volumes,
 						},
 					},
 				},
@@ -389,6 +522,231 @@ func ConfigMapName(prefix string) string {
 
 func ExternalClusterConfigMapName(prefix, clusterName string) string {
 	return fmt.Sprintf("%s%s-%s", prefix, InventoryConfigMapBase, clusterName)
+}
+
+// ExternalClusterSAKubeconfigName returns the name for the SA kubeconfig ConfigMap
+func ExternalClusterSAKubeconfigName(prefix, clusterName string) string {
+	return fmt.Sprintf("%s-sa-kubeconfig-%s", prefix, clusterName)
+}
+
+// WIFServiceAccountName returns the name for the WIF ServiceAccount
+func WIFServiceAccountName(prefix, clusterName string) string {
+	return fmt.Sprintf("%s-wif-%s", prefix, clusterName)
+}
+
+// ExternalClusterSAKubeconfig generates a kubeconfig that references mounted token and CA files
+func ExternalClusterSAKubeconfig(cluster v1alpha2.ExternalCluster) string {
+	insecureSkipTLSVerify := ""
+	certificateAuthority := "certificate-authority: /etc/opt/mondoo/sa-credentials/ca.crt"
+	if cluster.ServiceAccountAuth.SkipTLSVerify {
+		insecureSkipTLSVerify = "insecure-skip-tls-verify: true"
+		certificateAuthority = ""
+	}
+
+	return fmt.Sprintf(`apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    %s
+    %s
+    server: %s
+  name: external
+contexts:
+- context:
+    cluster: external
+    user: scanner
+  name: default
+current-context: default
+users:
+- name: scanner
+  user:
+    tokenFile: /etc/opt/mondoo/sa-credentials/token
+`, certificateAuthority, insecureSkipTLSVerify, cluster.ServiceAccountAuth.Server)
+}
+
+// ExternalClusterSAKubeconfigConfigMap creates a ConfigMap containing the generated kubeconfig for SA auth
+func ExternalClusterSAKubeconfigConfigMap(cluster v1alpha2.ExternalCluster, m *v1alpha2.MondooAuditConfig) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: m.Namespace,
+			Name:      ExternalClusterSAKubeconfigName(m.Name, cluster.Name),
+			Labels:    ExternalClusterCronJobLabels(*m, cluster.Name),
+		},
+		Data: map[string]string{
+			"kubeconfig": ExternalClusterSAKubeconfig(cluster),
+		},
+	}
+}
+
+// WIFServiceAccount creates a ServiceAccount with cloud-specific annotations for Workload Identity Federation
+func WIFServiceAccount(cluster v1alpha2.ExternalCluster, m *v1alpha2.MondooAuditConfig) *corev1.ServiceAccount {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        WIFServiceAccountName(m.Name, cluster.Name),
+			Namespace:   m.Namespace,
+			Labels:      ExternalClusterCronJobLabels(*m, cluster.Name),
+			Annotations: make(map[string]string),
+		},
+	}
+
+	switch cluster.WorkloadIdentity.Provider {
+	case v1alpha2.CloudProviderGKE:
+		sa.Annotations["iam.gke.io/gcp-service-account"] = cluster.WorkloadIdentity.GKE.GoogleServiceAccount
+	case v1alpha2.CloudProviderEKS:
+		sa.Annotations["eks.amazonaws.com/role-arn"] = cluster.WorkloadIdentity.EKS.RoleARN
+	case v1alpha2.CloudProviderAKS:
+		sa.Annotations["azure.workload.identity/client-id"] = cluster.WorkloadIdentity.AKS.ClientID
+		if sa.Labels == nil {
+			sa.Labels = make(map[string]string)
+		}
+		sa.Labels["azure.workload.identity/use"] = "true"
+	}
+
+	return sa
+}
+
+// wifInitContainer creates an init container that generates kubeconfig using cloud CLI tools
+func wifInitContainer(cluster v1alpha2.ExternalCluster) corev1.Container {
+	var image, script string
+
+	switch cluster.WorkloadIdentity.Provider {
+	case v1alpha2.CloudProviderGKE:
+		image = "gcr.io/google.com/cloudsdktool/google-cloud-cli:slim"
+		script = fmt.Sprintf(`
+gcloud container clusters get-credentials %s \
+  --project %s \
+  --location %s
+cp ~/.kube/config /etc/opt/mondoo/kubeconfig/kubeconfig
+`, cluster.WorkloadIdentity.GKE.ClusterName,
+			cluster.WorkloadIdentity.GKE.ProjectID,
+			cluster.WorkloadIdentity.GKE.ClusterLocation)
+
+	case v1alpha2.CloudProviderEKS:
+		image = "amazon/aws-cli:latest"
+		script = fmt.Sprintf(`
+aws eks update-kubeconfig \
+  --name %s \
+  --region %s \
+  --kubeconfig /etc/opt/mondoo/kubeconfig/kubeconfig
+`, cluster.WorkloadIdentity.EKS.ClusterName,
+			cluster.WorkloadIdentity.EKS.Region)
+
+	case v1alpha2.CloudProviderAKS:
+		image = "mcr.microsoft.com/azure-cli:latest"
+		script = fmt.Sprintf(`
+az aks get-credentials \
+  --resource-group %s \
+  --name %s \
+  --subscription %s \
+  --file /etc/opt/mondoo/kubeconfig/kubeconfig
+`, cluster.WorkloadIdentity.AKS.ResourceGroup,
+			cluster.WorkloadIdentity.AKS.ClusterName,
+			cluster.WorkloadIdentity.AKS.SubscriptionID)
+	}
+
+	return corev1.Container{
+		Name:    "generate-kubeconfig",
+		Image:   image,
+		Command: []string{"/bin/sh", "-c", script},
+		VolumeMounts: []corev1.VolumeMount{
+			{Name: "kubeconfig", MountPath: "/etc/opt/mondoo/kubeconfig"},
+		},
+	}
+}
+
+// spiffeInitContainer creates an init container that fetches SPIFFE certificates
+// and generates a kubeconfig for the remote cluster
+func spiffeInitContainer(cluster v1alpha2.ExternalCluster) corev1.Container {
+	socketPath := cluster.SPIFFEAuth.SocketPath
+	if socketPath == "" {
+		socketPath = "/run/spire/sockets/agent.sock"
+	}
+	socketFile := filepath.Base(socketPath)
+
+	script := fmt.Sprintf(`#!/bin/sh
+set -e
+
+# Wait for SPIRE agent socket
+echo "Waiting for SPIRE agent socket..."
+while [ ! -S /spire-agent-socket/%s ]; do
+    sleep 1
+done
+
+# Fetch SVID using spiffe-helper
+# The spiffe-helper writes certs to the specified directory
+cat > /tmp/spiffe-helper.conf << 'CONF'
+agent_address = "/spire-agent-socket/%s"
+cmd = ""
+cert_dir = "/etc/spiffe-certs"
+svid_file_name = "svid.pem"
+svid_key_file_name = "svid_key.pem"
+svid_bundle_file_name = "svid_bundle.pem"
+CONF
+
+/usr/bin/spiffe-helper -config /tmp/spiffe-helper.conf &
+HELPER_PID=$!
+
+# Wait for certificates to be written
+echo "Waiting for SPIFFE certificates..."
+for i in $(seq 1 60); do
+    if [ -f /etc/spiffe-certs/svid.pem ] && [ -f /etc/spiffe-certs/svid_key.pem ]; then
+        break
+    fi
+    sleep 1
+done
+
+if [ ! -f /etc/spiffe-certs/svid.pem ]; then
+    echo "ERROR: SPIFFE certificates not generated within timeout"
+    exit 1
+fi
+
+# Generate kubeconfig using client certificates
+cat > /etc/opt/mondoo/kubeconfig/kubeconfig << EOF
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: /etc/trust-bundle/ca.crt
+    server: %s
+  name: external
+contexts:
+- context:
+    cluster: external
+    user: spiffe
+  name: default
+current-context: default
+users:
+- name: spiffe
+  user:
+    client-certificate: /etc/spiffe-certs/svid.pem
+    client-key: /etc/spiffe-certs/svid_key.pem
+EOF
+
+echo "Kubeconfig generated successfully"
+
+# Kill spiffe-helper (certs are already fetched)
+kill $HELPER_PID 2>/dev/null || true
+`, socketFile, socketFile, cluster.SPIFFEAuth.Server)
+
+	return corev1.Container{
+		Name:    "fetch-spiffe-certs",
+		Image:   "ghcr.io/spiffe/spiffe-helper:latest",
+		Command: []string{"/bin/sh", "-c", script},
+		VolumeMounts: []corev1.VolumeMount{
+			{Name: "spire-agent-socket", MountPath: "/spire-agent-socket"},
+			{Name: "spiffe-certs", MountPath: "/etc/spiffe-certs"},
+			{Name: "trust-bundle", MountPath: "/etc/trust-bundle", ReadOnly: true},
+			{Name: "kubeconfig", MountPath: "/etc/opt/mondoo/kubeconfig"},
+		},
+		SecurityContext: &corev1.SecurityContext{
+			AllowPrivilegeEscalation: ptr.To(false),
+			RunAsNonRoot:             ptr.To(true),
+			RunAsUser:                ptr.To(int64(101)),
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+		},
+	}
 }
 
 func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (*corev1.ConfigMap, error) {

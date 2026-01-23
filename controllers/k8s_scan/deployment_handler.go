@@ -28,6 +28,49 @@ const (
 	WorkloadDeploymentNameTemplate          = `%s-workload`
 )
 
+// validateExternalClusterAuth validates that exactly one authentication method is specified
+func validateExternalClusterAuth(cluster v1alpha2.ExternalCluster) error {
+	authMethods := 0
+	if cluster.KubeconfigSecretRef != nil {
+		authMethods++
+	}
+	if cluster.ServiceAccountAuth != nil {
+		authMethods++
+	}
+	if cluster.WorkloadIdentity != nil {
+		authMethods++
+	}
+	if cluster.SPIFFEAuth != nil {
+		authMethods++
+	}
+
+	if authMethods == 0 {
+		return fmt.Errorf("externalCluster %q: must specify one of kubeconfigSecretRef, serviceAccountAuth, workloadIdentity, or spiffeAuth", cluster.Name)
+	}
+	if authMethods > 1 {
+		return fmt.Errorf("externalCluster %q: kubeconfigSecretRef, serviceAccountAuth, workloadIdentity, and spiffeAuth are mutually exclusive", cluster.Name)
+	}
+
+	// Provider-specific validation for WorkloadIdentity
+	if cluster.WorkloadIdentity != nil {
+		switch cluster.WorkloadIdentity.Provider {
+		case v1alpha2.CloudProviderGKE:
+			if cluster.WorkloadIdentity.GKE == nil {
+				return fmt.Errorf("externalCluster %q: gke config required when provider is gke", cluster.Name)
+			}
+		case v1alpha2.CloudProviderEKS:
+			if cluster.WorkloadIdentity.EKS == nil {
+				return fmt.Errorf("externalCluster %q: eks config required when provider is eks", cluster.Name)
+			}
+		case v1alpha2.CloudProviderAKS:
+			if cluster.WorkloadIdentity.AKS == nil {
+				return fmt.Errorf("externalCluster %q: aks config required when provider is aks", cluster.Name)
+			}
+		}
+	}
+	return nil
+}
+
 type DeploymentHandler struct {
 	KubeClient             client.Client
 	Mondoo                 *v1alpha2.MondooAuditConfig
@@ -212,6 +255,26 @@ func (n *DeploymentHandler) reconcileExternalClusters(ctx context.Context) error
 	for _, cluster := range n.Mondoo.Spec.KubernetesResources.ExternalClusters {
 		configuredClusters[cluster.Name] = true
 
+		// Validate authentication configuration
+		if err := validateExternalClusterAuth(cluster); err != nil {
+			logger.Error(err, "invalid external cluster authentication configuration", "cluster", cluster.Name)
+			return err
+		}
+
+		// Sync SA kubeconfig ConfigMap if using ServiceAccountAuth
+		if cluster.ServiceAccountAuth != nil {
+			if err := n.syncExternalClusterSAKubeconfigConfigMap(ctx, cluster); err != nil {
+				return err
+			}
+		}
+
+		// Sync WIF ServiceAccount if using WorkloadIdentity
+		if cluster.WorkloadIdentity != nil {
+			if err := n.syncWIFServiceAccount(ctx, cluster); err != nil {
+				return err
+			}
+		}
+
 		// Sync ConfigMap for this external cluster
 		if err := n.syncExternalClusterConfigMap(ctx, integrationMrn, clusterUid, cluster); err != nil {
 			return err
@@ -341,6 +404,7 @@ func (n *DeploymentHandler) cleanupOrphanedExternalClusterResources(ctx context.
 				return err
 			}
 
+			// Delete inventory ConfigMap
 			configMap := &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      ExternalClusterConfigMapName(n.Mondoo.Name, clusterName),
@@ -349,6 +413,30 @@ func (n *DeploymentHandler) cleanupOrphanedExternalClusterResources(ctx context.
 			}
 			if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
 				logger.Error(err, "failed to delete orphaned ConfigMap for external cluster", "cluster", clusterName)
+				return err
+			}
+
+			// Delete SA kubeconfig ConfigMap (if exists)
+			saKubeconfigCM := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ExternalClusterSAKubeconfigName(n.Mondoo.Name, clusterName),
+					Namespace: n.Mondoo.Namespace,
+				},
+			}
+			if err := k8s.DeleteIfExists(ctx, n.KubeClient, saKubeconfigCM); err != nil {
+				logger.Error(err, "failed to delete orphaned SA kubeconfig ConfigMap for external cluster", "cluster", clusterName)
+				return err
+			}
+
+			// Delete WIF ServiceAccount (if exists)
+			wifSA := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      WIFServiceAccountName(n.Mondoo.Name, clusterName),
+					Namespace: n.Mondoo.Namespace,
+				},
+			}
+			if err := k8s.DeleteIfExists(ctx, n.KubeClient, wifSA); err != nil {
+				logger.Error(err, "failed to delete orphaned WIF ServiceAccount for external cluster", "cluster", clusterName)
 				return err
 			}
 
@@ -430,5 +518,86 @@ func (n *DeploymentHandler) cleanupWorkloadDeployment(ctx context.Context) error
 		logger.Error(err, "failed to cleanup configmap", "namespace", cfgMap.Namespace, "name", cfgMap.Name)
 		return err
 	}
+	return nil
+}
+
+// syncExternalClusterSAKubeconfigConfigMap syncs a ConfigMap containing the generated kubeconfig for ServiceAccountAuth
+func (n *DeploymentHandler) syncExternalClusterSAKubeconfigConfigMap(ctx context.Context, cluster v1alpha2.ExternalCluster) error {
+	existing := &corev1.ConfigMap{}
+	desired := ExternalClusterSAKubeconfigConfigMap(cluster, n.Mondoo)
+
+	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
+		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
+		return err
+	}
+
+	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
+	if err != nil {
+		logger.Error(err, "Failed to create SA kubeconfig ConfigMap for external cluster", "cluster", cluster.Name)
+		return err
+	}
+
+	if created {
+		logger.Info("Created SA kubeconfig ConfigMap for external cluster", "cluster", cluster.Name)
+		return nil
+	}
+
+	if existing.Data["kubeconfig"] != desired.Data["kubeconfig"] ||
+		!reflect.DeepEqual(existing.GetOwnerReferences(), desired.GetOwnerReferences()) {
+		existing.Data["kubeconfig"] = desired.Data["kubeconfig"]
+		existing.SetOwnerReferences(desired.GetOwnerReferences())
+
+		if err := n.KubeClient.Update(ctx, existing); err != nil {
+			logger.Error(err, "Failed to update SA kubeconfig ConfigMap for external cluster", "cluster", cluster.Name)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// syncWIFServiceAccount syncs a ServiceAccount with cloud-specific annotations for Workload Identity Federation
+func (n *DeploymentHandler) syncWIFServiceAccount(ctx context.Context, cluster v1alpha2.ExternalCluster) error {
+	desired := WIFServiceAccount(cluster, n.Mondoo)
+
+	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
+		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
+		return err
+	}
+
+	existing := &corev1.ServiceAccount{}
+	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
+	if err != nil {
+		logger.Error(err, "Failed to create WIF ServiceAccount for external cluster", "cluster", cluster.Name)
+		return err
+	}
+
+	if created {
+		logger.Info("Created WIF ServiceAccount for external cluster", "cluster", cluster.Name)
+		return nil
+	}
+
+	// Update if annotations or labels changed
+	needsUpdate := false
+	if !reflect.DeepEqual(existing.Annotations, desired.Annotations) {
+		existing.Annotations = desired.Annotations
+		needsUpdate = true
+	}
+	if !reflect.DeepEqual(existing.Labels, desired.Labels) {
+		existing.Labels = desired.Labels
+		needsUpdate = true
+	}
+	if !reflect.DeepEqual(existing.GetOwnerReferences(), desired.GetOwnerReferences()) {
+		existing.SetOwnerReferences(desired.GetOwnerReferences())
+		needsUpdate = true
+	}
+
+	if needsUpdate {
+		if err := n.KubeClient.Update(ctx, existing); err != nil {
+			logger.Error(err, "Failed to update WIF ServiceAccount for external cluster", "cluster", cluster.Name)
+			return err
+		}
+	}
+
 	return nil
 }
