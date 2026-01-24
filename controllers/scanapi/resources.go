@@ -56,6 +56,21 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alp
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
+	// Build proxy environment variables
+	var proxyEnvVars []corev1.EnvVar
+	if cfg.Spec.HttpProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTP_PROXY", Value: *cfg.Spec.HttpProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "http_proxy", Value: *cfg.Spec.HttpProxy})
+	}
+	if cfg.Spec.HttpsProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTPS_PROXY", Value: *cfg.Spec.HttpsProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "https_proxy", Value: *cfg.Spec.HttpsProxy})
+	}
+	if cfg.Spec.NoProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "NO_PROXY", Value: *cfg.Spec.NoProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "no_proxy", Value: *cfg.Spec.NoProxy})
+	}
+
 	healthcheckEndpoint := "/Scan/HealthCheck"
 	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources, k8s.DefaultCnspecResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
@@ -268,8 +283,16 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alp
 		})
 	}
 
+	// Add proxy environment variables from MondooOperatorConfig
+	scanApiDeployment.Spec.Template.Spec.Containers[0].Env = append(scanApiDeployment.Spec.Template.Spec.Containers[0].Env, proxyEnvVars...)
+
 	// Merge the operator env for the scanner with the one provided in the MondooAuditConfig
 	scanApiDeployment.Spec.Template.Spec.Containers[0].Env = k8s.MergeEnv(scanApiDeployment.Spec.Template.Spec.Containers[0].Env, m.Spec.Scanner.Env)
+
+	// Add imagePullSecrets from MondooOperatorConfig
+	if len(cfg.Spec.ImagePullSecrets) > 0 {
+		scanApiDeployment.Spec.Template.Spec.ImagePullSecrets = cfg.Spec.ImagePullSecrets
+	}
 
 	if deployOnOpenShift {
 		// OpenShift will set its own UID in the range assinged to the Namespace the Pod is running

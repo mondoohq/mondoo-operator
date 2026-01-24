@@ -45,6 +45,21 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
+
+	// Add proxy environment variables from MondooOperatorConfig
+	if cfg.Spec.HttpProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{Name: "HTTP_PROXY", Value: *cfg.Spec.HttpProxy})
+		envVars = append(envVars, corev1.EnvVar{Name: "http_proxy", Value: *cfg.Spec.HttpProxy})
+	}
+	if cfg.Spec.HttpsProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{Name: "HTTPS_PROXY", Value: *cfg.Spec.HttpsProxy})
+		envVars = append(envVars, corev1.EnvVar{Name: "https_proxy", Value: *cfg.Spec.HttpsProxy})
+	}
+	if cfg.Spec.NoProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{Name: "NO_PROXY", Value: *cfg.Spec.NoProxy})
+		envVars = append(envVars, corev1.EnvVar{Name: "no_proxy", Value: *cfg.Spec.NoProxy})
+	}
+
 	envVars = k8s.MergeEnv(envVars, m.Spec.Containers.Env)
 
 	cronjob := &batchv1.CronJob{
@@ -182,6 +197,11 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 			Name:  "DOCKER_CONFIG",
 			Value: "/etc/opt/mondoo/docker", // the client automatically adds '/config.json' to the path
 		})
+	}
+
+	// Add imagePullSecrets from MondooOperatorConfig
+	if len(cfg.Spec.ImagePullSecrets) > 0 {
+		cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = cfg.Spec.ImagePullSecrets
 	}
 
 	return cronjob

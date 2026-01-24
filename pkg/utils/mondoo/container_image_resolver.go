@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/go-logr/logr"
 
@@ -41,6 +42,10 @@ type ContainerImageResolver interface {
 	// MondooOperatorImage return the Mondoo operator image. If skipResolveImage is false, then the image tag is replaced
 	// by a digest. If userImage or userTag are empty strings, default values are used.
 	MondooOperatorImage(ctx context.Context, userImage, userTag string, skipImageResolution bool) (string, error)
+
+	// WithImageRegistry returns a new ContainerImageResolver that uses the specified image registry.
+	// This allows rewriting image references to use a custom registry (e.g., corporate Artifactory mirror).
+	WithImageRegistry(imageRegistry string) ContainerImageResolver
 }
 
 type containerImageResolver struct {
@@ -50,9 +55,14 @@ type containerImageResolver struct {
 	kubeClient           client.Client
 	operatorPodName      string
 	operatorPodNamespace string
+	imageRegistry        string
 }
 
 func NewContainerImageResolver(kubeClient client.Client, isOpenShift bool) ContainerImageResolver {
+	return NewContainerImageResolverWithRegistry(kubeClient, isOpenShift, "")
+}
+
+func NewContainerImageResolverWithRegistry(kubeClient client.Client, isOpenShift bool, imageRegistry string) ContainerImageResolver {
 	podName := os.Getenv(PodNameEnvVar)
 	if podName == "" {
 		podName = "mondoo-operator-controller-manager"
@@ -69,6 +79,7 @@ func NewContainerImageResolver(kubeClient client.Client, isOpenShift bool) Conta
 		kubeClient:           kubeClient,
 		operatorPodName:      podName,
 		operatorPodNamespace: podNamespace,
+		imageRegistry:        imageRegistry,
 	}
 }
 
@@ -114,6 +125,9 @@ func (c *containerImageResolver) MondooOperatorImage(ctx context.Context, userIm
 }
 
 func (c *containerImageResolver) resolveImage(image string, skipImageResolution bool) (string, error) {
+	// Apply custom image registry prefix if configured
+	image = c.applyImageRegistry(image)
+
 	if skipImageResolution {
 		return image, nil
 	}
@@ -125,6 +139,79 @@ func (c *containerImageResolver) resolveImage(image string, skipImageResolution 
 	}
 
 	return imageWithDigest, nil
+}
+
+// applyImageRegistry rewrites the image to use a custom registry if configured.
+// For example, if imageRegistry is "artifactory.example.com/ghcr.io.docker" and
+// the image is "ghcr.io/mondoohq/mondoo-operator:v1.0.0", it will be rewritten to
+// "artifactory.example.com/ghcr.io.docker/mondoohq/mondoo-operator:v1.0.0"
+func (c *containerImageResolver) applyImageRegistry(image string) string {
+	if c.imageRegistry == "" {
+		return image
+	}
+
+	// Parse the image to extract registry, repository, and tag
+	// Image format: [registry/]repository[:tag][@digest]
+	// Examples:
+	//   ghcr.io/mondoohq/mondoo-operator:v1.0.0
+	//   mondoohq/mondoo-operator:v1.0.0
+	//   mondoo-operator:v1.0.0
+
+	// Check if image starts with a known registry (contains a dot before the first slash)
+	parts := splitImageParts(image)
+	if parts.registry != "" {
+		// Replace the registry with the custom one
+		// e.g., ghcr.io/mondoohq/mondoo-operator -> artifactory.example.com/ghcr.io.docker/mondoohq/mondoo-operator
+		return fmt.Sprintf("%s/%s", c.imageRegistry, parts.repositoryWithTag)
+	}
+
+	// No registry in the image, just prepend the custom registry
+	return fmt.Sprintf("%s/%s", c.imageRegistry, image)
+}
+
+type imageParts struct {
+	registry          string
+	repositoryWithTag string
+}
+
+func splitImageParts(image string) imageParts {
+	// Find the first slash
+	slashIdx := -1
+	for i, c := range image {
+		if c == '/' {
+			slashIdx = i
+			break
+		}
+	}
+
+	if slashIdx == -1 {
+		// No slash, no registry (e.g., "ubuntu:latest")
+		return imageParts{registry: "", repositoryWithTag: image}
+	}
+
+	potentialRegistry := image[:slashIdx]
+	// Check if it looks like a registry (contains a dot or colon, or is "localhost")
+	if strings.Contains(potentialRegistry, ".") || strings.Contains(potentialRegistry, ":") || potentialRegistry == "localhost" {
+		return imageParts{
+			registry:          potentialRegistry,
+			repositoryWithTag: image[slashIdx+1:],
+		}
+	}
+
+	// No registry, the first part is part of the repository (e.g., "library/ubuntu:latest")
+	return imageParts{registry: "", repositoryWithTag: image}
+}
+
+func (c *containerImageResolver) WithImageRegistry(imageRegistry string) ContainerImageResolver {
+	return &containerImageResolver{
+		logger:               c.logger,
+		resolveForOpenShift:  c.resolveForOpenShift,
+		imageCacher:          c.imageCacher,
+		kubeClient:           c.kubeClient,
+		operatorPodName:      c.operatorPodName,
+		operatorPodNamespace: c.operatorPodNamespace,
+		imageRegistry:        imageRegistry,
+	}
 }
 
 func userImageOrDefault(defaultImage, defaultTag, userImage, userTag string) string {

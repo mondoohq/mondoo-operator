@@ -28,8 +28,19 @@ type MondooOperatorConfigSpec struct {
 	SkipContainerResolution bool `json:"skipContainerResolution,omitempty"`
 	// HttpProxy specifies a proxy to use for HTTP requests to the Mondoo Platform.
 	HttpProxy *string `json:"httpProxy,omitempty"`
+	// HttpsProxy specifies a proxy to use for HTTPS requests to the Mondoo Platform.
+	HttpsProxy *string `json:"httpsProxy,omitempty"`
+	// NoProxy specifies a comma-separated list of hosts that should not use the proxy.
+	NoProxy *string `json:"noProxy,omitempty"`
 	// ContainerProxy specifies a proxy to use for container images.
 	ContainerProxy *string `json:"containerProxy,omitempty"`
+	// ImagePullSecrets specifies the name of the Secret to use for pulling images for all Mondoo components.
+	// The secret must be of type kubernetes.io/dockerconfigjson.
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	// ImageRegistry specifies a custom container image registry to use for all Mondoo images.
+	// This allows using a private registry mirror (e.g., artifactory.example.com/ghcr.io.docker).
+	// If set, all image references will be prefixed with this registry.
+	ImageRegistry *string `json:"imageRegistry,omitempty"`
 }
 
 type Metrics struct {

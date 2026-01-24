@@ -85,6 +85,13 @@ func (n *DeploymentHandler) syncValidatingWebhookConfiguration(ctx context.Conte
 		existingVWC.Webhooks = vwc.Webhooks
 		existingVWC.Labels = vwc.Labels
 
+		// Copy namespace selectors from desired to existing
+		for i := range existingVWC.Webhooks {
+			if i < len(vwc.Webhooks) {
+				existingVWC.Webhooks[i].NamespaceSelector = vwc.Webhooks[i].NamespaceSelector
+			}
+		}
+
 		if existingVWC.Annotations == nil {
 			existingVWC.Annotations = map[string]string{}
 		}
@@ -131,6 +138,10 @@ func deepEqualsValidatingWebhookConfiguration(existing, desired *webhooksv1.Vali
 		}
 
 		if existing.Webhooks[i].Name != desired.Webhooks[i].Name {
+			return false
+		}
+
+		if !reflect.DeepEqual(existing.Webhooks[i].NamespaceSelector, desired.Webhooks[i].NamespaceSelector) {
 			return false
 		}
 
@@ -229,7 +240,7 @@ func (n *DeploymentHandler) syncWebhookDeployment(ctx context.Context) error {
 		return err
 	}
 
-	desiredDeployment := WebhookDeployment(n.TargetNamespace, mondooOperatorImage, *n.Mondoo, integrationMRN, clusterID)
+	desiredDeployment := WebhookDeployment(n.TargetNamespace, mondooOperatorImage, *n.Mondoo, *n.MondooOperatorConfig, integrationMRN, clusterID)
 	if err := n.setControllerRef(desiredDeployment); err != nil {
 		return err
 	}

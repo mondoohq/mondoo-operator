@@ -23,3 +23,7 @@ func (c *noOpContainerImageResolver) CnspecImage(userImage, userTag string, skip
 func (c *noOpContainerImageResolver) MondooOperatorImage(ctx context.Context, userImage, userTag string, skipResolveImage bool) (string, error) {
 	return fmt.Sprintf("%s:%s", mondoo.MondooOperatorImage, mondoo.MondooOperatorTag), nil
 }
+
+func (c *noOpContainerImageResolver) WithImageRegistry(imageRegistry string) mondoo.ContainerImageResolver {
+	return c
+}

@@ -1,0 +1,31 @@
+{{- if .Values.operator.createConfig }}
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooOperatorConfig
+metadata:
+  name: mondoo-operator-config
+  labels:
+  {{- include "mondoo-operator.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.operator.httpProxy }}
+  httpProxy: {{ .Values.operator.httpProxy | quote }}
+  {{- end }}
+  {{- if .Values.operator.httpsProxy }}
+  httpsProxy: {{ .Values.operator.httpsProxy | quote }}
+  {{- end }}
+  {{- if .Values.operator.noProxy }}
+  noProxy: {{ .Values.operator.noProxy | quote }}
+  {{- end }}
+  {{- if .Values.operator.containerProxy }}
+  containerProxy: {{ .Values.operator.containerProxy | quote }}
+  {{- end }}
+  {{- if .Values.operator.imagePullSecrets }}
+  imagePullSecrets:
+  {{- toYaml .Values.operator.imagePullSecrets | nindent 4 }}
+  {{- end }}
+  {{- if .Values.operator.imageRegistry }}
+  imageRegistry: {{ .Values.operator.imageRegistry | quote }}
+  {{- end }}
+  {{- if .Values.operator.skipContainerResolution }}
+  skipContainerResolution: {{ .Values.operator.skipContainerResolution }}
+  {{- end }}
+{{- end }}

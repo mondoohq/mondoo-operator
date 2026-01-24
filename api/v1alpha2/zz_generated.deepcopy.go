@@ -397,8 +397,28 @@ func (in *MondooOperatorConfigSpec) DeepCopyInto(out *MondooOperatorConfigSpec) 
 		*out = new(string)
 		**out = **in
 	}
+	if in.HttpsProxy != nil {
+		in, out := &in.HttpsProxy, &out.HttpsProxy
+		*out = new(string)
+		**out = **in
+	}
+	if in.NoProxy != nil {
+		in, out := &in.NoProxy, &out.NoProxy
+		*out = new(string)
+		**out = **in
+	}
 	if in.ContainerProxy != nil {
 		in, out := &in.ContainerProxy, &out.ContainerProxy
+		*out = new(string)
+		**out = **in
+	}
+	if in.ImagePullSecrets != nil {
+		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
+		*out = make([]v1.LocalObjectReference, len(*in))
+		copy(*out, *in)
+	}
+	if in.ImageRegistry != nil {
+		in, out := &in.ImageRegistry, &out.ImageRegistry
 		*out = new(string)
 		**out = **in
 	}

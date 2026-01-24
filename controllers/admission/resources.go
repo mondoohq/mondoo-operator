@@ -52,7 +52,7 @@ func GetTLSCertificatesSecretName(mondooAuditConfigName string) string {
 	return fmt.Sprintf(webhookTLSSecretNameTemplate, mondooAuditConfigName)
 }
 
-func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, integrationMRN, clusterID string) *appsv1.Deployment {
+func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, cfg mondoov1alpha2.MondooOperatorConfig, integrationMRN, clusterID string) *appsv1.Deployment {
 	scanApiUrl := scanapi.ScanApiServiceUrl(m)
 
 	containerArgs := []string{
@@ -73,6 +73,21 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 
 	if integrationMRN != "" {
 		containerArgs = append(containerArgs, []string{"--integration-mrn", integrationMRN}...)
+	}
+
+	// Build proxy environment variables
+	var proxyEnvVars []corev1.EnvVar
+	if cfg.Spec.HttpProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTP_PROXY", Value: *cfg.Spec.HttpProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "http_proxy", Value: *cfg.Spec.HttpProxy})
+	}
+	if cfg.Spec.HttpsProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTPS_PROXY", Value: *cfg.Spec.HttpsProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "https_proxy", Value: *cfg.Spec.HttpsProxy})
+	}
+	if cfg.Spec.NoProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "NO_PROXY", Value: *cfg.Spec.NoProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "no_proxy", Value: *cfg.Spec.NoProxy})
 	}
 
 	deployment := &appsv1.Deployment{
@@ -106,8 +121,10 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 										Port: intstr.FromInt(8081),
 									},
 								},
-								InitialDelaySeconds: int32(15),
+								InitialDelaySeconds: int32(30),
 								PeriodSeconds:       int32(20),
+								TimeoutSeconds:      int32(10),
+								FailureThreshold:    int32(3),
 							},
 							Env:  feature_flags.AllFeatureFlagsAsEnv(),
 							Name: "webhook",
@@ -118,17 +135,19 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 										Port: intstr.FromInt(8081),
 									},
 								},
-								InitialDelaySeconds: int32(5),
-								PeriodSeconds:       int32(5),
+								InitialDelaySeconds: int32(10),
+								PeriodSeconds:       int32(10),
+								TimeoutSeconds:      int32(5),
+								FailureThreshold:    int32(3),
 							},
 							Resources: corev1.ResourceRequirements{
 								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("200m"),
-									corev1.ResourceMemory: resource.MustParse("50Mi"),
+									corev1.ResourceCPU:    resource.MustParse("500m"),
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
 								},
 								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("100m"),
-									corev1.ResourceMemory: resource.MustParse("30Mi"),
+									corev1.ResourceCPU:    resource.MustParse("200m"),
+									corev1.ResourceMemory: resource.MustParse("64Mi"),
 								},
 							},
 							SecurityContext: &corev1.SecurityContext{
@@ -203,6 +222,14 @@ func WebhookDeployment(ns, image string, m mondoov1alpha2.MondooAuditConfig, int
 				},
 			},
 		},
+	}
+
+	// Add proxy environment variables
+	deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, proxyEnvVars...)
+
+	// Add imagePullSecrets from MondooOperatorConfig
+	if len(cfg.Spec.ImagePullSecrets) > 0 {
+		deployment.Spec.Template.Spec.ImagePullSecrets = cfg.Spec.ImagePullSecrets
 	}
 
 	return deployment

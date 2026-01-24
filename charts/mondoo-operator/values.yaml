@@ -57,3 +57,29 @@ metricsService:
 webhook:
   serviceAccount:
     annotations: {}
+
+# Mondoo Operator Configuration
+# These settings are applied to the MondooOperatorConfig custom resource
+operator:
+  # Create MondooOperatorConfig resource (set to false on first install, then true on upgrade)
+  createConfig: false
+  # HTTP proxy for outbound connections to Mondoo Platform
+  httpProxy: ""
+  # HTTPS proxy for outbound connections to Mondoo Platform
+  httpsProxy: ""
+  # Comma-separated list of hosts that should bypass the proxy
+  noProxy: ""
+  # Container proxy for pulling container images (used in container image scanning)
+  containerProxy: ""
+  # Image pull secrets for pulling Mondoo images from private registries
+  # Example:
+  # imagePullSecrets:
+  #   - name: my-registry-secret
+  imagePullSecrets: []
+  # Custom image registry prefix for corporate registries
+  # Example: "artifactory.devops.telekom.de/ghcr.io.docker"
+  # This will rewrite image references like:
+  #   ghcr.io/mondoohq/mondoo-operator:v1.0.0 -> artifactory.devops.telekom.de/ghcr.io.docker/mondoohq/mondoo-operator:v1.0.0
+  imageRegistry: ""
+  # Skip container image resolution (useful for air-gapped environments)
+  skipContainerResolution: false
