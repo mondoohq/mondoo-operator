@@ -76,10 +76,18 @@ operator:
   # imagePullSecrets:
   #   - name: my-registry-secret
   imagePullSecrets: []
-  # Custom image registry prefix for corporate registries
-  # Example: "artifactory.devops.telekom.de/ghcr.io.docker"
+  # Custom image registry prefix for corporate registries (deprecated, use registryMirrors)
+  # Example: "registry.example.com/ghcr.io.docker"
   # This will rewrite image references like:
-  #   ghcr.io/mondoohq/mondoo-operator:v1.0.0 -> artifactory.devops.telekom.de/ghcr.io.docker/mondoohq/mondoo-operator:v1.0.0
+  #   ghcr.io/mondoohq/mondoo-operator:v1.0.0 -> registry.example.com/ghcr.io.docker/mondoohq/mondoo-operator:v1.0.0
   imageRegistry: ""
+  # Registry mirrors for mapping public registries to private mirrors
+  # This is more flexible than imageRegistry as it supports multiple registries
+  # Example:
+  # registryMirrors:
+  #   ghcr.io: registry.example.com/ghcr.io.docker
+  #   docker.io: registry.example.com/hub.docker.com
+  #   quay.io: registry.example.com/quay.io
+  registryMirrors: {}
   # Skip container image resolution (useful for air-gapped environments)
   skipContainerResolution: false

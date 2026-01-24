@@ -25,6 +25,10 @@ spec:
   {{- if .Values.operator.imageRegistry }}
   imageRegistry: {{ .Values.operator.imageRegistry | quote }}
   {{- end }}
+  {{- if .Values.operator.registryMirrors }}
+  registryMirrors:
+  {{- toYaml .Values.operator.registryMirrors | nindent 4 }}
+  {{- end }}
   {{- if .Values.operator.skipContainerResolution }}
   skipContainerResolution: {{ .Values.operator.skipContainerResolution }}
   {{- end }}

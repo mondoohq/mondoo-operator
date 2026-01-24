@@ -40,7 +40,16 @@ type MondooOperatorConfigSpec struct {
 	// ImageRegistry specifies a custom container image registry to use for all Mondoo images.
 	// This allows using a private registry mirror (e.g., artifactory.example.com/ghcr.io.docker).
 	// If set, all image references will be prefixed with this registry.
+	// Deprecated: Use RegistryMirrors for more flexible registry mapping.
 	ImageRegistry *string `json:"imageRegistry,omitempty"`
+	// RegistryMirrors specifies a mapping of public registries to private mirrors.
+	// The key is the public registry (e.g., "ghcr.io", "docker.io", "quay.io")
+	// and the value is the private mirror (e.g., "artifactory.example.com/ghcr.io.docker").
+	// Example:
+	//   registryMirrors:
+	//     ghcr.io: artifactory.example.com/ghcr.io.docker
+	//     docker.io: artifactory.example.com/hub.docker.com
+	RegistryMirrors map[string]string `json:"registryMirrors,omitempty"`
 }
 
 type Metrics struct {

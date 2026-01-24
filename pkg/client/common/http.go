@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -23,6 +24,10 @@ const (
 )
 
 func DefaultHttpClient(httpProxy *string, httpTimeout *time.Duration) (http.Client, error) {
+	return DefaultHttpClientWithNoProxy(httpProxy, nil, httpTimeout)
+}
+
+func DefaultHttpClientWithNoProxy(httpProxy *string, noProxy *string, httpTimeout *time.Duration) (http.Client, error) {
 	tr := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
@@ -40,7 +45,13 @@ func DefaultHttpClient(httpProxy *string, httpTimeout *time.Duration) (http.Clie
 		if err != nil {
 			return http.Client{}, err
 		}
-		tr.Proxy = http.ProxyURL(urlParsed)
+		// Create a proxy function that respects noProxy settings
+		tr.Proxy = func(req *http.Request) (*url.URL, error) {
+			if noProxy != nil && shouldBypassProxy(req.URL.Host, *noProxy) {
+				return nil, nil // No proxy for this host
+			}
+			return urlParsed, nil
+		}
 	}
 	timeout := defaultHttpTimeout
 	if httpTimeout != nil {
@@ -50,6 +61,59 @@ func DefaultHttpClient(httpProxy *string, httpTimeout *time.Duration) (http.Clie
 		Transport: tr,
 		Timeout:   timeout,
 	}, nil
+}
+
+// shouldBypassProxy checks if the given host should bypass the proxy based on noProxy settings
+func shouldBypassProxy(host string, noProxy string) bool {
+	if noProxy == "" {
+		return false
+	}
+
+	// Remove port from host if present
+	hostWithoutPort := host
+	if colonIndex := strings.LastIndex(host, ":"); colonIndex != -1 {
+		hostWithoutPort = host[:colonIndex]
+	}
+
+	// Check each entry in the noProxy list
+	for _, entry := range strings.Split(noProxy, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+
+		// Handle wildcard "*" - bypass all
+		if entry == "*" {
+			return true
+		}
+
+		// Handle domain suffix matching (e.g., ".example.com" matches "api.mondoo.example.com")
+		if strings.HasPrefix(entry, ".") {
+			if strings.HasSuffix(hostWithoutPort, entry) || hostWithoutPort == entry[1:] {
+				return true
+			}
+			continue
+		}
+
+		// Handle CIDR notation for IP ranges
+		if strings.Contains(entry, "/") {
+			_, cidr, err := net.ParseCIDR(entry)
+			if err == nil {
+				ip := net.ParseIP(hostWithoutPort)
+				if ip != nil && cidr.Contains(ip) {
+					return true
+				}
+			}
+			continue
+		}
+
+		// Exact match or suffix match
+		if hostWithoutPort == entry || strings.HasSuffix(hostWithoutPort, "."+entry) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func Request(ctx context.Context, client http.Client, url, token string, reqBodyBytes []byte) ([]byte, error) {
