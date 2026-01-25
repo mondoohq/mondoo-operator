@@ -21,7 +21,7 @@ import (
 
 const CronJobNameSuffix = "-k8s-scan"
 
-func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(*m)
 	scanApiUrl := scanapi.ScanApiServiceUrl(*m)
 
@@ -105,7 +105,7 @@ func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditCo
 											ReadOnly:  true,
 										},
 									},
-									Env: feature_flags.AllFeatureFlagsAsEnv(),
+									Env: buildEnvVars(cfg),
 								},
 							},
 							Volumes: []corev1.Volume{
@@ -119,6 +119,7 @@ func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditCo
 									},
 								},
 							},
+							ImagePullSecrets: cfg.Spec.ImagePullSecrets,
 						},
 					},
 				},
@@ -139,4 +140,24 @@ func CronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 
 func CronJobName(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, CronJobNameSuffix)
+}
+
+func buildEnvVars(cfg v1alpha2.MondooOperatorConfig) []corev1.EnvVar {
+	envVars := feature_flags.AllFeatureFlagsAsEnv()
+
+	// Add proxy environment variables from MondooOperatorConfig
+	if cfg.Spec.HttpProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{Name: "HTTP_PROXY", Value: *cfg.Spec.HttpProxy})
+		envVars = append(envVars, corev1.EnvVar{Name: "http_proxy", Value: *cfg.Spec.HttpProxy})
+	}
+	if cfg.Spec.HttpsProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{Name: "HTTPS_PROXY", Value: *cfg.Spec.HttpsProxy})
+		envVars = append(envVars, corev1.EnvVar{Name: "https_proxy", Value: *cfg.Spec.HttpsProxy})
+	}
+	if cfg.Spec.NoProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{Name: "NO_PROXY", Value: *cfg.Spec.NoProxy})
+		envVars = append(envVars, corev1.EnvVar{Name: "no_proxy", Value: *cfg.Spec.NoProxy})
+	}
+
+	return envVars
 }

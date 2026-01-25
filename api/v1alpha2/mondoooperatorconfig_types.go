@@ -50,6 +50,11 @@ type MondooOperatorConfigSpec struct {
 	//     ghcr.io: artifactory.example.com/ghcr.io.docker
 	//     docker.io: artifactory.example.com/hub.docker.com
 	RegistryMirrors map[string]string `json:"registryMirrors,omitempty"`
+	// SkipProxyForCnspec disables proxy environment variables for cnspec-based components
+	// (scan-api, container scanning). Use this when the Mondoo API is accessible directly
+	// without proxy (e.g., internal mirror) but other components need proxy for external access.
+	// Default: false (proxy settings are applied to all components)
+	SkipProxyForCnspec bool `json:"skipProxyForCnspec,omitempty"`
 }
 
 type Metrics struct {

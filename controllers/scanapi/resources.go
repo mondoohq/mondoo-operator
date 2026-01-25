@@ -52,23 +52,27 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alp
 		"--http-timeout", "1800",
 	}
 
-	if cfg.Spec.HttpProxy != nil {
-		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
-	}
-
-	// Build proxy environment variables
+	// Only add proxy settings if SkipProxyForCnspec is false
+	// cnspec-based components may not properly handle NO_PROXY for internal domains
 	var proxyEnvVars []corev1.EnvVar
-	if cfg.Spec.HttpProxy != nil {
-		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTP_PROXY", Value: *cfg.Spec.HttpProxy})
-		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "http_proxy", Value: *cfg.Spec.HttpProxy})
-	}
-	if cfg.Spec.HttpsProxy != nil {
-		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTPS_PROXY", Value: *cfg.Spec.HttpsProxy})
-		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "https_proxy", Value: *cfg.Spec.HttpsProxy})
-	}
-	if cfg.Spec.NoProxy != nil {
-		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "NO_PROXY", Value: *cfg.Spec.NoProxy})
-		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "no_proxy", Value: *cfg.Spec.NoProxy})
+	if !cfg.Spec.SkipProxyForCnspec {
+		if cfg.Spec.HttpProxy != nil {
+			cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
+		}
+
+		// Build proxy environment variables
+		if cfg.Spec.HttpProxy != nil {
+			proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTP_PROXY", Value: *cfg.Spec.HttpProxy})
+			proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "http_proxy", Value: *cfg.Spec.HttpProxy})
+		}
+		if cfg.Spec.HttpsProxy != nil {
+			proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTPS_PROXY", Value: *cfg.Spec.HttpsProxy})
+			proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "https_proxy", Value: *cfg.Spec.HttpsProxy})
+		}
+		if cfg.Spec.NoProxy != nil {
+			proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "NO_PROXY", Value: *cfg.Spec.NoProxy})
+			proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "no_proxy", Value: *cfg.Spec.NoProxy})
+		}
 	}
 
 	healthcheckEndpoint := "/Scan/HealthCheck"

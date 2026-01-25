@@ -45,6 +45,8 @@ type urlRequest struct {
 	integrationMrn    string
 	includeNamespaces []string
 	excludeNamespaces []string
+	httpProxy         *string
+	noProxy           *string
 }
 
 type scanApiStore struct {
@@ -82,7 +84,12 @@ func (s *scanApiStore) Start() {
 			switch req.requestType {
 			case AddRequest:
 				client, err := s.scanApiClientBuilder(
-					scanapiclient.ScanApiClientOptions{ApiEndpoint: req.url, Token: req.token})
+					scanapiclient.ScanApiClientOptions{
+						ApiEndpoint: req.url,
+						Token:       req.token,
+						HttpProxy:   req.httpProxy,
+						NoProxy:     req.noProxy,
+					})
 				if err != nil {
 					logger.Error(err, "Failed to create scan api client", "url", req.url)
 					continue
@@ -114,6 +121,8 @@ type ScanApiStoreAddOpts struct {
 	IntegrationMrn    string
 	IncludeNamespaces []string
 	ExcludeNamespaces []string
+	HttpProxy         *string
+	NoProxy           *string
 }
 
 // Add adds a scan api url to the store. The operatorion is idempotent.
@@ -125,6 +134,8 @@ func (s *scanApiStore) Add(opts *ScanApiStoreAddOpts) {
 		integrationMrn:    opts.IntegrationMrn,
 		includeNamespaces: opts.IncludeNamespaces,
 		excludeNamespaces: opts.ExcludeNamespaces,
+		httpProxy:         opts.HttpProxy,
+		noProxy:           opts.NoProxy,
 	}
 }
 

@@ -28,6 +28,8 @@ type ScanApiClientOptions struct {
 	ApiEndpoint string
 	Token       string
 	HttpTimeout *time.Duration
+	HttpProxy   *string
+	NoProxy     *string
 }
 
 type scanApiClient struct {
@@ -38,7 +40,7 @@ type scanApiClient struct {
 
 func NewClient(opts ScanApiClientOptions) (ScanApiClient, error) {
 	opts.ApiEndpoint = strings.TrimRight(opts.ApiEndpoint, "/")
-	client, err := common.DefaultHttpClient(nil, opts.HttpTimeout)
+	client, err := common.DefaultHttpClientWithNoProxy(opts.HttpProxy, opts.NoProxy, opts.HttpTimeout)
 	if err != nil {
 		return nil, err
 	}

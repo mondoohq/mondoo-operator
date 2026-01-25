@@ -18,7 +18,7 @@ import (
 
 // HandleAuditConfig adds the scan API service URL, token and integration MRN to the scan API store if the provided MondooAuditConfig has k8s
 // resources enabled.
-func HandleAuditConfig(ctx context.Context, kubeClient client.Client, scanApiStore ScanApiStore, auditConfig v1alpha2.MondooAuditConfig) error {
+func HandleAuditConfig(ctx context.Context, kubeClient client.Client, scanApiStore ScanApiStore, auditConfig v1alpha2.MondooAuditConfig, config v1alpha2.MondooOperatorConfig) error {
 	if auditConfig.Spec.KubernetesResources.Enable {
 		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: scanapi.TokenSecretName(auditConfig.Name), Namespace: auditConfig.Namespace}}
 		if err := kubeClient.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
@@ -35,6 +35,8 @@ func HandleAuditConfig(ctx context.Context, kubeClient client.Client, scanApiSto
 			IntegrationMrn:    integrationMrn,
 			IncludeNamespaces: auditConfig.Spec.Filtering.Namespaces.Include,
 			ExcludeNamespaces: auditConfig.Spec.Filtering.Namespaces.Exclude,
+			HttpProxy:         config.Spec.HttpProxy,
+			NoProxy:           config.Spec.NoProxy,
 		}
 		scanApiStore.Add(opts)
 	}

@@ -89,5 +89,11 @@ operator:
   #   docker.io: registry.example.com/hub.docker.com
   #   quay.io: registry.example.com/quay.io
   registryMirrors: {}
+  
+  # Skip proxy settings for cnspec-based components (scan-api, container scanning)
+  # Set to true when using an internal Mondoo API mirror that doesn't require proxy
+  # but other components still need proxy for external access (e.g., image resolution)
+  # Default: false (proxy settings are applied to all components)
+  skipProxyForCnspec: false
   # Skip container image resolution (useful for air-gapped environments)
   skipContainerResolution: false

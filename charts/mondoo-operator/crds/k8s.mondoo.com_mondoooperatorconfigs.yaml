@@ -113,6 +113,13 @@ spec:
               skipContainerResolution:
                 description: Allows skipping Image resolution from upstream repository
                 type: boolean
+              skipProxyForCnspec:
+                description: |-
+                  SkipProxyForCnspec disables proxy environment variables for cnspec-based components
+                  (scan-api, container scanning). Use this when the Mondoo API is accessible directly
+                  without proxy (e.g., internal mirror) but other components need proxy for external access.
+                  Default: false (proxy settings are applied to all components)
+                type: boolean
             type: object
           status:
             description: MondooOperatorConfigStatus defines the observed state of

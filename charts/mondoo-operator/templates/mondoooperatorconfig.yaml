@@ -32,4 +32,7 @@ spec:
   {{- if .Values.operator.skipContainerResolution }}
   skipContainerResolution: {{ .Values.operator.skipContainerResolution }}
   {{- end }}
+  {{- if .Values.operator.skipProxyForCnspec }}
+  skipProxyForCnspec: {{ .Values.operator.skipProxyForCnspec }}
+  {{- end }}
 {{- end }}
