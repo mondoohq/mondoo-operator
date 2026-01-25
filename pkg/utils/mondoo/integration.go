@@ -17,6 +17,7 @@ func IntegrationCheckIn(
 	sa mondooclient.ServiceAccountCredentials,
 	mondooClientBuilder MondooClientBuilder,
 	httpProxy *string,
+	noProxy *string,
 	logger logr.Logger,
 ) error {
 	token, err := GenerateTokenFromServiceAccount(sa, logger)
@@ -28,6 +29,7 @@ func IntegrationCheckIn(
 		ApiEndpoint: sa.ApiEndpoint,
 		Token:       token,
 		HttpProxy:   httpProxy,
+		NoProxy:     noProxy,
 	})
 	if err != nil {
 		return err

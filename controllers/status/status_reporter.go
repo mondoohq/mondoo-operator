@@ -73,6 +73,7 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 		ApiEndpoint: serviceAccount.ApiEndpoint,
 		Token:       token,
 		HttpProxy:   cfg.Spec.HttpProxy,
+		NoProxy:     cfg.Spec.NoProxy,
 	})
 	if err != nil {
 		return err

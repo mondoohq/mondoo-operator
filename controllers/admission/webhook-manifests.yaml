@@ -12,6 +12,21 @@ webhooks:
       path: /validate-k8s-mondoo-com
   failurePolicy: Ignore
   name: policy.k8s.mondoo.com
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+      - kube-system
+      - kube-public
+      - kube-node-lease
+      - gke-managed-system
+      - gke-managed-cim
+      - gke-managed-filestorecsi
+      - gke-managed-parallelstorecsi
+      - gke-managed-volumepopulator
+      - gke-gmp-system
+      - gmp-public
   rules:
   - apiGroups:
     - ""

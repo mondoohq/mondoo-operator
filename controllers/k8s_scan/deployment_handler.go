@@ -43,7 +43,7 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		return ctrl.Result{}, n.down(ctx)
 	}
 
-	if err := scan_api_store.HandleAuditConfig(ctx, n.KubeClient, n.ScanApiStore, *n.Mondoo); err != nil {
+	if err := scan_api_store.HandleAuditConfig(ctx, n.KubeClient, n.ScanApiStore, *n.Mondoo, *n.MondooOperatorConfig); err != nil {
 		logger.Error(
 			err, "failed to add scan API URL to the store for audit config",
 			"namespace", n.Mondoo.Namespace,
@@ -75,7 +75,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	existing := &batchv1.CronJob{}
-	desired := CronJob(mondooOperatorImage, integrationMrn, clusterUid, n.Mondoo)
+	desired := CronJob(mondooOperatorImage, integrationMrn, clusterUid, n.Mondoo, *n.MondooOperatorConfig)
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 		return err

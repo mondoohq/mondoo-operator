@@ -101,7 +101,7 @@ func TestReconcile(t *testing.T) {
 					},
 				}
 
-				deployment := WebhookDeployment(testNamespace, "ghcr.io/mondoohq/mondoo-operator:latest", *mac, "", testClusterID)
+				deployment := WebhookDeployment(testNamespace, "ghcr.io/mondoohq/mondoo-operator:latest", *mac, mondoov1alpha2.MondooOperatorConfig{}, "", testClusterID)
 				err := ctrl.SetControllerReference(mac, deployment, scheme.Scheme)
 				if err != nil {
 					panic("failed to set controller ref for sample object")
@@ -408,7 +408,7 @@ func TestReconcile(t *testing.T) {
 			name:                  "update webhook Deployment when changed externally",
 			mondooAuditConfigSpec: testMondooAuditConfigSpec(true, false),
 			existingObjects: func(m mondoov1alpha2.MondooAuditConfig) []client.Object {
-				deployment := WebhookDeployment(testNamespace, "wrong", m, "", testClusterID)
+				deployment := WebhookDeployment(testNamespace, "wrong", m, mondoov1alpha2.MondooOperatorConfig{}, "", testClusterID)
 				return []client.Object{deployment}
 			},
 			validate: func(t *testing.T, kubeClient client.Client) {
@@ -425,7 +425,7 @@ func TestReconcile(t *testing.T) {
 
 				img, err := containerImageResolver.MondooOperatorImage(context.Background(), "", "", false)
 				require.NoErrorf(t, err, "failed to get mondoo operator image.")
-				expectedDeployment := WebhookDeployment(testNamespace, img, *auditConfig, "", testClusterID)
+				expectedDeployment := WebhookDeployment(testNamespace, img, *auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", testClusterID)
 				require.NoError(t, ctrl.SetControllerReference(auditConfig, expectedDeployment, kubeClient.Scheme()))
 				assert.Truef(t, k8s.AreDeploymentsEqual(*deployment, *expectedDeployment), "deployment has not been updated")
 			},
