@@ -57,12 +57,6 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
-	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(ctx, "", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
-	if err != nil {
-		logger.Error(err, "Failed to resolve mondoo-operator container image")
-		return err
-	}
-
 	clusterUid, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
 	if err != nil {
 		logger.Error(err, "Failed to get cluster's UID")
@@ -160,9 +154,15 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 
 	updateNodeConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs), pods)
 
-	if err := n.syncGCCronjob(ctx, mondooOperatorImage, clusterUid); err != nil {
+	// Clean up any leftover GC CronJobs from previous versions
+	gcCronJob := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
+	}
+	if err := k8s.DeleteIfExists(ctx, n.KubeClient, gcCronJob); err != nil {
+		logger.Error(err, "Failed to clean up node garbage collect CronJob", "namespace", gcCronJob.Namespace, "name", gcCronJob.Name)
 		return err
 	}
+
 	return nil
 }
 
@@ -171,12 +171,6 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		logger.Error(err, "Failed to resolve mondoo-client container image")
-		return err
-	}
-
-	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(ctx, "", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
-	if err != nil {
-		logger.Error(err, "Failed to resolve mondoo-operator container image")
 		return err
 	}
 
@@ -272,9 +266,15 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 
 	updateNodeConditions(n.Mondoo, ds.Status.CurrentNumberScheduled < ds.Status.DesiredNumberScheduled, pods)
 
-	if err := n.syncGCCronjob(ctx, mondooOperatorImage, clusterUid); err != nil {
+	// Clean up any leftover GC CronJobs from previous versions
+	gcCronJob := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
+	}
+	if err := k8s.DeleteIfExists(ctx, n.KubeClient, gcCronJob); err != nil {
+		logger.Error(err, "Failed to clean up node garbage collect CronJob", "namespace", gcCronJob.Namespace, "name", gcCronJob.Name)
 		return err
 	}
+
 	return nil
 }
 
@@ -329,15 +329,6 @@ func (n *DeploymentHandler) cleanupCronJobsForDeletedNodes(ctx context.Context, 
 		logger.Info("Deleted CronJob", "namespace", c.Namespace, "name", c.Name)
 	}
 	return nil
-}
-
-func (n *DeploymentHandler) syncGCCronjob(ctx context.Context, mondooOperatorImage, clusterUid string) error {
-	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
-	_, err := k8s.CreateOrUpdate(ctx, n.KubeClient, cj, n.Mondoo, logger, func() error {
-		UpdateGarbageCollectCronJob(cj, mondooOperatorImage, clusterUid, *n.Mondoo)
-		return nil
-	})
-	return err
 }
 
 func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]batchv1.CronJob, error) {
