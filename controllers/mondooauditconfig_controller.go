@@ -508,8 +508,8 @@ func (r *MondooAuditConfigReconciler) cleanupOrphanedAdmissionResources(ctx cont
 	// Cleanup ValidatingWebhookConfiguration (cluster-scoped)
 	webhookName := fmt.Sprintf("%s-%s-mondoo", m.Namespace, m.Name)
 	webhook := &admissionregistrationv1.ValidatingWebhookConfiguration{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: webhookName}, webhook); err == nil {
-		if err := r.Client.Delete(ctx, webhook); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: webhookName}, webhook); err == nil {
+		if err := r.Delete(ctx, webhook); err != nil {
 			log.V(1).Info("Failed to delete orphaned ValidatingWebhookConfiguration", "name", webhookName, "error", err)
 		} else {
 			log.Info("Cleaned up orphaned ValidatingWebhookConfiguration", "name", webhookName)
@@ -519,8 +519,8 @@ func (r *MondooAuditConfigReconciler) cleanupOrphanedAdmissionResources(ctx cont
 	// Cleanup webhook deployment
 	deploymentName := fmt.Sprintf("%s-webhook-manager", m.Name)
 	deployment := &appsv1.Deployment{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: m.Namespace}, deployment); err == nil {
-		if err := r.Client.Delete(ctx, deployment); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: m.Namespace}, deployment); err == nil {
+		if err := r.Delete(ctx, deployment); err != nil {
 			log.V(1).Info("Failed to delete orphaned webhook deployment", "name", deploymentName, "error", err)
 		} else {
 			log.Info("Cleaned up orphaned webhook deployment", "name", deploymentName)
@@ -530,8 +530,8 @@ func (r *MondooAuditConfigReconciler) cleanupOrphanedAdmissionResources(ctx cont
 	// Cleanup webhook service
 	serviceName := fmt.Sprintf("%s-webhook-service", m.Name)
 	service := &corev1.Service{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: m.Namespace}, service); err == nil {
-		if err := r.Client.Delete(ctx, service); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: m.Namespace}, service); err == nil {
+		if err := r.Delete(ctx, service); err != nil {
 			log.V(1).Info("Failed to delete orphaned webhook service", "name", serviceName, "error", err)
 		} else {
 			log.Info("Cleaned up orphaned webhook service", "name", serviceName)
@@ -541,8 +541,8 @@ func (r *MondooAuditConfigReconciler) cleanupOrphanedAdmissionResources(ctx cont
 	// Cleanup webhook TLS secret
 	secretName := fmt.Sprintf("%s-webhook-server-cert", m.Name)
 	secret := &corev1.Secret{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: m.Namespace}, secret); err == nil {
-		if err := r.Client.Delete(ctx, secret); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: m.Namespace}, secret); err == nil {
+		if err := r.Delete(ctx, secret); err != nil {
 			log.V(1).Info("Failed to delete orphaned webhook secret", "name", secretName, "error", err)
 		} else {
 			log.Info("Cleaned up orphaned webhook secret", "name", secretName)
