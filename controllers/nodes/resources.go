@@ -7,12 +7,10 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
@@ -21,9 +19,7 @@ import (
 
 	"go.mondoo.com/cnquery/v12/providers-sdk/v1/inventory"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
-	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/utils/gomemlimit"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
@@ -62,6 +58,8 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 	cj.Spec.ConcurrencyPolicy = batchv1.ForbidConcurrent
 	cj.Spec.SuccessfulJobsHistoryLimit = ptr.To(int32(1))
 	cj.Spec.FailedJobsHistoryLimit = ptr.To(int32(1))
+	// Allow one retry for node scanning (transient issues possible)
+	cj.Spec.JobTemplate.Spec.BackoffLimit = ptr.To(int32(1))
 	cj.Spec.JobTemplate.Annotations = map[string]string{
 		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-job-runasnonroot": ignoreAnnotationValue,
 	}
@@ -334,92 +332,6 @@ func UpdateDaemonSet(
 			Name: "temp",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
-	}
-}
-
-func UpdateGarbageCollectCronJob(cj *batchv1.CronJob, image, clusterUid string, m v1alpha2.MondooAuditConfig) {
-	ls := NodeScanningLabels(m)
-
-	cronTab := fmt.Sprintf("%d */12 * * *", time.Now().Add(1*time.Minute).Minute())
-	scanApiUrl := scanapi.ScanApiServiceUrl(m)
-	containerArgs := []string{
-		"garbage-collect",
-		"--scan-api-url", scanApiUrl,
-		"--token-file-path", "/etc/scanapi/token",
-
-		// The job runs hourly and we need to make sure that the previous one is killed before the new one is started so we don't stack them.
-		"--timeout", "55",
-		// Cleanup any resources more than 48 hours old
-		"--filter-older-than", "48h",
-		"--labels", "k8s.mondoo.com/kind=node",
-	}
-
-	if clusterUid != "" {
-		scannedAssetsManagedBy := "mondoo-operator-" + clusterUid
-		containerArgs = append(containerArgs, []string{"--filter-managed-by", scannedAssetsManagedBy}...)
-	}
-
-	cj.Labels = GarbageCollectCronJobLabels(m)
-	cj.Spec.Schedule = cronTab
-	cj.Spec.ConcurrencyPolicy = batchv1.ForbidConcurrent
-	cj.Spec.SuccessfulJobsHistoryLimit = ptr.To(int32(1))
-	cj.Spec.FailedJobsHistoryLimit = ptr.To(int32(1))
-	cj.Spec.JobTemplate.Labels = ls
-	cj.Spec.JobTemplate.Spec.Template.Labels = ls
-	cj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
-	// The node scanning does not use the Kubernetes API at all, therefore the service account token
-	// should not be mounted at all.
-	cj.Spec.JobTemplate.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
-	cj.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{
-		{
-			Image:                    image,
-			ImagePullPolicy:          corev1.PullIfNotPresent,
-			Name:                     "gc",
-			Command:                  []string{"/mondoo-operator"},
-			Args:                     containerArgs,
-			TerminationMessagePath:   "/dev/termination-log",
-			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-			Resources: corev1.ResourceRequirements{
-				Limits: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("30Mi"),
-				},
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("50m"),
-					corev1.ResourceMemory: resource.MustParse("20Mi"),
-				},
-			},
-			SecurityContext: &corev1.SecurityContext{
-				AllowPrivilegeEscalation: ptr.To(false),
-				ReadOnlyRootFilesystem:   ptr.To(true),
-				RunAsNonRoot:             ptr.To(true),
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{
-						"ALL",
-					},
-				},
-				Privileged: ptr.To(false),
-			},
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      "token",
-					MountPath: "/etc/scanapi",
-					ReadOnly:  true,
-				},
-			},
-			Env: feature_flags.AllFeatureFlagsAsEnv(),
-		},
-	}
-	cj.Spec.JobTemplate.Spec.Template.Spec.Volumes = []corev1.Volume{
-		{
-			Name: "token",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					DefaultMode: ptr.To(int32(0o444)),
-					SecretName:  scanapi.TokenSecretName(m.Name),
-				},
 			},
 		},
 	}

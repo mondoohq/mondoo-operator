@@ -1,48 +1,83 @@
 # Copyright (c) Mondoo, Inc.
 # SPDX-License-Identifier: BUSL-1.1
 
+# Full example with all available options
 apiVersion: k8s.mondoo.com/v1alpha2
 kind: MondooAuditConfig
 metadata:
   name: mondoo-client
   namespace: mondoo-operator
 spec:
-  mondooTokenSecretRef:
-    name: mondoo-token
-  mondooCredsSecretRef: 
+  # Required: Reference to secret containing Mondoo service account credentials
+  mondooCredsSecretRef:
     name: mondoo-client
+
+  # Optional: Reference to secret containing a Mondoo registration token
+  # If provided and mondooCredsSecretRef secret doesn't exist, the operator
+  # will exchange this token for a service account
+  # mondooTokenSecretRef:
+  #   name: mondoo-token
+
+  # Scanner settings (applies to K8s resources and container scanning)
   scanner:
-    serviceAccountName: mondoo-client
+    serviceAccountName: mondoo-operator-k8s-resources-scanning
     image:
-      name: docker.io/mondoo/client
+      name: ghcr.io/mondoohq/mondoo-operator
       tag: latest
     resources:
       requests:
+        cpu: 100m
+        memory: 100Mi
       limits:
+        cpu: 500m
+        memory: 500Mi
+    # For private registries
+    # privateRegistriesPullSecretRef:
+    #   name: mondoo-private-registries-secrets
+
+  # Kubernetes resources scanning (RBAC, workloads, etc.)
   kubernetesResources:
     enable: true
+    # Cron schedule (default: random minute each hour)
+    # schedule: "0 * * * *"
+
+  # Container image scanning
   containers:
     enable: true
+    # Cron schedule (default: daily)
+    # schedule: "0 0 * * *"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+      limits:
+        cpu: 500m
+        memory: 500Mi
+
+  # Node scanning
   nodes:
     enable: true
-  admission:
-    enable: true
-    certificateProvisioning:
-    # Could be "cert-manager", "openshift" or "manual"
-      mode: cert-manager
-    image:
-      name: ghcr.io/mondoo/mondoo-operator
-      tag: latest
-    # could be "permissive" or "enforcing"
-    mode: permissive
+    # Style: cronjob (default), deployment, or daemonset
+    style: cronjob
+    # Cron schedule (only for cronjob style)
+    # schedule: "0 * * * *"
+    # Interval in minutes (only for deployment style)
+    # intervalTimer: 60
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+      limits:
+        cpu: 500m
+        memory: 500Mi
+
+  # Namespace filtering (applies to K8s resources and container scanning)
   filtering:
     namespaces:
-      include:
-        - default
-        - my-work*
-        - mondoo-operator
-      # Specifying both include and exclude results in the exclude
-      # list being ignored, as the include list is effectively the
-      # same as exclude ALL except for the include list.
+      # Exclude specific namespaces
       exclude:
         - kube-system
+      # Or include only specific namespaces (overrides exclude)
+      # include:
+      #   - default
+      #   - production

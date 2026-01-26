@@ -9,49 +9,57 @@ import (
 
 	// That's the mod k8s relies on https://github.com/kubernetes/kubernetes/blob/master/go.mod#L63
 
+	"go.mondoo.com/cnquery/v12/providers-sdk/v1/inventory"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/controllers/scanapi"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	"gopkg.in/yaml.v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
 
-const CronJobNameSuffix = "-k8s-scan"
+const (
+	CronJobNameSuffix      = "-k8s-scan"
+	InventoryConfigMapBase = "-k8s-inventory"
+)
 
-func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditConfig) *batchv1.CronJob {
+// K8sDiscoveryTargets defines explicit targets for K8s resource scanning
+// (excludes container-images which is handled by the separate containers controller)
+var K8sDiscoveryTargets = []string{
+	"clusters",
+	"pods",
+	"jobs",
+	"cronjobs",
+	"statefulsets",
+	"deployments",
+	"replicasets",
+	"daemonsets",
+	"ingresses",
+	"namespaces",
+	"services",
+}
+
+func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(*m)
-	scanApiUrl := scanapi.ScanApiServiceUrl(*m)
 
-	containerArgs := []string{
-		"k8s-scan",
-		"--scan-api-url", scanApiUrl,
-		"--token-file-path", "/etc/scanapi/token",
-
-		// The job runs hourly and we need to make sure that the previous one is killed before the new one is started so we don't stack them.
-		"--timeout", "55",
-		// Cleanup any resources more than 2 hours old
-		"--cleanup-assets-older-than", "2h",
-		"--namespaces", strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
-		"--namespaces-exclude", strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
+	cmd := []string{
+		"cnspec", "scan", "k8s",
+		"--config", "/etc/opt/mondoo/config/mondoo.yml",
+		"--inventory-file", "/etc/opt/mondoo/config/inventory.yml",
+		"--score-threshold", "0",
 	}
 
-	if integrationMrn != "" {
-		containerArgs = append(containerArgs, []string{"--integration-mrn", integrationMrn}...)
+	if cfg.Spec.HttpProxy != nil {
+		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
-	// use the clusterUid to uniquely set the managedBy field on assets managed by this instance of the mondoo-operator
-	if clusterUid == "" {
-		logger.Info("no clusterUid provided, will not set ManagedBy field on scanned/discovered assets")
-	} else {
-		scannedAssetsManagedBy := "mondoo-operator-" + clusterUid
+	envVars := feature_flags.AllFeatureFlagsAsEnv()
+	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 
-		containerArgs = append(containerArgs, []string{"--set-managed-by", scannedAssetsManagedBy}...)
-	}
-
-	return &batchv1.CronJob{
+	cronjob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CronJobName(m.Name),
 			Namespace: m.Namespace,
@@ -63,58 +71,82 @@ func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditCo
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: ls},
 				Spec: batchv1.JobSpec{
+					// Don't retry failed scans - re-running won't fix the issue
+					BackoffLimit: ptr.To(int32(0)),
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: ls},
 						Spec: corev1.PodSpec{
-							RestartPolicy: corev1.RestartPolicyOnFailure,
-							// Triggering the Kubernetes resources scan does not require any API access, therefore no service account
-							// is needed.
-							AutomountServiceAccountToken: ptr.To(false),
+							// The scan can fail when an asset has an error. However, re-scanning won't result in the error
+							// being fixed. Therefore, we don't want to restart the job.
+							RestartPolicy: corev1.RestartPolicyNever,
 							Containers: []corev1.Container{
 								{
 									Image:           image,
 									ImagePullPolicy: corev1.PullIfNotPresent,
 									Name:            "mondoo-k8s-scan",
-									Command:         []string{"/mondoo-operator"},
-									Args:            containerArgs,
-									Resources: corev1.ResourceRequirements{
-										Limits: corev1.ResourceList{
-											corev1.ResourceCPU:    resource.MustParse("100m"),
-											corev1.ResourceMemory: resource.MustParse("30Mi"),
-										},
-										Requests: corev1.ResourceList{
-											corev1.ResourceCPU:    resource.MustParse("50m"),
-											corev1.ResourceMemory: resource.MustParse("20Mi"),
-										},
-									},
+									Command:         cmd,
+									Resources:       k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources, k8s.DefaultK8sResourceScanningResources),
 									SecurityContext: &corev1.SecurityContext{
 										AllowPrivilegeEscalation: ptr.To(false),
 										ReadOnlyRootFilesystem:   ptr.To(true),
-										RunAsNonRoot:             ptr.To(true),
 										Capabilities: &corev1.Capabilities{
 											Drop: []corev1.Capability{
 												"ALL",
 											},
 										},
+										RunAsNonRoot: ptr.To(true),
+										// This is needed to prevent:
+										// Error: container has runAsNonRoot and image has non-numeric user (mondoo), cannot verify user is non-root ...
+										RunAsUser:  ptr.To(int64(101)),
 										Privileged: ptr.To(false),
 									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
-											Name:      "token",
-											MountPath: "/etc/scanapi",
+											Name:      "config",
 											ReadOnly:  true,
+											MountPath: "/etc/opt/mondoo/config",
+										},
+										{
+											Name:      "temp",
+											MountPath: "/tmp",
 										},
 									},
-									Env: feature_flags.AllFeatureFlagsAsEnv(),
+									Env: envVars,
 								},
 							},
+							ServiceAccountName: m.Spec.Scanner.ServiceAccountName,
 							Volumes: []corev1.Volume{
 								{
-									Name: "token",
+									Name: "temp",
 									VolumeSource: corev1.VolumeSource{
-										Secret: &corev1.SecretVolumeSource{
-											DefaultMode: ptr.To(int32(0o444)),
-											SecretName:  scanapi.TokenSecretName(m.Name),
+										EmptyDir: &corev1.EmptyDirVolumeSource{},
+									},
+								},
+								{
+									Name: "config",
+									VolumeSource: corev1.VolumeSource{
+										Projected: &corev1.ProjectedVolumeSource{
+											DefaultMode: ptr.To(int32(corev1.ProjectedVolumeSourceDefaultMode)),
+											Sources: []corev1.VolumeProjection{
+												{
+													ConfigMap: &corev1.ConfigMapProjection{
+														LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name)},
+														Items: []corev1.KeyToPath{{
+															Key:  "inventory",
+															Path: "inventory.yml",
+														}},
+													},
+												},
+												{
+													Secret: &corev1.SecretProjection{
+														LocalObjectReference: m.Spec.MondooCredsSecretRef,
+														Items: []corev1.KeyToPath{{
+															Key:  "config",
+															Path: "mondoo.yml",
+														}},
+													},
+												},
+											},
 										},
 									},
 								},
@@ -127,6 +159,8 @@ func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditCo
 			FailedJobsHistoryLimit:     ptr.To(int32(1)),
 		},
 	}
+
+	return cronjob
 }
 
 func CronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {
@@ -139,4 +173,72 @@ func CronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 
 func CronJobName(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, CronJobNameSuffix)
+}
+
+func ConfigMapName(prefix string) string {
+	return fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
+}
+
+func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (*corev1.ConfigMap, error) {
+	inv, err := Inventory(integrationMRN, clusterUID, m, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: m.Namespace,
+			Name:      ConfigMapName(m.Name),
+		},
+		Data: map[string]string{"inventory": inv},
+	}, nil
+}
+
+func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (string, error) {
+	inv := &inventory.Inventory{
+		Metadata: &inventory.ObjectMeta{
+			Name: "mondoo-k8s-resources-inventory",
+		},
+		Spec: &inventory.InventorySpec{
+			Assets: []*inventory.Asset{
+				{
+					Connections: []*inventory.Config{
+						{
+							Type: "k8s",
+							Options: map[string]string{
+								"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
+								"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
+							},
+							Discover: &inventory.Discovery{
+								Targets: K8sDiscoveryTargets,
+							},
+						},
+					},
+					Labels: map[string]string{
+						"k8s.mondoo.com/kind": "cluster",
+					},
+					ManagedBy: "mondoo-operator-" + clusterUID,
+				},
+			},
+		},
+	}
+
+	if integrationMRN != "" {
+		for i := range inv.Spec.Assets {
+			inv.Spec.Assets[i].Labels[constants.MondooAssetsIntegrationLabel] = integrationMRN
+		}
+	}
+
+	if cfg.Spec.ContainerProxy != nil {
+		for i := range inv.Spec.Assets {
+			inv.Spec.Assets[i].Connections[0].Options["container-proxy"] = *cfg.Spec.ContainerProxy
+		}
+	}
+
+	invBytes, err := yaml.Marshal(inv)
+	if err != nil {
+		return "", err
+	}
+
+	return string(invBytes), nil
 }

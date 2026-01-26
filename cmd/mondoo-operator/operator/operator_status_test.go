@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-logr/zapr"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -23,8 +22,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	mondoov1alpha2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
-	scanapistoremock "go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store/mock"
-	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	"go.mondoo.com/mondoo-operator/pkg/utils/test"
@@ -39,8 +36,6 @@ type DeploymentHandlerSuite struct {
 
 	auditConfig       mondoov1alpha2.MondooAuditConfig
 	fakeClientBuilder *fake.ClientBuilder
-	mockCtrl          *gomock.Controller
-	scanApiStoreMock  *scanapistoremock.MockScanApiStore
 }
 
 func (s *DeploymentHandlerSuite) SetupSuite() {
@@ -48,23 +43,11 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 	s.scheme = clientgoscheme.Scheme
 	s.Require().NoError(mondoov1alpha2.AddToScheme(s.scheme))
 	s.containerImageResolver = fakeMondoo.NewNoOpContainerImageResolver()
-	s.mockCtrl = gomock.NewController(s.T())
-	s.scanApiStoreMock = scanapistoremock.NewMockScanApiStore(s.mockCtrl)
 }
 
 func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
 	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", true, false, false)
-	s.fakeClientBuilder = fake.NewClientBuilder().WithObjects(&corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      scanapi.TokenSecretName(s.auditConfig.Name),
-			Namespace: s.auditConfig.Namespace,
-		},
-		Data: map[string][]byte{"token": []byte("token")},
-	}, test.TestKubeSystemNamespace())
-}
-
-func (s *DeploymentHandlerSuite) AfterTest(suiteName, testName string) {
-	s.mockCtrl.Finish()
+	s.fakeClientBuilder = fake.NewClientBuilder().WithObjects(test.TestKubeSystemNamespace())
 }
 
 func (s *DeploymentHandlerSuite) TestOOMDetect() {

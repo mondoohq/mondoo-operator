@@ -210,8 +210,6 @@ const (
 	K8sResourcesScanningDegraded MondooAuditConfigConditionType = "K8sResourcesScanningDegraded"
 	// Indicates weather Kubernetes container image scanning is Degraded
 	K8sContainerImageScanningDegraded MondooAuditConfigConditionType = "K8sContainerImageScanningDegraded"
-	// Indicates weather ScanAPI is Degraded
-	ScanAPIDegraded MondooAuditConfigConditionType = "ScanAPIDegraded"
 	// Indicates weather the operator itself is Degraded
 	MondooOperatorDegraded MondooAuditConfigConditionType = "MondooOperatorDegraded"
 	// MondooIntegrationDegraded will hold the status for any issues encountered while trying to CheckIn()
