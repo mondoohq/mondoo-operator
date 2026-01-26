@@ -42,8 +42,6 @@ managerConfig:
       healthProbeBindAddress: :8081
     metrics:
       bindAddress: 127.0.0.1:8080
-    webhook:
-      port: 9443
     leaderElection:
       leaderElect: true
       resourceName: 60679458.mondoo.com
@@ -54,6 +52,3 @@ metricsService:
     protocol: TCP
     targetPort: metrics
   type: ClusterIP
-webhook:
-  serviceAccount:
-    annotations: {}

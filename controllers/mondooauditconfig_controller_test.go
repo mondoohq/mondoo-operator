@@ -252,11 +252,6 @@ func TestTokenRegistration(t *testing.T) {
 								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 							},
 							{
-								Message:    "Admission controller is disabled",
-								Identifier: status.AdmissionControllerIdentifier,
-								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-							},
-							{
 								Message:    "Scan API is disabled",
 								Identifier: status.ScanApiIdentifier,
 								Status:     mondooclient.MessageStatus_MESSAGE_INFO,

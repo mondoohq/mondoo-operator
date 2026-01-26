@@ -13,9 +13,8 @@ import (
 const FeatureFlagPrefix = "FEATURE_"
 
 var (
-	enableAdmissionReviewDiscovery bool
-	disableResourceMonitor         bool
-	allFeatureFlags                = make(map[string]string)
+	disableResourceMonitor bool
+	allFeatureFlags        = make(map[string]string)
 )
 
 func init() {
@@ -42,10 +41,6 @@ func AllFeatureFlagsAsEnv() []corev1.EnvVar {
 	return env
 }
 
-func GetAdmissionReviewDiscovery() bool {
-	return enableAdmissionReviewDiscovery
-}
-
 func GetDisableResourceMonitor() bool {
 	return disableResourceMonitor
 }
@@ -55,8 +50,6 @@ func setGlobalFlags(k, v string) {
 		return
 	}
 	switch k {
-	case "FEATURE_ENABLE_ADMISSION_REVIEW_DISCOVERY":
-		enableAdmissionReviewDiscovery = true
 	case "FEATURE_DISABLE_RESOURCE_MONITOR":
 		disableResourceMonitor = true
 	}

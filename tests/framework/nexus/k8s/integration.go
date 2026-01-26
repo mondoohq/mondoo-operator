@@ -17,7 +17,6 @@ type IntegrationBuilder struct {
 	scanNodes           bool
 	scanWorkloads       bool
 	scanContainerImages bool
-	admissionController bool
 }
 
 func (i *IntegrationBuilder) EnableNodesScan() *IntegrationBuilder {
@@ -32,11 +31,6 @@ func (i *IntegrationBuilder) EnableWorkloadsScan() *IntegrationBuilder {
 
 func (i *IntegrationBuilder) EnableContainersScan() *IntegrationBuilder {
 	i.scanContainerImages = true
-	return i
-}
-
-func (i *IntegrationBuilder) EnableAdmissionController() *IntegrationBuilder {
-	i.admissionController = true
 	return i
 }
 
@@ -58,7 +52,6 @@ func (b *IntegrationBuilder) Run(ctx context.Context) (*Integration, error) {
 				ScanNodes:        mondoogql.Boolean(b.scanNodes),
 				ScanWorkloads:    mondoogql.Boolean(b.scanWorkloads),
 				ScanPublicImages: mondoogql.NewBooleanPtr(mondoogql.Boolean(b.scanContainerImages)),
-				ScanDeploys:      mondoogql.Boolean(b.admissionController),
 			},
 		},
 	}, nil)

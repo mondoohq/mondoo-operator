@@ -40,24 +40,24 @@ spec:
             description: MondooAuditConfigSpec defines the desired state of MondooAuditConfig
             properties:
               admission:
+                description: |-
+                  Admission is DEPRECATED and ignored. Admission webhooks were removed in v12.1.0.
+                  The operator will automatically clean up any orphaned admission resources.
+                  See docs/admission-migration-guide.md for migration instructions.
                 properties:
                   certificateProvisioning:
-                    description: CertificateProvisioning defines the certificate provisioning
-                      configuration within the cluster.
+                    description: CertificateProvisioning is DEPRECATED.
                     properties:
                       mode:
-                        default: manual
-                        description: CertificateProvisioningMode is the specified
-                          method the cluster uses for provisioning TLS certificates
-                        enum:
-                        - cert-manager
-                        - openshift
-                        - manual
+                        description: Mode is DEPRECATED.
                         type: string
                     type: object
                   enable:
+                    description: Enable is DEPRECATED. Admission webhooks are no longer
+                      supported.
                     type: boolean
                   image:
+                    description: Image is DEPRECATED.
                     properties:
                       name:
                         type: string
@@ -65,29 +65,14 @@ spec:
                         type: string
                     type: object
                   mode:
-                    default: permissive
-                    description: |-
-                      Mode represents whether the webhook will behave in a "permissive" mode (the default) which
-                      will only scan and report on k8s resources or "enforcing" mode where depending
-                      on the scan results may reject the k8s resource creation/modification.
-                    enum:
-                    - permissive
-                    - enforcing
+                    description: Mode is DEPRECATED.
                     type: string
                   replicas:
-                    default: 1
-                    description: |-
-                      Number of replicas for the admission webhook.
-                      For enforcing mode, the minimum should be two to prevent problems during Pod failures,
-                      e.g. node failure, node scaling, etc.
+                    description: Replicas is DEPRECATED.
                     format: int32
-                    minimum: 1
                     type: integer
                   serviceAccountName:
-                    default: mondoo-operator-webhook
-                    description: |-
-                      ServiceAccountName specifies the Kubernetes ServiceAccount the webhook should use
-                      during its operation.
+                    description: ServiceAccountName is DEPRECATED.
                     type: string
                 type: object
               consoleIntegration:
@@ -646,7 +631,7 @@ spec:
               scanner:
                 description: |-
                   Scanner defines the settings for the Mondoo scanner that will be running in the cluster. The same scanner
-                  is used for scanning the Kubernetes API, the nodes and for serving the admission controller.
+                  is used for scanning the Kubernetes API and the nodes.
                 properties:
                   env:
                     description: |-

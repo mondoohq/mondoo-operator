@@ -20,7 +20,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
-	mondooadmission "go.mondoo.com/mondoo-operator/controllers/admission"
 	"go.mondoo.com/mondoo-operator/controllers/container_image"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
@@ -89,10 +88,6 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 	if s.testCluster != nil {
 		s.testCluster.GatherAllMondooLogs(testName, installer.MondooNamespace)
 		s.NoError(s.testCluster.CleanupAuditConfigs())
-		secret := &corev1.Secret{}
-		secret.Name = mondooadmission.GetTLSCertificatesSecretName(s.auditConfig.Name)
-		secret.Namespace = s.auditConfig.Namespace
-		s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(secret), "Failed to delete TLS secret")
 
 		operatorConfig := &mondoov2.MondooOperatorConfig{
 			ObjectMeta: metav1.ObjectMeta{Name: mondoov2.MondooOperatorConfigName},
@@ -101,16 +96,9 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 
 		zap.S().Info("Waiting for cleanup of the test cluster.")
 		// wait for deployments to be gone
-		// sometimes the operator still terminates ,e.g. the webhook, while the next test already started
-		// the new test then fails because resources vanish during the test
 		scanApiListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(scanapi.DeploymentLabels(s.auditConfig))}
 		err := s.testCluster.K8sHelper.EnsureNoPodsPresent(scanApiListOpts)
 		s.NoErrorf(err, "Failed to wait for ScanAPI Pods to be gone")
-
-		webhookLabels := mondooadmission.WebhookDeploymentLabels()
-		webhookListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(webhookLabels)}
-		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(webhookListOpts)
-		s.NoErrorf(err, "Failed to wait for Webhook Pods to be gone")
 
 		k8sScanListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(k8s_scan.CronJobLabels(s.auditConfig))}
 		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(k8sScanListOpts)
@@ -433,9 +421,9 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesCronjobs(auditConfig mo
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigAllDisabled(auditConfig mondoov2.MondooAuditConfig) {
 	s.auditConfig = auditConfig
-	// Disable imageResolution for the webhook image to be runnable.
-	// Otherwise, mondoo-operator will try to resolve the locally-built mondoo-operator container
-	// image, and fail because we haven't pushed this image publicly.
+	// Disable image resolution so locally-built container images can be used.
+	// Otherwise, mondoo-operator will try to resolve the locally-built container
+	// images, and fail because they haven't been pushed publicly.
 	operatorConfig := &mondoov2.MondooOperatorConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: mondoov2.MondooOperatorConfigName,

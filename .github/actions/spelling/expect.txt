@@ -1,2 +1,5 @@
+deletecollection
 fullname
-openssl
+selfsigned
+servicemonitors
+tekton

@@ -29,8 +29,8 @@ type DeploymentHandler struct {
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
-	// If neither KubernetesResources, nor Admission is enabled, the scan API is not needed.
-	if (!n.Mondoo.Spec.KubernetesResources.Enable && !n.Mondoo.Spec.Admission.Enable && !n.Mondoo.Spec.Nodes.Enable) ||
+	// If KubernetesResources is not enabled, the scan API is not needed.
+	if (!n.Mondoo.Spec.KubernetesResources.Enable && !n.Mondoo.Spec.Nodes.Enable) ||
 		!n.Mondoo.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, n.down(ctx)
 	}
@@ -124,10 +124,6 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	deployment := ScanApiDeployment(n.Mondoo.Namespace, cnspecImage, *n.Mondoo, *n.MondooOperatorConfig, privateRegistriesSecretName, n.DeployOnOpenShift)
 	if err := ctrl.SetControllerReference(n.Mondoo, deployment, n.KubeClient.Scheme()); err != nil {
 		return err
-	}
-
-	if *deployment.Spec.Replicas < 2 && n.Mondoo.Spec.Admission.Mode == v1alpha2.Enforcing {
-		logger.V(3).Info("Scan API deployment is only scaled to 1 replica, but the admission mode is set to 'enforcing'. This might be problematic if the API server is not able to connect to the admission webhook. Please consider increasing the replicas.")
 	}
 
 	existingDeployment := appsv1.Deployment{}

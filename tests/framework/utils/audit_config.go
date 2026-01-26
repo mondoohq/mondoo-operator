@@ -35,7 +35,7 @@ func init() {
 // make sure a test passes (e.g. setting the correct secret name). Values which have defaults are not set.
 // This means that using this function in unit tests might result in strange behavior. For unit tests use
 // DefaultAuditConfig instead.
-func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes, admission bool) mondoov2.MondooAuditConfig {
+func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes bool) mondoov2.MondooAuditConfig {
 	now := time.Now()
 	startScan := now.Add(time.Minute).Add(time.Second * 15)
 	schedule := fmt.Sprintf("%d * * * *", startScan.Minute())
@@ -61,7 +61,6 @@ func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes, admissio
 				Schedule: schedule,
 				Style:    mondoov2.NodeScanStyle_CronJob,
 			},
-			Admission: mondoov2.Admission{Enable: admission},
 		},
 	}
 
@@ -76,7 +75,7 @@ func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes, admissio
 
 // DefaultAuditConfig returns a new Mondoo audit config with some default settings to
 // make sure a tests passes (e.g. setting the correct secret name).
-func DefaultAuditConfig(ns string, workloads, containers, nodes, admission bool) mondoov2.MondooAuditConfig {
+func DefaultAuditConfig(ns string, workloads, containers, nodes bool) mondoov2.MondooAuditConfig {
 	return mondoov2.MondooAuditConfig{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "mondoo-client",
@@ -87,7 +86,6 @@ func DefaultAuditConfig(ns string, workloads, containers, nodes, admission bool)
 			KubernetesResources:  mondoov2.KubernetesResources{Enable: workloads, Schedule: "0 * * * *"},
 			Containers:           mondoov2.Containers{Enable: containers, Schedule: "0 0 * * *"},
 			Nodes:                mondoov2.Nodes{Enable: nodes, Schedule: "0 * * * *", Style: mondoov2.NodeScanStyle_CronJob},
-			Admission:            mondoov2.Admission{Enable: admission},
 			Scanner: mondoov2.Scanner{
 				Image:    mondoov2.Image{Name: "test", Tag: "latest"},
 				Replicas: ptr.To(int32(1)),

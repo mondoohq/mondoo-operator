@@ -25,10 +25,15 @@ type MondooAuditConfigSpec struct {
 	Scanner             Scanner             `json:"scanner,omitempty"`
 	KubernetesResources KubernetesResources `json:"kubernetesResources,omitempty"`
 	Nodes               Nodes               `json:"nodes,omitempty"`
-	Admission           Admission           `json:"admission,omitempty"`
 	ConsoleIntegration  ConsoleIntegration  `json:"consoleIntegration,omitempty"`
 	Filtering           Filtering           `json:"filtering,omitempty"`
 	Containers          Containers          `json:"containers,omitempty"`
+
+	// Admission is DEPRECATED and ignored. Admission webhooks were removed in v12.1.0.
+	// The operator will automatically clean up any orphaned admission resources.
+	// See docs/admission-migration-guide.md for migration instructions.
+	// +optional
+	Admission *DeprecatedAdmission `json:"admission,omitempty"`
 }
 
 type Filtering struct {
@@ -50,15 +55,8 @@ type ConsoleIntegration struct {
 	Enable bool `json:"enable,omitempty"`
 }
 
-// CertificateProvisioning defines the certificate provisioning configuration within the cluster.
-type CertificateProvisioning struct {
-	// +kubebuilder:validation:Enum=cert-manager;openshift;manual
-	// +kubebuilder:default=manual
-	Mode CertificateProvisioningMode `json:"mode,omitempty"`
-}
-
 // Scanner defines the settings for the Mondoo scanner that will be running in the cluster. The same scanner
-// is used for scanning the Kubernetes API, the nodes and for serving the admission controller.
+// is used for scanning the Kubernetes API and the nodes.
 type Scanner struct {
 	// +kubebuilder:default=mondoo-operator-k8s-resources-scanning
 	ServiceAccountName string                      `json:"serviceAccountName,omitempty"`
@@ -120,28 +118,6 @@ type Nodes struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
-type Admission struct {
-	Enable bool  `json:"enable,omitempty"`
-	Image  Image `json:"image,omitempty"`
-	// Mode represents whether the webhook will behave in a "permissive" mode (the default) which
-	// will only scan and report on k8s resources or "enforcing" mode where depending
-	// on the scan results may reject the k8s resource creation/modification.
-	// +kubebuilder:validation:Enum=permissive;enforcing
-	// +kubebuilder:default=permissive
-	Mode AdmissionMode `json:"mode,omitempty"`
-	// Number of replicas for the admission webhook.
-	// For enforcing mode, the minimum should be two to prevent problems during Pod failures,
-	// e.g. node failure, node scaling, etc.
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=1
-	Replicas                *int32                  `json:"replicas,omitempty"`
-	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
-	// ServiceAccountName specifies the Kubernetes ServiceAccount the webhook should use
-	// during its operation.
-	// +kubebuilder:default=mondoo-operator-webhook
-	ServiceAccountName string `json:"serviceAccountName,omitempty"`
-}
-
 type Containers struct {
 	Enable    bool                        `json:"enable,omitempty"`
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
@@ -152,27 +128,40 @@ type Containers struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
+// DeprecatedAdmission exists for backward compatibility during upgrades.
+// This field is ignored and will be removed in a future version.
+type DeprecatedAdmission struct {
+	// Enable is DEPRECATED. Admission webhooks are no longer supported.
+	// +optional
+	Enable bool `json:"enable,omitempty"`
+	// Mode is DEPRECATED.
+	// +optional
+	Mode string `json:"mode,omitempty"`
+	// Replicas is DEPRECATED.
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+	// ServiceAccountName is DEPRECATED.
+	// +optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+	// CertificateProvisioning is DEPRECATED.
+	// +optional
+	CertificateProvisioning *DeprecatedCertificateProvisioning `json:"certificateProvisioning,omitempty"`
+	// Image is DEPRECATED.
+	// +optional
+	Image *Image `json:"image,omitempty"`
+}
+
+// DeprecatedCertificateProvisioning exists for backward compatibility.
+type DeprecatedCertificateProvisioning struct {
+	// Mode is DEPRECATED.
+	// +optional
+	Mode string `json:"mode,omitempty"`
+}
+
 type Image struct {
 	Name string `json:"name,omitempty"`
 	Tag  string `json:"tag,omitempty"`
 }
-
-// CertificateProvisioningMode is the specified method the cluster uses for provisioning TLS certificates
-type CertificateProvisioningMode string
-
-const (
-	CertManagerProvisioning CertificateProvisioningMode = "cert-manager"
-	OpenShiftProvisioning   CertificateProvisioningMode = "openshift"
-	ManualProvisioning      CertificateProvisioningMode = "manual"
-)
-
-// AdmissionMode specifies the allowed modes of operation for the webhook admission controller
-type AdmissionMode string
-
-const (
-	Permissive AdmissionMode = "permissive"
-	Enforcing  AdmissionMode = "enforcing"
-)
 
 // MondooAuditConfigStatus defines the observed state of MondooAuditConfig
 type MondooAuditConfigStatus struct {
@@ -221,9 +210,7 @@ const (
 	K8sResourcesScanningDegraded MondooAuditConfigConditionType = "K8sResourcesScanningDegraded"
 	// Indicates weather Kubernetes container image scanning is Degraded
 	K8sContainerImageScanningDegraded MondooAuditConfigConditionType = "K8sContainerImageScanningDegraded"
-	// Indicates weather Admission controller is Degraded
-	AdmissionDegraded MondooAuditConfigConditionType = "AdmissionDegraded"
-	// Indicates weather Admission controller is Degraded because of the ScanAPI
+	// Indicates weather ScanAPI is Degraded
 	ScanAPIDegraded MondooAuditConfigConditionType = "ScanAPIDegraded"
 	// Indicates weather the operator itself is Degraded
 	MondooOperatorDegraded MondooAuditConfigConditionType = "MondooOperatorDegraded"

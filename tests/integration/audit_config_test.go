@@ -21,17 +21,17 @@ func (s *AuditConfigSuite) SetupSuite() {
 }
 
 func (s *AuditConfigSuite) TestReconcile_AllDisabled() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, false)
 	s.testMondooAuditConfigAllDisabled(auditConfig)
 }
 
 func (s *AuditConfigSuite) TestReconcile_KubernetesResources() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false)
 	s.testMondooAuditConfigKubernetesResources(auditConfig)
 }
 
 func (s *AuditConfigSuite) TestReconcile_Containers() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, true, false, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, true, false)
 
 	// Ignore the operator namespace because we cannot scan a local image
 	// Ignore kube-system to speed up the containers test
@@ -40,7 +40,7 @@ func (s *AuditConfigSuite) TestReconcile_Containers() {
 }
 
 func (s *AuditConfigSuite) TestReconcile_Nodes_CronJobs() {
-	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true, false)
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true)
 	s.testMondooAuditConfigNodesCronjobs(auditConfig)
 }
 

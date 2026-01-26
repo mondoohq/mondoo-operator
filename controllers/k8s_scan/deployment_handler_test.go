@@ -56,7 +56,7 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 }
 
 func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
-	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", true, false, false, false)
+	s.auditConfig = utils.DefaultAuditConfig("mondoo-operator", true, false, false)
 	s.fakeClientBuilder = fake.NewClientBuilder().WithObjects(&corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      scanapi.TokenSecretName(s.auditConfig.Name),
