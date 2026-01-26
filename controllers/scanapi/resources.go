@@ -41,7 +41,7 @@ func ScanApiSecret(mondoo v1alpha2.MondooAuditConfig) *corev1.Secret {
 	}
 }
 
-func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig, privateImageScanningSecretName string, deployOnOpenShift bool) *appsv1.Deployment {
+func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig, privateImageScanningSecretNames []string, deployOnOpenShift bool) *appsv1.Deployment {
 	labels := DeploymentLabels(m)
 
 	name := "cnspec"
@@ -230,42 +230,12 @@ func ScanApiDeployment(ns, image string, m v1alpha2.MondooAuditConfig, cfg v1alp
 		},
 	}
 
-	if privateImageScanningSecretName != "" {
-		// mount secret needed to pull images from private registries
-		scanApiDeployment.Spec.Template.Spec.Volumes = append(scanApiDeployment.Spec.Template.Spec.Volumes, corev1.Volume{
-			Name: "pull-secrets",
-			VolumeSource: corev1.VolumeSource{
-				Projected: &corev1.ProjectedVolumeSource{
-					Sources: []corev1.VolumeProjection{
-						{
-							Secret: &corev1.SecretProjection{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: privateImageScanningSecretName,
-								},
-								Items: []corev1.KeyToPath{
-									{
-										Key:  ".dockerconfigjson",
-										Path: "config.json",
-									},
-								},
-							},
-						},
-					},
-					DefaultMode: ptr.To(int32(0o440)),
-				},
-			},
-		})
-
-		scanApiDeployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(scanApiDeployment.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
-			Name:      "pull-secrets",
-			ReadOnly:  true,
-			MountPath: "/etc/opt/mondoo/docker",
-		})
-
-		scanApiDeployment.Spec.Template.Spec.Containers[0].Env = append(scanApiDeployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
-			Name:  "DOCKER_CONFIG",
-			Value: "/etc/opt/mondoo/docker", // the client automatically adds '/config.json' to the path
-		})
+	if len(privateImageScanningSecretNames) > 0 {
+		k8s.AddPrivateRegistrySecretsToSpec(
+			&scanApiDeployment.Spec.Template.Spec,
+			privateImageScanningSecretNames,
+			image,
+		)
 	}
 
 	// Merge the operator env for the scanner with the one provided in the MondooAuditConfig

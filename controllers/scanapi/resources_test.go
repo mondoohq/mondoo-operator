@@ -62,7 +62,7 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			mac := *test.mondooauditconfig()
-			dep := ScanApiDeployment(testNamespace, "test123", mac, v1alpha2.MondooOperatorConfig{}, "", false)
+			dep := ScanApiDeployment(testNamespace, "test123", mac, v1alpha2.MondooOperatorConfig{}, nil, false)
 			goMemLimitEnv := corev1.EnvVar{}
 			for _, env := range dep.Spec.Template.Spec.Containers[0].Env {
 				if env.Name == "GOMEMLIMIT" {

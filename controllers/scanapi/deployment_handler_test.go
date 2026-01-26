@@ -76,7 +76,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_CustomEnvVars() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", false)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, nil, false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
@@ -116,7 +116,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_KubernetesResources() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", false)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, nil, false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
@@ -159,10 +159,64 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() 
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "my-pull-secrets", false)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, []string{"my-pull-secrets"}, false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_Create_MultiplePrivateRegistriesSecrets() {
+	d := s.createDeploymentHandler()
+
+	// Use the new plural field for multiple secrets
+	s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRefs = []corev1.LocalObjectReference{
+		{Name: "registry-secret-1"},
+		{Name: "registry-secret-2"},
+	}
+
+	// Create both secrets
+	secret1 := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      "registry-secret-1",
+		},
+		StringData: map[string]string{
+			".dockerconfigjson": `{"auths": {"registry1.example.com": {"auth": "secret1"}}}`,
+		},
+	}
+	secret2 := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      "registry-secret-2",
+		},
+		StringData: map[string]string{
+			".dockerconfigjson": `{"auths": {"registry2.example.com": {"auth": "secret2"}}}`,
+		},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, secret1), "Error creating first registry secret")
+	s.NoError(d.KubeClient.Create(s.ctx, secret2), "Error creating second registry secret")
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	ds := &appsv1.DeploymentList{}
+	s.NoError(d.KubeClient.List(s.ctx, ds))
+	s.Equal(1, len(ds.Items))
+
+	// Verify the deployment has an init container for merging the secrets
+	s.Len(ds.Items[0].Spec.Template.Spec.InitContainers, 1)
+	s.Equal("merge-docker-configs", ds.Items[0].Spec.Template.Spec.InitContainers[0].Name)
+
+	// Verify the deployment has the merged-pull-secrets volume
+	var hasMergedVolume bool
+	for _, vol := range ds.Items[0].Spec.Template.Spec.Volumes {
+		if vol.Name == "merged-pull-secrets" {
+			hasMergedVolume = true
+			break
+		}
+	}
+	s.True(hasMergedVolume, "Expected merged-pull-secrets volume to exist")
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretNotSpecifiedButPresent() {
@@ -191,7 +245,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretNot
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "mondoo-private-registries-secrets", false)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, []string{"mondoo-private-registries-secrets"}, false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
@@ -223,7 +277,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecretWro
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", false)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, nil, false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
@@ -256,7 +310,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_Admission() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", false)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, nil, false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
@@ -298,7 +352,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_NodeScanning() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", false)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, nil, false)
 	deployment.ResourceVersion = "1" // Needed because the fake client sets it.
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	s.True(k8s.AreDeploymentsEqual(*deployment, ds.Items[0]))
@@ -322,7 +376,7 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateMissingServiceAccount() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", false)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, nil, false)
 	deployment.Status.UnavailableReplicas = 1
 	deployment.Status.Conditions = []appsv1.DeploymentCondition{
 		{
@@ -364,7 +418,7 @@ func (s *DeploymentHandlerSuite) TestDeploy_CreateOOMCondition() {
 	s.NoError(err)
 
 	labels := DeploymentLabels(s.auditConfig)
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", false)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, nil, false)
 	deployment.Status.UnavailableReplicas = 1
 	deployment.Status.Conditions = []appsv1.DeploymentCondition{
 		{
@@ -438,7 +492,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", false)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, nil, false)
 	deployment.Spec.Replicas = ptr.To(int32(3))
 
 	service := ScanApiService(s.auditConfig.Namespace, s.auditConfig)
@@ -455,7 +509,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.NoError(d.KubeClient.List(s.ctx, ds))
 	s.Equal(1, len(ds.Items))
 
-	deployment = ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", false)
+	deployment = ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, nil, false)
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, deployment, s.scheme))
 	deployment.ResourceVersion = "1000" // Needed because the fake client sets it.
 
@@ -480,7 +534,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Cleanup_NoScanning() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", false)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, nil, false)
 	service := ScanApiService(s.auditConfig.Namespace, s.auditConfig)
 	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(deployment, service)
 
@@ -511,7 +565,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Cleanup_AuditConfigDeletion() {
 		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
 	s.NoError(err)
 
-	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, "", false)
+	deployment := ScanApiDeployment(s.auditConfig.Namespace, image, s.auditConfig, mondoov1alpha2.MondooOperatorConfig{}, nil, false)
 	service := ScanApiService(s.auditConfig.Namespace, s.auditConfig)
 	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(deployment, service)
 

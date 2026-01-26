@@ -53,3 +53,7 @@ tests/integration/_output
 
 package.json
 .env
+
+## AI
+
+.claude/settings.local.json
