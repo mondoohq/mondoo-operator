@@ -15,9 +15,3 @@ spec:
     enable: true
   nodes:
     enable: false
-  admission:
-    enable: false
-    certificateProvisioning:
-      # Could be "cert-manager", "openshift" or "manual"
-      mode: cert-manager
-  
