@@ -63,7 +63,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -90,7 +90,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_CustomEnvVars() {
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -123,7 +123,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomImage() {
 	image, err := s.containerImageResolver.CnspecImage("ubuntu", "22.04", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -152,7 +152,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 
 	created := &batchv1.CronJob{}
 	created.Name = expected.Name
@@ -187,7 +187,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() 
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRef.Name, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, []string{s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRef.Name}, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -225,7 +225,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, integrationMrn, test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, integrationMrn, test.KubeSystemNamespaceUid, nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -248,7 +248,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.NoError(err)
 
 	// Make sure a cron job exists with different container command
-	cronJob := CronJob(image, "", "", "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	cronJob := CronJob(image, "", "", nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, cronJob))
 
@@ -256,7 +256,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// The second node has an updated cron job so resource version is +1

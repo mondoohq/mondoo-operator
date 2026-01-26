@@ -52,7 +52,7 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		logger.Error(err, "failed to clean up scan API token Secret resource")
 		return err
 	}
-	scanApiDeployment := ScanApiDeployment(n.Mondoo.Namespace, "", *n.Mondoo, *n.MondooOperatorConfig, "", n.DeployOnOpenShift) // Image and private image scanning secret are not relevant when deleting.
+	scanApiDeployment := ScanApiDeployment(n.Mondoo.Namespace, "", *n.Mondoo, *n.MondooOperatorConfig, nil, n.DeployOnOpenShift) // Image and private image scanning secret are not relevant when deleting.
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, scanApiDeployment); err != nil {
 		logger.Error(err, "failed to clean up scan API Deployment resource")
 		return err
@@ -99,29 +99,12 @@ func (n *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	logger.V(7).Info("Cnspec skip resolve: ", "SkipContainerResolution", n.MondooOperatorConfig.Spec.SkipContainerResolution)
 
 	// check whether we have private registry pull secrets
-	privateRegistriesSecretName := "mondoo-private-registries-secrets"
-	if n.Mondoo.Spec.Scanner.PrivateRegistriesPullSecretRef.Name != "" {
-		privateRegistriesSecretName = n.Mondoo.Spec.Scanner.PrivateRegistriesPullSecretRef.Name
-	}
-	privateRegistriesSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      privateRegistriesSecretName,
-			Namespace: n.Mondoo.Namespace,
-		},
-	}
-	found, err := k8s.CheckIfExists(ctx, n.KubeClient, privateRegistriesSecret, privateRegistriesSecret)
+	privateRegistriesSecretNames, err := k8s.CollectPrivateRegistrySecretNames(ctx, n.KubeClient, n.Mondoo)
 	if err != nil {
 		return err
 	}
-	if !found {
-		logger.Info("private registries pull secret not found",
-			" namespace=", n.Mondoo.Namespace,
-			" secretname=", privateRegistriesSecretName)
-		logger.Info("trying to fetch imagePullSecrets for each discovered image")
-		privateRegistriesSecretName = ""
-	}
 
-	deployment := ScanApiDeployment(n.Mondoo.Namespace, cnspecImage, *n.Mondoo, *n.MondooOperatorConfig, privateRegistriesSecretName, n.DeployOnOpenShift)
+	deployment := ScanApiDeployment(n.Mondoo.Namespace, cnspecImage, *n.Mondoo, *n.MondooOperatorConfig, privateRegistriesSecretNames, n.DeployOnOpenShift)
 	if err := ctrl.SetControllerReference(n.Mondoo, deployment, n.KubeClient.Scheme()); err != nil {
 		return err
 	}
