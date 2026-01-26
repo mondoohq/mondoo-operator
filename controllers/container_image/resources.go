@@ -36,7 +36,6 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 		"cnspec", "scan", "k8s",
 		"--config", "/etc/opt/mondoo/config/mondoo.yml",
 		"--inventory-file", "/etc/opt/mondoo/config/inventory.yml",
-		"--score-threshold", "0",
 	}
 
 	if cfg.Spec.HttpProxy != nil {
