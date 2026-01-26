@@ -1,3 +1,4 @@
+deepcopy
 deletecollection
 fullname
 selfsigned
