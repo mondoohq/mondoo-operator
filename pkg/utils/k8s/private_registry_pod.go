@@ -117,25 +117,38 @@ func addMultipleSecretsToSpec(podSpec *corev1.PodSpec, secretNames []string, ima
 		},
 	})
 
-	// Init container that merges the configs using jq
+	// Init container that merges the configs using pure shell (no jq dependency)
 	// The script reads all config-*.json files and merges their .auths objects
 	mergeScript := `#!/bin/sh
 set -e
 cd /secrets
-# Start with an empty auths object
-echo '{"auths":{}}' > /merged/config.json
-# Merge all config files
+
+# Initialize merged auths content
+merged_auths=""
+file_count=0
+
+# Process each config file
 for f in config-*.json; do
   if [ -f "$f" ]; then
-    # Merge the auths from this file into the combined config
-    jq -s '.[0].auths * .[1].auths | {auths: .}' /merged/config.json "$f" > /merged/config.tmp
-    mv /merged/config.tmp /merged/config.json
+    file_count=$((file_count + 1))
+    # Read file and remove whitespace
+    content=$(cat "$f" | tr -d '\n\t\r')
+    # Extract the auths object content (the part inside "auths":{...})
+    # Pattern: {"auths":{...}} or {"auths":{...},...}
+    auths_content=$(echo "$content" | sed 's/.*"auths"[[:space:]]*:[[:space:]]*{\([^}]*\)}.*/\1/')
+    if [ -n "$auths_content" ] && [ "$auths_content" != "$content" ]; then
+      if [ -n "$merged_auths" ]; then
+        merged_auths="${merged_auths},${auths_content}"
+      else
+        merged_auths="${auths_content}"
+      fi
+    fi
   fi
 done
-echo "Merged Docker configs from $(ls config-*.json | wc -l) files"
-cat /merged/config.json | jq -r '.auths | keys[]' | while read registry; do
-  echo "  - $registry"
-done
+
+# Write merged config
+echo "{\"auths\":{${merged_auths}}}" > /merged/config.json
+echo "Merged Docker configs from ${file_count} files"
 `
 
 	initContainer := corev1.Container{

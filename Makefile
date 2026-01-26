@@ -268,9 +268,11 @@ KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/k
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
 ifeq (,$(wildcard $(LOCALBIN)/kustomize))
-	curl -sLO https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F$(KUSTOMIZE_VERSION)/kustomize_$(KUSTOMIZE_VERSION)_linux_amd64.tar.gz && \
-	tar xzf kustomize_$(KUSTOMIZE_VERSION)_linux_amd64.tar.gz -C $(LOCALBIN)/ && \
-	rm kustomize_$(KUSTOMIZE_VERSION)_linux_amd64.tar.gz
+	$(eval KUSTOMIZE_OS := $(shell uname -s | tr '[:upper:]' '[:lower:]'))
+	$(eval KUSTOMIZE_ARCH := $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/' | sed 's/arm64/arm64/'))
+	curl -sLO https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F$(KUSTOMIZE_VERSION)/kustomize_$(KUSTOMIZE_VERSION)_$(KUSTOMIZE_OS)_$(KUSTOMIZE_ARCH).tar.gz && \
+	tar xzf kustomize_$(KUSTOMIZE_VERSION)_$(KUSTOMIZE_OS)_$(KUSTOMIZE_ARCH).tar.gz -C $(LOCALBIN)/ && \
+	rm kustomize_$(KUSTOMIZE_VERSION)_$(KUSTOMIZE_OS)_$(KUSTOMIZE_ARCH).tar.gz
 endif
 
 .PHONY: controller-gen
@@ -411,3 +413,212 @@ license/headers/check:
 
 license/headers/apply:
 	copywrite headers
+
+##@ Local Testing
+
+LOCAL_REGISTRY_DIR ?= /tmp/local-registries
+REGISTRY1_PORT ?= 5001
+REGISTRY2_PORT ?= 5002
+REGISTRY1_USER ?= user1
+REGISTRY1_PASS ?= pass1
+REGISTRY2_USER ?= user2
+REGISTRY2_PASS ?= pass2
+# Registry hostnames as seen from inside the K8s cluster
+REGISTRY1_HOST ?= local-registry1:5000
+REGISTRY2_HOST ?= local-registry2:5000
+K3D_NETWORK ?= k3d-k3s-default
+
+K3D_CLUSTER_NAME ?= k3s-default
+
+.PHONY: local-registries
+local-registries: local-registries/start ## Start two local private container registries for testing
+
+.PHONY: local-registries/k3d-config
+local-registries/k3d-config: ## Generate K3D registries config for insecure local registries
+	@echo "Creating K3D registries config..."
+	@mkdir -p $(LOCAL_REGISTRY_DIR)
+	@printf '%s\n' \
+		'mirrors:' \
+		'  "local-registry1:5000":' \
+		'    endpoint:' \
+		'      - "http://local-registry1:5000"' \
+		'  "local-registry2:5000":' \
+		'    endpoint:' \
+		'      - "http://local-registry2:5000"' \
+		> $(LOCAL_REGISTRY_DIR)/registries.yaml
+	@echo "Config written to $(LOCAL_REGISTRY_DIR)/registries.yaml"
+
+.PHONY: local-registries/k3d-create
+local-registries/k3d-create: local-registries/k3d-config ## Create K3D cluster configured for local registries
+	@echo "Deleting existing K3D cluster if exists..."
+	-@k3d cluster delete $(K3D_CLUSTER_NAME) 2>/dev/null || true
+	@echo "Creating K3D cluster with registry config..."
+	@k3d cluster create $(K3D_CLUSTER_NAME) \
+		--registry-config $(LOCAL_REGISTRY_DIR)/registries.yaml
+	@echo "K3D cluster '$(K3D_CLUSTER_NAME)' created with insecure registry support."
+
+.PHONY: local-registries/start
+local-registries/start: ## Start local private registries with basic auth
+	@echo "Creating registry auth directories..."
+	@mkdir -p $(LOCAL_REGISTRY_DIR)/registry1/auth $(LOCAL_REGISTRY_DIR)/registry2/auth
+	@echo "Generating htpasswd files..."
+	@docker run --rm --entrypoint htpasswd httpd:2 -Bbn $(REGISTRY1_USER) $(REGISTRY1_PASS) > $(LOCAL_REGISTRY_DIR)/registry1/auth/htpasswd
+	@docker run --rm --entrypoint htpasswd httpd:2 -Bbn $(REGISTRY2_USER) $(REGISTRY2_PASS) > $(LOCAL_REGISTRY_DIR)/registry2/auth/htpasswd
+	@echo "Starting registry1 on port $(REGISTRY1_PORT)..."
+	@docker run -d -p $(REGISTRY1_PORT):5000 --name local-registry1 \
+		-v $(LOCAL_REGISTRY_DIR)/registry1/auth:/auth \
+		-e "REGISTRY_AUTH=htpasswd" \
+		-e "REGISTRY_AUTH_HTPASSWD_REALM=Registry1" \
+		-e "REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd" \
+		registry:2
+	@echo "Starting registry2 on port $(REGISTRY2_PORT)..."
+	@docker run -d -p $(REGISTRY2_PORT):5000 --name local-registry2 \
+		-v $(LOCAL_REGISTRY_DIR)/registry2/auth:/auth \
+		-e "REGISTRY_AUTH=htpasswd" \
+		-e "REGISTRY_AUTH_HTPASSWD_REALM=Registry2" \
+		-e "REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd" \
+		registry:2
+	@echo "Connecting registries to K3D network (if exists)..."
+	-@docker network connect $(K3D_NETWORK) local-registry1 2>/dev/null || true
+	-@docker network connect $(K3D_NETWORK) local-registry2 2>/dev/null || true
+	@echo "Local registries started:"
+	@echo "  - localhost:$(REGISTRY1_PORT) (user: $(REGISTRY1_USER), pass: $(REGISTRY1_PASS))"
+	@echo "  - localhost:$(REGISTRY2_PORT) (user: $(REGISTRY2_USER), pass: $(REGISTRY2_PASS))"
+	@echo "  - From inside K3D cluster: $(REGISTRY1_HOST), $(REGISTRY2_HOST)"
+
+.PHONY: local-registries/stop
+local-registries/stop: ## Stop and remove local private registries
+	@echo "Stopping local registries..."
+	-@docker stop local-registry1 local-registry2 2>/dev/null || true
+	-@docker rm local-registry1 local-registry2 2>/dev/null || true
+	@echo "Local registries stopped and removed."
+
+.PHONY: local-registries/clean
+local-registries/clean: local-registries/stop ## Stop registries and clean up auth files
+	@echo "Cleaning up registry directories..."
+	@rm -rf $(LOCAL_REGISTRY_DIR)
+	@echo "Cleanup complete."
+
+.PHONY: local-registries/push-test-images
+local-registries/push-test-images: ## Push test images to local registries
+	@echo "Logging into registry1..."
+	@docker login localhost:$(REGISTRY1_PORT) -u $(REGISTRY1_USER) -p $(REGISTRY1_PASS)
+	@echo "Logging into registry2..."
+	@docker login localhost:$(REGISTRY2_PORT) -u $(REGISTRY2_USER) -p $(REGISTRY2_PASS)
+	@echo "Pulling and tagging test image..."
+	@docker pull nginx:alpine
+	@docker tag nginx:alpine localhost:$(REGISTRY1_PORT)/test-image:v1
+	@docker tag nginx:alpine localhost:$(REGISTRY2_PORT)/test-image:v1
+	@echo "Pushing to registry1..."
+	@docker push localhost:$(REGISTRY1_PORT)/test-image:v1
+	@echo "Pushing to registry2..."
+	@docker push localhost:$(REGISTRY2_PORT)/test-image:v1
+	@echo "Test images pushed successfully."
+	@echo "Images available at:"
+	@echo "  - localhost:$(REGISTRY1_PORT)/test-image:v1 (from host)"
+	@echo "  - localhost:$(REGISTRY2_PORT)/test-image:v1 (from host)"
+	@echo "  - $(REGISTRY1_HOST)/test-image:v1 (from K3D cluster)"
+	@echo "  - $(REGISTRY2_HOST)/test-image:v1 (from K3D cluster)"
+
+.PHONY: local-registries/create-secrets
+local-registries/create-secrets: ## Create K8s pull secrets for local registries
+	@echo "Creating namespace if not exists..."
+	-@kubectl create namespace mondoo-operator 2>/dev/null || true
+	@echo "Creating registry1 pull secret..."
+	-@kubectl delete secret local-registry1-secret -n mondoo-operator 2>/dev/null || true
+	@kubectl create secret docker-registry local-registry1-secret \
+		--docker-server=$(REGISTRY1_HOST) \
+		--docker-username=$(REGISTRY1_USER) \
+		--docker-password=$(REGISTRY1_PASS) \
+		-n mondoo-operator
+	@echo "Creating registry2 pull secret..."
+	-@kubectl delete secret local-registry2-secret -n mondoo-operator 2>/dev/null || true
+	@kubectl create secret docker-registry local-registry2-secret \
+		--docker-server=$(REGISTRY2_HOST) \
+		--docker-username=$(REGISTRY2_USER) \
+		--docker-password=$(REGISTRY2_PASS) \
+		-n mondoo-operator
+	@echo "Pull secrets created: local-registry1-secret, local-registry2-secret"
+
+.PHONY: local-registries/deploy-test-workloads
+local-registries/deploy-test-workloads: ## Deploy test workloads using images from local private registries
+	@echo "Creating test namespace..."
+	-@kubectl create namespace local-registry-test 2>/dev/null || true
+	@echo "Creating pull secrets in test namespace..."
+	-@kubectl delete secret local-registry1-secret -n local-registry-test 2>/dev/null || true
+	-@kubectl delete secret local-registry2-secret -n local-registry-test 2>/dev/null || true
+	@kubectl create secret docker-registry local-registry1-secret \
+		--docker-server=$(REGISTRY1_HOST) \
+		--docker-username=$(REGISTRY1_USER) \
+		--docker-password=$(REGISTRY1_PASS) \
+		-n local-registry-test
+	@kubectl create secret docker-registry local-registry2-secret \
+		--docker-server=$(REGISTRY2_HOST) \
+		--docker-username=$(REGISTRY2_USER) \
+		--docker-password=$(REGISTRY2_PASS) \
+		-n local-registry-test
+	@echo "Deploying test workload from registry1..."
+	@printf '%s\n' \
+		'apiVersion: apps/v1' \
+		'kind: Deployment' \
+		'metadata:' \
+		'  name: test-app-registry1' \
+		'  namespace: local-registry-test' \
+		'  labels:' \
+		'    app: test-app-registry1' \
+		'spec:' \
+		'  replicas: 1' \
+		'  selector:' \
+		'    matchLabels:' \
+		'      app: test-app-registry1' \
+		'  template:' \
+		'    metadata:' \
+		'      labels:' \
+		'        app: test-app-registry1' \
+		'    spec:' \
+		'      imagePullSecrets:' \
+		'      - name: local-registry1-secret' \
+		'      containers:' \
+		'      - name: nginx' \
+		'        image: $(REGISTRY1_HOST)/test-image:v1' \
+		'        ports:' \
+		'        - containerPort: 80' | kubectl apply -f -
+	@echo "Deploying test workload from registry2..."
+	@printf '%s\n' \
+		'apiVersion: apps/v1' \
+		'kind: Deployment' \
+		'metadata:' \
+		'  name: test-app-registry2' \
+		'  namespace: local-registry-test' \
+		'  labels:' \
+		'    app: test-app-registry2' \
+		'spec:' \
+		'  replicas: 1' \
+		'  selector:' \
+		'    matchLabels:' \
+		'      app: test-app-registry2' \
+		'  template:' \
+		'    metadata:' \
+		'      labels:' \
+		'        app: test-app-registry2' \
+		'    spec:' \
+		'      imagePullSecrets:' \
+		'      - name: local-registry2-secret' \
+		'      containers:' \
+		'      - name: nginx' \
+		'        image: $(REGISTRY2_HOST)/test-image:v1' \
+		'        ports:' \
+		'        - containerPort: 80' | kubectl apply -f -
+	@echo "Test workloads deployed. Check status with: kubectl get pods -n local-registry-test"
+
+.PHONY: local-registries/delete-test-workloads
+local-registries/delete-test-workloads: ## Delete test workloads and namespace
+	@echo "Deleting test namespace and workloads..."
+	-@kubectl delete namespace local-registry-test 2>/dev/null || true
+	@echo "Test workloads deleted."
+
+.PHONY: local-registries/setup
+local-registries/setup: local-registries/start local-registries/push-test-images local-registries/create-secrets local-registries/deploy-test-workloads ## Full setup: start registries, push test images, create K8s secrets, deploy test workloads
+	@echo "Local registry setup complete!"
+	@echo "Test workloads are running in namespace: local-registry-test"
+	@echo "Mondoo operator secrets are in namespace: mondoo-operator"
