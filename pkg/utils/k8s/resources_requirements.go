@@ -47,6 +47,19 @@ var DefaultNodeScanningResources corev1.ResourceRequirements = corev1.ResourceRe
 	},
 }
 
+// DefaultK8sResourceScanningResources for cnspec container when scanning K8s resources
+var DefaultK8sResourceScanningResources corev1.ResourceRequirements = corev1.ResourceRequirements{
+	Limits: corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("500M"),
+		corev1.ResourceCPU:    resource.MustParse("1"),
+	},
+
+	Requests: corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("250M"),
+		corev1.ResourceCPU:    resource.MustParse("400m"),
+	},
+}
+
 // ResourcesRequirementsWithDefaults will return the resource requirements from the parameter if such
 // are specified. If not requirements are specified, default values will be returned.
 func ResourcesRequirementsWithDefaults(m corev1.ResourceRequirements, defaults corev1.ResourceRequirements) corev1.ResourceRequirements {

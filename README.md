@@ -10,13 +10,7 @@
 
 ## Overview
 
-The **Mondoo Operator** provides a new [Kubernetes](https://kubernetes.io/) native way to do a security assessment of your whole Kubernetes Cluster. The purpose of this project is to simplify and automate the configuration for a Mondoo-based security assessment for Kubernetes clusters.
-
-The Mondoo Operator provides the following features:
-
-- Continuous validation of deployed workloads
-- Continuous validation of Kubernetes nodes **without** privileged access
-- Admission Controller
+The **Mondoo Operator** provides a [Kubernetes](https://kubernetes.io/) native way to do continuous security assessment of your Kubernetes clusters. The purpose of this project is to simplify and automate the configuration for Mondoo-based security scanning.
 
 It is backed by Mondoo's powerful policy-as-code engine [cnspec](https://mondoo.com/docs/cnspec/cnspec-about/) and [MQL](https://mondoo.com/docs/mql/resources/). Mondoo ships out-of-the-box security policies for:
 
@@ -25,6 +19,124 @@ It is backed by Mondoo's powerful policy-as-code engine [cnspec](https://mondoo.
 - NSA/CISA Kubernetes Hardening Guide
 - Kubernetes Cluster and Workload Security
 - Kubernetes Best Practices
+
+## Deployment Modes
+
+The Mondoo Operator supports two deployment modes that can be used independently or together:
+
+### Self-Cluster Scanning
+
+Install the operator in each cluster you want to scan. The operator scans the cluster it runs in using in-cluster credentials.
+
+```
+┌─────────────────────────────────────┐
+│         Your Kubernetes Cluster     │
+│                                     │
+│  ┌─────────────────────────────┐   │
+│  │      Mondoo Operator        │   │
+│  │                             │   │
+│  │  • K8s Resources Scanning   │   │
+│  │  • Node Scanning            │   │
+│  │  • Container Image Scanning │   │
+│  └─────────────────────────────┘   │
+│               │                     │
+│               ▼                     │
+│     Scans this cluster directly     │
+└─────────────────────────────────────┘
+```
+
+**Use when:** You want full scanning capabilities including node scanning, or when clusters are isolated.
+
+```yaml
+# Self-cluster scanning configuration
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+spec:
+  kubernetesResources:
+    enable: true        # Scan K8s resources in this cluster
+  nodes:
+    enable: true        # Scan nodes in this cluster
+  containers:
+    enable: true        # Scan container images
+```
+
+### External Cluster Scanning
+
+Install the operator in a central management cluster and scan remote clusters via kubeconfig or workload identity. This allows scanning multiple clusters from a single operator installation.
+
+```
+┌─────────────────────────────────────┐
+│       Management Cluster            │
+│                                     │
+│  ┌─────────────────────────────┐   │
+│  │      Mondoo Operator        │   │
+│  └──────────┬──────────────────┘   │
+└─────────────┼───────────────────────┘
+              │
+              │ kubeconfig / WIF / SPIFFE
+              │
+    ┌─────────┴─────────┬─────────────────┐
+    ▼                   ▼                 ▼
+┌─────────┐       ┌─────────┐       ┌─────────┐
+│  Prod   │       │ Staging │       │   Dev   │
+│ Cluster │       │ Cluster │       │ Cluster │
+└─────────┘       └─────────┘       └─────────┘
+```
+
+**Use when:** You want centralized scanning, cannot install operators in target clusters, or want to reduce operational overhead.
+
+**Authentication methods:**
+- **Kubeconfig**: Use a kubeconfig file stored in a Secret
+- **Workload Identity (WIF)**: Native cloud provider authentication for GKE, EKS, AKS
+- **SPIFFE**: Use SPIFFE/SPIRE for cross-cluster authentication
+
+```yaml
+# External cluster scanning with kubeconfig
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+spec:
+  kubernetesResources:
+    enable: false       # Don't scan local cluster
+    externalClusters:
+      - name: production
+        kubeconfigSecretRef:
+          name: prod-kubeconfig
+      - name: staging
+        kubeconfigSecretRef:
+          name: staging-kubeconfig
+```
+
+### Combined Mode
+
+You can also combine both modes - scan the local cluster AND external clusters from the same operator:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+spec:
+  kubernetesResources:
+    enable: true        # Scan local cluster
+    externalClusters:   # Also scan remote clusters
+      - name: production
+        kubeconfigSecretRef:
+          name: prod-kubeconfig
+  nodes:
+    enable: true        # Scan local nodes
+  containers:
+    enable: true        # Scan container images
+```
+
+## Features
+
+| Feature | Self-Cluster | External Cluster |
+|---------|:------------:|:----------------:|
+| Kubernetes Resources Scanning | ✅ | ✅ |
+| Node Scanning | ✅ | ❌ |
+| Container Image Scanning | ✅ | ✅ |
+| Namespace Filtering | ✅ | ✅ |
+| Kubeconfig Auth | - | ✅ |
+| Workload Identity (GKE/EKS/AKS) | - | ✅ |
+| SPIFFE Auth | - | ✅ |
 
 ![Architecture](docs/img/architecture.svg)
 

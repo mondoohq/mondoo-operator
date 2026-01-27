@@ -11,7 +11,13 @@ This user manual describes how to install and use the Mondoo Operator.
   - [Configuring the Mondoo Secret](#configuring-the-mondoo-secret)
   - [Creating a MondooAuditConfig](#creating-a-mondooauditconfig)
     - [Filter Kubernetes objects based on namespace](#filter-kubernetes-objects-based-on-namespace)
-  - [Creating a secret for private image scanning](#creating-a-secret-for-private-image-scanning)
+  - [Scanning External Clusters](#scanning-external-clusters)
+    - [Creating a kubeconfig Secret](#creating-a-kubeconfig-secret)
+    - [Configuring external cluster scanning](#configuring-external-cluster-scanning)
+    - [Per-cluster configuration](#per-cluster-configuration)
+    - [Authentication methods](#authentication-methods)
+  - [Container Image Scanning](#container-image-scanning)
+    - [Creating a secret for private image scanning](#creating-a-secret-for-private-image-scanning)
   - [Installing Mondoo into multiple namespaces](#installing-mondoo-into-multiple-namespaces)
   - [Adjust the scan interval](#adjust-the-scan-interval)
   - [Configure resources for the operator and its components](#configure-resources-for-the-operator-and-its-components)
@@ -25,7 +31,6 @@ This user manual describes how to install and use the Mondoo Operator.
   - [FAQ](#faq)
     - [I do not see the service running, only the operator. What should I do?](#i-do-not-see-the-service-running-only-the-operator-what-should-i-do)
     - [How do I edit an existing operator configuration?](#how-do-i-edit-an-existing-operator-configuration)
-    - [How do I run asset garbage collection manually?](#how-do-i-run-asset-garbage-collection-manually)
     - [Why is there a deployment marked as unschedulable?](#why-is-there-a-deployment-marked-as-unschedulable)
     - [Why are (some of) my nodes unscored?](#why-are-some-of-my-nodes-unscored)
     - [How can I trigger a new scan?](#how-can-i-trigger-a-new-scan)
@@ -193,7 +198,229 @@ spec:
         - ...
 ```
 
-## Creating a secret for private image scanning
+## Scanning External Clusters
+
+The Mondoo Operator can scan remote Kubernetes clusters from a central installation. This is useful for:
+
+- Scanning clusters where you cannot or do not want to install the operator
+- Centralizing security scanning in a management cluster
+- Scanning development or staging clusters from a single location
+
+### Creating a kubeconfig Secret
+
+First, create a kubeconfig file that has access to the remote cluster. The kubeconfig should have read-only access to the Kubernetes API resources you want to scan.
+
+1. Create a kubeconfig file for the remote cluster:
+
+   ```bash
+   # Example: Export kubeconfig from your current context
+   kubectl config view --minify --flatten > remote-kubeconfig.yaml
+   ```
+
+2. Create a Secret containing the kubeconfig:
+
+   ```bash
+   kubectl create secret generic prod-kubeconfig \
+     --namespace mondoo-operator \
+     --from-file=kubeconfig=remote-kubeconfig.yaml
+   ```
+
+   > **Note**: The Secret must have a key named `kubeconfig` containing the kubeconfig content.
+
+### Configuring external cluster scanning
+
+Add the `externalClusters` field to your `MondooAuditConfig`:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true  # Scan local cluster (optional)
+    externalClusters:
+      - name: production
+        kubeconfigSecretRef:
+          name: prod-kubeconfig
+      - name: staging
+        kubeconfigSecretRef:
+          name: staging-kubeconfig
+```
+
+Each external cluster will have its own CronJob created with the appropriate kubeconfig mounted.
+
+### Per-cluster configuration
+
+You can customize settings for each external cluster:
+
+```yaml
+externalClusters:
+  - name: production
+    kubeconfigSecretRef:
+      name: prod-kubeconfig
+    # Custom schedule for this cluster
+    schedule: "0 */2 * * *"  # Every 2 hours
+    # Cluster-specific namespace filtering
+    filtering:
+      namespaces:
+        exclude:
+          - kube-system
+          - monitoring
+    # Enable container image scanning for this cluster
+    containerImageScanning: true
+    # Private registry credentials for this cluster
+    privateRegistriesPullSecretRef:
+      name: prod-registry-creds
+```
+
+**Configuration options:**
+
+| Field | Description |
+|-------|-------------|
+| `name` | Unique identifier for the cluster (used in CronJob names) |
+| `kubeconfigSecretRef` | Reference to Secret containing kubeconfig |
+| `schedule` | Override the default scan schedule (cron format) |
+| `filtering` | Namespace include/exclude specific to this cluster |
+| `containerImageScanning` | Enable container image scanning for this cluster |
+| `privateRegistriesPullSecretRef` | Registry credentials for private images |
+
+### Authentication methods
+
+The operator supports four authentication methods for external clusters. Choose the one that best fits your security requirements:
+
+#### 1. Kubeconfig (most flexible)
+
+Use a kubeconfig file stored in a Secret. This works with any cluster and authentication method supported by kubectl.
+
+```yaml
+externalClusters:
+  - name: production
+    kubeconfigSecretRef:
+      name: prod-kubeconfig
+```
+
+#### 2. Service Account Token
+
+Use a Kubernetes service account token with CA certificate. Simpler than a full kubeconfig.
+
+```yaml
+externalClusters:
+  - name: production
+    serviceAccountAuth:
+      server: "https://prod-cluster.example.com:6443"
+      credentialsSecretRef:
+        name: prod-sa-credentials  # Secret with "token" and "ca.crt" keys
+```
+
+Create the credentials Secret:
+
+```bash
+kubectl create secret generic prod-sa-credentials \
+  --namespace mondoo-operator \
+  --from-file=token=./token \
+  --from-file=ca.crt=./ca.crt
+```
+
+#### 3. Workload Identity Federation (cloud-native)
+
+Use cloud-native identity federation with no static credentials. Supports GKE, EKS, and AKS.
+
+**GKE example:**
+
+```yaml
+externalClusters:
+  - name: gke-prod
+    workloadIdentity:
+      provider: gke
+      gke:
+        projectId: my-gcp-project
+        clusterName: production-cluster
+        clusterLocation: us-central1-a
+        googleServiceAccount: scanner@my-gcp-project.iam.gserviceaccount.com
+```
+
+**EKS example:**
+
+```yaml
+externalClusters:
+  - name: eks-prod
+    workloadIdentity:
+      provider: eks
+      eks:
+        region: us-west-2
+        clusterName: production-cluster
+        roleArn: arn:aws:iam::123456789012:role/MondooScannerRole
+```
+
+**AKS example:**
+
+```yaml
+externalClusters:
+  - name: aks-prod
+    workloadIdentity:
+      provider: aks
+      aks:
+        subscriptionId: 12345678-1234-1234-1234-123456789012
+        resourceGroup: my-resource-group
+        clusterName: production-cluster
+        clientId: abcdef12-3456-7890-abcd-ef1234567890
+        tenantId: fedcba98-7654-3210-fedc-ba9876543210
+```
+
+#### 4. SPIFFE/SPIRE (zero-trust)
+
+Use SPIFFE/SPIRE for zero-trust authentication with auto-rotating X.509 certificates.
+
+```yaml
+externalClusters:
+  - name: spiffe-cluster
+    spiffeAuth:
+      server: "https://remote-cluster.example.com:6443"
+      trustBundleSecretRef:
+        name: remote-cluster-ca  # Secret with "ca.crt" key
+      # Optional: custom socket path (default: /run/spire/sockets/agent.sock)
+      # socketPath: "/run/spire/sockets/agent.sock"
+```
+
+> **Important: HostPath permissions required**
+>
+> SPIFFE authentication requires mounting the SPIRE agent socket from the host filesystem using a HostPath volume. This may require:
+>
+> - **Pod Security Admission**: Configure the namespace with a policy that allows HostPath volumes
+> - **Pod Security Policy (deprecated)**: Allow HostPath in the PSP
+> - **OpenShift SCC**: Use an SCC that permits HostPath mounts
+>
+> Ensure your cluster's security policies allow HostPath volumes for the mondoo-operator namespace before using SPIFFE authentication.
+
+> **Note: Certificate TTL consideration**
+>
+> SPIFFE certificates are fetched once at the start of each scan job and are not rotated during the scan. SPIFFE SVIDs typically have a 1-hour TTL by default. For most K8s resource scans that complete within minutes, this is sufficient. If your scans consistently exceed the SVID TTL, consider increasing the TTL in your SPIRE server configuration or using a different authentication method.
+
+## Container Image Scanning
+
+The Mondoo Operator can scan container images running in your cluster for vulnerabilities and security issues.
+
+Enable container image scanning in your `MondooAuditConfig`:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  containers:
+    enable: true
+    schedule: "0 0 * * *"  # Daily at midnight
+```
+
+### Creating a secret for private image scanning
 
 To allow the Mondoo operator to scan private images, it needs access to image pull secrets for these private registries.
 Please create a secret with the name `mondoo-private-registries-secrets` within the same namespace you created your `MondooAuditConfig`.
@@ -453,36 +680,6 @@ Run:
 ```bash
 kubectl edit  mondooauditconfigs -n mondoo-operator
 ```
-
-### How do I run asset garbage collection manually?
-
-The operator will trigger garbage collection after each successful cluster scan. This will delete all old assets that were created
-by the operator but are no longer present in the cluster. It is possible to trigger garbage collection manually. To do this it is required
-to have the Mondoo Client API running locally:
-
-```bash
-mondoo serve --api --token abcdefgh
-```
-
-Retrieve the cluster UID:
-
-```bash
-kubectl get ns kube-system -o yaml | grep uid
-```
-
-Then you can trigger asset garbage collection for workloads by the following command:
-
-```bash
-mondoo-operator garbage-collect --filter-managed-by mondoo-operator-<<cluster UID>> --filter-older-than 2h --filter-platform-runtime k8s-cluster --scan-api-url http://127.0.0.1:8989 --token abcdefgh
-```
-
-For container images use:
-
-```bash
-mondoo-operator garbage-collect --filter-managed-by mondoo-operator-<<cluster UID>> --filter-older-than 48h --filter-platform-runtime docker-registry --scan-api-url http://127.0.0.1:8989 --token abcdefgh
-```
-
-For different use-cases adjust the CLI arguments.
 
 ### Why is there a deployment marked as unschedulable?
 
