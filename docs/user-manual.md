@@ -15,10 +15,8 @@ This user manual describes how to install and use the Mondoo Operator.
     - [Creating a kubeconfig Secret](#creating-a-kubeconfig-secret)
     - [Configuring external cluster scanning](#configuring-external-cluster-scanning)
     - [Per-cluster configuration](#per-cluster-configuration)
+    - [Authentication methods](#authentication-methods)
   - [Container Image Scanning](#container-image-scanning)
-    - [Basic container image scanning](#basic-container-image-scanning)
-    - [Scan deduplication](#scan-deduplication)
-    - [SBOM-based scanning](#sbom-based-scanning)
     - [Creating a secret for private image scanning](#creating-a-secret-for-private-image-scanning)
   - [Installing Mondoo into multiple namespaces](#installing-mondoo-into-multiple-namespaces)
   - [Adjust the scan interval](#adjust-the-scan-interval)
@@ -306,11 +304,121 @@ externalClusters:
 | `containerImageScanning` | Enable container image scanning for this cluster |
 | `privateRegistriesPullSecretRef` | Registry credentials for private images |
 
+### Authentication methods
+
+The operator supports four authentication methods for external clusters. Choose the one that best fits your security requirements:
+
+#### 1. Kubeconfig (most flexible)
+
+Use a kubeconfig file stored in a Secret. This works with any cluster and authentication method supported by kubectl.
+
+```yaml
+externalClusters:
+  - name: production
+    kubeconfigSecretRef:
+      name: prod-kubeconfig
+```
+
+#### 2. Service Account Token
+
+Use a Kubernetes service account token with CA certificate. Simpler than a full kubeconfig.
+
+```yaml
+externalClusters:
+  - name: production
+    serviceAccountAuth:
+      server: "https://prod-cluster.example.com:6443"
+      credentialsSecretRef:
+        name: prod-sa-credentials  # Secret with "token" and "ca.crt" keys
+```
+
+Create the credentials Secret:
+
+```bash
+kubectl create secret generic prod-sa-credentials \
+  --namespace mondoo-operator \
+  --from-file=token=./token \
+  --from-file=ca.crt=./ca.crt
+```
+
+#### 3. Workload Identity Federation (cloud-native)
+
+Use cloud-native identity federation with no static credentials. Supports GKE, EKS, and AKS.
+
+**GKE example:**
+
+```yaml
+externalClusters:
+  - name: gke-prod
+    workloadIdentity:
+      provider: gke
+      gke:
+        projectId: my-gcp-project
+        clusterName: production-cluster
+        clusterLocation: us-central1-a
+        googleServiceAccount: scanner@my-gcp-project.iam.gserviceaccount.com
+```
+
+**EKS example:**
+
+```yaml
+externalClusters:
+  - name: eks-prod
+    workloadIdentity:
+      provider: eks
+      eks:
+        region: us-west-2
+        clusterName: production-cluster
+        roleArn: arn:aws:iam::123456789012:role/MondooScannerRole
+```
+
+**AKS example:**
+
+```yaml
+externalClusters:
+  - name: aks-prod
+    workloadIdentity:
+      provider: aks
+      aks:
+        subscriptionId: 12345678-1234-1234-1234-123456789012
+        resourceGroup: my-resource-group
+        clusterName: production-cluster
+        clientId: abcdef12-3456-7890-abcd-ef1234567890
+        tenantId: fedcba98-7654-3210-fedc-ba9876543210
+```
+
+#### 4. SPIFFE/SPIRE (zero-trust)
+
+Use SPIFFE/SPIRE for zero-trust authentication with auto-rotating X.509 certificates.
+
+```yaml
+externalClusters:
+  - name: spiffe-cluster
+    spiffeAuth:
+      server: "https://remote-cluster.example.com:6443"
+      trustBundleSecretRef:
+        name: remote-cluster-ca  # Secret with "ca.crt" key
+      # Optional: custom socket path (default: /run/spire/sockets/agent.sock)
+      # socketPath: "/run/spire/sockets/agent.sock"
+```
+
+> **Important: HostPath permissions required**
+>
+> SPIFFE authentication requires mounting the SPIRE agent socket from the host filesystem using a HostPath volume. This may require:
+>
+> - **Pod Security Admission**: Configure the namespace with a policy that allows HostPath volumes
+> - **Pod Security Policy (deprecated)**: Allow HostPath in the PSP
+> - **OpenShift SCC**: Use an SCC that permits HostPath mounts
+>
+> Ensure your cluster's security policies allow HostPath volumes for the mondoo-operator namespace before using SPIFFE authentication.
+
+> **Note: Certificate TTL consideration**
+>
+> SPIFFE certificates are fetched once at the start of each scan job and are not rotated during the scan. SPIFFE SVIDs typically have a 1-hour TTL by default. For most K8s resource scans that complete within minutes, this is sufficient. If your scans consistently exceed the SVID TTL, consider increasing the TTL in your SPIRE server configuration or using a different authentication method.
+
 ## Container Image Scanning
 
 The Mondoo Operator can scan container images running in your cluster for vulnerabilities and security issues.
-
-### Basic container image scanning
 
 Enable container image scanning in your `MondooAuditConfig`:
 
@@ -327,64 +435,6 @@ spec:
     enable: true
     schedule: "0 0 * * *"  # Daily at midnight
 ```
-
-### Scan deduplication
-
-To avoid re-scanning the same container images, enable scan deduplication. This uses the image's SHA256 digest to identify already-scanned images:
-
-```yaml
-spec:
-  containers:
-    enable: true
-    scanDeduplication:
-      enable: true      # Skip images that were already scanned
-      cacheTTL: "24h"   # Remember scanned images for 24 hours
-```
-
-**How it works:**
-
-1. Before scanning, the operator checks if the image digest exists in the scan cache
-2. If found and not expired (based on `cacheTTL`), the image is skipped
-3. If not found or expired, the image is scanned and added to the cache
-
-This significantly reduces scan time and resource usage when the same images run across multiple pods or namespaces.
-
-### SBOM-based scanning
-
-When container images have attached SBOMs (Software Bill of Materials), the operator can use them for scanning instead of downloading the full image. This is especially useful for large images.
-
-```yaml
-spec:
-  containers:
-    enable: true
-    sbomScanning:
-      enable: true
-      preferSBOM: true           # Use SBOM when available
-      supportedFormats:          # Accepted SBOM formats
-        - spdx-json
-        - cyclonedx-json
-```
-
-**How it works:**
-
-1. The operator checks if the image has an attached SBOM using the OCI Referrers API
-2. If a supported SBOM format is found:
-   - Only the SBOM is fetched (not the full image)
-   - Scanning is performed using the SBOM data
-3. If no SBOM is found, falls back to downloading the full image
-
-**Benefits:**
-
-- **Reduced memory usage**: No need to download and extract large container images
-- **Faster scans**: SBOMs are typically small (KB) compared to images (GB)
-- **Supply chain integration**: Works with signed SBOMs from your build pipeline
-
-**Attaching SBOMs to images:**
-
-You can attach SBOMs to your container images using tools like:
-
-- [Syft](https://github.com/anchore/syft): `syft packages <image> -o spdx-json | cosign attach sbom --sbom - <image>`
-- [cosign](https://github.com/sigstore/cosign): `cosign attach sbom --sbom sbom.spdx.json <image>`
 
 ### Creating a secret for private image scanning
 
