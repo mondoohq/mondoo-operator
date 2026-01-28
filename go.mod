@@ -9,11 +9,11 @@ require (
 	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang/mock v1.6.0
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.88.0
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.88.1
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
-	go.mondoo.com/mondoo-go v0.0.0-20260114000441-07c33481a7a8
+	go.mondoo.com/mondoo-go v0.0.0-20260121000438-392a57e88e7c
 	k8s.io/api v0.35.0
 	k8s.io/apiextensions-apiserver v0.35.0-beta.0 // indirect
 	k8s.io/apimachinery v0.35.0
@@ -22,9 +22,9 @@ require (
 )
 
 require (
-	go.mondoo.com/cnquery/v12 v12.19.2
+	go.mondoo.com/cnquery/v12 v12.20.1
 	go.mondoo.com/cnquery/v12/providers/k8s v0.0.0-00010101000000-000000000000
-	go.mondoo.com/cnspec/v12 v12.19.2
+	go.mondoo.com/cnspec/v12 v12.20.1
 )
 
 require (
@@ -85,10 +85,10 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.4 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.14 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
-	github.com/clipperhouse/displaywidth v0.7.0 // indirect
+	github.com/clipperhouse/displaywidth v0.8.0 // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
-	github.com/clipperhouse/uax29/v2 v2.3.1 // indirect
-	github.com/cloudflare/circl v1.6.2 // indirect
+	github.com/clipperhouse/uax29/v2 v2.4.0 // indirect
+	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cncf/xds/go v0.0.0-20251022180443-0feb69152e9f // indirect
 	github.com/cockroachdb/errors v1.12.0 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20241215232642-bb51bb14a506 // indirect
@@ -181,7 +181,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oklog/run v1.2.0 // indirect
 	github.com/olekukonko/cat v0.0.0-20250911104152-50322a0618f6 // indirect
-	github.com/olekukonko/errors v1.1.0 // indirect
+	github.com/olekukonko/errors v1.2.0 // indirect
 	github.com/olekukonko/ll v0.1.4-0.20260115111900-9e59c2286df0 // indirect
 	github.com/olekukonko/tablewriter v1.1.3 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -238,7 +238,7 @@ require (
 	google.golang.org/api v0.251.0 // indirect
 	google.golang.org/genproto v0.0.0-20250826171959-ef028d996bc1 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260114163908-3f89685c29c3 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260122232226-8e98ce8d340d // indirect
 	google.golang.org/grpc v1.78.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
