@@ -95,11 +95,9 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		existing.Spec.ConcurrencyPolicy = desired.Spec.ConcurrencyPolicy
 		existing.SetOwnerReferences(desired.GetOwnerReferences())
 
-		// Remove any old jobs because they won't be updated when the cronjob changes
-		if err := n.KubeClient.DeleteAllOf(ctx, &batchv1.Job{},
-			client.InNamespace(n.Mondoo.Namespace),
-			client.MatchingLabels(CronJobLabels(*n.Mondoo)),
-			client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
+		// Remove any old completed/failed jobs because they won't be updated when the cronjob changes
+		// We only delete non-active jobs to avoid killing running scans
+		if err := k8s.DeleteCompletedJobs(ctx, n.KubeClient, n.Mondoo.Namespace, CronJobLabels(*n.Mondoo), logger); err != nil {
 			return err
 		}
 
