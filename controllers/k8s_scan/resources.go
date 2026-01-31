@@ -42,14 +42,21 @@ var K8sDiscoveryTargets = []string{
 	"services",
 }
 
+const (
+	// GarbageCollectOlderThan is the default duration for garbage collection of stale assets
+	GarbageCollectOlderThan = "2h"
+)
+
 func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(*m)
 
+	managedBy := "mondoo-operator-" + clusterUid
 	cmd := []string{
-		"cnspec", "scan", "k8s",
+		"/mondoo-operator", "k8s-scan",
 		"--config", "/etc/opt/mondoo/config/mondoo.yml",
 		"--inventory-file", "/etc/opt/mondoo/config/inventory.yml",
-		"--score-threshold", "0",
+		"--cleanup-assets-older-than", GarbageCollectOlderThan,
+		"--set-managed-by", managedBy,
 	}
 
 	if cfg.Spec.HttpProxy != nil {
