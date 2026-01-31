@@ -24,7 +24,7 @@ var DefaultCnspecResources corev1.ResourceRequirements = corev1.ResourceRequirem
 // DefaultContainerScanningResources for cnspec container
 var DefaultContainerScanningResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("500M"),
+		corev1.ResourceMemory: resource.MustParse("1G"),
 		corev1.ResourceCPU:    resource.MustParse("1"),
 	},
 
@@ -50,7 +50,7 @@ var DefaultNodeScanningResources corev1.ResourceRequirements = corev1.ResourceRe
 // DefaultK8sResourceScanningResources for cnspec container when scanning K8s resources
 var DefaultK8sResourceScanningResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("500M"),
+		corev1.ResourceMemory: resource.MustParse("1G"),
 		corev1.ResourceCPU:    resource.MustParse("1"),
 	},
 
