@@ -30,6 +30,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/container_image"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
+	resourcewatcher "go.mondoo.com/mondoo-operator/controllers/resource_watcher"
 	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -265,6 +266,21 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	result, reconcileError = workloads.Reconcile(ctx)
 	if reconcileError != nil {
 		log.Error(reconcileError, "Failed to set up Kubernetes resources scanning")
+	}
+	if reconcileError != nil || result.RequeueAfter > 0 {
+		return result, reconcileError
+	}
+
+	resourceWatcher := resourcewatcher.DeploymentHandler{
+		Mondoo:                 mondooAuditConfig,
+		KubeClient:             r.Client,
+		MondooOperatorConfig:   config,
+		ContainerImageResolver: r.ContainerImageResolver,
+	}
+
+	result, reconcileError = resourceWatcher.Reconcile(ctx)
+	if reconcileError != nil {
+		log.Error(reconcileError, "Failed to set up resource watcher")
 	}
 	if reconcileError != nil || result.RequeueAfter > 0 {
 		return result, reconcileError
