@@ -43,7 +43,6 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 		"cnspec", "scan", "local",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
 		"--inventory-template", "/etc/opt/mondoo/inventory_template.yml",
-		"--score-threshold", "0",
 	}
 
 	if cfg.Spec.HttpProxy != nil {
