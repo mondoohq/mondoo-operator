@@ -46,6 +46,22 @@ spec:
     # Cron schedule (default: random minute each hour)
     # schedule: "0 * * * *"
 
+    # Real-time resource watching (alternative to CronJob scheduling)
+    # When enabled, resources are scanned immediately when they change
+    # resourceWatcher:
+    #   enable: true
+    #   # How long to batch changes before triggering a scan (default: 10s)
+    #   debounceInterval: 10s
+    #   # Minimum time between scans - rate limit (default: 2m)
+    #   minimumScanInterval: 2m
+    #   # Watch all resources including ephemeral ones like Pods (default: false)
+    #   # When false, only watches: Deployments, DaemonSets, StatefulSets, ReplicaSets
+    #   watchAllResources: false
+    #   # Custom list of resource types to watch (optional)
+    #   # resourceTypes:
+    #   #   - deployments
+    #   #   - daemonsets
+
     # External clusters to scan from this operator instance
     # Four authentication methods are available (mutually exclusive):
     #

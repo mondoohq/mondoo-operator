@@ -4,7 +4,7 @@ This guide helps you set up a local development environment for the Mondoo Opera
 
 ## Prerequisites
 
-- Go 1.21+
+- Go 1.25+
 - [k3d](https://k3d.io/) (recommended) or [minikube](https://minikube.sigs.k8s.io/docs/start/) as fallback
 - kubectl
 - A Mondoo account with a service account credential file (`creds.json`)
@@ -161,6 +161,39 @@ spec:
   nodes:
     enable: true
     style: cronjob  # or "deployment" or "daemonset"
+    # Optional: set priority class for node scanning workloads
+    # priorityClassName: high-priority
+```
+
+#### With Real-Time Resource Watching
+
+Instead of waiting for the CronJob schedule, you can enable real-time resource watching that scans resources immediately when they change:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    resourceWatcher:
+      enable: true
+      # How long to batch changes before triggering a scan (default: 10s)
+      debounceInterval: 10s
+      # Minimum time between scans - rate limit (default: 2m)
+      minimumScanInterval: 2m
+      # Watch all resources including ephemeral ones like Pods (default: false)
+      # When false, only watches: Deployments, DaemonSets, StatefulSets, ReplicaSets
+      watchAllResources: false
+      # Custom list of resource types to watch (optional)
+      # resourceTypes:
+      #   - deployments
+      #   - daemonsets
+      #   - statefulsets
 ```
 
 #### With External Cluster Scanning
@@ -347,6 +380,29 @@ subjects:
 - **EKS**: Configure IRSA on management cluster, create IAM trust policy, grant role cluster access
 - **AKS**: Install Azure Workload Identity, create federated identity credential, grant managed identity RBAC on target cluster
 
+**Additional External Cluster Options:**
+
+Each external cluster also supports these optional fields:
+
+```yaml
+externalClusters:
+  - name: production
+    kubeconfigSecretRef:
+      name: prod-kubeconfig
+    # Override the default schedule for this cluster
+    schedule: "0 */2 * * *"
+    # Cluster-specific namespace filtering
+    filtering:
+      namespaces:
+        exclude:
+          - kube-system
+    # Enable container image scanning for this external cluster
+    containerImageScanning: true
+    # Reference to private registry credentials for this cluster
+    privateRegistriesPullSecretRef:
+      name: prod-registry-creds
+```
+
 #### Full Configuration Reference
 
 See [config/samples/k8s_v1alpha2_mondooauditconfig.yaml](../config/samples/k8s_v1alpha2_mondooauditconfig.yaml) for a fully documented example with all available options.
@@ -393,6 +449,53 @@ spec:
 ```
 
 Note: If both `include` and `exclude` are specified, only `include` is used.
+
+### Scanner Configuration
+
+Configure the scanner that runs K8s resources and container image scans:
+
+```yaml
+spec:
+  scanner:
+    serviceAccountName: mondoo-operator-k8s-resources-scanning
+    image:
+      name: ghcr.io/mondoohq/mondoo-operator
+      tag: latest
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+      limits:
+        cpu: 500m
+        memory: 500Mi
+    # Single private registry secret (deprecated, use privateRegistriesPullSecretRefs)
+    # privateRegistriesPullSecretRef:
+    #   name: registry-creds
+    # Multiple private registry secrets (preferred)
+    privateRegistriesPullSecretRefs:
+      - name: team-a-registry-creds
+      - name: team-b-registry-creds
+    # Custom environment variables for the scanner
+    env:
+      - name: CUSTOM_VAR
+        value: "custom-value"
+```
+
+Environment variables can also be set on node and container scanners:
+
+```yaml
+spec:
+  nodes:
+    enable: true
+    env:
+      - name: NODE_SCAN_VAR
+        value: "node-value"
+  containers:
+    enable: true
+    env:
+      - name: CONTAINER_SCAN_VAR
+        value: "container-value"
+```
 
 ## Running as a Container
 

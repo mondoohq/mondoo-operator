@@ -26,6 +26,14 @@ Scans Kubernetes API resources (Pods, Deployments, Services, Namespaces, etc.) u
 - **Resources scanned**: clusters, pods, jobs, cronjobs, statefulsets, deployments, replicasets, daemonsets, ingresses, namespaces, services
 - **Configuration**: Via inventory ConfigMap
 
+**Real-Time Resource Watching (Optional)**
+
+As an alternative to scheduled CronJob scanning, you can enable the ResourceWatcher which:
+- Watches for K8s resource changes in real-time
+- Batches changes using a configurable debounce interval
+- Triggers immediate scans when resources change
+- Provides rate limiting to prevent excessive scanning
+
 #### Node Scanning
 
 Scans Kubernetes nodes for security compliance. Supports three deployment styles:
@@ -57,8 +65,8 @@ Scans remote Kubernetes clusters from a central operator installation.
 │                           Mondoo Operator                                    │
 │                                                                              │
 │  ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐    │
-│  │ MondooAuditConfig │────▶│    Controller    │────▶│    CronJobs      │    │
-│  │     (CRD)        │     │   (Reconciler)   │     │                  │    │
+│  │ MondooAuditConfig │────▶│    Controller    │────▶│ CronJobs and/or  │    │
+│  │     (CRD)        │     │   (Reconciler)   │     │ ResourceWatcher  │    │
 │  └──────────────────┘     └──────────────────┘     └────────┬─────────┘    │
 │                                                              │              │
 └──────────────────────────────────────────────────────────────┼──────────────┘
@@ -132,6 +140,11 @@ spec:
   kubernetesResources:
     enable: true
     schedule: "0 * * * *"  # Hourly
+    # Optional: real-time scanning instead of/in addition to CronJob
+    # resourceWatcher:
+    #   enable: true
+    #   debounceInterval: 10s
+    #   minimumScanInterval: 2m
     externalClusters:      # Optional: scan remote clusters
       - name: production
         kubeconfigSecretRef:
