@@ -1099,8 +1099,10 @@ spec:
                     type: object
                   privateRegistriesPullSecretRef:
                     description: |-
-                      PrivateRegistryScanning defines the name of a secret that contains the credentials for the private
-                      registries we have to pull images from.
+                      PrivateRegistriesPullSecretRef defines the name of a secret that contains the credentials for the private
+                      registries we have to pull images from. Use this when you have a single secret containing credentials
+                      for one or more registries. For multiple separate secrets, use PrivateRegistriesPullSecretRefs instead.
+                      Deprecated: Use PrivateRegistriesPullSecretRefs for new configurations.
                     properties:
                       name:
                         default: ""
@@ -1113,6 +1115,30 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
+                  privateRegistriesPullSecretRefs:
+                    description: |-
+                      PrivateRegistriesPullSecretRefs defines a list of secrets that contain credentials for private
+                      registries. Use this when you need to pull images from multiple private registries and the credentials
+                      are stored in separate secrets (e.g., managed by different teams or external secret operators).
+                      The credentials from all secrets will be merged. If both PrivateRegistriesPullSecretRef and
+                      PrivateRegistriesPullSecretRefs are specified, all secrets will be merged together.
+                    items:
+                      description: |-
+                        LocalObjectReference contains enough information to let you locate the
+                        referenced object inside the same namespace.
+                      properties:
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    type: array
                   replicas:
                     default: 1
                     description: |-

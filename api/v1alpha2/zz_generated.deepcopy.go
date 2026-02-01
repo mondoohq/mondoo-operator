@@ -614,6 +614,11 @@ func (in *Scanner) DeepCopyInto(out *Scanner) {
 		**out = **in
 	}
 	out.PrivateRegistriesPullSecretRef = in.PrivateRegistriesPullSecretRef
+	if in.PrivateRegistriesPullSecretRefs != nil {
+		in, out := &in.PrivateRegistriesPullSecretRefs, &out.PrivateRegistriesPullSecretRefs
+		*out = make([]v1.LocalObjectReference, len(*in))
+		copy(*out, *in)
+	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
 		*out = make([]v1.EnvVar, len(*in))

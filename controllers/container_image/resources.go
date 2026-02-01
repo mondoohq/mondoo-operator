@@ -29,7 +29,7 @@ const (
 	InventoryConfigMapBase = "-containers-inventory"
 )
 
-func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
+func CronJob(image, integrationMrn, clusterUid string, privateRegistrySecretNames []string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(*m)
 
 	cmd := []string{
@@ -147,43 +147,8 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 		},
 	}
 
-	if privateImageScanningSecretName != "" {
-		// mount secret needed to pull images from private registries
-		cronjob.Spec.JobTemplate.Spec.Template.Spec.Volumes = append(cronjob.Spec.JobTemplate.Spec.Template.Spec.Volumes, corev1.Volume{
-			Name: "pull-secrets",
-			VolumeSource: corev1.VolumeSource{
-				Projected: &corev1.ProjectedVolumeSource{
-					Sources: []corev1.VolumeProjection{
-						{
-							Secret: &corev1.SecretProjection{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: privateImageScanningSecretName,
-								},
-								Items: []corev1.KeyToPath{
-									{
-										Key:  ".dockerconfigjson",
-										Path: "config.json",
-									},
-								},
-							},
-						},
-					},
-					DefaultMode: ptr.To(int32(0o440)),
-				},
-			},
-		})
-
-		cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts = append(cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
-			Name:      "pull-secrets",
-			ReadOnly:  true,
-			MountPath: "/etc/opt/mondoo/docker",
-		})
-
-		cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env = append(cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
-			Name:  "DOCKER_CONFIG",
-			Value: "/etc/opt/mondoo/docker", // the client automatically adds '/config.json' to the path
-		})
-	}
+	// Add private registry secrets if any are specified
+	k8s.AddPrivateRegistrySecretsToSpec(&cronjob.Spec.JobTemplate.Spec.Template.Spec, privateRegistrySecretNames, image)
 
 	return cronjob
 }

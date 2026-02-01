@@ -69,9 +69,18 @@ type Scanner struct {
 	// +kubebuilder:default=1
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// PrivateRegistryScanning defines the name of a secret that contains the credentials for the private
-	// registries we have to pull images from.
+	// PrivateRegistriesPullSecretRef defines the name of a secret that contains the credentials for the private
+	// registries we have to pull images from. Use this when you have a single secret containing credentials
+	// for one or more registries. For multiple separate secrets, use PrivateRegistriesPullSecretRefs instead.
+	// Deprecated: Use PrivateRegistriesPullSecretRefs for new configurations.
 	PrivateRegistriesPullSecretRef corev1.LocalObjectReference `json:"privateRegistriesPullSecretRef,omitempty"`
+
+	// PrivateRegistriesPullSecretRefs defines a list of secrets that contain credentials for private
+	// registries. Use this when you need to pull images from multiple private registries and the credentials
+	// are stored in separate secrets (e.g., managed by different teams or external secret operators).
+	// The credentials from all secrets will be merged. If both PrivateRegistriesPullSecretRef and
+	// PrivateRegistriesPullSecretRefs are specified, all secrets will be merged together.
+	PrivateRegistriesPullSecretRefs []corev1.LocalObjectReference `json:"privateRegistriesPullSecretRefs,omitempty"`
 
 	// Env allows setting extra environment variables for the scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.
