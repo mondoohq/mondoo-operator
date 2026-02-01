@@ -201,6 +201,67 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() 
 	s.Equal(expected, created)
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_Create_MultiplePrivateRegistriesSecrets() {
+	d := s.createDeploymentHandler()
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+
+	// Set up multiple private registry secrets using the new plural field
+	s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRefs = []corev1.LocalObjectReference{
+		{Name: "pull-secret-1"},
+		{Name: "pull-secret-2"},
+	}
+
+	// Create both source secrets with different registries
+	secret1 := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      "pull-secret-1",
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+		Data: map[string][]byte{
+			".dockerconfigjson": []byte(`{"auths": {"registry1.example.com": {"auth": "dGVzdDE="}}}`),
+		},
+	}
+	secret2 := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      "pull-secret-2",
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+		Data: map[string][]byte{
+			".dockerconfigjson": []byte(`{"auths": {"registry2.example.com": {"auth": "dGVzdDI="}}}`),
+		},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, secret1))
+	s.NoError(d.KubeClient.Create(s.ctx, secret2))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Verify the operator created a merged secret
+	mergedSecretName := s.auditConfig.Name + "-private-registries-merged"
+	mergedSecret := &corev1.Secret{}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKey{
+		Namespace: s.auditConfig.Namespace,
+		Name:      mergedSecretName,
+	}, mergedSecret))
+
+	// Verify merged secret contains both registries
+	s.Contains(string(mergedSecret.Data[".dockerconfigjson"]), "registry1.example.com")
+	s.Contains(string(mergedSecret.Data[".dockerconfigjson"]), "registry2.example.com")
+
+	// Verify the CronJob uses the merged secret (no init container needed)
+	created := &batchv1.CronJob{}
+	created.Name = CronJobName(s.auditConfig.Name)
+	created.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+
+	// No init container - operator handles merging
+	s.Empty(created.Spec.JobTemplate.Spec.Template.Spec.InitContainers)
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 	s.auditConfig.Spec.ConsoleIntegration.Enable = true
 	d := s.createDeploymentHandler()

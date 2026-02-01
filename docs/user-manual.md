@@ -439,29 +439,71 @@ spec:
 ### Creating a secret for private image scanning
 
 To allow the Mondoo operator to scan private images, it needs access to image pull secrets for these private registries.
-Please create a secret with the name `mondoo-private-registries-secrets` within the same namespace you created your `MondooAuditConfig`.
-The Mondoo operator will only read a secret with this exact name so that we can limit required RBAC permissions.
-Please ensure the secret contains access data to all the registries you want to scan.
-Now add the name to your `MondooAuditConfig` so that the operator knows you want to scan private images.
 
-```yaml
-    apiVersion: k8s.mondoo.com/v1alpha2
-    kind: MondooAuditConfig
-    ...
-    spec:
-      ...
-      kubernetesResources:
-        enable: true
-        containerImageScanning: true
-        privateRegistriesPullSecretRef:
-          name: "mondoo-private-registries-secrets"
-      ...
+#### Single registry secret
+
+Create a secret with the name `mondoo-private-registries-secrets` within the same namespace as your `MondooAuditConfig`:
+
+```bash
+kubectl create secret docker-registry mondoo-private-registries-secrets \
+  --namespace mondoo-operator \
+  --docker-server=registry.example.com \
+  --docker-username=user \
+  --docker-password=password
 ```
 
-You can find examples of creating such a secret [here](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
+Then reference it in your `MondooAuditConfig`:
 
-It is also possible to create a secret with a different name, but by default the operator isn't allowed to read the secret.
-Please extend RBAC in a way, that the `ServiceAccount` `mondoo-operator-k8s-resources-scanning` has the privilege to get the secret.
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+spec:
+  scanner:
+    privateRegistriesPullSecretRef:
+      name: mondoo-private-registries-secrets
+  containers:
+    enable: true
+```
+
+#### Multiple registry secrets
+
+When you need credentials from multiple sources (e.g., managed by different teams or external secret operators like External Secrets or Vault), use `privateRegistriesPullSecretRefs`:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+spec:
+  scanner:
+    privateRegistriesPullSecretRefs:
+      - name: team-a-registry-creds
+      - name: team-b-registry-creds
+      - name: external-secrets-managed-creds
+  containers:
+    enable: true
+```
+
+The operator automatically merges credentials from all specified secrets. If the same registry appears in multiple secrets, the last one takes precedence.
+
+You can also use both fields together - all secrets will be merged:
+
+```yaml
+spec:
+  scanner:
+    privateRegistriesPullSecretRef:
+      name: default-registry-creds
+    privateRegistriesPullSecretRefs:
+      - name: additional-registry-creds
+```
+
+#### Default secret name
+
+If no secret reference is specified, the operator looks for a secret named `mondoo-private-registries-secrets` by default.
+
+#### RBAC considerations
+
+The operator's default RBAC only allows reading secrets with specific names. If you use a custom secret name, extend RBAC so that the `ServiceAccount` `mondoo-operator-k8s-resources-scanning` has permission to read the secret.
+
+You can find examples of creating Docker registry secrets [here](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
 
 ## Installing Mondoo into multiple namespaces
 
