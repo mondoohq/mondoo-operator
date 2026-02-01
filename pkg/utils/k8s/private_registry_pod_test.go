@@ -45,10 +45,10 @@ func TestAddPrivateRegistryPullSecretToSpec_WithSecret(t *testing.T) {
 	assert.Equal(t, DockerConfigMountPath, podSpec.Containers[0].Env[0].Value)
 
 	// Verify the projected volume has the correct secret
-	projected := podSpec.Volumes[0].VolumeSource.Projected
+	projected := podSpec.Volumes[0].Projected
 	require.NotNil(t, projected)
 	require.Len(t, projected.Sources, 1)
-	assert.Equal(t, "my-secret", projected.Sources[0].Secret.LocalObjectReference.Name)
+	assert.Equal(t, "my-secret", projected.Sources[0].Secret.Name)
 }
 
 func TestAddPrivateRegistryPullSecretToSpec_PreservesExistingSpec(t *testing.T) {

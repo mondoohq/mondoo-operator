@@ -31,9 +31,14 @@ spec:
       limits:
         cpu: 500m
         memory: 500Mi
-    # For private registries
+    # For private registries - single secret
     # privateRegistriesPullSecretRef:
     #   name: mondoo-private-registries-secrets
+    #
+    # For multiple private registry secrets (e.g., managed by different teams)
+    # privateRegistriesPullSecretRefs:
+    #   - name: team-a-registry-creds
+    #   - name: team-b-registry-creds
 
   # Kubernetes resources scanning (RBAC, workloads, etc.)
   kubernetesResources:
