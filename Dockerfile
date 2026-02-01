@@ -1,4 +1,4 @@
-# Copyright (c) Mondoo, Inc.
+# Copyright Mondoo, Inc. 2026
 # SPDX-License-Identifier: BUSL-1.1
 
 # Use distroless as minimal base image to package the manager binary
