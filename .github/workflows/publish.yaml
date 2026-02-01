@@ -136,6 +136,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
 
       - name: Scan Image
+        if: matrix.arch == 'amd64'
         uses: mondoohq/actions/docker-image@main
         env:
           MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
