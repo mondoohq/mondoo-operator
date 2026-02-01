@@ -48,10 +48,10 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 }
 
 func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
-	mondooClientImage, err := n.ContainerImageResolver.CnspecImage(
-		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(
+		ctx, n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
-		logger.Error(err, "Failed to resolve cnspec container image")
+		logger.Error(err, "Failed to resolve mondoo-operator container image")
 		return err
 	}
 
@@ -82,7 +82,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	existing := &batchv1.CronJob{}
-	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, n.Mondoo, *n.MondooOperatorConfig)
+	desired := CronJob(mondooOperatorImage, integrationMrn, clusterUid, n.Mondoo, *n.MondooOperatorConfig)
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 		return err

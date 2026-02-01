@@ -117,7 +117,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	d := s.createDeploymentHandler()
 
-	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	image, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
 	s.NoError(err)
 
 	// Make sure a cron job exists with different container command
