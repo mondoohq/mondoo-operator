@@ -91,6 +91,11 @@ type KubernetesResources struct {
 	// When enabled, a deployment will be created that watches for K8s resource changes
 	// and scans them immediately rather than waiting for the CronJob schedule.
 	ResourceWatcher ResourceWatcherSpec `json:"resourceWatcher,omitempty"`
+
+	// ExternalClusters defines remote K8s clusters to scan from this operator instance.
+	// Each external cluster will have its own CronJob created with the appropriate kubeconfig.
+	// +optional
+	ExternalClusters []ExternalCluster `json:"externalClusters,omitempty"`
 }
 
 // ResourceWatcherSpec defines the configuration for real-time resource watching.
@@ -123,6 +128,191 @@ type ResourceWatcherSpec struct {
 	// deployments, daemonsets, statefulsets, replicasets. When true, defaults to:
 	// pods, deployments, daemonsets, statefulsets, replicasets, jobs, cronjobs, services, ingresses, namespaces
 	ResourceTypes []string `json:"resourceTypes,omitempty"`
+}
+
+// ExternalCluster defines configuration for scanning a remote K8s cluster
+type ExternalCluster struct {
+	// Name is a unique identifier for this cluster (used in resource names).
+	// Must be a valid Kubernetes name (lowercase, alphanumeric, hyphens allowed).
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// KubeconfigSecretRef references a Secret containing kubeconfig for the remote cluster.
+	// The Secret must have a key "kubeconfig" with the kubeconfig content.
+	// Mutually exclusive with ServiceAccountAuth and WorkloadIdentity.
+	// +optional
+	KubeconfigSecretRef *corev1.LocalObjectReference `json:"kubeconfigSecretRef,omitempty"`
+
+	// ServiceAccountAuth configures authentication using a service account token.
+	// Mutually exclusive with KubeconfigSecretRef and WorkloadIdentity.
+	// +optional
+	ServiceAccountAuth *ServiceAccountAuth `json:"serviceAccountAuth,omitempty"`
+
+	// WorkloadIdentity configures cloud-native Workload Identity Federation authentication.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, and SPIFFEAuth.
+	// +optional
+	WorkloadIdentity *WorkloadIdentityConfig `json:"workloadIdentity,omitempty"`
+
+	// SPIFFEAuth configures SPIFFE/SPIRE-based authentication using X.509 SVIDs.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, and WorkloadIdentity.
+	// +optional
+	SPIFFEAuth *SPIFFEAuthConfig `json:"spiffeAuth,omitempty"`
+
+	// Schedule overrides the default schedule for this cluster (optional).
+	// If not specified, uses the schedule from KubernetesResources.Schedule.
+	// +optional
+	Schedule string `json:"schedule,omitempty"`
+
+	// Filtering allows namespace filtering specific to this external cluster.
+	// If not specified, uses the global filtering from MondooAuditConfigSpec.Filtering.
+	// +optional
+	Filtering Filtering `json:"filtering,omitempty"`
+
+	// ContainerImageScanning enables scanning of container images in this external cluster.
+	// +optional
+	ContainerImageScanning bool `json:"containerImageScanning,omitempty"`
+
+	// PrivateRegistriesPullSecretRef references a Secret containing registry credentials
+	// for pulling/scanning private images in this remote cluster.
+	// +optional
+	PrivateRegistriesPullSecretRef *corev1.LocalObjectReference `json:"privateRegistriesPullSecretRef,omitempty"`
+}
+
+// ServiceAccountAuth defines authentication using a Kubernetes service account token
+type ServiceAccountAuth struct {
+	// Server is the URL of the Kubernetes API server.
+	// Example: "https://my-cluster.example.com:6443"
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^https://.*`
+	Server string `json:"server"`
+
+	// CredentialsSecretRef references a Secret containing:
+	//   - "token": The service account token (required)
+	//   - "ca.crt": The CA certificate (required)
+	// +kubebuilder:validation:Required
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+
+	// SkipTLSVerify skips TLS verification. NOT RECOMMENDED for production.
+	// +optional
+	// +kubebuilder:default=false
+	SkipTLSVerify bool `json:"skipTLSVerify,omitempty"`
+}
+
+// CloudProvider specifies the cloud provider for Workload Identity Federation
+type CloudProvider string
+
+const (
+	CloudProviderGKE CloudProvider = "gke"
+	CloudProviderEKS CloudProvider = "eks"
+	CloudProviderAKS CloudProvider = "aks"
+)
+
+// WorkloadIdentityConfig configures Workload Identity Federation
+type WorkloadIdentityConfig struct {
+	// Provider specifies the cloud provider for WIF.
+	// +kubebuilder:validation:Enum=gke;eks;aks
+	// +kubebuilder:validation:Required
+	Provider CloudProvider `json:"provider"`
+
+	// GKE contains GKE-specific Workload Identity configuration.
+	// Required when provider is "gke".
+	// +optional
+	GKE *GKEWorkloadIdentity `json:"gke,omitempty"`
+
+	// EKS contains EKS-specific IRSA configuration.
+	// Required when provider is "eks".
+	// +optional
+	EKS *EKSWorkloadIdentity `json:"eks,omitempty"`
+
+	// AKS contains AKS-specific Azure Workload Identity configuration.
+	// Required when provider is "aks".
+	// +optional
+	AKS *AKSWorkloadIdentity `json:"aks,omitempty"`
+}
+
+// GKEWorkloadIdentity configures GKE Workload Identity
+type GKEWorkloadIdentity struct {
+	// ProjectID is the GCP project ID.
+	// +kubebuilder:validation:Required
+	ProjectID string `json:"projectId"`
+
+	// ClusterName is the GKE cluster name.
+	// +kubebuilder:validation:Required
+	ClusterName string `json:"clusterName"`
+
+	// ClusterLocation is the region or zone (e.g., "us-central1" or "us-central1-a").
+	// +kubebuilder:validation:Required
+	ClusterLocation string `json:"clusterLocation"`
+
+	// GoogleServiceAccount is the Google service account to impersonate.
+	// Format: <name>@<project>.iam.gserviceaccount.com
+	// +kubebuilder:validation:Required
+	GoogleServiceAccount string `json:"googleServiceAccount"`
+}
+
+// EKSWorkloadIdentity configures AWS EKS IRSA (IAM Roles for Service Accounts)
+type EKSWorkloadIdentity struct {
+	// Region is the AWS region.
+	// +kubebuilder:validation:Required
+	Region string `json:"region"`
+
+	// ClusterName is the EKS cluster name.
+	// +kubebuilder:validation:Required
+	ClusterName string `json:"clusterName"`
+
+	// RoleARN is the IAM role to assume.
+	// Format: arn:aws:iam::<account>:role/<name>
+	// +kubebuilder:validation:Required
+	RoleARN string `json:"roleArn"`
+}
+
+// AKSWorkloadIdentity configures Azure Workload Identity
+type AKSWorkloadIdentity struct {
+	// SubscriptionID is the Azure subscription.
+	// +kubebuilder:validation:Required
+	SubscriptionID string `json:"subscriptionId"`
+
+	// ResourceGroup containing the AKS cluster.
+	// +kubebuilder:validation:Required
+	ResourceGroup string `json:"resourceGroup"`
+
+	// ClusterName is the AKS cluster name.
+	// +kubebuilder:validation:Required
+	ClusterName string `json:"clusterName"`
+
+	// ClientID is the Azure AD app client ID.
+	// +kubebuilder:validation:Required
+	ClientID string `json:"clientId"`
+
+	// TenantID is the Azure AD tenant ID.
+	// +kubebuilder:validation:Required
+	TenantID string `json:"tenantId"`
+}
+
+// SPIFFEAuthConfig configures SPIFFE/SPIRE authentication using X.509 SVIDs
+type SPIFFEAuthConfig struct {
+	// Server is the URL of the remote Kubernetes API server.
+	// Example: "https://remote-cluster.example.com:6443"
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^https://.*`
+	Server string `json:"server"`
+
+	// SocketPath is the path to the SPIRE agent's Workload API socket.
+	// Defaults to "/run/spire/sockets/agent.sock" if not specified.
+	// +optional
+	// +kubebuilder:default="/run/spire/sockets/agent.sock"
+	SocketPath string `json:"socketPath,omitempty"`
+
+	// TrustBundleSecretRef references a Secret containing the remote cluster's
+	// CA certificate for TLS verification. The Secret must have a key "ca.crt".
+	// +kubebuilder:validation:Required
+	TrustBundleSecretRef corev1.LocalObjectReference `json:"trustBundleSecretRef"`
+
+	// Audience is the intended audience for the SVID (optional).
+	// Some SPIRE configurations require this for workload attestation.
+	// +optional
+	Audience string `json:"audience,omitempty"`
 }
 
 // NodeScanStyle specifies the scan style for nodes

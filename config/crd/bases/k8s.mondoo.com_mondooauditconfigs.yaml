@@ -340,6 +340,260 @@ spec:
                     type: boolean
                   enable:
                     type: boolean
+                  externalClusters:
+                    description: |-
+                      ExternalClusters defines remote K8s clusters to scan from this operator instance.
+                      Each external cluster will have its own CronJob created with the appropriate kubeconfig.
+                    items:
+                      description: ExternalCluster defines configuration for scanning
+                        a remote K8s cluster
+                      properties:
+                        containerImageScanning:
+                          description: ContainerImageScanning enables scanning of
+                            container images in this external cluster.
+                          type: boolean
+                        filtering:
+                          description: |-
+                            Filtering allows namespace filtering specific to this external cluster.
+                            If not specified, uses the global filtering from MondooAuditConfigSpec.Filtering.
+                          properties:
+                            namespaces:
+                              properties:
+                                exclude:
+                                  description: |-
+                                    Exclude is the list of resources to ignore for any watching/scanning actions. Use this if
+                                    the goal is to watch/scan all resources except for this Exclude list.
+                                  items:
+                                    type: string
+                                  type: array
+                                include:
+                                  description: |-
+                                    Include is the list of resources to watch/scan. Setting Include overrides anything in the
+                                    Exclude list as specifying an Include list is effectively excluding everything except for what
+                                    is on the Include list.
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                          type: object
+                        kubeconfigSecretRef:
+                          description: |-
+                            KubeconfigSecretRef references a Secret containing kubeconfig for the remote cluster.
+                            The Secret must have a key "kubeconfig" with the kubeconfig content.
+                            Mutually exclusive with ServiceAccountAuth and WorkloadIdentity.
+                          properties:
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        name:
+                          description: |-
+                            Name is a unique identifier for this cluster (used in resource names).
+                            Must be a valid Kubernetes name (lowercase, alphanumeric, hyphens allowed).
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                          type: string
+                        privateRegistriesPullSecretRef:
+                          description: |-
+                            PrivateRegistriesPullSecretRef references a Secret containing registry credentials
+                            for pulling/scanning private images in this remote cluster.
+                          properties:
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        schedule:
+                          description: |-
+                            Schedule overrides the default schedule for this cluster (optional).
+                            If not specified, uses the schedule from KubernetesResources.Schedule.
+                          type: string
+                        serviceAccountAuth:
+                          description: |-
+                            ServiceAccountAuth configures authentication using a service account token.
+                            Mutually exclusive with KubeconfigSecretRef and WorkloadIdentity.
+                          properties:
+                            credentialsSecretRef:
+                              description: |-
+                                CredentialsSecretRef references a Secret containing:
+                                  - "token": The service account token (required)
+                                  - "ca.crt": The CA certificate (required)
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            server:
+                              description: |-
+                                Server is the URL of the Kubernetes API server.
+                                Example: "https://my-cluster.example.com:6443"
+                              pattern: ^https://.*
+                              type: string
+                            skipTLSVerify:
+                              default: false
+                              description: SkipTLSVerify skips TLS verification. NOT
+                                RECOMMENDED for production.
+                              type: boolean
+                          required:
+                          - credentialsSecretRef
+                          - server
+                          type: object
+                        spiffeAuth:
+                          description: |-
+                            SPIFFEAuth configures SPIFFE/SPIRE-based authentication using X.509 SVIDs.
+                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, and WorkloadIdentity.
+                          properties:
+                            audience:
+                              description: |-
+                                Audience is the intended audience for the SVID (optional).
+                                Some SPIRE configurations require this for workload attestation.
+                              type: string
+                            server:
+                              description: |-
+                                Server is the URL of the remote Kubernetes API server.
+                                Example: "https://remote-cluster.example.com:6443"
+                              pattern: ^https://.*
+                              type: string
+                            socketPath:
+                              default: /run/spire/sockets/agent.sock
+                              description: |-
+                                SocketPath is the path to the SPIRE agent's Workload API socket.
+                                Defaults to "/run/spire/sockets/agent.sock" if not specified.
+                              type: string
+                            trustBundleSecretRef:
+                              description: |-
+                                TrustBundleSecretRef references a Secret containing the remote cluster's
+                                CA certificate for TLS verification. The Secret must have a key "ca.crt".
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                          required:
+                          - server
+                          - trustBundleSecretRef
+                          type: object
+                        workloadIdentity:
+                          description: |-
+                            WorkloadIdentity configures cloud-native Workload Identity Federation authentication.
+                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, and SPIFFEAuth.
+                          properties:
+                            aks:
+                              description: |-
+                                AKS contains AKS-specific Azure Workload Identity configuration.
+                                Required when provider is "aks".
+                              properties:
+                                clientId:
+                                  description: ClientID is the Azure AD app client
+                                    ID.
+                                  type: string
+                                clusterName:
+                                  description: ClusterName is the AKS cluster name.
+                                  type: string
+                                resourceGroup:
+                                  description: ResourceGroup containing the AKS cluster.
+                                  type: string
+                                subscriptionId:
+                                  description: SubscriptionID is the Azure subscription.
+                                  type: string
+                                tenantId:
+                                  description: TenantID is the Azure AD tenant ID.
+                                  type: string
+                              required:
+                              - clientId
+                              - clusterName
+                              - resourceGroup
+                              - subscriptionId
+                              - tenantId
+                              type: object
+                            eks:
+                              description: |-
+                                EKS contains EKS-specific IRSA configuration.
+                                Required when provider is "eks".
+                              properties:
+                                clusterName:
+                                  description: ClusterName is the EKS cluster name.
+                                  type: string
+                                region:
+                                  description: Region is the AWS region.
+                                  type: string
+                                roleArn:
+                                  description: |-
+                                    RoleARN is the IAM role to assume.
+                                    Format: arn:aws:iam::<account>:role/<name>
+                                  type: string
+                              required:
+                              - clusterName
+                              - region
+                              - roleArn
+                              type: object
+                            gke:
+                              description: |-
+                                GKE contains GKE-specific Workload Identity configuration.
+                                Required when provider is "gke".
+                              properties:
+                                clusterLocation:
+                                  description: ClusterLocation is the region or zone
+                                    (e.g., "us-central1" or "us-central1-a").
+                                  type: string
+                                clusterName:
+                                  description: ClusterName is the GKE cluster name.
+                                  type: string
+                                googleServiceAccount:
+                                  description: |-
+                                    GoogleServiceAccount is the Google service account to impersonate.
+                                    Format: <name>@<project>.iam.gserviceaccount.com
+                                  type: string
+                                projectId:
+                                  description: ProjectID is the GCP project ID.
+                                  type: string
+                              required:
+                              - clusterLocation
+                              - clusterName
+                              - googleServiceAccount
+                              - projectId
+                              type: object
+                            provider:
+                              description: Provider specifies the cloud provider for
+                                WIF.
+                              enum:
+                              - gke
+                              - eks
+                              - aks
+                              type: string
+                          required:
+                          - provider
+                          type: object
+                      required:
+                      - name
+                      type: object
+                    type: array
                   resourceWatcher:
                     description: |-
                       ResourceWatcher configures real-time resource watching and scanning.

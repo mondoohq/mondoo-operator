@@ -3,7 +3,6 @@
 This user manual describes how to install and use the Mondoo Operator.
 
 - [User manual](#user-manual)
-  - [Upgrading from Previous Versions](#upgrading-from-previous-versions)
   - [Mondoo Operator Installation](#mondoo-operator-installation)
     - [Installing with kubectl](#installing-with-kubectl)
     - [Installing with Helm](#installing-with-helm)
@@ -12,6 +11,11 @@ This user manual describes how to install and use the Mondoo Operator.
   - [Configuring the Mondoo Secret](#configuring-the-mondoo-secret)
   - [Creating a MondooAuditConfig](#creating-a-mondooauditconfig)
     - [Filter Kubernetes objects based on namespace](#filter-kubernetes-objects-based-on-namespace)
+  - [Scanning External Clusters](#scanning-external-clusters)
+    - [Creating a kubeconfig Secret](#creating-a-kubeconfig-secret)
+    - [Configuring external cluster scanning](#configuring-external-cluster-scanning)
+    - [Per-cluster configuration](#per-cluster-configuration)
+    - [Authentication methods](#authentication-methods)
   - [Container Image Scanning](#container-image-scanning)
     - [Creating a secret for private image scanning](#creating-a-secret-for-private-image-scanning)
   - [Installing Mondoo into multiple namespaces](#installing-mondoo-into-multiple-namespaces)
@@ -45,6 +49,7 @@ When upgrading from operator versions prior to v12.x, the following changes appl
 **Resource Watcher Changes**: If you have `resourceWatcher.enable: true`:
 - **New rate limiting**: A minimum scan interval of 2 minutes is now enforced by default to prevent excessive scanning.
 - **High-priority resources by default**: The watcher now only monitors Deployments, DaemonSets, StatefulSets, and ReplicaSets by default (previously watched all resources including Pods and Jobs). To restore the previous behavior, set `watchAllResources: true` in your configuration.
+
 
 ## Mondoo Operator Installation
 
@@ -208,6 +213,208 @@ spec:
         - backend2
         - ...
 ```
+
+## Scanning External Clusters
+
+The Mondoo Operator can scan remote Kubernetes clusters from a central installation. This is useful for:
+
+- Scanning clusters where you cannot or do not want to install the operator
+- Centralizing security scanning in a management cluster
+- Scanning development or staging clusters from a single location
+
+### Creating a kubeconfig Secret
+
+First, create a kubeconfig file that has access to the remote cluster. The kubeconfig should have read-only access to the Kubernetes API resources you want to scan.
+
+1. Create a kubeconfig file for the remote cluster:
+
+   ```bash
+   # Example: Export kubeconfig from your current context
+   kubectl config view --minify --flatten > remote-kubeconfig.yaml
+   ```
+
+2. Create a Secret containing the kubeconfig:
+
+   ```bash
+   kubectl create secret generic prod-kubeconfig \
+     --namespace mondoo-operator \
+     --from-file=kubeconfig=remote-kubeconfig.yaml
+   ```
+
+   > **Note**: The Secret must have a key named `kubeconfig` containing the kubeconfig content.
+
+### Configuring external cluster scanning
+
+Add the `externalClusters` field to your `MondooAuditConfig`:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true  # Scan local cluster (optional)
+    externalClusters:
+      - name: production
+        kubeconfigSecretRef:
+          name: prod-kubeconfig
+      - name: staging
+        kubeconfigSecretRef:
+          name: staging-kubeconfig
+```
+
+Each external cluster will have its own CronJob created with the appropriate kubeconfig mounted.
+
+### Per-cluster configuration
+
+You can customize settings for each external cluster:
+
+```yaml
+externalClusters:
+  - name: production
+    kubeconfigSecretRef:
+      name: prod-kubeconfig
+    # Custom schedule for this cluster
+    schedule: "0 */2 * * *"  # Every 2 hours
+    # Cluster-specific namespace filtering
+    filtering:
+      namespaces:
+        exclude:
+          - kube-system
+          - monitoring
+    # Enable container image scanning for this cluster
+    containerImageScanning: true
+    # Private registry credentials for this cluster
+    privateRegistriesPullSecretRef:
+      name: prod-registry-creds
+```
+
+**Configuration options:**
+
+| Field | Description |
+|-------|-------------|
+| `name` | Unique identifier for the cluster (used in CronJob names) |
+| `kubeconfigSecretRef` | Reference to Secret containing kubeconfig |
+| `schedule` | Override the default scan schedule (cron format) |
+| `filtering` | Namespace include/exclude specific to this cluster |
+| `containerImageScanning` | Enable container image scanning for this cluster |
+| `privateRegistriesPullSecretRef` | Registry credentials for private images |
+
+### Authentication methods
+
+The operator supports four authentication methods for external clusters. Choose the one that best fits your security requirements:
+
+#### 1. Kubeconfig (most flexible)
+
+Use a kubeconfig file stored in a Secret. This works with any cluster and authentication method supported by kubectl.
+
+```yaml
+externalClusters:
+  - name: production
+    kubeconfigSecretRef:
+      name: prod-kubeconfig
+```
+
+#### 2. Service Account Token
+
+Use a Kubernetes service account token with CA certificate. Simpler than a full kubeconfig.
+
+```yaml
+externalClusters:
+  - name: production
+    serviceAccountAuth:
+      server: "https://prod-cluster.example.com:6443"
+      credentialsSecretRef:
+        name: prod-sa-credentials  # Secret with "token" and "ca.crt" keys
+```
+
+Create the credentials Secret:
+
+```bash
+kubectl create secret generic prod-sa-credentials \
+  --namespace mondoo-operator \
+  --from-file=token=./token \
+  --from-file=ca.crt=./ca.crt
+```
+
+#### 3. Workload Identity Federation (cloud-native)
+
+Use cloud-native identity federation with no static credentials. Supports GKE, EKS, and AKS.
+
+**GKE example:**
+
+```yaml
+externalClusters:
+  - name: gke-prod
+    workloadIdentity:
+      provider: gke
+      gke:
+        projectId: my-gcp-project
+        clusterName: production-cluster
+        clusterLocation: us-central1-a
+        googleServiceAccount: scanner@my-gcp-project.iam.gserviceaccount.com
+```
+
+**EKS example:**
+
+```yaml
+externalClusters:
+  - name: eks-prod
+    workloadIdentity:
+      provider: eks
+      eks:
+        region: us-west-2
+        clusterName: production-cluster
+        roleArn: arn:aws:iam::123456789012:role/MondooScannerRole
+```
+
+**AKS example:**
+
+```yaml
+externalClusters:
+  - name: aks-prod
+    workloadIdentity:
+      provider: aks
+      aks:
+        subscriptionId: 12345678-1234-1234-1234-123456789012
+        resourceGroup: my-resource-group
+        clusterName: production-cluster
+        clientId: abcdef12-3456-7890-abcd-ef1234567890
+        tenantId: fedcba98-7654-3210-fedc-ba9876543210
+```
+
+#### 4. SPIFFE/SPIRE (zero-trust)
+
+Use SPIFFE/SPIRE for zero-trust authentication with auto-rotating X.509 certificates.
+
+```yaml
+externalClusters:
+  - name: spiffe-cluster
+    spiffeAuth:
+      server: "https://remote-cluster.example.com:6443"
+      trustBundleSecretRef:
+        name: remote-cluster-ca  # Secret with "ca.crt" key
+      # Optional: custom socket path (default: /run/spire/sockets/agent.sock)
+      # socketPath: "/run/spire/sockets/agent.sock"
+```
+
+> **Important: HostPath permissions required**
+>
+> SPIFFE authentication requires mounting the SPIRE agent socket from the host filesystem using a HostPath volume. This may require:
+>
+> - **Pod Security Admission**: Configure the namespace with a policy that allows HostPath volumes
+> - **Pod Security Policy (deprecated)**: Allow HostPath in the PSP
+> - **OpenShift SCC**: Use an SCC that permits HostPath mounts
+>
+> Ensure your cluster's security policies allow HostPath volumes for the mondoo-operator namespace before using SPIFFE authentication.
+
+> **Note: Certificate TTL consideration**
+>
+> SPIFFE certificates are fetched once at the start of each scan job and are not rotated during the scan. SPIFFE SVIDs typically have a 1-hour TTL by default. For most K8s resource scans that complete within minutes, this is sufficient. If your scans consistently exceed the SVID TTL, consider increasing the TTL in your SPIRE server configuration or using a different authentication method.
 
 ## Container Image Scanning
 
