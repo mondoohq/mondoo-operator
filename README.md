@@ -10,13 +10,7 @@
 
 ## Overview
 
-The **Mondoo Operator** provides a new [Kubernetes](https://kubernetes.io/) native way to do a security assessment of your whole Kubernetes Cluster. The purpose of this project is to simplify and automate the configuration for a Mondoo-based security assessment for Kubernetes clusters.
-
-The Mondoo Operator provides the following features:
-
-- Continuous validation of deployed workloads
-- Continuous validation of Kubernetes nodes **without** privileged access
-- Admission Controller
+The **Mondoo Operator** provides a [Kubernetes](https://kubernetes.io/) native way to do continuous security assessment of your Kubernetes clusters. The purpose of this project is to simplify and automate the configuration for Mondoo-based security scanning.
 
 It is backed by Mondoo's powerful policy-as-code engine [cnspec](https://mondoo.com/docs/cnspec/cnspec-about/) and [MQL](https://mondoo.com/docs/mql/resources/). Mondoo ships out-of-the-box security policies for:
 
@@ -25,6 +19,67 @@ It is backed by Mondoo's powerful policy-as-code engine [cnspec](https://mondoo.
 - NSA/CISA Kubernetes Hardening Guide
 - Kubernetes Cluster and Workload Security
 - Kubernetes Best Practices
+
+## How It Works
+
+The Mondoo Operator uses a simple, CronJob-based architecture to scan Kubernetes clusters:
+
+```
+┌─────────────────────────────────────┐
+│         Your Kubernetes Cluster     │
+│                                     │
+│  ┌─────────────────────────────┐   │
+│  │      Mondoo Operator        │   │
+│  │                             │   │
+│  │  • K8s Resources Scanning   │   │
+│  │  • Node Scanning            │   │
+│  │  • Container Image Scanning │   │
+│  └─────────────────────────────┘   │
+│               │                     │
+│               ▼                     │
+│     CronJobs run cnspec scans       │
+│               │                     │
+│               ▼                     │
+│        Mondoo Platform              │
+└─────────────────────────────────────┘
+```
+
+Each scan type runs as an independent CronJob that executes `cnspec` directly against the target.
+
+## Configuration
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+
+  # Scan Kubernetes resources (RBAC, workloads, etc.)
+  kubernetesResources:
+    enable: true
+
+  # Scan nodes for security compliance
+  nodes:
+    enable: true
+
+  # Scan container images for vulnerabilities
+  containers:
+    enable: true
+```
+
+## Features
+
+| Feature | Status |
+|---------|:------:|
+| Kubernetes Resources Scanning | ✅ |
+| Node Scanning | ✅ |
+| Container Image Scanning | ✅ |
+| Namespace Filtering | ✅ |
+| Private Registry Support | ✅ |
 
 ![Architecture](docs/img/architecture.svg)
 

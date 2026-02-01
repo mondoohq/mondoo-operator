@@ -340,6 +340,49 @@ spec:
                     type: boolean
                   enable:
                     type: boolean
+                  resourceWatcher:
+                    description: |-
+                      ResourceWatcher configures real-time resource watching and scanning.
+                      When enabled, a deployment will be created that watches for K8s resource changes
+                      and scans them immediately rather than waiting for the CronJob schedule.
+                    properties:
+                      debounceInterval:
+                        default: 10s
+                        description: |-
+                          DebounceInterval specifies how long to batch changes before triggering a scan.
+                          This prevents excessive scanning when multiple resources change in quick succession.
+                          Default is 10 seconds.
+                        type: string
+                      enable:
+                        description: |-
+                          Enable enables real-time resource watching and scanning.
+                          When enabled, a deployment will be created that watches K8s resources for changes
+                          and scans them using cnspec.
+                        type: boolean
+                      minimumScanInterval:
+                        default: 2m
+                        description: |-
+                          MinimumScanInterval specifies the minimum time between scans (rate limit).
+                          This provides a hard limit on scan frequency even when resources are changing continuously.
+                          Default is 2 minutes.
+                        type: string
+                      resourceTypes:
+                        description: |-
+                          ResourceTypes specifies which resource types to watch. If not specified, defaults are used
+                          based on WatchAllResources setting. When WatchAllResources is false (default), defaults to:
+                          deployments, daemonsets, statefulsets, replicasets. When true, defaults to:
+                          pods, deployments, daemonsets, statefulsets, replicasets, jobs, cronjobs, services, ingresses, namespaces
+                        items:
+                          type: string
+                        type: array
+                      watchAllResources:
+                        description: |-
+                          WatchAllResources controls whether to watch all resource types or only high-priority ones.
+                          When false (default), only watches stable workload resources: Deployments, DaemonSets,
+                          StatefulSets, and ReplicaSets. When true, watches all resources including ephemeral ones
+                          like Pods, Jobs, and CronJobs.
+                        type: boolean
+                    type: object
                   schedule:
                     description: Specify a custom crontab schedule for the Kubernetes
                       resource scanning job. If not specified, the default schedule

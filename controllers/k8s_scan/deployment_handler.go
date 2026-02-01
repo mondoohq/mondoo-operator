@@ -6,6 +6,7 @@ package k8s_scan
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -16,8 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
-	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
@@ -34,28 +33,23 @@ type DeploymentHandler struct {
 	Mondoo                 *v1alpha2.MondooAuditConfig
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
-	ScanApiStore           scan_api_store.ScanApiStore
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	if !n.Mondoo.Spec.KubernetesResources.Enable {
-		n.ScanApiStore.Delete(scanapi.ScanApiServiceUrl(*n.Mondoo))
 		return ctrl.Result{}, n.down(ctx)
 	}
 
-	if err := scan_api_store.HandleAuditConfig(ctx, n.KubeClient, n.ScanApiStore, *n.Mondoo); err != nil {
-		logger.Error(
-			err, "failed to add scan API URL to the store for audit config",
-			"namespace", n.Mondoo.Namespace,
-			"name", n.Mondoo.Name)
+	if err := n.syncCronJob(ctx); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{}, n.syncCronJob(ctx)
+	return ctrl.Result{}, nil
 }
 
 func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
-	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(ctx, "", "", n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(
+		ctx, n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		logger.Error(err, "Failed to resolve mondoo-operator container image")
 		return err
@@ -74,8 +68,21 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
+	updated, err := n.syncConfigMap(ctx, integrationMrn, clusterUid)
+	if err != nil {
+		return err
+	}
+
+	// If ConfigMap was just updated, the job will pick up the new config during the next scheduled run
+	if updated {
+		logger.Info(
+			"Inventory ConfigMap was just updated. The job will use the new config during the next scheduled run.",
+			"namespace", n.Mondoo.Namespace,
+			"name", CronJobName(n.Mondoo.Name))
+	}
+
 	existing := &batchv1.CronJob{}
-	desired := CronJob(mondooOperatorImage, integrationMrn, clusterUid, n.Mondoo)
+	desired := CronJob(mondooOperatorImage, integrationMrn, clusterUid, n.Mondoo, *n.MondooOperatorConfig)
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 		return err
@@ -123,13 +130,54 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		}
 		err = n.KubeClient.List(ctx, pods, opts)
 		if err != nil {
-			logger.Error(err, "Failed to list Pods for scan Kubernetes Reosurce Scanning")
+			logger.Error(err, "Failed to list Pods for Kubernetes Resource Scanning")
 			return err
 		}
 	}
 
 	updateWorkloadsConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs), pods)
 	return n.cleanupWorkloadDeployment(ctx)
+}
+
+// syncConfigMap syncs the inventory ConfigMap. Returns a boolean indicating whether the ConfigMap has been updated.
+func (n *DeploymentHandler) syncConfigMap(ctx context.Context, integrationMrn, clusterUid string) (bool, error) {
+	existing := &corev1.ConfigMap{}
+
+	desired, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo, *n.MondooOperatorConfig)
+	if err != nil {
+		logger.Error(err, "failed to generate desired ConfigMap with inventory")
+		return false, err
+	}
+
+	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
+		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
+		return false, err
+	}
+
+	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
+	if err != nil {
+		logger.Error(err, "Failed to create inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
+		return false, err
+	}
+
+	if created {
+		logger.Info("Created inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
+		return false, nil
+	}
+
+	updated := false
+	if existing.Data["inventory"] != desired.Data["inventory"] ||
+		!reflect.DeepEqual(existing.GetOwnerReferences(), desired.GetOwnerReferences()) {
+		existing.Data["inventory"] = desired.Data["inventory"]
+		existing.SetOwnerReferences(desired.GetOwnerReferences())
+
+		if err := n.KubeClient.Update(ctx, existing); err != nil {
+			logger.Error(err, "Failed to update inventory ConfigMap", "namespace", existing.Namespace, "name", existing.Name)
+			return false, err
+		}
+		updated = true
+	}
+	return updated, nil
 }
 
 func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]batchv1.CronJob, error) {
@@ -146,10 +194,19 @@ func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]ba
 }
 
 func (n *DeploymentHandler) down(ctx context.Context) error {
+	// Delete CronJob
 	cronJob := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, cronJob); err != nil {
 		logger.Error(
 			err, "failed to clean up Kubernetes resource scanning CronJob", "namespace", cronJob.Namespace, "name", cronJob.Name)
+		return err
+	}
+
+	// Delete ConfigMap
+	configMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
+	if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
+		logger.Error(
+			err, "failed to clean up Kubernetes resource scanning ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
 		return err
 	}
 

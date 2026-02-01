@@ -178,7 +178,7 @@ metadata:
   namespace: system
 ```
 
-> When `MondooAuditConfig` is created in the same namespace as the operator a service account named `mondoo-operator-k8s-resources-scanning` is added by default. If `MondooAuditConfig` is created in any other namespace create a ServiceAccount in that other namespace and add the ServiceAccount to the `ClusterRoleBinding` named `mondoo-operator-k8s-resources-scanning` that was created during installation of the mondoo-operator. The ServiceAccount needs to be specified in the `MondooAuditConfig` object at `.spec.workload.serviceAccount`.
+> When `MondooAuditConfig` is created in the same namespace as the operator a service account named `mondoo-operator-k8s-resources-scanning` is added by default. If `MondooAuditConfig` is created in any other namespace create a ServiceAccount in that other namespace and add the ServiceAccount to the `ClusterRoleBinding` named `mondoo-operator-k8s-resources-scanning` that was created during installation of the mondoo-operator. The ServiceAccount needs to be specified in the `MondooAuditConfig` object at `.spec.scanner.serviceAccountName`.
 
 > Additionally, when defining a `MondooAuditConfig` in a different namespace, a ServiceAccount with no permissions is needed for the node scanning. Create a ServiceAccount named `mondoo-operator-nodes` that will be used by the DaemonSet for node scanning.
 

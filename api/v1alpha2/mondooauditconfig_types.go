@@ -86,6 +86,43 @@ type KubernetesResources struct {
 	ContainerImageScanning bool `json:"containerImageScanning,omitempty"`
 	// Specify a custom crontab schedule for the Kubernetes resource scanning job. If not specified, the default schedule is used.
 	Schedule string `json:"schedule,omitempty"`
+
+	// ResourceWatcher configures real-time resource watching and scanning.
+	// When enabled, a deployment will be created that watches for K8s resource changes
+	// and scans them immediately rather than waiting for the CronJob schedule.
+	ResourceWatcher ResourceWatcherSpec `json:"resourceWatcher,omitempty"`
+}
+
+// ResourceWatcherSpec defines the configuration for real-time resource watching.
+type ResourceWatcherSpec struct {
+	// Enable enables real-time resource watching and scanning.
+	// When enabled, a deployment will be created that watches K8s resources for changes
+	// and scans them using cnspec.
+	Enable bool `json:"enable,omitempty"`
+
+	// DebounceInterval specifies how long to batch changes before triggering a scan.
+	// This prevents excessive scanning when multiple resources change in quick succession.
+	// Default is 10 seconds.
+	// +kubebuilder:default="10s"
+	DebounceInterval metav1.Duration `json:"debounceInterval,omitempty"`
+
+	// MinimumScanInterval specifies the minimum time between scans (rate limit).
+	// This provides a hard limit on scan frequency even when resources are changing continuously.
+	// Default is 2 minutes.
+	// +kubebuilder:default="2m"
+	MinimumScanInterval metav1.Duration `json:"minimumScanInterval,omitempty"`
+
+	// WatchAllResources controls whether to watch all resource types or only high-priority ones.
+	// When false (default), only watches stable workload resources: Deployments, DaemonSets,
+	// StatefulSets, and ReplicaSets. When true, watches all resources including ephemeral ones
+	// like Pods, Jobs, and CronJobs.
+	WatchAllResources bool `json:"watchAllResources,omitempty"`
+
+	// ResourceTypes specifies which resource types to watch. If not specified, defaults are used
+	// based on WatchAllResources setting. When WatchAllResources is false (default), defaults to:
+	// deployments, daemonsets, statefulsets, replicasets. When true, defaults to:
+	// pods, deployments, daemonsets, statefulsets, replicasets, jobs, cronjobs, services, ingresses, namespaces
+	ResourceTypes []string `json:"resourceTypes,omitempty"`
 }
 
 // NodeScanStyle specifies the scan style for nodes
@@ -210,8 +247,8 @@ const (
 	K8sResourcesScanningDegraded MondooAuditConfigConditionType = "K8sResourcesScanningDegraded"
 	// Indicates weather Kubernetes container image scanning is Degraded
 	K8sContainerImageScanningDegraded MondooAuditConfigConditionType = "K8sContainerImageScanningDegraded"
-	// Indicates weather ScanAPI is Degraded
-	ScanAPIDegraded MondooAuditConfigConditionType = "ScanAPIDegraded"
+	// Indicates whether the resource watcher is Degraded
+	ResourceWatcherDegraded MondooAuditConfigConditionType = "ResourceWatcherDegraded"
 	// Indicates weather the operator itself is Degraded
 	MondooOperatorDegraded MondooAuditConfigConditionType = "MondooOperatorDegraded"
 	// MondooIntegrationDegraded will hold the status for any issues encountered while trying to CheckIn()

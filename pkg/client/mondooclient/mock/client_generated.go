@@ -51,6 +51,20 @@ func (mr *MockMondooClientMockRecorder) ExchangeRegistrationToken(arg0, arg1 int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExchangeRegistrationToken", reflect.TypeOf((*MockMondooClient)(nil).ExchangeRegistrationToken), arg0, arg1)
 }
 
+// GarbageCollectAssets mocks base method.
+func (m *MockMondooClient) GarbageCollectAssets(arg0 context.Context, arg1 *mondooclient.GarbageCollectOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GarbageCollectAssets", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// GarbageCollectAssets indicates an expected call of GarbageCollectAssets.
+func (mr *MockMondooClientMockRecorder) GarbageCollectAssets(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GarbageCollectAssets", reflect.TypeOf((*MockMondooClient)(nil).GarbageCollectAssets), arg0, arg1)
+}
+
 // HealthCheck mocks base method.
 func (m *MockMondooClient) HealthCheck(arg0 context.Context, arg1 *common.HealthCheckRequest) (*common.HealthCheckResponse, error) {
 	m.ctrl.T.Helper()

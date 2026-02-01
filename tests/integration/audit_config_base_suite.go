@@ -23,7 +23,6 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/container_image"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
-	"go.mondoo.com/mondoo-operator/controllers/scanapi"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"go.mondoo.com/mondoo-operator/pkg/version"
@@ -32,7 +31,6 @@ import (
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
 	nexusK8s "go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -95,13 +93,9 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		s.NoErrorf(s.testCluster.K8sHelper.DeleteResourceIfExists(operatorConfig), "Failed to delete MondooOperatorConfig")
 
 		zap.S().Info("Waiting for cleanup of the test cluster.")
-		// wait for deployments to be gone
-		scanApiListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(scanapi.DeploymentLabels(s.auditConfig))}
-		err := s.testCluster.K8sHelper.EnsureNoPodsPresent(scanApiListOpts)
-		s.NoErrorf(err, "Failed to wait for ScanAPI Pods to be gone")
-
+		// wait for resources to be gone
 		k8sScanListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(k8s_scan.CronJobLabels(s.auditConfig))}
-		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(k8sScanListOpts)
+		err := s.testCluster.K8sHelper.EnsureNoPodsPresent(k8sScanListOpts)
 		s.NoErrorf(err, "Failed to wait for k8s scan pods to be gone")
 
 		containerScanListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(container_image.CronJobLabels(s.auditConfig))}
@@ -135,9 +129,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 		"Failed to create Mondoo audit config.")
 
 	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
-
-	// Verify scan API deployment and service
-	s.validateScanApiDeployment(auditConfig)
 
 	// K8s scan
 	zap.S().Info("Make sure the Mondoo k8s resources scan CronJob is created.")
@@ -359,25 +350,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesCronjobs(auditConfig mo
 		s.NoErrorf(err, "Couldn't find NodeScan Pod for node "+node.Name+" in Podlist of the MondooAuditConfig Status")
 	}
 
-	// Verify the garbage collect cron job
-	gcCronJobs := &batchv1.CronJobList{}
-	gcCronJobLabels := nodes.GarbageCollectCronJobLabels(auditConfig)
-
-	// List only the CronJobs in the namespace of the MondooAuditConfig and only the ones that exactly match our labels.
-	gcListOpts := &client.ListOptions{Namespace: auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(gcCronJobLabels)}
-
-	// Verify the amount of CronJobs created is 1
-	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
-		s.NoError(s.testCluster.K8sHelper.Clientset.List(s.ctx, gcCronJobs, gcListOpts))
-		if len(gcCronJobs.Items) == 1 {
-			return true, nil
-		}
-		return false, nil
-	})
-	s.NoErrorf(
-		err,
-		"The amount of garbage collect CronJobs is not 1 expected: 1; actual: %d", len(gcCronJobs.Items))
-
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
 	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
 
@@ -447,37 +419,6 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigAllDisabled(auditConfig mond
 	status, err := s.integration.GetStatus(s.ctx)
 	s.NoError(err, "Failed to get status")
 	s.Equal("ACTIVE", status)
-}
-
-func (s *AuditConfigBaseSuite) validateScanApiDeployment(auditConfig mondoov2.MondooAuditConfig) {
-	scanApiLabelsString := utils.LabelsToLabelSelector(scanapi.DeploymentLabels(auditConfig))
-	zap.S().Info("Waiting for scan API Pod to become ready.")
-	s.Truef(
-		s.testCluster.K8sHelper.IsPodReady(scanApiLabelsString, auditConfig.Namespace),
-		"Mondoo scan API Pod is not in a Ready state.")
-	zap.S().Info("Scan API Pod is ready.")
-
-	scanApiService := scanapi.ScanApiService(auditConfig.Namespace, auditConfig)
-	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
-		err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(scanApiService), scanApiService)
-		if err == nil {
-			return true, nil
-		}
-		return false, nil
-	})
-	s.NoErrorf(err, "Failed to get scan API service.")
-
-	expectedService := scanapi.ScanApiService(auditConfig.Namespace, auditConfig)
-	s.NoError(ctrl.SetControllerReference(&auditConfig, expectedService, s.testCluster.K8sHelper.Clientset.Scheme()))
-	s.Truef(k8s.AreServicesEqual(*expectedService, *scanApiService), "Scan API service is not as expected.")
-
-	// might take some time because of reconcile loop
-	zap.S().Info("Waiting for good condition of Scan API")
-	err = s.testCluster.K8sHelper.WaitForGoodCondition(&auditConfig, mondoov2.ScanAPIDegraded)
-	s.NoErrorf(err, "ScanAPI shouldn't be in degraded state")
-
-	err = s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-scan-api")
-	s.NoErrorf(err, "Couldn't find ScanAPI in Podlist of the MondooAuditConfig Status")
 }
 
 // disableContainerImageResolution Creates a MondooOperatorConfig that disables container image resolution. This is needed

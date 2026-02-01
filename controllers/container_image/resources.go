@@ -59,6 +59,8 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: ls},
 				Spec: batchv1.JobSpec{
+					// Don't retry failed scans - re-running won't fix the issue
+					BackoffLimit: ptr.To(int32(0)),
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: ls},
 						Spec: corev1.PodSpec{

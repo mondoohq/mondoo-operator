@@ -5,111 +5,122 @@ package k8s_scan
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
-	"strings"
+	"os/exec"
 	"time"
 
 	"github.com/spf13/cobra"
 	"go.mondoo.com/mondoo-operator/cmd/mondoo-operator/garbage_collect"
-	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var Cmd = &cobra.Command{
 	Use:   "k8s-scan",
-	Short: "Sends a requests for a Kubernetes resources scan to a scan API instance.",
+	Short: "Scans Kubernetes resources and performs garbage collection of stale assets.",
 }
 
 func init() {
-	scanApiUrl := Cmd.Flags().String("scan-api-url", "", "The URL of the service to send scan requests to.")
-	tokenFilePath := Cmd.Flags().String("token-file-path", "", "Path to a file containing token to use when making scan requests.")
-	integrationMrn := Cmd.Flags().String("integration-mrn", "", "The Mondoo integration MRN to label scanned items with if the MondooAuditConfig is configured with Mondoo integration.")
-	scanContainerImages := Cmd.Flags().Bool("scan-container-images", false, "A value indicating whether to scan container images.")
-	timeout := Cmd.Flags().Int64("timeout", 0, "The timeout in minutes for the scan request.")
-	setManagedBy := Cmd.Flags().String("set-managed-by", "", "String to set the ManagedBy field for scanned/discovered assets")
-	cleanupOlderThan := Cmd.Flags().String("cleanup-assets-older-than", "", "Set the age for which assets which have not been updated in over the time provided should be garbage collected (eg 12m or 48h)")
-	includeNamespaces := Cmd.Flags().StringSlice("namespaces", nil, "Only resources residing in this list of Namespaces will be scanned")
-	excludeNamespaces := Cmd.Flags().StringSlice("namespaces-exclude", nil, "Ignore resources residing in any of the specified Namespaces")
+	configPath := Cmd.Flags().String("config", "", "The path to the mondoo.yml config file containing service account credentials.")
+	inventoryFile := Cmd.Flags().String("inventory-file", "", "Path to the inventory.yml file for cnspec.")
+	timeout := Cmd.Flags().Int64("timeout", 25, "The timeout in minutes for the scan request.")
+	setManagedBy := Cmd.Flags().String("set-managed-by", "", "String to set the ManagedBy field for scanned/discovered assets.")
+	cleanupOlderThan := Cmd.Flags().String("cleanup-assets-older-than", "", "Set the age for which assets which have not been updated in over the time provided should be garbage collected (eg 12m or 48h).")
+	apiProxy := Cmd.Flags().String("api-proxy", "", "HTTP proxy to use for API requests.")
 
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(logger.NewLogger())
 		logger := log.Log.WithName("k8s-scan")
 
-		if *scanApiUrl == "" {
-			return fmt.Errorf("--scan-api-url must be provided")
+		if *configPath == "" {
+			return fmt.Errorf("--config must be provided")
 		}
-		if *tokenFilePath == "" {
-			return fmt.Errorf("--token-file-path must be provided")
+		if *inventoryFile == "" {
+			return fmt.Errorf("--inventory-file must be provided")
 		}
 		if *timeout <= 0 {
 			return fmt.Errorf("--timeout must be greater than 0")
 		}
 
-		tokenBytes, err := os.ReadFile(*tokenFilePath)
-		if err != nil {
-			logger.Error(err, "failed to read in file with token content")
-			return err
+		// Build cnspec command
+		cnspecArgs := []string{
+			"scan", "k8s",
+			"--config", *configPath,
+			"--inventory-file", *inventoryFile,
+			"--score-threshold", "0",
 		}
-		token := strings.TrimSuffix(string(tokenBytes), "\n")
-
-		client, err := scanapiclient.NewClient(scanapiclient.ScanApiClientOptions{
-			ApiEndpoint: *scanApiUrl,
-			Token:       token,
-			HttpTimeout: ptr.To(time.Duration((*timeout)) * time.Minute),
-		})
-		if err != nil {
-			return err
+		if *apiProxy != "" {
+			cnspecArgs = append(cnspecArgs, "--api-proxy", *apiProxy)
 		}
 
-		logger.Info("triggering Kubernetes resources scan")
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration((*timeout))*time.Minute)
+		logger.Info("executing cnspec scan", "args", cnspecArgs)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*timeout)*time.Minute)
 		defer cancel()
-		scanOpts := &scanapiclient.ScanKubernetesResourcesOpts{
-			IntegrationMrn:      *integrationMrn,
-			ScanContainerImages: *scanContainerImages,
-			ManagedBy:           *setManagedBy,
-			IncludeNamespaces:   *includeNamespaces,
-			ExcludeNamespaces:   *excludeNamespaces,
-		}
-		res, err := client.ScanKubernetesResources(ctx, scanOpts)
-		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				logger.Error(err, "failed to receive a response before the timeout was exceeded", "timeout", *timeout)
-			} else {
-				logger.Error(err, "failed to trigger a Kubernetes resources scan")
-			}
+
+		// Execute cnspec scan k8s
+		cnspecCmd := exec.CommandContext(ctx, "cnspec", cnspecArgs...) //nolint:gosec // cnspec is a trusted binary
+		cnspecCmd.Stdout = os.Stdout
+		cnspecCmd.Stderr = os.Stderr
+		cnspecCmd.Env = append(os.Environ(), "MONDOO_AUTO_UPDATE=false")
+
+		if err := cnspecCmd.Run(); err != nil {
+			logger.Error(err, "cnspec scan failed")
 			return err
 		}
 
-		// TODO: print some more useful info
-		if res.Ok {
-			logger.Info("Kubernetes resources scan successful", "worst score", res.WorstScore.Value)
-		} else {
-			err := fmt.Errorf("scan API returned not OK. %+v", res)
-			logger.Error(err, "Kubernetes resources scan was not successful")
-			return err
-		}
+		logger.Info("cnspec scan completed successfully")
 
 		// If scanning successful, now attempt some cleanup of older assets
 		if *setManagedBy != "" && *cleanupOlderThan != "" {
+			logger.Info("starting garbage collection of stale assets")
+
+			// Read the service account credentials from the config file
+			configData, err := os.ReadFile(*configPath)
+			if err != nil {
+				logger.Error(err, "failed to read config file for garbage collection")
+				return err
+			}
+
+			serviceAccount, err := mondoo.LoadServiceAccountFromFile(configData)
+			if err != nil {
+				logger.Error(err, "failed to parse service account from config file")
+				return err
+			}
+
+			token, err := mondoo.GenerateTokenFromServiceAccount(*serviceAccount, logger)
+			if err != nil {
+				logger.Error(err, "failed to generate token from service account")
+				return err
+			}
+
+			var httpProxy *string
+			if *apiProxy != "" {
+				httpProxy = apiProxy
+			}
+
+			client, err := mondooclient.NewClient(mondooclient.MondooClientOptions{
+				ApiEndpoint: serviceAccount.ApiEndpoint,
+				Token:       token,
+				HttpProxy:   httpProxy,
+				HttpTimeout: ptr.To(time.Duration(*timeout) * time.Minute),
+			})
+			if err != nil {
+				logger.Error(err, "failed to create mondoo client")
+				return err
+			}
+
+			// Garbage collect k8s-cluster assets
 			platformRuntime := "k8s-cluster"
 			logger.Info("garbage collecting assets", "platformRuntime", platformRuntime, "cleanupOlderThan", *cleanupOlderThan)
 
 			err = garbage_collect.GarbageCollectCmd(ctx, client, platformRuntime, *cleanupOlderThan, *setManagedBy, make(map[string]string), logger)
 			if err != nil {
 				logger.Error(err, "error while garbage collecting assets; will attempt on next scan", "platform", platformRuntime)
-			}
-			if *scanContainerImages {
-				platformRuntime = "docker-image"
-				logger.Info("garbage collecting assets", "platformRuntime", platformRuntime, "cleanupOlderThan", *cleanupOlderThan)
-				err = garbage_collect.GarbageCollectCmd(ctx, client, platformRuntime, *cleanupOlderThan, *setManagedBy, make(map[string]string), logger)
-				if err != nil {
-					logger.Error(err, "error while garbage collecting assets; will attempt on next scan", "platform", platformRuntime)
-				}
+				// Don't return error - GC failure shouldn't fail the overall scan
 			}
 		} else {
 			logger.Info("skipping garbage collection of assets; either --set-managed-by or --cleanup-assets-older-than are missing")

@@ -3,6 +3,7 @@
 This user manual describes how to install and use the Mondoo Operator.
 
 - [User manual](#user-manual)
+  - [Upgrading from Previous Versions](#upgrading-from-previous-versions)
   - [Mondoo Operator Installation](#mondoo-operator-installation)
     - [Installing with kubectl](#installing-with-kubectl)
     - [Installing with Helm](#installing-with-helm)
@@ -11,9 +12,11 @@ This user manual describes how to install and use the Mondoo Operator.
   - [Configuring the Mondoo Secret](#configuring-the-mondoo-secret)
   - [Creating a MondooAuditConfig](#creating-a-mondooauditconfig)
     - [Filter Kubernetes objects based on namespace](#filter-kubernetes-objects-based-on-namespace)
-  - [Creating a secret for private image scanning](#creating-a-secret-for-private-image-scanning)
+  - [Container Image Scanning](#container-image-scanning)
+    - [Creating a secret for private image scanning](#creating-a-secret-for-private-image-scanning)
   - [Installing Mondoo into multiple namespaces](#installing-mondoo-into-multiple-namespaces)
   - [Adjust the scan interval](#adjust-the-scan-interval)
+  - [Real-time Resource Watcher (Opt-in)](#real-time-resource-watcher-opt-in)
   - [Configure resources for the operator and its components](#configure-resources-for-the-operator-and-its-components)
     - [Configure resources for the operator-controller](#configure-resources-for-the-operator-controller)
     - [Configure resources for the different scanning components](#configure-resources-for-the-different-scanning-components)
@@ -25,10 +28,23 @@ This user manual describes how to install and use the Mondoo Operator.
   - [FAQ](#faq)
     - [I do not see the service running, only the operator. What should I do?](#i-do-not-see-the-service-running-only-the-operator-what-should-i-do)
     - [How do I edit an existing operator configuration?](#how-do-i-edit-an-existing-operator-configuration)
-    - [How do I run asset garbage collection manually?](#how-do-i-run-asset-garbage-collection-manually)
     - [Why is there a deployment marked as unschedulable?](#why-is-there-a-deployment-marked-as-unschedulable)
     - [Why are (some of) my nodes unscored?](#why-are-some-of-my-nodes-unscored)
     - [How can I trigger a new scan?](#how-can-i-trigger-a-new-scan)
+
+## Upgrading from Previous Versions
+
+When upgrading from operator versions prior to v12.x, the following changes apply:
+
+**Automatic Cleanup**: The operator automatically cleans up resources from previous versions:
+- **ScanAPI resources**: The ScanAPI Deployment, Service, and token Secret are automatically removed. The new architecture uses direct CronJob-based scanning with `cnspec`.
+- **Admission webhook resources**: If you had admission webhooks configured, the ValidatingWebhookConfiguration, webhook Deployment, Service, and TLS Secret are automatically removed. See [admission-migration-guide.md](admission-migration-guide.md) for details.
+
+**No action required**: Existing `MondooAuditConfig` resources continue to work. The operator will transition your scanning workloads to the new CronJob-based architecture automatically.
+
+**Resource Watcher Changes**: If you have `resourceWatcher.enable: true`:
+- **New rate limiting**: A minimum scan interval of 2 minutes is now enforced by default to prevent excessive scanning.
+- **High-priority resources by default**: The watcher now only monitors Deployments, DaemonSets, StatefulSets, and ReplicaSets by default (previously watched all resources including Pods and Jobs). To restore the previous behavior, set `watchAllResources: true` in your configuration.
 
 ## Mondoo Operator Installation
 
@@ -193,7 +209,27 @@ spec:
         - ...
 ```
 
-## Creating a secret for private image scanning
+## Container Image Scanning
+
+The Mondoo Operator can scan container images running in your cluster for vulnerabilities and security issues.
+
+Enable container image scanning in your `MondooAuditConfig`:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  containers:
+    enable: true
+    schedule: "0 0 * * *"  # Daily at midnight
+```
+
+### Creating a secret for private image scanning
 
 To allow the Mondoo operator to scan private images, it needs access to image pull secrets for these private registries.
 Please create a secret with the name `mondoo-private-registries-secrets` within the same namespace you created your `MondooAuditConfig`.
@@ -288,6 +324,101 @@ You can adjust the schedule for the following components:
 - Kubernetes Resources Scanning
 - Container Image Scanning
 - Node Scanning
+
+## Real-time Resource Watcher (Opt-in)
+
+The Resource Watcher is an **opt-in** feature that provides real-time scanning of Kubernetes resources as they change, rather than waiting for the scheduled CronJob scans.
+
+> **Breaking Change (v1.x+):** If you previously had `resourceWatcher.enable: true` without specifying `resourceTypes`, the default watched resources changed from all resource types to only high-priority resources (Deployments, DaemonSets, StatefulSets, ReplicaSets). To restore the previous behavior, set `watchAllResources: true`.
+
+### Enabling the Resource Watcher
+
+To enable the resource watcher, add the following to your `MondooAuditConfig`:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    resourceWatcher:
+      enable: true  # Opt-in: must be explicitly enabled
+```
+
+### Default Behavior
+
+When enabled with default settings, the resource watcher:
+
+- **Watches only high-priority resources**: Deployments, DaemonSets, StatefulSets, and ReplicaSets
+- **Rate limits scans**: Minimum 2 minutes between scans to prevent excessive scanning
+- **Batches changes**: 10-second debounce interval to batch rapid changes before scanning
+- **Complements scheduled scans**: The hourly CronJob continues to run for full cluster coverage
+
+### Configuration Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enable` | `false` | Must be set to `true` to enable the resource watcher |
+| `minimumScanInterval` | `2m` | Minimum time between scans (rate limit) |
+| `debounceInterval` | `10s` | Time to wait after last change before triggering a scan |
+| `watchAllResources` | `false` | When `true`, watches all resources including Pods, Jobs, CronJobs |
+| `resourceTypes` | (auto) | Explicit list of resource types to watch (overrides `watchAllResources`) |
+
+### Example: Custom Configuration
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    resourceWatcher:
+      enable: true
+      minimumScanInterval: 5m    # Scan at most every 5 minutes
+      debounceInterval: 30s      # Wait 30s after last change
+      watchAllResources: true    # Include Pods, Jobs, etc.
+```
+
+### Example: Watch Specific Resource Types
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    resourceWatcher:
+      enable: true
+      resourceTypes:
+        - deployments
+        - services
+        - ingresses
+```
+
+### Why High-Priority Resources by Default?
+
+By default, the resource watcher only monitors stable workload resources (Deployments, DaemonSets, StatefulSets, ReplicaSets) because:
+
+1. **Pods are ephemeral**: Pod changes are frequent but already covered by scanning their parent resources
+2. **Jobs are transient**: Job resources change constantly in active clusters
+3. **Reduces noise**: Fewer unnecessary scans means less resource consumption
+
+If you need to monitor all resources, set `watchAllResources: true` or specify explicit `resourceTypes`.
 
 ## Configure resources for the operator and its components
 
@@ -453,36 +584,6 @@ Run:
 ```bash
 kubectl edit  mondooauditconfigs -n mondoo-operator
 ```
-
-### How do I run asset garbage collection manually?
-
-The operator will trigger garbage collection after each successful cluster scan. This will delete all old assets that were created
-by the operator but are no longer present in the cluster. It is possible to trigger garbage collection manually. To do this it is required
-to have the Mondoo Client API running locally:
-
-```bash
-mondoo serve --api --token abcdefgh
-```
-
-Retrieve the cluster UID:
-
-```bash
-kubectl get ns kube-system -o yaml | grep uid
-```
-
-Then you can trigger asset garbage collection for workloads by the following command:
-
-```bash
-mondoo-operator garbage-collect --filter-managed-by mondoo-operator-<<cluster UID>> --filter-older-than 2h --filter-platform-runtime k8s-cluster --scan-api-url http://127.0.0.1:8989 --token abcdefgh
-```
-
-For container images use:
-
-```bash
-mondoo-operator garbage-collect --filter-managed-by mondoo-operator-<<cluster UID>> --filter-older-than 48h --filter-platform-runtime docker-registry --scan-api-url http://127.0.0.1:8989 --token abcdefgh
-```
-
-For different use-cases adjust the CLI arguments.
 
 ### Why is there a deployment marked as unschedulable?
 
