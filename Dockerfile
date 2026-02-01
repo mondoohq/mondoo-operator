@@ -1,11 +1,17 @@
 # Copyright Mondoo, Inc. 2026
 # SPDX-License-Identifier: BUSL-1.1
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
+# Use mondoo/cnspec as base image to have cnspec available for k8s scanning
+ARG CNSPEC_VERSION=latest
+FROM mondoo/cnspec:${CNSPEC_VERSION}
+
+# Install the k8s provider needed for k8s resource scanning
+RUN cnspec providers install k8s
+
 WORKDIR /
-ADD bin/mondoo-operator .
-USER 65532:65532
+COPY bin/mondoo-operator .
+
+# Use same user as cnspec base image
+USER 100:101
 
 ENTRYPOINT ["/mondoo-operator"]
