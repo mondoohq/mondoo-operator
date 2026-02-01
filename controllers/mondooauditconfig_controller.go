@@ -175,8 +175,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if shouldUpdate {
 		err := r.Update(ctx, mondooAuditConfig)
 		if err != nil {
-			log.Error(reconcileError, "failed to update MondooAuditConfig with default schedule")
-			return ctrl.Result{}, reconcileError
+			log.Error(err, "failed to update MondooAuditConfig with default schedule")
+			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
 	}
@@ -185,9 +185,11 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	// Conditions might be updated before this reconciler reaches the end
 	// MondooAuditConfig has to include these updates in any case.
+	// Capture context for use in defer - using parent context ensures operations
+	// respect cancellation signals instead of running indefinitely
+	deferCtx := ctx
 	defer func() {
 		var deferFuncErr error
-		ctx := context.Background()
 		// Update the mondoo status with the pod names only after all pod creation actions are done
 		// List the pods for this mondoo's cronjobs and deployment
 		podList := &corev1.PodList{}
@@ -195,7 +197,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			client.InNamespace(mondooAuditConfig.Namespace),
 			client.MatchingLabels(labelsForMondoo(mondooAuditConfig.Name)),
 		}
-		if deferFuncErr = r.List(ctx, podList, listOpts...); deferFuncErr != nil {
+		if deferFuncErr = r.List(deferCtx, podList, listOpts...); deferFuncErr != nil {
 			log.Error(deferFuncErr, "Failed to list pods", "Mondoo.Namespace", mondooAuditConfig.Namespace, "Mondoo.Name", mondooAuditConfig.Name)
 		} else {
 			podListNames := getPodNames(podList.Items)
@@ -208,7 +210,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			}
 		}
 
-		deferFuncErr = mondoo.UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log)
+		deferFuncErr = mondoo.UpdateMondooAuditStatus(deferCtx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log)
 		// do not overwrite errors which happened before the defered function is called
 		// but in case an error happend in the defered func, also overwrite the reconcileResult
 		if reconcileError == nil && deferFuncErr != nil {

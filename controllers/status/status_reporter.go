@@ -6,6 +6,7 @@ package status
 import (
 	"context"
 	"reflect"
+	"sync"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
@@ -23,6 +24,7 @@ type StatusReporter struct {
 	kubeClient          client.Client
 	k8sVersion          *version.Info
 	mondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
+	mu                  sync.RWMutex
 	lastReportedStatus  mondooclient.ReportStatusRequest
 }
 
@@ -55,7 +57,12 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 	}
 
 	operatorStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes.Items, r.k8sVersion, logger)
-	if reflect.DeepEqual(operatorStatus, r.lastReportedStatus) {
+
+	r.mu.RLock()
+	statusUnchanged := reflect.DeepEqual(operatorStatus, r.lastReportedStatus)
+	r.mu.RUnlock()
+
+	if statusUnchanged {
 		return nil // If the status hasn't change, don't report
 	}
 
@@ -83,6 +90,8 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 	}
 
 	// Update the last reported status only if we reported successfully
+	r.mu.Lock()
 	r.lastReportedStatus = operatorStatus
+	r.mu.Unlock()
 	return nil
 }
