@@ -29,7 +29,7 @@ const (
 	InventoryConfigMapBase = "-containers-inventory"
 )
 
-func CronJob(image, integrationMrn, clusterUid string, privateRegistrySecretNames []string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
+func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(*m)
 
 	cmd := []string{
@@ -147,8 +147,8 @@ func CronJob(image, integrationMrn, clusterUid string, privateRegistrySecretName
 		},
 	}
 
-	// Add private registry secrets if any are specified
-	k8s.AddPrivateRegistrySecretsToSpec(&cronjob.Spec.JobTemplate.Spec.Template.Spec, privateRegistrySecretNames, image)
+	// Add private registry secret if specified
+	k8s.AddPrivateRegistryPullSecretToSpec(&cronjob.Spec.JobTemplate.Spec.Template.Spec, privateRegistrySecretName)
 
 	return cronjob
 }

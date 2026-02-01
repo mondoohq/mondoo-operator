@@ -63,7 +63,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -90,7 +90,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_CustomEnvVars() {
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -123,7 +123,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomImage() {
 	image, err := s.containerImageResolver.CnspecImage("ubuntu", "22.04", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -152,7 +152,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 
 	created := &batchv1.CronJob{}
 	created.Name = expected.Name
@@ -187,7 +187,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() 
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, []string{s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRef.Name}, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRef.Name, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -212,33 +212,54 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_MultiplePrivateRegistriesS
 		{Name: "pull-secret-2"},
 	}
 
-	// Create both secrets
-	for _, ref := range s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRefs {
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: s.auditConfig.Namespace,
-				Name:      ref.Name,
-			},
-			StringData: map[string]string{
-				".dockerconfigjson": `{"auths": {"registry.example.com": {"auth": "dGVzdA=="}}}`,
-			},
-		}
-		s.NoError(d.KubeClient.Create(s.ctx, secret), "Error creating private registry secret: %s", ref.Name)
+	// Create both source secrets with different registries
+	secret1 := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      "pull-secret-1",
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+		Data: map[string][]byte{
+			".dockerconfigjson": []byte(`{"auths": {"registry1.example.com": {"auth": "dGVzdDE="}}}`),
+		},
 	}
+	secret2 := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: s.auditConfig.Namespace,
+			Name:      "pull-secret-2",
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+		Data: map[string][]byte{
+			".dockerconfigjson": []byte(`{"auths": {"registry2.example.com": {"auth": "dGVzdDI="}}}`),
+		},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, secret1))
+	s.NoError(d.KubeClient.Create(s.ctx, secret2))
 
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	// Verify the CronJob was created with multiple secrets
+	// Verify the operator created a merged secret
+	mergedSecretName := s.auditConfig.Name + "-private-registries-merged"
+	mergedSecret := &corev1.Secret{}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKey{
+		Namespace: s.auditConfig.Namespace,
+		Name:      mergedSecretName,
+	}, mergedSecret))
+
+	// Verify merged secret contains both registries
+	s.Contains(string(mergedSecret.Data[".dockerconfigjson"]), "registry1.example.com")
+	s.Contains(string(mergedSecret.Data[".dockerconfigjson"]), "registry2.example.com")
+
+	// Verify the CronJob uses the merged secret (no init container needed)
 	created := &batchv1.CronJob{}
 	created.Name = CronJobName(s.auditConfig.Name)
 	created.Namespace = s.auditConfig.Namespace
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
 
-	// With multiple secrets, we expect an init container for merging
-	s.Len(created.Spec.JobTemplate.Spec.Template.Spec.InitContainers, 1)
-	s.Equal("merge-docker-configs", created.Spec.JobTemplate.Spec.Template.Spec.InitContainers[0].Name)
+	// No init container - operator handles merging
+	s.Empty(created.Spec.JobTemplate.Spec.Template.Spec.InitContainers)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
@@ -265,7 +286,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 	image, err := s.containerImageResolver.CnspecImage("", "", false)
 	s.NoError(err)
 
-	expected := CronJob(image, integrationMrn, test.KubeSystemNamespaceUid, nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, integrationMrn, test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// Set some fields that the kube client sets
@@ -288,7 +309,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.NoError(err)
 
 	// Make sure a cron job exists with different container command
-	cronJob := CronJob(image, "", "", nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	cronJob := CronJob(image, "", "", "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, cronJob))
 
@@ -296,7 +317,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	expected := CronJob(image, "", test.KubeSystemNamespaceUid, nil, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	s.NoError(ctrl.SetControllerReference(&s.auditConfig, expected, d.KubeClient.Scheme()))
 
 	// The second node has an updated cron job so resource version is +1

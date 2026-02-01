@@ -85,15 +85,15 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 			"name", CronJobName(n.Mondoo.Name))
 	}
 
-	// Collect all private registry pull secrets
-	privateRegistrySecretNames, err := k8s.CollectPrivateRegistrySecretNames(ctx, n.KubeClient, n.Mondoo)
+	// Reconcile private registry secrets (merges multiple secrets if needed)
+	privateRegistrySecretName, err := k8s.ReconcilePrivateRegistriesSecret(ctx, n.KubeClient, n.Mondoo)
 	if err != nil {
-		logger.Error(err, "Failed to collect private registry secrets")
+		logger.Error(err, "Failed to reconcile private registry secrets")
 		return err
 	}
 
 	existing := &batchv1.CronJob{}
-	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, privateRegistrySecretNames, n.Mondoo, *n.MondooOperatorConfig)
+	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, privateRegistrySecretName, n.Mondoo, *n.MondooOperatorConfig)
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 		return err
