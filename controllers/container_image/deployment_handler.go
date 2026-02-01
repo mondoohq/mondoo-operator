@@ -136,7 +136,11 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	pods := &corev1.PodList{}
 	if len(cronJobs) > 0 {
 		lSelector := metav1.SetAsLabelSelector(CronJobLabels(*n.Mondoo))
-		selector, _ := metav1.LabelSelectorAsSelector(lSelector)
+		selector, err := metav1.LabelSelectorAsSelector(lSelector)
+		if err != nil {
+			logger.Error(err, "Failed to create label selector for Kubernetes Container Image Scanning")
+			return err
+		}
 		opts := []client.ListOption{
 			client.InNamespace(n.Mondoo.Namespace),
 			client.MatchingLabelsSelector{Selector: selector},
