@@ -71,6 +71,8 @@ var MondooClientBuilder = mondooclient.NewClient
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=create;delete
 // Need to be able to check for the existence of Secrets with tokens, Mondoo service accounts, and private image pull secrets without asking for permission to read all Secrets
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get
+// Need to be able to manage ServiceAccounts for external cluster workload identity federation
+//+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;delete
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
