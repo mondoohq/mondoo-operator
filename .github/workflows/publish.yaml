@@ -134,6 +134,9 @@ jobs:
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
+          # Disable provenance attestations to produce single-platform images
+          # instead of manifest lists. Required for docker manifest create to work.
+          provenance: false
 
       - name: Scan Image
         if: matrix.arch == 'amd64'
