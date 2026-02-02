@@ -106,17 +106,30 @@ type DeploymentHandler struct {
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
+	hasExternalClusters := len(n.Mondoo.Spec.KubernetesResources.ExternalClusters) > 0
+
 	if !n.Mondoo.Spec.KubernetesResources.Enable {
-		return ctrl.Result{}, n.down(ctx)
+		// Clean up local cluster resources only
+		if err := n.downLocalCluster(ctx); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		// Sync local cluster CronJob
+		if err := n.syncCronJob(ctx); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
-	if err := n.syncCronJob(ctx); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Reconcile external cluster CronJobs
-	if err := n.reconcileExternalClusters(ctx); err != nil {
-		return ctrl.Result{}, err
+	// Reconcile external cluster CronJobs if any are configured, otherwise clean up orphaned resources
+	if hasExternalClusters {
+		if err := n.reconcileExternalClusters(ctx); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		// No external clusters configured - clean up any orphaned external resources
+		if err := n.cleanupOrphanedExternalClusterResources(ctx, make(map[string]bool)); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil
@@ -487,25 +500,19 @@ func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]ba
 	return cronJobs.Items, nil
 }
 
-func (n *DeploymentHandler) down(ctx context.Context) error {
+// downLocalCluster cleans up only the local cluster scanning resources
+func (n *DeploymentHandler) downLocalCluster(ctx context.Context) error {
 	// Delete main cluster CronJob
 	cronJob := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, cronJob); err != nil {
-		logger.Error(
-			err, "failed to clean up Kubernetes resource scanning CronJob", "namespace", cronJob.Namespace, "name", cronJob.Name)
+		logger.Error(err, "failed to clean up Kubernetes resource scanning CronJob", "namespace", cronJob.Namespace, "name", cronJob.Name)
 		return err
 	}
 
 	// Delete main cluster ConfigMap
 	configMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
-		logger.Error(
-			err, "failed to clean up Kubernetes resource scanning ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
-		return err
-	}
-
-	// Delete all external cluster resources (empty map means none are configured)
-	if err := n.cleanupOrphanedExternalClusterResources(ctx, make(map[string]bool)); err != nil {
+		logger.Error(err, "failed to clean up Kubernetes resource scanning ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
 		return err
 	}
 
@@ -513,7 +520,7 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		return err
 	}
 
-	// Clear any remnant status
+	// Clear local cluster status
 	updateWorkloadsConditions(n.Mondoo, false, &corev1.PodList{})
 
 	return nil
