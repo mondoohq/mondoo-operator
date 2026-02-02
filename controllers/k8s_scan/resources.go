@@ -726,6 +726,8 @@ retry az aks get-credentials \
 			AllowPrivilegeEscalation: ptr.To(false),
 			ReadOnlyRootFilesystem:   ptr.To(true),
 			RunAsNonRoot:             ptr.To(true),
+			// needed to prevent errors for the google CLI container which runs as root by default
+			RunAsUser: ptr.To(int64(101)),
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			},

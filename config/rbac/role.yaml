@@ -36,6 +36,17 @@ rules:
   - delete
   - get
 - apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
   - apps
   resources:
   - daemonsets
