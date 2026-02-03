@@ -1,4 +1,4 @@
-// Copyright (c) Mondoo, Inc.
+// Copyright Mondoo, Inc. 2026
 // SPDX-License-Identifier: BUSL-1.1
 
 package mondooclient
@@ -18,6 +18,8 @@ type MondooClient interface {
 	IntegrationRegister(context.Context, *IntegrationRegisterInput) (*IntegrationRegisterOutput, error)
 	IntegrationCheckIn(context.Context, *IntegrationCheckInInput) (*IntegrationCheckInOutput, error)
 	IntegrationReportStatus(context.Context, *ReportStatusRequest) error
+
+	GarbageCollectAssets(context.Context, *GarbageCollectOptions) error
 }
 
 // ExchangeRegistrationTokenInput is used for converting a JWT to a Mondoo serivce account
@@ -113,3 +115,11 @@ const (
 	MessageStatus_MESSAGE_ERROR   MessageStatus = 2
 	MessageStatus_MESSAGE_INFO    MessageStatus = 3
 )
+
+// GarbageCollectOptions contains filters for garbage collection of assets
+type GarbageCollectOptions struct {
+	ManagedBy       string            `json:"managed_by,omitempty"`
+	PlatformRuntime string            `json:"platform_runtime,omitempty"`
+	OlderThan       string            `json:"older_than,omitempty"` // RFC3339 timestamp
+	Labels          map[string]string `json:"labels,omitempty"`
+}

@@ -11,15 +11,16 @@ This user manual describes how to install and use the Mondoo Operator.
   - [Configuring the Mondoo Secret](#configuring-the-mondoo-secret)
   - [Creating a MondooAuditConfig](#creating-a-mondooauditconfig)
     - [Filter Kubernetes objects based on namespace](#filter-kubernetes-objects-based-on-namespace)
-  - [Deploying the admission controller](#deploying-the-admission-controller)
-    - [Scanned workload types](#scanned-workload-types)
-    - [Different modes of operation](#different-modes-of-operation)
-    - [Deploying the admission controller using cert-manager](#deploying-the-admission-controller-using-cert-manager)
-    - [Manually creating TLS certificates using OpenSSL](#manually-creating-tls-certificates-using-openssl)
-    - [Firewall rules for the webhook](#firewall-rules-for-the-webhook)
-  - [Creating a secret for private image scanning](#creating-a-secret-for-private-image-scanning)
+  - [Scanning External Clusters](#scanning-external-clusters)
+    - [Creating a kubeconfig Secret](#creating-a-kubeconfig-secret)
+    - [Configuring external cluster scanning](#configuring-external-cluster-scanning)
+    - [Per-cluster configuration](#per-cluster-configuration)
+    - [Authentication methods](#authentication-methods)
+  - [Container Image Scanning](#container-image-scanning)
+    - [Creating a secret for private image scanning](#creating-a-secret-for-private-image-scanning)
   - [Installing Mondoo into multiple namespaces](#installing-mondoo-into-multiple-namespaces)
   - [Adjust the scan interval](#adjust-the-scan-interval)
+  - [Real-time Resource Watcher (Opt-in)](#real-time-resource-watcher-opt-in)
   - [Configure resources for the operator and its components](#configure-resources-for-the-operator-and-its-components)
     - [Configure resources for the operator-controller](#configure-resources-for-the-operator-controller)
     - [Configure resources for the different scanning components](#configure-resources-for-the-different-scanning-components)
@@ -31,10 +32,24 @@ This user manual describes how to install and use the Mondoo Operator.
   - [FAQ](#faq)
     - [I do not see the service running, only the operator. What should I do?](#i-do-not-see-the-service-running-only-the-operator-what-should-i-do)
     - [How do I edit an existing operator configuration?](#how-do-i-edit-an-existing-operator-configuration)
-    - [How do I run asset garbage collection manually?](#how-do-i-run-asset-garbage-collection-manually)
     - [Why is there a deployment marked as unschedulable?](#why-is-there-a-deployment-marked-as-unschedulable)
     - [Why are (some of) my nodes unscored?](#why-are-some-of-my-nodes-unscored)
     - [How can I trigger a new scan?](#how-can-i-trigger-a-new-scan)
+
+## Upgrading from Previous Versions
+
+When upgrading from operator versions prior to v12.x, the following changes apply:
+
+**Automatic Cleanup**: The operator automatically cleans up resources from previous versions:
+- **ScanAPI resources**: The ScanAPI Deployment, Service, and token Secret are automatically removed. The new architecture uses direct CronJob-based scanning with `cnspec`.
+- **Admission webhook resources**: If you had admission webhooks configured, the ValidatingWebhookConfiguration, webhook Deployment, Service, and TLS Secret are automatically removed. See [admission-migration-guide.md](admission-migration-guide.md) for details.
+
+**No action required**: Existing `MondooAuditConfig` resources continue to work. The operator will transition your scanning workloads to the new CronJob-based architecture automatically.
+
+**Resource Watcher Changes**: If you have `resourceWatcher.enable: true`:
+- **New rate limiting**: A minimum scan interval of 2 minutes is now enforced by default to prevent excessive scanning.
+- **High-priority resources by default**: The watcher now only monitors Deployments, DaemonSets, StatefulSets, and ReplicaSets by default (previously watched all resources including Pods and Jobs). To restore the previous behavior, set `watchAllResources: true` in your configuration.
+
 
 ## Mondoo Operator Installation
 
@@ -199,246 +214,296 @@ spec:
         - ...
 ```
 
-## Deploying the admission controller
+## Scanning External Clusters
 
-Kubernetes webhooks require TLS certs to establish the trust between the certificate authority listed in `ValidatingWebhookConfiguration.Webhooks[].ClientConfig.CABundle` and the TLS certificates presented when connecting to the HTTPS endpoint specified in the webhook.
+The Mondoo Operator can scan remote Kubernetes clusters from a central installation. This is useful for:
 
-You can choose one of three approaches:
+- Scanning clusters where you cannot or do not want to install the operator
+- Centralizing security scanning in a management cluster
+- Scanning development or staging clusters from a single location
 
-- Install and use cert-manager to automate the creation and update of the TLS certs
-- Use the OpenShift certificate creation/rotation features
-- Create (and rotate) your own TLS certificates manually
+### Creating a kubeconfig Secret
 
-A working setup shows the webhook Pod processing the created/modified Pods.
+First, create a kubeconfig file that has access to the remote cluster. The kubeconfig should have read-only access to the Kubernetes API resources you want to scan.
 
-Display the logs in one window:
+1. Create a kubeconfig file for the remote cluster:
 
-```bash
-kubectl logs -f deployment/mondoo-client-webhook-manager -n mondoo-operator
-```
+   ```bash
+   # Example: Export kubeconfig from your current context
+   kubectl config view --minify --flatten > remote-kubeconfig.yaml
+   ```
 
-And delete a Pod in another window (which will cause a new one to be created):
+2. Create a Secret containing the kubeconfig:
 
-```bash
-kubectl delete pod -n mondoo-operator --selector app.kubernetes.io/name=mondoo-operator
-```
+   ```bash
+   kubectl create secret generic prod-kubeconfig \
+     --namespace mondoo-operator \
+     --from-file=kubeconfig=remote-kubeconfig.yaml
+   ```
 
-### Scanned workload types
+   > **Note**: The Secret must have a key named `kubeconfig` containing the kubeconfig content.
 
-Currently, the admission controller can scan these workload types:
+### Configuring external cluster scanning
 
-- Pods
-- Deployments
-- DaemonSets
-- StatefulSets
-- Jobs
-- CronJobs
-
-If a workload is dependent on another workload, the admission controller only scans the owner workload.
-For example, if a Deployment creates a Pod, the admission controller skips the Pod and scans the Deployment.
-The owner workload is the definition where you can fix issues permanently.
-
-For more information on how you can configure this, have a look at [this tutorial](https://mondoo.com/docs/platform/infra/cloud/kubernetes/scan-kubernetes-with-operator/).
-
-### Different modes of operation
-
-You can run the admission controller in two modes: permissive and enforcing.
-You configure the mode via the `MondooAuditConfig`:
+Add the `externalClusters` field to your `MondooAuditConfig`:
 
 ```yaml
-    apiVersion: k8s.mondoo.com/v1alpha2
-    kind: MondooAuditConfig
-    ...
-    spec:
-      ...
-      admission:
-        enable: true
-        mode: permissive
-        replicas: 1
-      scanner:
-        replicas: 1
-```
-
-When admission is enabled, the default mode is `permissive` with one replica.
-In permissive mode, the webhook checks objects like Deployments or Pods against policies and reports problems to the Mondoo Backend.
-Mondoo shows the results in the CI/CD view.
-For more details, have a look at the [docs](https://mondoo.com/docs/platform/infra/supply/overview/).
-In enforcing mode, the operator automatically sets the `failurePolicy` of the `ValidatingWebhookConfiguration` to `Fail`.
-The webhook then will deny objects not passing the policy.
-The details are reported to the Mondoo Backend.
-
-With kubectl, this looks similar to this example:
-
-```bash
-$ kubectl apply -f ubuntu-privileged.yaml
-Error from server (FAILED MONDOO SCAN): error when creating "ubuntu-privileged.yaml": admission webhook "policy.k8s.mondoo.com" denied the request: FAILED MONDOO SCAN
-```
-
-> :warning: The default replica count of one is not meant for production usage in enforcing mode.
->
-> Increase replicas for webhook **and** scanner to at least two.
-
-The Deployments are configured with [`PodAntiAffinity`](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity).
-This, with a replica count of two, helps to prevent outages because of single Pod or Node failures.
-Please increase the replicas count according to your needs.
-
-### Deploying the admission controller using cert-manager
-
-[cert-manager](https://cert-manager.io/) is the easiest way to bootstrap the admission controller TLS certificate:
-
-1. Install cert-manger on the cluster if it isn't already installed. ([See instructions](https://cert-manager.io/docs/installation/).)
-
-2. Update MondooAuditConfig so that the webhook section requests TLS certificates from cert-manager:
-
-   ```yaml
-   apiVersion: k8s.mondoo.com/v1alpha2
-   kind: MondooAuditConfig
-   metadata:
-     name: mondoo-client
-     namespace: mondoo-operator
-   spec:
-     mondooCredsSecretRef:
-       name: mondoo-client
-     kubernetesResources:
-       enable: true
-     nodes:
-       enable: true
-     admission:
-       enable: true
-       certificateProvisioning:
-         mode: cert-manager
-   ```
-
-The admission controller `Deployment` should start. The`ValidatingWebhookConfiguration` should be annotated to insert the certificate authority data. cert-manager creates a Secret named `webhook-serving-cert` that contains the TLS certificates.
-
-### Manually creating TLS certificates using OpenSSL
-
-You can manually create the TLS certificate required for the admission controller. These steps show one method:
-
-1. Create a key for your certificate authority:
-
-   ```bash
-   openssl genrsa -out ca.key 2048
-   ```
-
-2. Generate a certificate for your certificate authority:
-
-   ```bash
-   openssl req -x509 -new -nodes -key ca.key -subj "/CN=Webhook Issuer" -days 10000 -out ca.crt
-   ```
-
-3. Generate a key for the webhook server Pod:
-
-   ```bash
-   openssl genrsa -out server.key 2048
-   ```
-
-4. Create a config file named `csr.conf` to specify the options for the webhook server certificate. Substitute NAMESPACE with the namespace where the MondooAuditConfig resource was created (ie. mondoo-operator):
-
-   ```
-   [ req ]
-   default_bits = 2048
-   prompt = no
-   default_md = sha256
-   req_extensions = req_ext
-   distinguished_name = dn
-   [ dn ]
-   C = US
-   ST = NY
-   L = NYC
-   O = My Company
-   OU = My Organization
-   CN = Webhook Server
-   [ req_ext ]
-   subjectAltName = @alt_names
-   [ alt_names ]
-   DNS.1 = mondoo-operator-webhook-service.NAMESPACE.svc
-   DNS.2 = mondoo-operator-webhook-service.NAMESPACE.svc.cluster.local
-   [ v3_ext ]
-   authorityKeyIdentifier=keyid,issuer:always
-   basicConstraints=CA:FALSE
-   keyUsage=keyEncipherment,dataEncipherment
-   extendedKeyUsage=serverAuth,clientAuth
-   subjectAltName=@alt_names
-   ```
-
-5. Generate the certificate signing request:
-
-   ```bash
-   openssl req -new -key server.key -out server.csr -config csr.conf
-   ```
-
-6. Generate the certificate for the webhook server:
-
-   ```bash
-   openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 10000 -extensions v3_ext -extfile csr.conf
-   ```
-
-7. Create the Secret holding the TLS certificate data:
-
-   ```bash
-   kubectl create secret tls -n mondoo-operator webhook-server-cert --cert ./server.crt --key ./server.key
-   ```
-
-8. Add the certificate authority as base64 encoded CA data (`base64 ./ca.crt`) to the ValidatingWebhookConfiguration under the `webhooks[].clientConfig.caBundle` field:
-
-   ```bash
-   kubectl edit validatingwebhookconfiguration mondoo-operator-mondoo-webhook
-   ```
-
-The end result should resemble this:
-
-```yaml
-apiVersion: admissionregistration.k8s.io/v1
-kind: ValidatingWebhookConfiguration
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
 metadata:
-  annotations:
-    mondoo.com/tls-mode: manual
-  name: mondoo-operator-mondoo-webhook
-webhooks:
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      caBundle: BASE64-ENCODED-DATA-HERE
-      service:
-        name: mondoo-operator-webhook-service
-        namespace: mondoo-operator
-        path: /validate-k8s-mondoo-com-core
-        port: 443
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true  # Scan local cluster (optional)
+    externalClusters:
+      - name: production
+        kubeconfigSecretRef:
+          name: prod-kubeconfig
+      - name: staging
+        kubeconfigSecretRef:
+          name: staging-kubeconfig
 ```
 
-### Firewall rules for the webhook
+Each external cluster will have its own CronJob created with the appropriate kubeconfig mounted.
 
-Make sure your Kubernetes API servers can connect to the webhook.
-Otherwise, you would see connection timeout errors in your API server logs.
-An example for an EKS basic firewall rule can be found [here](../.github/terraform/aws/main.tf#L110)
+### Per-cluster configuration
 
-## Creating a secret for private image scanning
+You can customize settings for each external cluster:
+
+```yaml
+externalClusters:
+  - name: production
+    kubeconfigSecretRef:
+      name: prod-kubeconfig
+    # Custom schedule for this cluster
+    schedule: "0 */2 * * *"  # Every 2 hours
+    # Cluster-specific namespace filtering
+    filtering:
+      namespaces:
+        exclude:
+          - kube-system
+          - monitoring
+    # Enable container image scanning for this cluster
+    containerImageScanning: true
+    # Private registry credentials for this cluster
+    privateRegistriesPullSecretRef:
+      name: prod-registry-creds
+```
+
+**Configuration options:**
+
+| Field | Description |
+|-------|-------------|
+| `name` | Unique identifier for the cluster (used in CronJob names) |
+| `kubeconfigSecretRef` | Reference to Secret containing kubeconfig |
+| `schedule` | Override the default scan schedule (cron format) |
+| `filtering` | Namespace include/exclude specific to this cluster |
+| `containerImageScanning` | Enable container image scanning for this cluster |
+| `privateRegistriesPullSecretRef` | Registry credentials for private images |
+
+### Authentication methods
+
+The operator supports four authentication methods for external clusters. Choose the one that best fits your security requirements:
+
+#### 1. Kubeconfig (most flexible)
+
+Use a kubeconfig file stored in a Secret. This works with any cluster and authentication method supported by kubectl.
+
+```yaml
+externalClusters:
+  - name: production
+    kubeconfigSecretRef:
+      name: prod-kubeconfig
+```
+
+#### 2. Service Account Token
+
+Use a Kubernetes service account token with CA certificate. Simpler than a full kubeconfig.
+
+```yaml
+externalClusters:
+  - name: production
+    serviceAccountAuth:
+      server: "https://prod-cluster.example.com:6443"
+      credentialsSecretRef:
+        name: prod-sa-credentials  # Secret with "token" and "ca.crt" keys
+```
+
+Create the credentials Secret:
+
+```bash
+kubectl create secret generic prod-sa-credentials \
+  --namespace mondoo-operator \
+  --from-file=token=./token \
+  --from-file=ca.crt=./ca.crt
+```
+
+#### 3. Workload Identity Federation (cloud-native)
+
+Use cloud-native identity federation with no static credentials. Supports GKE, EKS, and AKS.
+
+**GKE example:**
+
+```yaml
+externalClusters:
+  - name: gke-prod
+    workloadIdentity:
+      provider: gke
+      gke:
+        projectId: my-gcp-project
+        clusterName: production-cluster
+        clusterLocation: us-central1-a
+        googleServiceAccount: scanner@my-gcp-project.iam.gserviceaccount.com
+```
+
+**EKS example:**
+
+```yaml
+externalClusters:
+  - name: eks-prod
+    workloadIdentity:
+      provider: eks
+      eks:
+        region: us-west-2
+        clusterName: production-cluster
+        roleArn: arn:aws:iam::123456789012:role/MondooScannerRole
+```
+
+**AKS example:**
+
+```yaml
+externalClusters:
+  - name: aks-prod
+    workloadIdentity:
+      provider: aks
+      aks:
+        subscriptionId: 12345678-1234-1234-1234-123456789012
+        resourceGroup: my-resource-group
+        clusterName: production-cluster
+        clientId: abcdef12-3456-7890-abcd-ef1234567890
+        tenantId: fedcba98-7654-3210-fedc-ba9876543210
+```
+
+#### 4. SPIFFE/SPIRE (zero-trust)
+
+Use SPIFFE/SPIRE for zero-trust authentication with auto-rotating X.509 certificates.
+
+```yaml
+externalClusters:
+  - name: spiffe-cluster
+    spiffeAuth:
+      server: "https://remote-cluster.example.com:6443"
+      trustBundleSecretRef:
+        name: remote-cluster-ca  # Secret with "ca.crt" key
+      # Optional: custom socket path (default: /run/spire/sockets/agent.sock)
+      # socketPath: "/run/spire/sockets/agent.sock"
+```
+
+> **Important: HostPath permissions required**
+>
+> SPIFFE authentication requires mounting the SPIRE agent socket from the host filesystem using a HostPath volume. This may require:
+>
+> - **Pod Security Admission**: Configure the namespace with a policy that allows HostPath volumes
+> - **Pod Security Policy (deprecated)**: Allow HostPath in the PSP
+> - **OpenShift SCC**: Use an SCC that permits HostPath mounts
+>
+> Ensure your cluster's security policies allow HostPath volumes for the mondoo-operator namespace before using SPIFFE authentication.
+
+> **Note: Certificate TTL consideration**
+>
+> SPIFFE certificates are fetched once at the start of each scan job and are not rotated during the scan. SPIFFE SVIDs typically have a 1-hour TTL by default. For most K8s resource scans that complete within minutes, this is sufficient. If your scans consistently exceed the SVID TTL, consider increasing the TTL in your SPIRE server configuration or using a different authentication method.
+
+## Container Image Scanning
+
+The Mondoo Operator can scan container images running in your cluster for vulnerabilities and security issues.
+
+Enable container image scanning in your `MondooAuditConfig`:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  containers:
+    enable: true
+    schedule: "0 0 * * *"  # Daily at midnight
+```
+
+### Creating a secret for private image scanning
 
 To allow the Mondoo operator to scan private images, it needs access to image pull secrets for these private registries.
-Please create a secret with the name `mondoo-private-registries-secrets` within the same namespace you created your `MondooAuditConfig`.
-The Mondoo operator will only read a secret with this exact name so that we can limit required RBAC permissions.
-Please ensure the secret contains access data to all the registries you want to scan.
-Now add the name to your `MondooAuditConfig` so that the operator knows you want to scan private images.
 
-```yaml
-    apiVersion: k8s.mondoo.com/v1alpha2
-    kind: MondooAuditConfig
-    ...
-    spec:
-      ...
-      kubernetesResources:
-        enable: true
-        containerImageScanning: true
-        privateRegistriesPullSecretRef:
-          name: "mondoo-private-registries-secrets"
-      ...
+#### Single registry secret
+
+Create a secret with the name `mondoo-private-registries-secrets` within the same namespace as your `MondooAuditConfig`:
+
+```bash
+kubectl create secret docker-registry mondoo-private-registries-secrets \
+  --namespace mondoo-operator \
+  --docker-server=registry.example.com \
+  --docker-username=user \
+  --docker-password=password
 ```
 
-You can find examples of creating such a secret [here](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
+Then reference it in your `MondooAuditConfig`:
 
-It is also possible to create a secret with a different name, but by default the operator isn't allowed to read the secret.
-Please extend RBAC in a way, that the `ServiceAccount` `mondoo-operator-k8s-resources-scanning` has the privilege to get the secret.
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+spec:
+  scanner:
+    privateRegistriesPullSecretRef:
+      name: mondoo-private-registries-secrets
+  containers:
+    enable: true
+```
+
+#### Multiple registry secrets
+
+When you need credentials from multiple sources (e.g., managed by different teams or external secret operators like External Secrets or Vault), use `privateRegistriesPullSecretRefs`:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+spec:
+  scanner:
+    privateRegistriesPullSecretRefs:
+      - name: team-a-registry-creds
+      - name: team-b-registry-creds
+      - name: external-secrets-managed-creds
+  containers:
+    enable: true
+```
+
+The operator automatically merges credentials from all specified secrets. If the same registry appears in multiple secrets, the last one takes precedence.
+
+You can also use both fields together - all secrets will be merged:
+
+```yaml
+spec:
+  scanner:
+    privateRegistriesPullSecretRef:
+      name: default-registry-creds
+    privateRegistriesPullSecretRefs:
+      - name: additional-registry-creds
+```
+
+#### Default secret name
+
+If no secret reference is specified, the operator looks for a secret named `mondoo-private-registries-secrets` by default.
+
+#### RBAC considerations
+
+The operator's default RBAC only allows reading secrets with specific names. If you use a custom secret name, extend RBAC so that the `ServiceAccount` `mondoo-operator-k8s-resources-scanning` has permission to read the secret.
+
+You can find examples of creating Docker registry secrets [here](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
 
 ## Installing Mondoo into multiple namespaces
 
@@ -508,6 +573,101 @@ You can adjust the schedule for the following components:
 - Kubernetes Resources Scanning
 - Container Image Scanning
 - Node Scanning
+
+## Real-time Resource Watcher (Opt-in)
+
+The Resource Watcher is an **opt-in** feature that provides real-time scanning of Kubernetes resources as they change, rather than waiting for the scheduled CronJob scans.
+
+> **Breaking Change (v1.x+):** If you previously had `resourceWatcher.enable: true` without specifying `resourceTypes`, the default watched resources changed from all resource types to only high-priority resources (Deployments, DaemonSets, StatefulSets, ReplicaSets). To restore the previous behavior, set `watchAllResources: true`.
+
+### Enabling the Resource Watcher
+
+To enable the resource watcher, add the following to your `MondooAuditConfig`:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    resourceWatcher:
+      enable: true  # Opt-in: must be explicitly enabled
+```
+
+### Default Behavior
+
+When enabled with default settings, the resource watcher:
+
+- **Watches only high-priority resources**: Deployments, DaemonSets, StatefulSets, and ReplicaSets
+- **Rate limits scans**: Minimum 2 minutes between scans to prevent excessive scanning
+- **Batches changes**: 10-second debounce interval to batch rapid changes before scanning
+- **Complements scheduled scans**: The hourly CronJob continues to run for full cluster coverage
+
+### Configuration Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enable` | `false` | Must be set to `true` to enable the resource watcher |
+| `minimumScanInterval` | `2m` | Minimum time between scans (rate limit) |
+| `debounceInterval` | `10s` | Time to wait after last change before triggering a scan |
+| `watchAllResources` | `false` | When `true`, watches all resources including Pods, Jobs, CronJobs |
+| `resourceTypes` | (auto) | Explicit list of resource types to watch (overrides `watchAllResources`) |
+
+### Example: Custom Configuration
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    resourceWatcher:
+      enable: true
+      minimumScanInterval: 5m    # Scan at most every 5 minutes
+      debounceInterval: 30s      # Wait 30s after last change
+      watchAllResources: true    # Include Pods, Jobs, etc.
+```
+
+### Example: Watch Specific Resource Types
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    resourceWatcher:
+      enable: true
+      resourceTypes:
+        - deployments
+        - services
+        - ingresses
+```
+
+### Why High-Priority Resources by Default?
+
+By default, the resource watcher only monitors stable workload resources (Deployments, DaemonSets, StatefulSets, ReplicaSets) because:
+
+1. **Pods are ephemeral**: Pod changes are frequent but already covered by scanning their parent resources
+2. **Jobs are transient**: Job resources change constantly in active clusters
+3. **Reduces noise**: Fewer unnecessary scans means less resource consumption
+
+If you need to monitor all resources, set `watchAllResources: true` or specify explicit `resourceTypes`.
 
 ## Configure resources for the operator and its components
 
@@ -673,36 +833,6 @@ Run:
 ```bash
 kubectl edit  mondooauditconfigs -n mondoo-operator
 ```
-
-### How do I run asset garbage collection manually?
-
-The operator will trigger garbage collection after each successful cluster scan. This will delete all old assets that were created
-by the operator but are no longer present in the cluster. It is possible to trigger garbage collection manually. To do this it is required
-to have the Mondoo Client API running locally:
-
-```bash
-mondoo serve --api --token abcdefgh
-```
-
-Retrieve the cluster UID:
-
-```bash
-kubectl get ns kube-system -o yaml | grep uid
-```
-
-Then you can trigger asset garbage collection for workloads by the following command:
-
-```bash
-mondoo-operator garbage-collect --filter-managed-by mondoo-operator-<<cluster UID>> --filter-older-than 2h --filter-platform-runtime k8s-cluster --scan-api-url http://127.0.0.1:8989 --token abcdefgh
-```
-
-For container images use:
-
-```bash
-mondoo-operator garbage-collect --filter-managed-by mondoo-operator-<<cluster UID>> --filter-older-than 48h --filter-platform-runtime docker-registry --scan-api-url http://127.0.0.1:8989 --token abcdefgh
-```
-
-For different use-cases adjust the CLI arguments.
 
 ### Why is there a deployment marked as unschedulable?
 

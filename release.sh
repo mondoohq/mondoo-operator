@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) Mondoo, Inc.
+# Copyright Mondoo, Inc. 2026
 # SPDX-License-Identifier: BUSL-1.1
 
 # This script updates all the versions to do a release:
@@ -22,7 +22,6 @@ fi
 make manifests
 
 yq -i ".images[0].newTag=\"v${VERSION}\"" config/manager/kustomization.yaml
-yq -i ".images[0].newTag=\"v${VERSION}\"" config/webhook/kustomization.yaml
 
 yq -i ".appVersion = \"${VERSION}\"" charts/mondoo-operator/Chart.yaml
 yq -i ".version = \"${VERSION}\"" charts/mondoo-operator/Chart.yaml

@@ -1,4 +1,4 @@
-// Copyright (c) Mondoo, Inc.
+// Copyright Mondoo, Inc. 2026
 // SPDX-License-Identifier: BUSL-1.1
 
 package container_image
@@ -85,31 +85,15 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 			"name", CronJobName(n.Mondoo.Name))
 	}
 
-	// check whether we have private registry pull secrets
-	privateRegistriesSecretName := "mondoo-private-registries-secrets"
-	if n.Mondoo.Spec.Scanner.PrivateRegistriesPullSecretRef.Name != "" {
-		privateRegistriesSecretName = n.Mondoo.Spec.Scanner.PrivateRegistriesPullSecretRef.Name
-	}
-	privateRegistriesSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      privateRegistriesSecretName,
-			Namespace: n.Mondoo.Namespace,
-		},
-	}
-	found, err := k8s.CheckIfExists(ctx, n.KubeClient, privateRegistriesSecret, privateRegistriesSecret)
+	// Reconcile private registry secrets (merges multiple secrets if needed)
+	privateRegistrySecretName, err := k8s.ReconcilePrivateRegistriesSecret(ctx, n.KubeClient, n.Mondoo)
 	if err != nil {
+		logger.Error(err, "Failed to reconcile private registry secrets")
 		return err
-	}
-	if !found {
-		logger.Info("private registries pull secret not found",
-			" namespace=", n.Mondoo.Namespace,
-			" secretname=", privateRegistriesSecretName)
-		logger.Info("trying to fetch imagePullSecrets for each discovered image")
-		privateRegistriesSecretName = ""
 	}
 
 	existing := &batchv1.CronJob{}
-	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, privateRegistriesSecretName, n.Mondoo, *n.MondooOperatorConfig)
+	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, privateRegistrySecretName, n.Mondoo, *n.MondooOperatorConfig)
 	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
 		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
 		return err
@@ -150,7 +134,11 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	pods := &corev1.PodList{}
 	if len(cronJobs) > 0 {
 		lSelector := metav1.SetAsLabelSelector(CronJobLabels(*n.Mondoo))
-		selector, _ := metav1.LabelSelectorAsSelector(lSelector)
+		selector, err := metav1.LabelSelectorAsSelector(lSelector)
+		if err != nil {
+			logger.Error(err, "Failed to create label selector for Kubernetes Container Image Scanning")
+			return err
+		}
 		opts := []client.ListOption{
 			client.InNamespace(n.Mondoo.Namespace),
 			client.MatchingLabelsSelector{Selector: selector},

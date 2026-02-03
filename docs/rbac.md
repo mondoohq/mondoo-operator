@@ -13,85 +13,9 @@ metadata:
   name: manager-role
 rules:
   - apiGroups:
-      - "*"
-    resources:
-      - "*"
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
-      - admissionregistration.k8s.io
-    resources:
-      - validatingwebhookconfigurations
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - apps
-    resources:
-      - daemonsets
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - apps
-    resources:
-      - deployments
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - cert-manager.io
-    resources:
-      - certificates
-      - issuers
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
       - ""
     resources:
       - configmaps
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - pods
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
-      - ""
-    resources:
       - services
     verbs:
       - create
@@ -102,9 +26,28 @@ rules:
       - update
       - watch
   - apiGroups:
-      - k8s.mondoo.com
+      - ""
     resources:
-      - mondooauditconfigs
+      - namespaces
+      - nodes
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - create
+      - delete
+      - get
+  - apiGroups:
+      - apps
+    resources:
+      - daemonsets
+      - deployments
     verbs:
       - create
       - delete
@@ -114,19 +57,80 @@ rules:
       - update
       - watch
   - apiGroups:
+      - apps
+    resources:
+      - replicasets
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - cronjobs
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - deletecollection
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - k8s.mondoo.com
+    resources:
+      - mondooauditconfigs
+    verbs:
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups:
       - k8s.mondoo.com
     resources:
       - mondooauditconfigs/finalizers
+      - mondoooperatorconfigs/finalizers
     verbs:
       - update
   - apiGroups:
       - k8s.mondoo.com
     resources:
       - mondooauditconfigs/status
+      - mondoooperatorconfigs/status
     verbs:
       - get
       - patch
       - update
+  - apiGroups:
+      - k8s.mondoo.com
+    resources:
+      - mondoooperatorconfigs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - monitoring.coreos.com
+    resources:
+      - servicemonitors
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
 ```
 
 ## RBAC rules for Mondoo Workload Scanning
@@ -174,7 +178,7 @@ metadata:
   namespace: system
 ```
 
-> When `MondooAuditConfig` is created in the same namespace as the operator a service account named `mondoo-operator-k8s-resources-scanning` is added by default. If `MondooAuditConfig` is created in any other namespace create a ServiceAccount in that other namespace and add the ServiceAccount to the `ClusterRoleBinding` named `mondoo-operator-k8s-resources-scanning` that was created during installation of the mondoo-operator. The ServiceAccount needs to be specified in the `MondooAuditConfig` object at `.spec.workload.serviceAccount`.
+> When `MondooAuditConfig` is created in the same namespace as the operator a service account named `mondoo-operator-k8s-resources-scanning` is added by default. If `MondooAuditConfig` is created in any other namespace create a ServiceAccount in that other namespace and add the ServiceAccount to the `ClusterRoleBinding` named `mondoo-operator-k8s-resources-scanning` that was created during installation of the mondoo-operator. The ServiceAccount needs to be specified in the `MondooAuditConfig` object at `.spec.scanner.serviceAccountName`.
 
 > Additionally, when defining a `MondooAuditConfig` in a different namespace, a ServiceAccount with no permissions is needed for the node scanning. Create a ServiceAccount named `mondoo-operator-nodes` that will be used by the DaemonSet for node scanning.
 
@@ -193,8 +197,6 @@ spec:
     enable: true
   nodes:
     enable: true
-  admission:
-    enable: false
   mondooCredsSecretRef: mondoo-client
 ```
 

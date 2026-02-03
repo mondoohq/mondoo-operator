@@ -1,4 +1,4 @@
-// Copyright (c) Mondoo, Inc.
+// Copyright Mondoo, Inc. 2026
 // SPDX-License-Identifier: BUSL-1.1
 
 package controllers
@@ -26,12 +26,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/controllers/admission"
 	"go.mondoo.com/mondoo-operator/controllers/container_image"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
-	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
-	"go.mondoo.com/mondoo-operator/controllers/scanapi"
+	resourcewatcher "go.mondoo.com/mondoo-operator/controllers/resource_watcher"
 	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -49,7 +47,6 @@ type MondooAuditConfigReconciler struct {
 	ContainerImageResolver mondoo.ContainerImageResolver
 	StatusReporter         *status.StatusReporter
 	RunningOnOpenShift     bool
-	ScanApiStore           scan_api_store.ScanApiStore
 }
 
 // so we can mock out the mondoo client for testing
@@ -69,14 +66,13 @@ var MondooClientBuilder = mondooclient.NewClient
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods;namespaces;nodes,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
-// Just neeed to be able to create a Secret to hold the generated ScanAPI token
+// Need to be able to create/delete Secrets for Mondoo service account credentials
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=create;delete
 // Need to be able to check for the existence of Secrets with tokens, Mondoo service accounts, and private image pull secrets without asking for permission to read all Secrets
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get
-//+kubebuilder:rbac:groups=cert-manager.io,resources=certificates;issuers,verbs=get;list;watch;create;update;patch;delete
+// Need to be able to manage ServiceAccounts for external cluster workload identity federation
+//+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;delete
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
-//The last line is required as we cant assign higher permissions that exist for operator serviceaccount
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -151,19 +147,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
 		// deleted should be called here
 
-		webhooks := admission.DeploymentHandler{
-			Mondoo:                 mondooAuditConfig,
-			KubeClient:             r.Client,
-			TargetNamespace:        req.Namespace,
-			MondooOperatorConfig:   config,
-			ContainerImageResolver: imageResolver,
-		}
-		result, reconcileError := webhooks.Reconcile(ctx)
-		if reconcileError != nil {
-			log.Error(reconcileError, "failed to cleanup webhooks")
-			return result, reconcileError
-		}
-
 		controllerutil.RemoveFinalizer(mondooAuditConfig, finalizerString)
 		if reconcileError = r.Update(ctx, mondooAuditConfig); reconcileError != nil {
 			log.Error(reconcileError, "failed to remove finalizer")
@@ -178,6 +161,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			return ctrl.Result{}, reconcileError
 		}
 	}
+
+	// Cleanup orphaned resources from previous versions
+	r.cleanupOrphanedAdmissionResources(ctx, mondooAuditConfig)
+	r.cleanupOrphanedScanAPIResources(ctx, mondooAuditConfig)
 
 	// Set the default cron tab if none is set
 	shouldUpdate := false
@@ -201,8 +188,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if shouldUpdate {
 		err := r.Update(ctx, mondooAuditConfig)
 		if err != nil {
-			log.Error(reconcileError, "failed to update MondooAuditConfig with default schedule")
-			return ctrl.Result{}, reconcileError
+			log.Error(err, "failed to update MondooAuditConfig with default schedule")
+			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
 	}
@@ -211,9 +198,11 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	// Conditions might be updated before this reconciler reaches the end
 	// MondooAuditConfig has to include these updates in any case.
+	// Capture context for use in defer - using parent context ensures operations
+	// respect cancellation signals instead of running indefinitely
+	deferCtx := ctx
 	defer func() {
 		var deferFuncErr error
-		ctx := context.Background()
 		// Update the mondoo status with the pod names only after all pod creation actions are done
 		// List the pods for this mondoo's cronjobs and deployment
 		podList := &corev1.PodList{}
@@ -221,7 +210,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			client.InNamespace(mondooAuditConfig.Namespace),
 			client.MatchingLabels(labelsForMondoo(mondooAuditConfig.Name)),
 		}
-		if deferFuncErr = r.List(ctx, podList, listOpts...); deferFuncErr != nil {
+		if deferFuncErr = r.List(deferCtx, podList, listOpts...); deferFuncErr != nil {
 			log.Error(deferFuncErr, "Failed to list pods", "Mondoo.Namespace", mondooAuditConfig.Namespace, "Mondoo.Name", mondooAuditConfig.Name)
 		} else {
 			podListNames := getPodNames(podList.Items)
@@ -234,7 +223,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			}
 		}
 
-		deferFuncErr = mondoo.UpdateMondooAuditStatus(ctx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log)
+		deferFuncErr = mondoo.UpdateMondooAuditStatus(deferCtx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log)
 		// do not overwrite errors which happened before the defered function is called
 		// but in case an error happend in the defered func, also overwrite the reconcileResult
 		if reconcileError == nil && deferFuncErr != nil {
@@ -251,21 +240,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, reconcileError
 	}
 
-	scanapi := scanapi.DeploymentHandler{
-		Mondoo:                 mondooAuditConfig,
-		KubeClient:             r.Client,
-		MondooOperatorConfig:   config,
-		ContainerImageResolver: imageResolver,
-		DeployOnOpenShift:      r.RunningOnOpenShift,
-	}
-	result, reconcileError := scanapi.Reconcile(ctx)
-	if reconcileError != nil {
-		log.Error(reconcileError, "Failed to set up scan API")
-	}
-	if reconcileError != nil || result.RequeueAfter > 0 {
-		return result, reconcileError
-	}
-
 	nodes := nodes.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
@@ -274,7 +248,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		IsOpenshift:            r.RunningOnOpenShift,
 	}
 
-	result, reconcileError = nodes.Reconcile(ctx)
+	result, reconcileError := nodes.Reconcile(ctx)
 	if reconcileError != nil {
 		log.Error(reconcileError, "Failed to set up nodes scanning")
 	}
@@ -302,7 +276,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: imageResolver,
-		ScanApiStore:           r.ScanApiStore,
+		// ScanApiStore:           r.ScanApiStore,
 	}
 
 	result, reconcileError = workloads.Reconcile(ctx)
@@ -313,17 +287,16 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return result, reconcileError
 	}
 
-	webhooks := admission.DeploymentHandler{
+	resourceWatcher := resourcewatcher.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
-		TargetNamespace:        req.Namespace,
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: imageResolver,
 	}
 
-	result, reconcileError = webhooks.Reconcile(ctx)
+	result, reconcileError = resourceWatcher.Reconcile(ctx)
 	if reconcileError != nil {
-		log.Error(reconcileError, "Failed to set up webhooks")
+		log.Error(reconcileError, "Failed to set up resource watcher")
 	}
 	if reconcileError != nil || result.RequeueAfter > 0 {
 		return result, reconcileError
@@ -533,4 +506,93 @@ func getPodNames(pods []corev1.Pod) sets.Set[string] {
 		podNames = append(podNames, pod.Name)
 	}
 	return sets.New(podNames...)
+}
+
+// cleanupOrphanedAdmissionResources removes leftover admission resources from previous versions
+func (r *MondooAuditConfigReconciler) cleanupOrphanedAdmissionResources(ctx context.Context, m *v1alpha2.MondooAuditConfig) {
+	log := ctrllog.FromContext(ctx)
+
+	// Only run cleanup if admission was configured
+	if m.Spec.Admission == nil {
+		return
+	}
+
+	log.Info("WARNING: admission configuration is deprecated and ignored. Cleaning up orphaned resources.",
+		"migration", "see docs/admission-migration-guide.md")
+
+	// Note: ValidatingWebhookConfiguration cleanup is skipped as it requires cluster-scoped permissions
+	// Users should manually delete any orphaned ValidatingWebhookConfiguration resources
+
+	// Cleanup webhook deployment
+	deploymentName := fmt.Sprintf("%s-webhook-manager", m.Name)
+	deployment := &appsv1.Deployment{}
+	if err := r.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: m.Namespace}, deployment); err == nil {
+		if err := r.Delete(ctx, deployment); err != nil {
+			log.V(1).Info("Failed to delete orphaned webhook deployment", "name", deploymentName, "error", err)
+		} else {
+			log.Info("Cleaned up orphaned webhook deployment", "name", deploymentName)
+		}
+	}
+
+	// Cleanup webhook service
+	serviceName := fmt.Sprintf("%s-webhook-service", m.Name)
+	service := &corev1.Service{}
+	if err := r.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: m.Namespace}, service); err == nil {
+		if err := r.Delete(ctx, service); err != nil {
+			log.V(1).Info("Failed to delete orphaned webhook service", "name", serviceName, "error", err)
+		} else {
+			log.Info("Cleaned up orphaned webhook service", "name", serviceName)
+		}
+	}
+
+	// Cleanup webhook TLS secret
+	secretName := fmt.Sprintf("%s-webhook-server-cert", m.Name)
+	secret := &corev1.Secret{}
+	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: m.Namespace}, secret); err == nil {
+		if err := r.Delete(ctx, secret); err != nil {
+			log.V(1).Info("Failed to delete orphaned webhook secret", "name", secretName, "error", err)
+		} else {
+			log.Info("Cleaned up orphaned webhook secret", "name", secretName)
+		}
+	}
+}
+
+// cleanupOrphanedScanAPIResources removes leftover ScanAPI resources from previous versions.
+// The ScanAPI was removed in favor of direct CronJob-based scanning.
+func (r *MondooAuditConfigReconciler) cleanupOrphanedScanAPIResources(ctx context.Context, m *v1alpha2.MondooAuditConfig) {
+	log := ctrllog.FromContext(ctx)
+
+	// Cleanup ScanAPI deployment
+	deploymentName := fmt.Sprintf("%s-scan-api", m.Name)
+	deployment := &appsv1.Deployment{}
+	if err := r.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: m.Namespace}, deployment); err == nil {
+		log.Info("Cleaning up orphaned ScanAPI resources from previous operator version")
+		if err := r.Delete(ctx, deployment); err != nil {
+			log.V(1).Info("Failed to delete orphaned ScanAPI deployment", "name", deploymentName, "error", err)
+		} else {
+			log.Info("Cleaned up orphaned ScanAPI deployment", "name", deploymentName)
+		}
+	}
+
+	// Cleanup ScanAPI service
+	serviceName := fmt.Sprintf("%s-scan-api", m.Name)
+	service := &corev1.Service{}
+	if err := r.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: m.Namespace}, service); err == nil {
+		if err := r.Delete(ctx, service); err != nil {
+			log.V(1).Info("Failed to delete orphaned ScanAPI service", "name", serviceName, "error", err)
+		} else {
+			log.Info("Cleaned up orphaned ScanAPI service", "name", serviceName)
+		}
+	}
+
+	// Cleanup ScanAPI token secret
+	secretName := fmt.Sprintf("%s-scan-api-token", m.Name)
+	secret := &corev1.Secret{}
+	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: m.Namespace}, secret); err == nil {
+		if err := r.Delete(ctx, secret); err != nil {
+			log.V(1).Info("Failed to delete orphaned ScanAPI secret", "name", secretName, "error", err)
+		} else {
+			log.Info("Cleaned up orphaned ScanAPI secret", "name", secretName)
+		}
+	}
 }

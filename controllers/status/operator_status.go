@@ -1,4 +1,4 @@
-// Copyright (c) Mondoo, Inc.
+// Copyright Mondoo, Inc. 2026
 // SPDX-License-Identifier: BUSL-1.1
 
 package status
@@ -20,8 +20,6 @@ const (
 	K8sResourcesScanningIdentifier   = "k8s-resources-scanning"
 	ContainerImageScanningIdentifier = "container-image-scanning"
 	NodeScanningIdentifier           = "node-scanning"
-	AdmissionControllerIdentifier    = "admission-controller"
-	ScanApiIdentifier                = "scan-api"
 	NamespaceFilteringIdentifier     = "namespace-filtering"
 	MondooOperatorIdentifier         = "mondoo-operator"
 	noStatusMessage                  = "No status reported yet"
@@ -35,7 +33,6 @@ type OperatorCustomState struct {
 	K8sResourcesScanning   bool
 	ContainerImageScanning bool
 	NodeScanning           bool
-	AdmissionController    bool
 	FilteringConfig        v1alpha2.Filtering
 }
 
@@ -52,7 +49,7 @@ func ReportStatusRequestFromAuditConfig(
 		nodeNames[i] = nodes[i].Name
 	}
 
-	messages := make([]mondooclient.IntegrationMessage, 6)
+	messages := make([]mondooclient.IntegrationMessage, 4)
 
 	// Kubernetes resources scanning status
 	messages[0].Identifier = K8sResourcesScanningIdentifier
@@ -135,78 +132,25 @@ func ReportStatusRequestFromAuditConfig(
 		messages[2].Message = "Node scanning is disabled"
 	}
 
-	// Admission controller status
-	messages[3].Identifier = AdmissionControllerIdentifier
-	if m.Spec.Admission.Enable {
-		admissionControllerScanning := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.AdmissionDegraded)
-		if admissionControllerScanning != nil {
-			if admissionControllerScanning.Status == v1.ConditionTrue {
-				messages[3].Status = mondooclient.MessageStatus_MESSAGE_ERROR
-				extraStruct, err := createOOMExtraInformation(admissionControllerScanning.Message, admissionControllerScanning.AffectedPods, admissionControllerScanning.MemoryLimit)
-				if err != nil {
-					log.Error(err, "Failed to create extra information for Admission Controller on OOM error")
-				}
-				if extraStruct != nil {
-					messages[3].Extra = extraStruct
-				}
-			} else {
-				messages[3].Status = mondooclient.MessageStatus_MESSAGE_INFO
-			}
-			messages[3].Message = admissionControllerScanning.Message
-		} else {
-			messages[3].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
-			messages[3].Message = noStatusMessage
-		}
-	} else {
-		messages[3].Status = mondooclient.MessageStatus_MESSAGE_INFO
-		messages[3].Message = "Admission controller is disabled"
-	}
-
-	messages[4].Identifier = ScanApiIdentifier
-	if m.Spec.Admission.Enable || m.Spec.KubernetesResources.Enable {
-		scanApi := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.ScanAPIDegraded)
-		if scanApi != nil {
-			if scanApi.Status == v1.ConditionTrue {
-				messages[4].Status = mondooclient.MessageStatus_MESSAGE_ERROR
-				extraStruct, err := createOOMExtraInformation(scanApi.Message, scanApi.AffectedPods, scanApi.MemoryLimit)
-				if err != nil {
-					log.Error(err, "Failed to create extra information for Scan API on OOM error")
-				}
-				if extraStruct != nil {
-					messages[4].Extra = extraStruct
-				}
-			} else {
-				messages[4].Status = mondooclient.MessageStatus_MESSAGE_INFO
-			}
-			messages[4].Message = scanApi.Message
-		} else {
-			messages[4].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
-			messages[4].Message = noStatusMessage
-		}
-	} else {
-		messages[4].Status = mondooclient.MessageStatus_MESSAGE_INFO
-		messages[4].Message = "Scan API is disabled"
-	}
-
-	messages[5].Identifier = MondooOperatorIdentifier
+	messages[3].Identifier = MondooOperatorIdentifier
 	mondooOperator := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.MondooOperatorDegraded)
 	if mondooOperator != nil {
 		if mondooOperator.Status == v1.ConditionTrue {
-			messages[5].Status = mondooclient.MessageStatus_MESSAGE_ERROR
+			messages[3].Status = mondooclient.MessageStatus_MESSAGE_ERROR
 			extraStruct, err := createOOMExtraInformation(mondooOperator.Message, mondooOperator.AffectedPods, mondooOperator.MemoryLimit)
 			if err != nil {
-				log.Error(err, "Failed to create extra information for Scan API on OOM error")
+				log.Error(err, "Failed to create extra information for Mondoo Operator on OOM error")
 			}
 			if extraStruct != nil {
-				messages[5].Extra = extraStruct
+				messages[3].Extra = extraStruct
 			}
 		} else {
-			messages[5].Status = mondooclient.MessageStatus_MESSAGE_INFO
+			messages[3].Status = mondooclient.MessageStatus_MESSAGE_INFO
 		}
-		messages[5].Message = mondooOperator.Message
+		messages[3].Message = mondooOperator.Message
 	} else {
-		messages[5].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
-		messages[5].Message = noStatusMessage
+		messages[3].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
+		messages[3].Message = noStatusMessage
 	}
 
 	// If there were any error messages, the overall status is error
@@ -229,7 +173,6 @@ func ReportStatusRequestFromAuditConfig(
 			K8sResourcesScanning:   m.Spec.KubernetesResources.Enable,
 			ContainerImageScanning: m.Spec.Containers.Enable || m.Spec.KubernetesResources.ContainerImageScanning,
 			NodeScanning:           m.Spec.Nodes.Enable,
-			AdmissionController:    m.Spec.Admission.Enable,
 			FilteringConfig:        m.Spec.Filtering,
 		},
 		Messages: mondooclient.Messages{Messages: messages},

@@ -1,4 +1,4 @@
-// Copyright (c) Mondoo, Inc.
+// Copyright Mondoo, Inc. 2026
 // SPDX-License-Identifier: BUSL-1.1
 
 package controllers
@@ -30,7 +30,6 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/container_image"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
-	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
 	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	mockmondoo "go.mondoo.com/mondoo-operator/pkg/client/mondooclient/mock"
@@ -252,16 +251,6 @@ func TestTokenRegistration(t *testing.T) {
 								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 							},
 							{
-								Message:    "Admission controller is disabled",
-								Identifier: status.AdmissionControllerIdentifier,
-								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-							},
-							{
-								Message:    "Scan API is disabled",
-								Identifier: status.ScanApiIdentifier,
-								Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-							},
-							{
 								Message:    "No status reported yet",
 								Identifier: status.MondooOperatorIdentifier,
 								Status:     mondooclient.MessageStatus_MESSAGE_UNKNOWN,
@@ -324,13 +313,10 @@ func TestTokenRegistration(t *testing.T) {
 				WithObjects(test.existingObjects...).
 				Build()
 
-			scanApiStore := scan_api_store.NewScanApiStore(context.Background())
-			go scanApiStore.Start()
 			reconciler := &MondooAuditConfigReconciler{
 				MondooClientBuilder: testMondooClientBuilder,
 				Client:              fakeClient,
 				StatusReporter:      status.NewStatusReporter(fakeClient, testMondooClientBuilder, k8sVersion),
-				ScanApiStore:        scanApiStore,
 			}
 
 			// Act
@@ -381,12 +367,9 @@ func TestMondooAuditConfigStatus(t *testing.T) {
 		WithObjects(mondooAuditConfig, testToken).
 		Build()
 
-	scanApiStore := scan_api_store.NewScanApiStore(context.Background())
-	go scanApiStore.Start()
 	reconciler := &MondooAuditConfigReconciler{
 		MondooClientBuilder: testMondooClientBuilder,
 		Client:              fakeClient,
-		ScanApiStore:        scanApiStore,
 	}
 
 	_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{
@@ -427,12 +410,9 @@ func TestMondooAuditConfig_Nodes_Schedule(t *testing.T) {
 		Build()
 
 	ctx := context.Background()
-	scanApiStore := scan_api_store.NewScanApiStore(ctx)
-	go scanApiStore.Start()
 	reconciler := &MondooAuditConfigReconciler{
 		MondooClientBuilder: testMondooClientBuilder,
 		Client:              fakeClient,
-		ScanApiStore:        scanApiStore,
 	}
 
 	_, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -471,12 +451,9 @@ func TestMondooAuditConfig_KubernetesResources_Schedule(t *testing.T) {
 		Build()
 
 	ctx := context.Background()
-	scanApiStore := scan_api_store.NewScanApiStore(ctx)
-	go scanApiStore.Start()
 	reconciler := &MondooAuditConfigReconciler{
 		MondooClientBuilder: testMondooClientBuilder,
 		Client:              fakeClient,
-		ScanApiStore:        scanApiStore,
 	}
 
 	_, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -515,12 +492,9 @@ func TestMondooAuditConfig_Containers_Schedule(t *testing.T) {
 		Build()
 
 	ctx := context.Background()
-	scanApiStore := scan_api_store.NewScanApiStore(ctx)
-	go scanApiStore.Start()
 	reconciler := &MondooAuditConfigReconciler{
 		MondooClientBuilder: testMondooClientBuilder,
 		Client:              fakeClient,
-		ScanApiStore:        scanApiStore,
 	}
 
 	_, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -560,12 +534,9 @@ func TestMondooAuditConfig_Containers_Enable(t *testing.T) {
 		Build()
 
 	ctx := context.Background()
-	scanApiStore := scan_api_store.NewScanApiStore(ctx)
-	go scanApiStore.Start()
 	reconciler := &MondooAuditConfigReconciler{
 		MondooClientBuilder: testMondooClientBuilder,
 		Client:              fakeClient,
-		ScanApiStore:        scanApiStore,
 	}
 
 	_, err := reconciler.Reconcile(ctx, reconcile.Request{

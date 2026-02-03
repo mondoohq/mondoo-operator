@@ -44,7 +44,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
@@ -62,7 +62,7 @@ jobs:
       # Login against a Docker registry except on PR
       # https://github.com/docker/login-action
       - name: Log into registry ${{ env.REGISTRY }}
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -115,6 +115,14 @@ jobs:
       - name: Build binaries
         run: VERSION=${{ steps.meta_clean.outputs.version }} TARGET_OS=${{ matrix.os }} TARGET_ARCH=${{ matrix.arch }} make build
 
+      # Set up QEMU for cross-platform builds
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
+      # Set up Docker Buildx for multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
       # Build and push Docker image with Buildx
       # https://github.com/docker/build-push-action
       - name: Build and push operator image
@@ -126,8 +134,12 @@ jobs:
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
+          # Disable provenance attestations to produce single-platform images
+          # instead of manifest lists. Required for docker manifest create to work.
+          provenance: false
 
       - name: Scan Image
+        if: matrix.arch == 'amd64'
         uses: mondoohq/actions/docker-image@main
         env:
           MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
@@ -159,7 +171,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
@@ -169,7 +181,7 @@ jobs:
       # Login against a Docker registry except on PR
       # https://github.com/docker/login-action
       - name: Log into registry ${{ env.REGISTRY }}
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -237,7 +249,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
@@ -256,14 +268,14 @@ jobs:
           kubernetes-version: ${{ matrix.k8s-version }}
 
       - name: Install Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
         id: install
 
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
@@ -281,14 +293,14 @@ jobs:
           MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
         run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.meta.outputs.version }} make test/integration/ci
 
-      - uses: actions/upload-artifact@v6  # upload test results
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: success() || failure()        # run this step even if previous step failed
         with:                             # upload a combined archive with unit and integration test results
           name: test-results-helm-${{ matrix.k8s-version }}
           path: integration-tests-helm-${{ matrix.k8s-version }}.xml
 
       - name: Upload test logs artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: failure()
         with:
           name: helm-test-logs-${{ matrix.k8s-version }}
@@ -331,7 +343,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 

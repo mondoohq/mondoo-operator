@@ -1,2 +1,11 @@
+bak
+curlimages
+deepcopy
+deletecollection
 fullname
 openssl
+selfsigned
+servicemonitors
+spiffe
+SVIDs
+tekton

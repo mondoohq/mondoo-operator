@@ -1,4 +1,4 @@
-// Copyright (c) Mondoo, Inc.
+// Copyright Mondoo, Inc. 2026
 // SPDX-License-Identifier: BUSL-1.1
 
 package mondooclient
@@ -19,6 +19,7 @@ const (
 	IntegrationRegisterEndpoint       = "/IntegrationsManager/Register"
 	IntegrationCheckInEndpoint        = "/IntegrationsManager/CheckIn"
 	IntegrationReportStatusEndpoint   = "/IntegrationsManager/ReportStatus"
+	GarbageCollectAssetsEndpoint      = "/Scan/GarbageCollectAssets"
 )
 
 type MondooClientOptions struct {
@@ -143,6 +144,22 @@ func (s *mondooClient) IntegrationReportStatus(ctx context.Context, in *ReportSt
 	_, err = common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
 	if err != nil {
 		return fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	return nil
+}
+
+func (s *mondooClient) GarbageCollectAssets(ctx context.Context, opts *GarbageCollectOptions) error {
+	url := s.ApiEndpoint + GarbageCollectAssetsEndpoint
+
+	reqBodyBytes, err := json.Marshal(opts)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	_, err = common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
+	if err != nil {
+		return fmt.Errorf("failed to make garbage collect request: %v", err)
 	}
 
 	return nil

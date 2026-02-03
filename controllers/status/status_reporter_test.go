@@ -1,4 +1,4 @@
-// Copyright (c) Mondoo, Inc.
+// Copyright Mondoo, Inc. 2026
 // SPDX-License-Identifier: BUSL-1.1
 
 package status
@@ -44,7 +44,7 @@ func (s *StatusReporterSuite) SetupSuite() {
 }
 
 func (s *StatusReporterSuite) BeforeTest(suiteName, testName string) {
-	s.auditConfig = utils.DefaultAuditConfig(testNamespace, false, false, false, false)
+	s.auditConfig = utils.DefaultAuditConfig(testNamespace, false, false, false)
 	s.auditConfig.Spec.ConsoleIntegration.Enable = true
 
 	key := credentials.MondooServiceAccount(s.T())
@@ -101,16 +101,6 @@ func (s *StatusReporterSuite) TestReport() {
 					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 				},
 				{
-					Message:    "Admission controller is disabled",
-					Identifier: AdmissionControllerIdentifier,
-					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-				},
-				{
-					Message:    "Scan API is disabled",
-					Identifier: ScanApiIdentifier,
-					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-				},
-				{
 					Message:    "No status reported yet",
 					Identifier: MondooOperatorIdentifier,
 					Status:     mondooclient.MessageStatus_MESSAGE_UNKNOWN,
@@ -125,7 +115,6 @@ func (s *StatusReporterSuite) TestReport() {
 			K8sResourcesScanning:   s.auditConfig.Spec.KubernetesResources.Enable,
 			ContainerImageScanning: s.auditConfig.Spec.KubernetesResources.ContainerImageScanning,
 			NodeScanning:           s.auditConfig.Spec.Nodes.Enable,
-			AdmissionController:    s.auditConfig.Spec.Admission.Enable,
 		},
 	}).Times(1).Return(nil)
 
@@ -152,7 +141,6 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 		K8sResourcesScanning:   s.auditConfig.Spec.KubernetesResources.Enable,
 		ContainerImageScanning: s.auditConfig.Spec.KubernetesResources.ContainerImageScanning,
 		NodeScanning:           s.auditConfig.Spec.Nodes.Enable,
-		AdmissionController:    s.auditConfig.Spec.Admission.Enable,
 	}
 	expected := &mondooclient.ReportStatusRequest{
 		Mrn:    testIntegrationMrn,
@@ -172,16 +160,6 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 				{
 					Message:    "Node scanning is disabled",
 					Identifier: NodeScanningIdentifier,
-					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-				},
-				{
-					Message:    "Admission controller is disabled",
-					Identifier: AdmissionControllerIdentifier,
-					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
-				},
-				{
-					Message:    "Scan API is disabled",
-					Identifier: ScanApiIdentifier,
 					Status:     mondooclient.MessageStatus_MESSAGE_INFO,
 				},
 				{

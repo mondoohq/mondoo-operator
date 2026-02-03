@@ -1,4 +1,4 @@
-// Copyright (c) Mondoo, Inc.
+// Copyright Mondoo, Inc. 2026
 // SPDX-License-Identifier: BUSL-1.1
 
 package nodes
@@ -50,7 +50,7 @@ func (s *DeploymentHandlerSuite) SetupSuite() {
 }
 
 func (s *DeploymentHandlerSuite) BeforeTest(suiteName, testName string) {
-	s.auditConfig = utils.DefaultAuditConfig(testNamespace, false, false, true, false)
+	s.auditConfig = utils.DefaultAuditConfig(testNamespace, false, false, true)
 	s.fakeClientBuilder = fake.NewClientBuilder()
 	s.seedKubeSystemNamespace()
 }
@@ -248,16 +248,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 	}
 
-	operatorImage, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
-	s.NoError(err)
-
-	// Verify node garbage collection cronjob
+	// Verify node garbage collection cronjob does not exist (removed in simplification)
 	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
-
-	gcCjExpected := gcCj.DeepCopy()
-	UpdateGarbageCollectCronJob(gcCjExpected, operatorImage, "abcdefg", s.auditConfig)
-	s.True(equality.Semantic.DeepEqual(gcCjExpected, gcCj))
+	s.Error(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_CustomEnvVars() {
@@ -290,16 +283,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_CustomEnvVars() {
 		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
 	}
 
-	operatorImage, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
-	s.NoError(err)
-
-	// Verify node garbage collection cronjob
+	// Verify node garbage collection cronjob does not exist (removed in simplification)
 	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
-
-	gcCjExpected := gcCj.DeepCopy()
-	UpdateGarbageCollectCronJob(gcCjExpected, operatorImage, "abcdefg", s.auditConfig)
-	s.True(equality.Semantic.DeepEqual(gcCjExpected, gcCj))
+	s.Error(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_Switch() {
@@ -345,16 +331,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_Switch() {
 
 	s.Empty(cronjobs.Items)
 
-	operatorImage, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
-	s.NoError(err)
-
-	// Verify node garbage collection cronjob
+	// Verify node garbage collection cronjob does not exist (removed in simplification)
 	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
-
-	gcCjExpected := gcCj.DeepCopy()
-	UpdateGarbageCollectCronJob(gcCjExpected, operatorImage, "abcdefg", s.auditConfig)
-	s.True(equality.Semantic.DeepEqual(gcCjExpected, gcCj))
+	s.Error(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
@@ -468,16 +447,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets() {
 	utils.SortEnvVars(ds.Spec.Template.Spec.Containers[0].Env)
 	s.True(equality.Semantic.DeepEqual(dsExpected, ds))
 
-	operatorImage, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
-	s.NoError(err)
-
-	// Verify node garbage collection cronjob
+	// Verify node garbage collection cronjob does not exist (removed in simplification)
 	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
-
-	gcCjExpected := gcCj.DeepCopy()
-	UpdateGarbageCollectCronJob(gcCjExpected, operatorImage, "abcdefg", s.auditConfig)
-	s.True(equality.Semantic.DeepEqual(gcCjExpected, gcCj))
+	s.Error(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_Switch() {
@@ -520,16 +492,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_Switch() {
 
 	s.Empty(deployments.Items)
 
-	operatorImage, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", false)
-	s.NoError(err)
-
-	// Verify node garbage collection cronjob
+	// Verify node garbage collection cronjob does not exist (removed in simplification)
 	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
-	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
-
-	gcCjExpected := gcCj.DeepCopy()
-	UpdateGarbageCollectCronJob(gcCjExpected, operatorImage, "abcdefg", s.auditConfig)
-	s.True(equality.Semantic.DeepEqual(gcCjExpected, gcCj))
+	s.Error(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_UpdateDaemonSets() {

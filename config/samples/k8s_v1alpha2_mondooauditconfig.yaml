@@ -1,48 +1,175 @@
 # Copyright (c) Mondoo, Inc.
 # SPDX-License-Identifier: BUSL-1.1
 
+# Full example with all available options
 apiVersion: k8s.mondoo.com/v1alpha2
 kind: MondooAuditConfig
 metadata:
   name: mondoo-client
   namespace: mondoo-operator
 spec:
-  mondooTokenSecretRef:
-    name: mondoo-token
-  mondooCredsSecretRef: 
+  # Required: Reference to secret containing Mondoo service account credentials
+  mondooCredsSecretRef:
     name: mondoo-client
+
+  # Optional: Reference to secret containing a Mondoo registration token
+  # If provided and mondooCredsSecretRef secret doesn't exist, the operator
+  # will exchange this token for a service account
+  # mondooTokenSecretRef:
+  #   name: mondoo-token
+
+  # Scanner settings (applies to K8s resources and container scanning)
   scanner:
-    serviceAccountName: mondoo-client
+    serviceAccountName: mondoo-operator-k8s-resources-scanning
     image:
-      name: docker.io/mondoo/client
+      name: ghcr.io/mondoohq/mondoo-operator
       tag: latest
     resources:
       requests:
+        cpu: 100m
+        memory: 100Mi
       limits:
+        cpu: 500m
+        memory: 500Mi
+    # For private registries - single secret
+    # privateRegistriesPullSecretRef:
+    #   name: mondoo-private-registries-secrets
+    #
+    # For multiple private registry secrets (e.g., managed by different teams)
+    # privateRegistriesPullSecretRefs:
+    #   - name: team-a-registry-creds
+    #   - name: team-b-registry-creds
+
+  # Kubernetes resources scanning (RBAC, workloads, etc.)
   kubernetesResources:
     enable: true
+    # Cron schedule (default: random minute each hour)
+    # schedule: "0 * * * *"
+
+    # Real-time resource watching (alternative to CronJob scheduling)
+    # When enabled, resources are scanned immediately when they change
+    # resourceWatcher:
+    #   enable: true
+    #   # How long to batch changes before triggering a scan (default: 10s)
+    #   debounceInterval: 10s
+    #   # Minimum time between scans - rate limit (default: 2m)
+    #   minimumScanInterval: 2m
+    #   # Watch all resources including ephemeral ones like Pods (default: false)
+    #   # When false, only watches: Deployments, DaemonSets, StatefulSets, ReplicaSets
+    #   watchAllResources: false
+    #   # Custom list of resource types to watch (optional)
+    #   # resourceTypes:
+    #   #   - deployments
+    #   #   - daemonsets
+
+    # External clusters to scan from this operator instance
+    # Four authentication methods are available (mutually exclusive):
+    #
+    # 1. Kubeconfig (most flexible, works with any cluster):
+    # externalClusters:
+    #   - name: production
+    #     kubeconfigSecretRef:
+    #       name: prod-kubeconfig
+    #     # Optional: override schedule for this cluster
+    #     # schedule: "0 */2 * * *"
+    #     # Optional: cluster-specific filtering
+    #     # filtering:
+    #     #   namespaces:
+    #     #     exclude:
+    #     #       - kube-system
+    #
+    # 2. Service Account Token (simpler alternative):
+    # externalClusters:
+    #   - name: production
+    #     serviceAccountAuth:
+    #       server: "https://prod-cluster.example.com:6443"
+    #       credentialsSecretRef:
+    #         name: prod-sa-credentials  # Secret with "token" and "ca.crt" keys
+    #       # skipTLSVerify: false  # NOT recommended for production
+    #
+    # 3. Workload Identity Federation (cloud-native, no static credentials):
+    # GKE example:
+    # externalClusters:
+    #   - name: gke-prod
+    #     workloadIdentity:
+    #       provider: gke
+    #       gke:
+    #         projectId: my-gcp-project
+    #         clusterName: production-cluster
+    #         clusterLocation: us-central1-a
+    #         googleServiceAccount: mondoo-scanner@my-gcp-project.iam.gserviceaccount.com
+    #
+    # EKS example:
+    # externalClusters:
+    #   - name: eks-prod
+    #     workloadIdentity:
+    #       provider: eks
+    #       eks:
+    #         region: us-west-2
+    #         clusterName: production-cluster
+    #         roleArn: arn:aws:iam::123456789012:role/MondooScannerRole
+    #
+    # AKS example:
+    # externalClusters:
+    #   - name: aks-prod
+    #     workloadIdentity:
+    #       provider: aks
+    #       aks:
+    #         subscriptionId: 12345678-1234-1234-1234-123456789012
+    #         resourceGroup: my-resource-group
+    #         clusterName: production-cluster
+    #         clientId: abcdef12-3456-7890-abcd-ef1234567890
+    #         tenantId: fedcba98-7654-3210-fedc-ba9876543210
+    #
+    # 4. SPIFFE/SPIRE (zero-trust, auto-rotating X.509 certificates):
+    # externalClusters:
+    #   - name: spiffe-cluster
+    #     spiffeAuth:
+    #       server: "https://remote-cluster.example.com:6443"
+    #       trustBundleSecretRef:
+    #         name: remote-cluster-ca  # Secret with "ca.crt" key
+    #       # Optional: custom socket path (default: /run/spire/sockets/agent.sock)
+    #       # socketPath: "/run/spire/sockets/agent.sock"
+    #       # Optional: audience for SVID
+    #       # audience: "k8s-api"
+
+  # Container image scanning
   containers:
     enable: true
+    # Cron schedule (default: daily)
+    # schedule: "0 0 * * *"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+      limits:
+        cpu: 500m
+        memory: 500Mi
+
+  # Node scanning
   nodes:
     enable: true
-  admission:
-    enable: true
-    certificateProvisioning:
-    # Could be "cert-manager", "openshift" or "manual"
-      mode: cert-manager
-    image:
-      name: ghcr.io/mondoo/mondoo-operator
-      tag: latest
-    # could be "permissive" or "enforcing"
-    mode: permissive
+    # Style: cronjob (default), deployment, or daemonset
+    style: cronjob
+    # Cron schedule (only for cronjob style)
+    # schedule: "0 * * * *"
+    # Interval in minutes (only for deployment style)
+    # intervalTimer: 60
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+      limits:
+        cpu: 500m
+        memory: 500Mi
+
+  # Namespace filtering (applies to K8s resources and container scanning)
   filtering:
     namespaces:
-      include:
-        - default
-        - my-work*
-        - mondoo-operator
-      # Specifying both include and exclude results in the exclude
-      # list being ignored, as the include list is effectively the
-      # same as exclude ALL except for the include list.
+      # Exclude specific namespaces
       exclude:
         - kube-system
+      # Or include only specific namespaces (overrides exclude)
+      # include:
+      #   - default
+      #   - production

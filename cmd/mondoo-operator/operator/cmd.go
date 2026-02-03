@@ -1,4 +1,4 @@
-// Copyright (c) Mondoo, Inc.
+// Copyright Mondoo, Inc. 2026
 // SPDX-License-Identifier: BUSL-1.1
 
 package operator
@@ -34,14 +34,11 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers"
 	"go.mondoo.com/mondoo-operator/controllers/integration"
 	"go.mondoo.com/mondoo-operator/controllers/metrics"
-	"go.mondoo.com/mondoo-operator/controllers/resource_monitor"
-	"go.mondoo.com/mondoo-operator/controllers/resource_monitor/scan_api_store"
 	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -73,7 +70,6 @@ func init() {
 		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 			Scheme:                 scheme,
 			Metrics:                metricsserver.Options{BindAddress: *metricsAddr},
-			WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}),
 			HealthProbeBindAddress: *probeAddr,
 			LeaderElection:         *enableLeaderElection,
 			LeaderElectionID:       "60679458.mondoo.com",
@@ -119,15 +115,12 @@ func init() {
 
 		ctx := ctrl.SetupSignalHandler()
 
-		scanApiStore := scan_api_store.NewScanApiStore(ctx)
-		go scanApiStore.Start()
 		if err = (&controllers.MondooAuditConfigReconciler{
 			Client:                 mgr.GetClient(),
 			MondooClientBuilder:    controllers.MondooClientBuilder,
 			ContainerImageResolver: mondoo.NewContainerImageResolver(mgr.GetClient(), isOpenShift),
 			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder, v),
 			RunningOnOpenShift:     isOpenShift,
-			ScanApiStore:           scanApiStore,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "MondooAuditConfig")
 			return err
@@ -159,11 +152,6 @@ func init() {
 		err = checkForTerminatedState(ctx, client, v, setupLog)
 		if err != nil {
 			setupLog.Error(err, "unable to check for terminated state of mondoo-operator-controller")
-		}
-
-		if err = resource_monitor.RegisterResourceMonitors(mgr, scanApiStore); err != nil {
-			setupLog.Error(err, "unable to register resource monitors", "controller", "resource_monitor")
-			return err
 		}
 
 		if err = integration.Add(mgr); err != nil {

@@ -1,4 +1,4 @@
-// Copyright (c) Mondoo, Inc.
+// Copyright Mondoo, Inc. 2026
 // SPDX-License-Identifier: BUSL-1.1
 
 package container_image
@@ -29,14 +29,13 @@ const (
 	InventoryConfigMapBase = "-containers-inventory"
 )
 
-func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
+func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(*m)
 
 	cmd := []string{
 		"cnspec", "scan", "k8s",
 		"--config", "/etc/opt/mondoo/config/mondoo.yml",
 		"--inventory-file", "/etc/opt/mondoo/config/inventory.yml",
-		"--score-threshold", "0",
 	}
 
 	// Only add proxy settings if SkipProxyForCnspec is false
@@ -78,6 +77,8 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: ls},
 				Spec: batchv1.JobSpec{
+					// Don't retry failed scans - re-running won't fix the issue
+					BackoffLimit: ptr.To(int32(0)),
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: ls},
 						Spec: corev1.PodSpec{
@@ -165,43 +166,8 @@ func CronJob(image, integrationMrn, clusterUid, privateImageScanningSecretName s
 		},
 	}
 
-	if privateImageScanningSecretName != "" {
-		// mount secret needed to pull images from private registries
-		cronjob.Spec.JobTemplate.Spec.Template.Spec.Volumes = append(cronjob.Spec.JobTemplate.Spec.Template.Spec.Volumes, corev1.Volume{
-			Name: "pull-secrets",
-			VolumeSource: corev1.VolumeSource{
-				Projected: &corev1.ProjectedVolumeSource{
-					Sources: []corev1.VolumeProjection{
-						{
-							Secret: &corev1.SecretProjection{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: privateImageScanningSecretName,
-								},
-								Items: []corev1.KeyToPath{
-									{
-										Key:  ".dockerconfigjson",
-										Path: "config.json",
-									},
-								},
-							},
-						},
-					},
-					DefaultMode: ptr.To(int32(0o440)),
-				},
-			},
-		})
-
-		cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts = append(cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
-			Name:      "pull-secrets",
-			ReadOnly:  true,
-			MountPath: "/etc/opt/mondoo/docker",
-		})
-
-		cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env = append(cronjob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
-			Name:  "DOCKER_CONFIG",
-			Value: "/etc/opt/mondoo/docker", // the client automatically adds '/config.json' to the path
-		})
-	}
+	// Add private registry secret if specified
+	k8s.AddPrivateRegistryPullSecretToSpec(&cronjob.Spec.JobTemplate.Spec.Template.Spec, privateRegistrySecretName)
 
 	// Add imagePullSecrets from MondooOperatorConfig
 	if len(cfg.Spec.ImagePullSecrets) > 0 {

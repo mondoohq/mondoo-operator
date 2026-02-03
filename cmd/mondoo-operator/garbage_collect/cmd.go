@@ -1,4 +1,4 @@
-// Copyright (c) Mondoo, Inc.
+// Copyright Mondoo, Inc. 2026
 // SPDX-License-Identifier: BUSL-1.1
 
 package garbage_collect
@@ -13,39 +13,31 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
-	"go.mondoo.com/cnspec/v12/policy/scan"
-	"go.mondoo.com/mondoo-operator/pkg/client/scanapiclient"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var Cmd = &cobra.Command{
 	Use:   "garbage-collect",
-	Short: "Triggers garbage collection based on provided critera.",
+	Short: "Triggers garbage collection based on provided criteria.",
 }
 
 func init() {
-	scanApiUrl := Cmd.Flags().String("scan-api-url", "", "The URL of the service to send scan requests to.")
-	tokenInput := Cmd.Flags().String("token", "", "The token to use when making requests to the scan API. Cannot be specified in combination with --token-file-path.")
-	tokenFilePath := Cmd.Flags().String("token-file-path", "", "Path to a file containing token to use when making requests to the scan API. Cannot be specified in combination with --token.")
-	timeout := Cmd.Flags().Int64("timeout", 0, "The timeout in minutes for the garbage collection request.")
-	filterPlatformRuntime := Cmd.Flags().String("filter-platform-runtime", "", "Cleanup assets by an asset's PlatformRuntime.")
-	filterManagedBy := Cmd.Flags().String("filter-managed-by", "", "Cleanup assets with matching ManagedBy field")
-	filterOlderThan := Cmd.Flags().String("filter-older-than", "", "Cleanup assets which have not been updated in over the time provided (eg 12m or 48h or anything time.ParseDuration() accepts)")
-	labelsInput := Cmd.Flags().StringSlice("labels", []string{}, "Cleanup assets with matching labels (eg --labels key1=value1,key2=value2)")
+	configPath := Cmd.Flags().String("config", "", "The path to the mondoo.yml config file containing service account credentials.")
+	timeout := Cmd.Flags().Int64("timeout", 5, "The timeout in minutes for the garbage collection request.")
+	filterPlatformRuntime := Cmd.Flags().String("filter-platform-runtime", "", "Cleanup assets by an asset's PlatformRuntime (k8s-cluster or docker-image).")
+	filterManagedBy := Cmd.Flags().String("filter-managed-by", "", "Cleanup assets with matching ManagedBy field.")
+	filterOlderThan := Cmd.Flags().String("filter-older-than", "", "Cleanup assets which have not been updated in over the time provided (eg 12m or 48h or anything time.ParseDuration() accepts).")
+	labelsInput := Cmd.Flags().StringSlice("labels", []string{}, "Cleanup assets with matching labels (eg --labels key1=value1,key2=value2).")
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(logger.NewLogger())
 		logger := log.Log.WithName("garbage-collect")
 
-		if *scanApiUrl == "" {
-			return fmt.Errorf("--scan-api-url must be provided")
-		}
-		if *tokenFilePath == "" && *tokenInput == "" {
-			return fmt.Errorf("either --token or --token-file-path must be provided")
-		}
-		if *tokenFilePath != "" && *tokenInput != "" {
-			return fmt.Errorf("only one of --token or --token-file-path must be provided")
+		if *configPath == "" {
+			return fmt.Errorf("--config must be provided")
 		}
 		if *timeout <= 0 {
 			return fmt.Errorf("--timeout must be greater than 0")
@@ -60,27 +52,36 @@ func init() {
 			labels[split[0]] = split[1]
 		}
 
-		token := *tokenInput
-		if *tokenFilePath != "" {
-			tokenBytes, err := os.ReadFile(*tokenFilePath)
-			if err != nil {
-				logger.Error(err, "failed to read in file with token content")
-				return err
-			}
-			token = strings.TrimSuffix(string(tokenBytes), "\n")
+		// Read the service account credentials from the config file
+		configData, err := os.ReadFile(*configPath)
+		if err != nil {
+			logger.Error(err, "failed to read config file")
+			return err
 		}
 
-		client, err := scanapiclient.NewClient(scanapiclient.ScanApiClientOptions{
-			ApiEndpoint: *scanApiUrl,
+		serviceAccount, err := mondoo.LoadServiceAccountFromFile(configData)
+		if err != nil {
+			logger.Error(err, "failed to parse service account from config file")
+			return err
+		}
+
+		token, err := mondoo.GenerateTokenFromServiceAccount(*serviceAccount, logger)
+		if err != nil {
+			logger.Error(err, "failed to generate token from service account")
+			return err
+		}
+
+		client, err := mondooclient.NewClient(mondooclient.MondooClientOptions{
+			ApiEndpoint: serviceAccount.ApiEndpoint,
 			Token:       token,
-			HttpTimeout: ptr.To(time.Duration((*timeout)) * time.Minute),
+			HttpTimeout: ptr.To(time.Duration(*timeout) * time.Minute),
 		})
 		if err != nil {
 			return err
 		}
 
 		logger.Info("triggering garbage collection")
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration((*timeout))*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*timeout)*time.Minute)
 		defer cancel()
 
 		if *filterManagedBy == "" && *filterOlderThan == "" && *filterPlatformRuntime == "" {
@@ -91,8 +92,8 @@ func init() {
 	}
 }
 
-func GarbageCollectCmd(ctx context.Context, client scanapiclient.ScanApiClient, platformRuntime, olderThan, managedBy string, labels map[string]string, logger logr.Logger) error {
-	gcOpts := &scan.GarbageCollectOptions{
+func GarbageCollectCmd(ctx context.Context, client mondooclient.MondooClient, platformRuntime, olderThan, managedBy string, labels map[string]string, logger logr.Logger) error {
+	gcOpts := &mondooclient.GarbageCollectOptions{
 		ManagedBy: managedBy,
 		Labels:    labels,
 	}

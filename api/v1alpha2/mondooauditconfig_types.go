@@ -1,4 +1,4 @@
-// Copyright (c) Mondoo, Inc.
+// Copyright Mondoo, Inc. 2026
 // SPDX-License-Identifier: BUSL-1.1
 
 package v1alpha2
@@ -25,10 +25,15 @@ type MondooAuditConfigSpec struct {
 	Scanner             Scanner             `json:"scanner,omitempty"`
 	KubernetesResources KubernetesResources `json:"kubernetesResources,omitempty"`
 	Nodes               Nodes               `json:"nodes,omitempty"`
-	Admission           Admission           `json:"admission,omitempty"`
 	ConsoleIntegration  ConsoleIntegration  `json:"consoleIntegration,omitempty"`
 	Filtering           Filtering           `json:"filtering,omitempty"`
 	Containers          Containers          `json:"containers,omitempty"`
+
+	// Admission is DEPRECATED and ignored. Admission webhooks were removed in v12.1.0.
+	// The operator will automatically clean up any orphaned admission resources.
+	// See docs/admission-migration-guide.md for migration instructions.
+	// +optional
+	Admission *DeprecatedAdmission `json:"admission,omitempty"`
 }
 
 type Filtering struct {
@@ -50,15 +55,8 @@ type ConsoleIntegration struct {
 	Enable bool `json:"enable,omitempty"`
 }
 
-// CertificateProvisioning defines the certificate provisioning configuration within the cluster.
-type CertificateProvisioning struct {
-	// +kubebuilder:validation:Enum=cert-manager;openshift;manual
-	// +kubebuilder:default=manual
-	Mode CertificateProvisioningMode `json:"mode,omitempty"`
-}
-
 // Scanner defines the settings for the Mondoo scanner that will be running in the cluster. The same scanner
-// is used for scanning the Kubernetes API, the nodes and for serving the admission controller.
+// is used for scanning the Kubernetes API and the nodes.
 type Scanner struct {
 	// +kubebuilder:default=mondoo-operator-k8s-resources-scanning
 	ServiceAccountName string                      `json:"serviceAccountName,omitempty"`
@@ -71,9 +69,18 @@ type Scanner struct {
 	// +kubebuilder:default=1
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// PrivateRegistryScanning defines the name of a secret that contains the credentials for the private
-	// registries we have to pull images from.
+	// PrivateRegistriesPullSecretRef defines the name of a secret that contains the credentials for the private
+	// registries we have to pull images from. Use this when you have a single secret containing credentials
+	// for one or more registries. For multiple separate secrets, use PrivateRegistriesPullSecretRefs instead.
+	// Deprecated: Use PrivateRegistriesPullSecretRefs for new configurations.
 	PrivateRegistriesPullSecretRef corev1.LocalObjectReference `json:"privateRegistriesPullSecretRef,omitempty"`
+
+	// PrivateRegistriesPullSecretRefs defines a list of secrets that contain credentials for private
+	// registries. Use this when you need to pull images from multiple private registries and the credentials
+	// are stored in separate secrets (e.g., managed by different teams or external secret operators).
+	// The credentials from all secrets will be merged. If both PrivateRegistriesPullSecretRef and
+	// PrivateRegistriesPullSecretRefs are specified, all secrets will be merged together.
+	PrivateRegistriesPullSecretRefs []corev1.LocalObjectReference `json:"privateRegistriesPullSecretRefs,omitempty"`
 
 	// Env allows setting extra environment variables for the scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.
@@ -88,6 +95,233 @@ type KubernetesResources struct {
 	ContainerImageScanning bool `json:"containerImageScanning,omitempty"`
 	// Specify a custom crontab schedule for the Kubernetes resource scanning job. If not specified, the default schedule is used.
 	Schedule string `json:"schedule,omitempty"`
+
+	// ResourceWatcher configures real-time resource watching and scanning.
+	// When enabled, a deployment will be created that watches for K8s resource changes
+	// and scans them immediately rather than waiting for the CronJob schedule.
+	ResourceWatcher ResourceWatcherSpec `json:"resourceWatcher,omitempty"`
+
+	// ExternalClusters defines remote K8s clusters to scan from this operator instance.
+	// Each external cluster will have its own CronJob created with the appropriate kubeconfig.
+	// +optional
+	ExternalClusters []ExternalCluster `json:"externalClusters,omitempty"`
+}
+
+// ResourceWatcherSpec defines the configuration for real-time resource watching.
+type ResourceWatcherSpec struct {
+	// Enable enables real-time resource watching and scanning.
+	// When enabled, a deployment will be created that watches K8s resources for changes
+	// and scans them using cnspec.
+	Enable bool `json:"enable,omitempty"`
+
+	// DebounceInterval specifies how long to batch changes before triggering a scan.
+	// This prevents excessive scanning when multiple resources change in quick succession.
+	// Default is 10 seconds.
+	// +kubebuilder:default="10s"
+	DebounceInterval metav1.Duration `json:"debounceInterval,omitempty"`
+
+	// MinimumScanInterval specifies the minimum time between scans (rate limit).
+	// This provides a hard limit on scan frequency even when resources are changing continuously.
+	// Default is 2 minutes.
+	// +kubebuilder:default="2m"
+	MinimumScanInterval metav1.Duration `json:"minimumScanInterval,omitempty"`
+
+	// WatchAllResources controls whether to watch all resource types or only high-priority ones.
+	// When false (default), only watches stable workload resources: Deployments, DaemonSets,
+	// StatefulSets, and ReplicaSets. When true, watches all resources including ephemeral ones
+	// like Pods, Jobs, and CronJobs.
+	WatchAllResources bool `json:"watchAllResources,omitempty"`
+
+	// ResourceTypes specifies which resource types to watch. If not specified, defaults are used
+	// based on WatchAllResources setting. When WatchAllResources is false (default), defaults to:
+	// deployments, daemonsets, statefulsets, replicasets. When true, defaults to:
+	// pods, deployments, daemonsets, statefulsets, replicasets, jobs, cronjobs, services, ingresses, namespaces
+	ResourceTypes []string `json:"resourceTypes,omitempty"`
+}
+
+// ExternalCluster defines configuration for scanning a remote K8s cluster
+type ExternalCluster struct {
+	// Name is a unique identifier for this cluster (used in resource names).
+	// Must be a valid Kubernetes name (lowercase, alphanumeric, hyphens allowed).
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// KubeconfigSecretRef references a Secret containing kubeconfig for the remote cluster.
+	// The Secret must have a key "kubeconfig" with the kubeconfig content.
+	// Mutually exclusive with ServiceAccountAuth and WorkloadIdentity.
+	// +optional
+	KubeconfigSecretRef *corev1.LocalObjectReference `json:"kubeconfigSecretRef,omitempty"`
+
+	// ServiceAccountAuth configures authentication using a service account token.
+	// Mutually exclusive with KubeconfigSecretRef and WorkloadIdentity.
+	// +optional
+	ServiceAccountAuth *ServiceAccountAuth `json:"serviceAccountAuth,omitempty"`
+
+	// WorkloadIdentity configures cloud-native Workload Identity Federation authentication.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, and SPIFFEAuth.
+	// +optional
+	WorkloadIdentity *WorkloadIdentityConfig `json:"workloadIdentity,omitempty"`
+
+	// SPIFFEAuth configures SPIFFE/SPIRE-based authentication using X.509 SVIDs.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, and WorkloadIdentity.
+	// +optional
+	SPIFFEAuth *SPIFFEAuthConfig `json:"spiffeAuth,omitempty"`
+
+	// Schedule overrides the default schedule for this cluster (optional).
+	// If not specified, uses the schedule from KubernetesResources.Schedule.
+	// +optional
+	Schedule string `json:"schedule,omitempty"`
+
+	// Filtering allows namespace filtering specific to this external cluster.
+	// If not specified, uses the global filtering from MondooAuditConfigSpec.Filtering.
+	// +optional
+	Filtering Filtering `json:"filtering,omitempty"`
+
+	// ContainerImageScanning enables scanning of container images in this external cluster.
+	// +optional
+	ContainerImageScanning bool `json:"containerImageScanning,omitempty"`
+
+	// PrivateRegistriesPullSecretRef references a Secret containing registry credentials
+	// for pulling/scanning private images in this remote cluster.
+	// +optional
+	PrivateRegistriesPullSecretRef *corev1.LocalObjectReference `json:"privateRegistriesPullSecretRef,omitempty"`
+}
+
+// ServiceAccountAuth defines authentication using a Kubernetes service account token
+type ServiceAccountAuth struct {
+	// Server is the URL of the Kubernetes API server.
+	// Example: "https://my-cluster.example.com:6443"
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^https://.*`
+	Server string `json:"server"`
+
+	// CredentialsSecretRef references a Secret containing:
+	//   - "token": The service account token (required)
+	//   - "ca.crt": The CA certificate (required)
+	// +kubebuilder:validation:Required
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+
+	// SkipTLSVerify skips TLS verification. NOT RECOMMENDED for production.
+	// +optional
+	// +kubebuilder:default=false
+	SkipTLSVerify bool `json:"skipTLSVerify,omitempty"`
+}
+
+// CloudProvider specifies the cloud provider for Workload Identity Federation
+type CloudProvider string
+
+const (
+	CloudProviderGKE CloudProvider = "gke"
+	CloudProviderEKS CloudProvider = "eks"
+	CloudProviderAKS CloudProvider = "aks"
+)
+
+// WorkloadIdentityConfig configures Workload Identity Federation
+type WorkloadIdentityConfig struct {
+	// Provider specifies the cloud provider for WIF.
+	// +kubebuilder:validation:Enum=gke;eks;aks
+	// +kubebuilder:validation:Required
+	Provider CloudProvider `json:"provider"`
+
+	// GKE contains GKE-specific Workload Identity configuration.
+	// Required when provider is "gke".
+	// +optional
+	GKE *GKEWorkloadIdentity `json:"gke,omitempty"`
+
+	// EKS contains EKS-specific IRSA configuration.
+	// Required when provider is "eks".
+	// +optional
+	EKS *EKSWorkloadIdentity `json:"eks,omitempty"`
+
+	// AKS contains AKS-specific Azure Workload Identity configuration.
+	// Required when provider is "aks".
+	// +optional
+	AKS *AKSWorkloadIdentity `json:"aks,omitempty"`
+}
+
+// GKEWorkloadIdentity configures GKE Workload Identity
+type GKEWorkloadIdentity struct {
+	// ProjectID is the GCP project ID.
+	// +kubebuilder:validation:Required
+	ProjectID string `json:"projectId"`
+
+	// ClusterName is the GKE cluster name.
+	// +kubebuilder:validation:Required
+	ClusterName string `json:"clusterName"`
+
+	// ClusterLocation is the region or zone (e.g., "us-central1" or "us-central1-a").
+	// +kubebuilder:validation:Required
+	ClusterLocation string `json:"clusterLocation"`
+
+	// GoogleServiceAccount is the Google service account to impersonate.
+	// Format: <name>@<project>.iam.gserviceaccount.com
+	// +kubebuilder:validation:Required
+	GoogleServiceAccount string `json:"googleServiceAccount"`
+}
+
+// EKSWorkloadIdentity configures AWS EKS IRSA (IAM Roles for Service Accounts)
+type EKSWorkloadIdentity struct {
+	// Region is the AWS region.
+	// +kubebuilder:validation:Required
+	Region string `json:"region"`
+
+	// ClusterName is the EKS cluster name.
+	// +kubebuilder:validation:Required
+	ClusterName string `json:"clusterName"`
+
+	// RoleARN is the IAM role to assume.
+	// Format: arn:aws:iam::<account>:role/<name>
+	// +kubebuilder:validation:Required
+	RoleARN string `json:"roleArn"`
+}
+
+// AKSWorkloadIdentity configures Azure Workload Identity
+type AKSWorkloadIdentity struct {
+	// SubscriptionID is the Azure subscription.
+	// +kubebuilder:validation:Required
+	SubscriptionID string `json:"subscriptionId"`
+
+	// ResourceGroup containing the AKS cluster.
+	// +kubebuilder:validation:Required
+	ResourceGroup string `json:"resourceGroup"`
+
+	// ClusterName is the AKS cluster name.
+	// +kubebuilder:validation:Required
+	ClusterName string `json:"clusterName"`
+
+	// ClientID is the Azure AD app client ID.
+	// +kubebuilder:validation:Required
+	ClientID string `json:"clientId"`
+
+	// TenantID is the Azure AD tenant ID.
+	// +kubebuilder:validation:Required
+	TenantID string `json:"tenantId"`
+}
+
+// SPIFFEAuthConfig configures SPIFFE/SPIRE authentication using X.509 SVIDs
+type SPIFFEAuthConfig struct {
+	// Server is the URL of the remote Kubernetes API server.
+	// Example: "https://remote-cluster.example.com:6443"
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^https://.*`
+	Server string `json:"server"`
+
+	// SocketPath is the path to the SPIRE agent's Workload API socket.
+	// Defaults to "/run/spire/sockets/agent.sock" if not specified.
+	// +optional
+	// +kubebuilder:default="/run/spire/sockets/agent.sock"
+	SocketPath string `json:"socketPath,omitempty"`
+
+	// TrustBundleSecretRef references a Secret containing the remote cluster's
+	// CA certificate for TLS verification. The Secret must have a key "ca.crt".
+	// +kubebuilder:validation:Required
+	TrustBundleSecretRef corev1.LocalObjectReference `json:"trustBundleSecretRef"`
+
+	// Audience is the intended audience for the SVID (optional).
+	// Some SPIRE configurations require this for workload attestation.
+	// +optional
+	Audience string `json:"audience,omitempty"`
 }
 
 // NodeScanStyle specifies the scan style for nodes
@@ -120,28 +354,6 @@ type Nodes struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
-type Admission struct {
-	Enable bool  `json:"enable,omitempty"`
-	Image  Image `json:"image,omitempty"`
-	// Mode represents whether the webhook will behave in a "permissive" mode (the default) which
-	// will only scan and report on k8s resources or "enforcing" mode where depending
-	// on the scan results may reject the k8s resource creation/modification.
-	// +kubebuilder:validation:Enum=permissive;enforcing
-	// +kubebuilder:default=permissive
-	Mode AdmissionMode `json:"mode,omitempty"`
-	// Number of replicas for the admission webhook.
-	// For enforcing mode, the minimum should be two to prevent problems during Pod failures,
-	// e.g. node failure, node scaling, etc.
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=1
-	Replicas                *int32                  `json:"replicas,omitempty"`
-	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
-	// ServiceAccountName specifies the Kubernetes ServiceAccount the webhook should use
-	// during its operation.
-	// +kubebuilder:default=mondoo-operator-webhook
-	ServiceAccountName string `json:"serviceAccountName,omitempty"`
-}
-
 type Containers struct {
 	Enable    bool                        `json:"enable,omitempty"`
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
@@ -152,12 +364,32 @@ type Containers struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
-type Image struct {
-	Name string `json:"name,omitempty"`
-	Tag  string `json:"tag,omitempty"`
+// Admission defines the settings for the Mondoo admission controller webhook
+type Admission struct {
+	Enable bool `json:"enable,omitempty"`
+	// +kubebuilder:validation:Enum=permissive;enforcing
+	// +kubebuilder:default=permissive
+	Mode AdmissionMode `json:"mode,omitempty"`
+	// Number of replicas for the admission webhook.
+	// For enforcing mode, the minimum should be two to prevent problems during Pod failures,
+	// e.g. node failure, node scaling, etc.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	Replicas *int32 `json:"replicas,omitempty"`
+	// +kubebuilder:default=mondoo-operator-webhook
+	ServiceAccountName      string                  `json:"serviceAccountName,omitempty"`
+	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
+	Image                   Image                   `json:"image,omitempty"`
 }
 
-// CertificateProvisioningMode is the specified method the cluster uses for provisioning TLS certificates
+// CertificateProvisioning defines the certificate provisioning settings for the admission webhook
+type CertificateProvisioning struct {
+	// +kubebuilder:validation:Enum=cert-manager;openshift;manual
+	// +kubebuilder:default=manual
+	Mode CertificateProvisioningMode `json:"mode,omitempty"`
+}
+
+// CertificateProvisioningMode specifies the certificate provisioning mode
 type CertificateProvisioningMode string
 
 const (
@@ -173,6 +405,41 @@ const (
 	Permissive AdmissionMode = "permissive"
 	Enforcing  AdmissionMode = "enforcing"
 )
+
+// DeprecatedAdmission exists for backward compatibility during upgrades.
+// This field is ignored and will be removed in a future version.
+type DeprecatedAdmission struct {
+	// Enable is DEPRECATED. Admission webhooks are no longer supported.
+	// +optional
+	Enable bool `json:"enable,omitempty"`
+	// Mode is DEPRECATED.
+	// +optional
+	Mode string `json:"mode,omitempty"`
+	// Replicas is DEPRECATED.
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+	// ServiceAccountName is DEPRECATED.
+	// +optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+	// CertificateProvisioning is DEPRECATED.
+	// +optional
+	CertificateProvisioning *DeprecatedCertificateProvisioning `json:"certificateProvisioning,omitempty"`
+	// Image is DEPRECATED.
+	// +optional
+	Image *Image `json:"image,omitempty"`
+}
+
+// DeprecatedCertificateProvisioning exists for backward compatibility.
+type DeprecatedCertificateProvisioning struct {
+	// Mode is DEPRECATED.
+	// +optional
+	Mode string `json:"mode,omitempty"`
+}
+
+type Image struct {
+	Name string `json:"name,omitempty"`
+	Tag  string `json:"tag,omitempty"`
+}
 
 // MondooAuditConfigStatus defines the observed state of MondooAuditConfig
 type MondooAuditConfigStatus struct {
@@ -221,10 +488,12 @@ const (
 	K8sResourcesScanningDegraded MondooAuditConfigConditionType = "K8sResourcesScanningDegraded"
 	// Indicates weather Kubernetes container image scanning is Degraded
 	K8sContainerImageScanningDegraded MondooAuditConfigConditionType = "K8sContainerImageScanningDegraded"
-	// Indicates weather Admission controller is Degraded
-	AdmissionDegraded MondooAuditConfigConditionType = "AdmissionDegraded"
-	// Indicates weather Admission controller is Degraded because of the ScanAPI
+	// Indicates whether the resource watcher is Degraded
+	ResourceWatcherDegraded MondooAuditConfigConditionType = "ResourceWatcherDegraded"
+	// Indicates whether the ScanAPI is Degraded
 	ScanAPIDegraded MondooAuditConfigConditionType = "ScanAPIDegraded"
+	// Indicates whether the Admission controller is Degraded
+	AdmissionDegraded MondooAuditConfigConditionType = "AdmissionDegraded"
 	// Indicates weather the operator itself is Degraded
 	MondooOperatorDegraded MondooAuditConfigConditionType = "MondooOperatorDegraded"
 	// MondooIntegrationDegraded will hold the status for any issues encountered while trying to CheckIn()
