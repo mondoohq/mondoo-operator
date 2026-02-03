@@ -5,7 +5,7 @@ go 1.25.1
 replace go.mondoo.com/cnquery/v12/providers/k8s => github.com/mondoohq/cnquery/providers/k8s v0.0.0-20251212084727-587f21e53534
 
 require (
-	github.com/cert-manager/cert-manager v1.19.2
+	github.com/cert-manager/cert-manager v1.19.3
 	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang/mock v1.6.0
