@@ -1,11 +1,10 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: mondoooperatorconfigs.k8s.mondoo.com
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
-  labels:
-  {{- include "mondoo-operator.labels" . | nindent 4 }}
+    controller-gen.kubebuilder.io/version: v0.20.0
+  name: mondoooperatorconfigs.k8s.mondoo.com
 spec:
   group: k8s.mondoo.com
   names:
@@ -42,11 +41,44 @@ spec:
             description: MondooOperatorConfigSpec defines the desired state of MondooOperatorConfig
             properties:
               containerProxy:
-                description: ContainerProxy specifies a proxy to use for container images.
+                description: ContainerProxy specifies a proxy to use for container
+                  images.
                 type: string
               httpProxy:
-                description: HttpProxy specifies a proxy to use for HTTP requests to
-                  the Mondoo Platform.
+                description: HttpProxy specifies a proxy to use for HTTP requests
+                  to the Mondoo Platform.
+                type: string
+              httpsProxy:
+                description: HttpsProxy specifies a proxy to use for HTTPS requests
+                  to the Mondoo Platform.
+                type: string
+              imagePullSecrets:
+                description: |-
+                  ImagePullSecrets specifies the name of the Secret to use for pulling images for all Mondoo components.
+                  The secret must be of type kubernetes.io/dockerconfigjson.
+                items:
+                  description: |-
+                    LocalObjectReference contains enough information to let you locate the
+                    referenced object inside the same namespace.
+                  properties:
+                    name:
+                      default: ""
+                      description: |-
+                        Name of the referent.
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
+                  type: object
+                  x-kubernetes-map-type: atomic
+                type: array
+              imageRegistry:
+                description: |-
+                  ImageRegistry specifies a custom container image registry to use for all Mondoo images.
+                  This allows using a private registry mirror (e.g., artifactory.example.com/ghcr.io.docker).
+                  If set, all image references will be prefixed with this registry.
+                  Deprecated: Use RegistryMirrors for more flexible registry mapping.
                 type: string
               metrics:
                 description: Metrics controls the enabling/disabling of metrics report
@@ -62,12 +94,36 @@ spec:
                       resources (eg. ServiceMonitor)
                     type: object
                 type: object
+              noProxy:
+                description: NoProxy specifies a comma-separated list of hosts that
+                  should not use the proxy.
+                type: string
+              registryMirrors:
+                additionalProperties:
+                  type: string
+                description: |-
+                  RegistryMirrors specifies a mapping of public registries to private mirrors.
+                  The key is the public registry (e.g., "ghcr.io", "docker.io", "quay.io")
+                  and the value is the private mirror (e.g., "artifactory.example.com/ghcr.io.docker").
+                  Example:
+                    registryMirrors:
+                      ghcr.io: artifactory.example.com/ghcr.io.docker
+                      docker.io: artifactory.example.com/hub.docker.com
+                type: object
               skipContainerResolution:
                 description: Allows skipping Image resolution from upstream repository
                 type: boolean
+              skipProxyForCnspec:
+                description: |-
+                  SkipProxyForCnspec disables proxy environment variables for cnspec-based components
+                  (scan-api, container scanning). Use this when the Mondoo API is accessible directly
+                  without proxy (e.g., internal mirror) but other components need proxy for external access.
+                  Default: false (proxy settings are applied to all components)
+                type: boolean
             type: object
           status:
-            description: MondooOperatorConfigStatus defines the observed state of MondooOperatorConfig
+            description: MondooOperatorConfigStatus defines the observed state of
+              MondooOperatorConfig
             properties:
               conditions:
                 description: Conditions includes more detailed status for the mondoo
@@ -87,12 +143,12 @@ spec:
                       format: date-time
                       type: string
                     message:
-                      description: Message is a human-readable message indicating details
-                        about last transition.
+                      description: Message is a human-readable message indicating
+                        details about last transition.
                       type: string
                     reason:
-                      description: Reason is a unique, one-word, CamelCase reason for
-                        the condition's last transition.
+                      description: Reason is a unique, one-word, CamelCase reason
+                        for the condition's last transition.
                       type: string
                     status:
                       description: Status is the status of the condition.
@@ -111,9 +167,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

@@ -49,6 +49,21 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
+	// Build proxy environment variables
+	var proxyEnvVars []corev1.EnvVar
+	if cfg.Spec.HttpProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTP_PROXY", Value: *cfg.Spec.HttpProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "http_proxy", Value: *cfg.Spec.HttpProxy})
+	}
+	if cfg.Spec.HttpsProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTPS_PROXY", Value: *cfg.Spec.HttpsProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "https_proxy", Value: *cfg.Spec.HttpsProxy})
+	}
+	if cfg.Spec.NoProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "NO_PROXY", Value: *cfg.Spec.NoProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "no_proxy", Value: *cfg.Spec.NoProxy})
+	}
+
 	cj.Labels = ls
 	cj.Annotations = map[string]string{
 		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-cronjob-runasnonroot": ignoreAnnotationValue,
@@ -112,7 +127,7 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 					MountPath: "/tmp",
 				},
 			},
-			Env: k8s.MergeEnv([]corev1.EnvVar{
+			Env: k8s.MergeEnv(append([]corev1.EnvVar{
 				{
 					Name:  "DEBUG",
 					Value: "false",
@@ -133,7 +148,7 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 					Name:  "GOMEMLIMIT",
 					Value: gcLimit,
 				},
-			}, m.Spec.Nodes.Env),
+			}, proxyEnvVars...), m.Spec.Nodes.Env),
 			TerminationMessagePath:   "/dev/termination-log",
 			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 			ImagePullPolicy:          corev1.PullIfNotPresent,
@@ -181,6 +196,11 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 			},
 		},
 	}
+
+	// Add imagePullSecrets from MondooOperatorConfig
+	if len(cfg.Spec.ImagePullSecrets) > 0 {
+		cj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = cfg.Spec.ImagePullSecrets
+	}
 }
 
 func UpdateDaemonSet(
@@ -200,6 +220,21 @@ func UpdateDaemonSet(
 	}
 	if cfg.Spec.HttpProxy != nil {
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
+	}
+
+	// Build proxy environment variables
+	var proxyEnvVars []corev1.EnvVar
+	if cfg.Spec.HttpProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTP_PROXY", Value: *cfg.Spec.HttpProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "http_proxy", Value: *cfg.Spec.HttpProxy})
+	}
+	if cfg.Spec.HttpsProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTPS_PROXY", Value: *cfg.Spec.HttpsProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "https_proxy", Value: *cfg.Spec.HttpsProxy})
+	}
+	if cfg.Spec.NoProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "NO_PROXY", Value: *cfg.Spec.NoProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "no_proxy", Value: *cfg.Spec.NoProxy})
 	}
 
 	ds.Labels = labels
@@ -264,7 +299,7 @@ func UpdateDaemonSet(
 					MountPath: "/tmp",
 				},
 			},
-			Env: k8s.MergeEnv([]corev1.EnvVar{
+			Env: k8s.MergeEnv(append([]corev1.EnvVar{
 				{
 					Name:  "DEBUG",
 					Value: "false",
@@ -289,7 +324,7 @@ func UpdateDaemonSet(
 						},
 					},
 				},
-			}, m.Spec.Nodes.Env),
+			}, proxyEnvVars...), m.Spec.Nodes.Env),
 		},
 	}
 	ds.Spec.Template.Spec.Volumes = []corev1.Volume{
@@ -333,6 +368,11 @@ func UpdateDaemonSet(
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
+	}
+
+	// Add imagePullSecrets from MondooOperatorConfig
+	if len(cfg.Spec.ImagePullSecrets) > 0 {
+		ds.Spec.Template.Spec.ImagePullSecrets = cfg.Spec.ImagePullSecrets
 	}
 }
 

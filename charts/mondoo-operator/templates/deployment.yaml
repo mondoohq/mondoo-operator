@@ -59,3 +59,7 @@ spec:
         8 }}
       serviceAccountName: {{ include "mondoo-operator.fullname" . }}-controller-manager
       terminationGracePeriodSeconds: 10
+      {{- if .Values.operator.imagePullSecrets }}
+      imagePullSecrets:
+      {{- toYaml .Values.operator.imagePullSecrets | nindent 6 }}
+      {{- end }}

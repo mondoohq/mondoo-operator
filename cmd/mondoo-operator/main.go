@@ -4,6 +4,9 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/spf13/cobra"
 	"go.mondoo.com/mondoo-operator/cmd/mondoo-operator/garbage_collect"
 	"go.mondoo.com/mondoo-operator/cmd/mondoo-operator/k8s_scan"
@@ -22,6 +25,7 @@ func main() {
 	rootCmd.AddCommand(operator.Cmd, version.Cmd, garbage_collect.Cmd, k8s_scan.Cmd, resourcewatcher.Cmd)
 
 	if err := rootCmd.Execute(); err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 }
