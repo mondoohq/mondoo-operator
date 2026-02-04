@@ -158,6 +158,9 @@ test/integration/ci: gotestsum load-minikube/ci
 endif
 	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -ldflags $(LDFLAGS) -v -timeout 20m -p 1
 
+test/integration/external-cluster: ## Run external cluster integration test (requires k3d management cluster)
+	K8S_DISTRO=k3d go test -ldflags $(LDFLAGS) -v -timeout 15m -p 1 ./tests/integration/... -run TestExternalClusterSuite
+
 ##@ Build
 
 build: manifests generate fmt vet ## Build manager binary.

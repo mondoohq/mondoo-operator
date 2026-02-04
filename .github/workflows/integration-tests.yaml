@@ -121,10 +121,59 @@ jobs:
           name: test-logs-${{ matrix.k8s-distro }}-${{ matrix.k8s-version }}
           path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
 
+  external-cluster-tests:
+    runs-on: ubuntu-latest
+    name: External cluster tests
+    needs: [build-operator]
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+
+      - name: Start k3d
+        uses: nolar/setup-k3d-k3s@293b8e5822a20bc0d5bcdd4826f1a665e72aba96 # v1.0.9
+        with:
+          version: v1.32.0
+          k3d-args: --k3s-arg=--disable=traefik@server:*
+
+      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version: "${{ env.golang-version }}"
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        name: Download operator build artifact
+        with:
+          name: operator-build
+
+      - name: Print workflow inputs
+        run: echo "${{ toJSON(github.event.inputs) }}"
+
+      - run: sleep 10
+
+      - name: Wait a bit for the runner to become more stable
+        run: for i in 1 2 3 4 5; do kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=180s && break || sleep 10; done
+
+      - name: Run external cluster integration tests
+        env:
+          MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
+        run: make test/integration/external-cluster
+
+      - name: Upload test logs artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: failure()
+        with:
+          name: test-logs-external-cluster
+          path: /home/runner/work/mondoo-operator/mondoo-operator/tests/integration/_output/
+
   slack-notification:
     runs-on: ubuntu-latest
     name: Send Slack notification
-    needs: [integration-tests]
+    needs: [integration-tests, external-cluster-tests]
     # Run only if the previous job has failed and only if it's running against the main branch
     if: ${{ always() && contains(join(needs.*.result, ','), 'fail') && github.ref_name == 'main' }}
     steps:

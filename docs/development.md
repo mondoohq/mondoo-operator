@@ -160,7 +160,7 @@ spec:
     enable: true
   nodes:
     enable: true
-    style: cronjob  # or "deployment" or "daemonset"
+    style: cronjob # or "deployment" or "daemonset"
     # Optional: set priority class for node scanning workloads
     # priorityClassName: high-priority
 ```
@@ -258,6 +258,7 @@ kubectl create secret generic prod-sa-credentials \
 **3. Workload Identity Federation (cloud-native, no static credentials)**
 
 For GKE:
+
 ```yaml
 apiVersion: k8s.mondoo.com/v1alpha2
 kind: MondooAuditConfig
@@ -281,6 +282,7 @@ spec:
 ```
 
 For EKS (IRSA):
+
 ```yaml
 spec:
   kubernetesResources:
@@ -295,6 +297,7 @@ spec:
 ```
 
 For AKS:
+
 ```yaml
 spec:
   kubernetesResources:
@@ -350,6 +353,7 @@ kubectl create secret generic remote-cluster-ca \
 4. **RBAC on remote cluster**: Create ClusterRole/ClusterRoleBinding for the SPIFFE identity
 
 Example SPIRE registration entry:
+
 ```bash
 spire-server entry create \
   -spiffeID spiffe://cluster.local/ns/mondoo-operator/sa/mondoo-operator-k8s-resources-scanning \
@@ -359,6 +363,7 @@ spire-server entry create \
 ```
 
 Example RBAC on remote cluster:
+
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -367,11 +372,11 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: view  # or a custom role with appropriate permissions
+  name: view # or a custom role with appropriate permissions
 subjects:
-- apiGroup: rbac.authorization.k8s.io
-  kind: User
-  name: spiffe://cluster.local/ns/mondoo-operator/sa/mondoo-operator-k8s-resources-scanning
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: spiffe://cluster.local/ns/mondoo-operator/sa/mondoo-operator-k8s-resources-scanning
 ```
 
 **WIF Prerequisites:**
@@ -424,11 +429,11 @@ spec:
   skipContainerResolution: false
 ```
 
-| Field | Description |
-|-------|-------------|
-| `metrics.enable` | Enable Prometheus metrics endpoint |
-| `metrics.resourceLabels` | Labels to add to ServiceMonitor for Prometheus discovery |
-| `skipContainerResolution` | Skip resolving image tags to SHA digests |
+| Field                     | Description                                              |
+| ------------------------- | -------------------------------------------------------- |
+| `metrics.enable`          | Enable Prometheus metrics endpoint                       |
+| `metrics.resourceLabels`  | Labels to add to ServiceMonitor for Prometheus discovery |
+| `skipContainerResolution` | Skip resolving image tags to SHA digests                 |
 
 ### Namespace Filtering
 
@@ -561,6 +566,20 @@ k3d cluster list
 # target       1/1       0/0      true
 ```
 
+**Important: Connect the Docker networks**
+
+k3d creates each cluster on a separate Docker network by default. For the management cluster to reach
+the target cluster, we need to connect them:
+
+```bash
+# Connect the management cluster's server to the target cluster's network
+docker network connect k3d-target k3d-management-server-0
+
+# Verify the connection
+docker inspect k3d-management-server-0 --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+# Should show: k3d-management k3d-target
+```
+
 ### Test Method 1: Kubeconfig Authentication
 
 This is the simplest method to test external cluster scanning.
@@ -581,9 +600,15 @@ echo "Target cluster IP: $TARGET_IP"
 # Update the kubeconfig to use the Docker network IP
 sed -i.bak "s|server:.*|server: https://${TARGET_IP}:6443|" /tmp/target-kubeconfig.yaml
 
-# Verify the kubeconfig works (from your host)
-KUBECONFIG=/tmp/target-kubeconfig.yaml kubectl get nodes
+# The k3d certificate was generated for localhost, not the Docker network IP.
+# We need to skip TLS verification for testing purposes.
+# This adds insecure-skip-tls-verify: true and removes certificate-authority-data
+yq -i '(.clusters[].cluster.insecure-skip-tls-verify) = true | del(.clusters[].cluster.certificate-authority-data)' /tmp/target-kubeconfig.yaml
 ```
+
+> **Note:** After updating the kubeconfig to use the Docker network IP, you cannot verify it from your host machine.
+> The Docker network IP (e.g., `172.21.0.3`) is only accessible from within containers on the same Docker network.
+> The operator's scanning pods will be able to reach this IP because they run inside the management cluster.
 
 #### Step 2: Set up the management cluster
 
@@ -636,6 +661,28 @@ kubectl create secret generic target-kubeconfig \
 kubectl create secret generic mondoo-client \
   --namespace mondoo-operator \
   --from-file=config=creds.json
+
+# (Optional) Verify connectivity from within the cluster
+# This runs a pod that uses the kubeconfig to connect to the target cluster
+kubectl run connectivity-test \
+  --namespace mondoo-operator \
+  --image=bitnami/kubectl:latest \
+  --restart=Never \
+  --rm -it \
+  --overrides='
+{
+  "spec": {
+    "containers": [{
+      "name": "connectivity-test",
+      "image": "bitnami/kubectl:latest",
+      "command": ["kubectl", "get", "nodes"],
+      "env": [{"name": "KUBECONFIG", "value": "/etc/kubeconfig/kubeconfig"}],
+      "volumeMounts": [{"name": "kubeconfig", "mountPath": "/etc/kubeconfig", "readOnly": true}]
+    }],
+    "volumes": [{"name": "kubeconfig", "secret": {"secretName": "target-kubeconfig"}}]
+  }
+}'
+# Expected output: node/k3d-target-server-0   Ready
 ```
 
 #### Step 3: Deploy MondooAuditConfig with external cluster
@@ -664,7 +711,8 @@ EOF
 
 ```bash
 # In one terminal, run the operator
-make run
+# Note: Use a different metrics port if 8080 is in use (e.g., by Docker Desktop)
+MONDOO_NAMESPACE_OVERRIDE=mondoo-operator go run ./cmd/mondoo-operator/main.go operator --metrics-bind-address=:9090
 
 # In another terminal, trigger a scan manually
 kubectl create job external-scan-test \
@@ -763,6 +811,840 @@ spec:
 EOF
 ```
 
+### Test Method 3: SPIFFE/SPIRE Authentication
+
+SPIFFE authentication is the most complex to test locally, but provides zero-trust security with auto-rotating certificates.
+
+> **Note:** This setup is significantly more complex than kubeconfig or service account token authentication.
+> It's primarily documented here for completeness and for testing the SPIFFE code path.
+
+#### Prerequisites
+
+- Both clusters from the [Setup: Two-Cluster Environment](#setup-two-cluster-environment) section
+- `helm` installed for SPIRE deployment
+
+#### Step 1: Install SPIRE on the management cluster
+
+```bash
+# Switch to management cluster
+kubectl config use-context k3d-management
+
+# Add the SPIFFE Helm repository
+helm repo add spiffe https://spiffe.github.io/helm-charts-hardened/
+helm repo update
+
+# Install SPIRE with a minimal configuration for testing
+helm install spire spiffe/spire \
+  --namespace spire-system \
+  --create-namespace \
+  --set global.spire.trustDomain=cluster.local \
+  --set spire-agent.hostPID=true \
+  --wait
+
+# Wait for SPIRE to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=spire-server -n spire-system --timeout=120s
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=spire-agent -n spire-system --timeout=120s
+```
+
+#### Step 2: Register the scanner workload in SPIRE
+
+```bash
+# Get the SPIRE server pod name
+SPIRE_SERVER=$(kubectl get pod -n spire-system -l app.kubernetes.io/name=spire-server -o jsonpath='{.items[0].metadata.name}')
+
+# Register the mondoo scanner workload
+kubectl exec -n spire-system $SPIRE_SERVER -- \
+  /opt/spire/bin/spire-server entry create \
+  -spiffeID spiffe://cluster.local/ns/mondoo-operator/sa/mondoo-operator-k8s-resources-scanning \
+  -parentID spiffe://cluster.local/spire/agent/k8s_psat/k3d-management \
+  -selector k8s:ns:mondoo-operator \
+  -selector k8s:sa:mondoo-operator-k8s-resources-scanning
+
+# Verify the registration
+kubectl exec -n spire-system $SPIRE_SERVER -- \
+  /opt/spire/bin/spire-server entry show
+```
+
+#### Step 3: Get the SPIRE CA bundle
+
+```bash
+# Export the SPIRE trust bundle (CA certificate)
+kubectl exec -n spire-system $SPIRE_SERVER -- \
+  /opt/spire/bin/spire-server bundle show -format pem > /tmp/spire-bundle.pem
+```
+
+#### Step 4: Configure the target cluster to trust SPIRE CA
+
+This is the most complex step. The target cluster's API server must be configured to accept
+client certificates signed by the SPIRE CA.
+
+```bash
+# Switch to target cluster
+kubectl config use-context k3d-target
+
+# Get target cluster IP for later
+TARGET_IP=$(docker inspect k3d-target-server-0 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
+echo "Target cluster IP: $TARGET_IP"
+
+# Get the target cluster's CA certificate
+kubectl config view --raw -o jsonpath='{.clusters[?(@.name=="k3d-target")].cluster.certificate-authority-data}' | base64 -d > /tmp/target-ca.crt
+
+# For k3d/k3s, we need to add the SPIRE CA to the API server's client CA bundle.
+# This requires modifying the k3s configuration.
+
+# Copy the SPIRE bundle into the k3d container
+docker cp /tmp/spire-bundle.pem k3d-target-server-0:/var/lib/rancher/k3s/server/tls/spire-ca.pem
+
+# Create a combined CA bundle (original + SPIRE)
+docker exec k3d-target-server-0 sh -c 'cat /var/lib/rancher/k3s/server/tls/client-ca.crt /var/lib/rancher/k3s/server/tls/spire-ca.pem > /var/lib/rancher/k3s/server/tls/client-ca-combined.crt'
+
+# Update k3s to use the combined CA bundle for client authentication
+# Note: This requires restarting k3s with --kube-apiserver-arg=client-ca-file
+docker exec k3d-target-server-0 sh -c 'kill 1'  # Restart k3s (it will auto-restart)
+
+# Wait for the target cluster to be ready again
+sleep 10
+kubectl config use-context k3d-target
+kubectl wait --for=condition=ready node --all --timeout=60s
+```
+
+> **Important:** The above k3s reconfiguration is simplified for testing. In production,
+> you would configure the API server's `--client-ca-file` flag properly during cluster creation.
+
+#### Step 5: Create RBAC for the SPIFFE identity on the target cluster
+
+```bash
+# Still on target cluster
+cat <<EOF | kubectl apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mondoo-spiffe-scanner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: spiffe://cluster.local/ns/mondoo-operator/sa/mondoo-operator-k8s-resources-scanning
+EOF
+```
+
+#### Step 6: Set up the management cluster
+
+```bash
+# Switch back to management cluster
+kubectl config use-context k3d-management
+
+# Create the trust bundle secret (target cluster's CA)
+kubectl create secret generic target-ca \
+  --namespace mondoo-operator \
+  --from-file=ca.crt=/tmp/target-ca.crt
+
+# Ensure the mondoo-operator namespace and RBAC exist (from earlier setup)
+# If not already done:
+kubectl create namespace mondoo-operator --dry-run=client -o yaml | kubectl apply -f -
+```
+
+#### Step 7: Deploy MondooAuditConfig with SPIFFE auth
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    schedule: "*/5 * * * *"
+    externalClusters:
+      - name: target
+        spiffeAuth:
+          server: "https://${TARGET_IP}:6443"
+          trustBundleSecretRef:
+            name: target-ca
+          # Use the default SPIRE socket path
+          # socketPath: "/run/spire/sockets/agent.sock"
+EOF
+```
+
+#### Step 8: Run the operator and test
+
+```bash
+# In one terminal, run the operator
+make run
+
+# In another terminal, verify the CronJob was created
+kubectl get cronjobs -n mondoo-operator
+
+# Trigger a scan manually
+kubectl create job spiffe-scan-test \
+  --from=cronjob/mondoo-client-k8s-scan-target \
+  -n mondoo-operator
+
+# Watch the job (look for the init container fetching SVID)
+kubectl logs -n mondoo-operator job/spiffe-scan-test -c spiffe-init -f
+
+# Then watch the main container
+kubectl logs -n mondoo-operator job/spiffe-scan-test -f
+```
+
+#### Troubleshooting SPIFFE
+
+**SPIRE agent socket not found:**
+```bash
+# Verify SPIRE agent is running and socket exists
+kubectl exec -n spire-system -l app.kubernetes.io/name=spire-agent -- ls -la /run/spire/sockets/
+```
+
+**Certificate fetch timeout:**
+```bash
+# Check SPIRE agent logs
+kubectl logs -n spire-system -l app.kubernetes.io/name=spire-agent
+
+# Verify workload is registered
+kubectl exec -n spire-system $SPIRE_SERVER -- /opt/spire/bin/spire-server entry show
+```
+
+**API server rejects certificate:**
+```bash
+# Verify the target cluster trusts the SPIRE CA
+# The API server logs will show certificate validation errors
+docker logs k3d-target-server-0 2>&1 | grep -i "client certificate"
+```
+
+### Test Method 4: Azure AKS Workload Identity
+
+This method tests Workload Identity Federation (WIF) with Azure AKS. The management cluster
+uses Azure AD Workload Identity to authenticate to a target AKS cluster without static credentials.
+
+> **Note:** This requires Azure resources and two AKS clusters. It cannot be tested locally with k3d.
+
+#### Prerequisites
+
+- Azure CLI (`az`) installed and authenticated
+- Two AKS clusters (management and target)
+- Permissions to create Azure AD App Registrations and manage AKS RBAC
+
+#### Step 1: Set up environment variables
+
+```bash
+# Azure configuration
+export AZURE_SUBSCRIPTION_ID="your-subscription-id"
+export AZURE_TENANT_ID="your-tenant-id"
+export AZURE_RESOURCE_GROUP="mondoo-operator-test"
+export AZURE_LOCATION="eastus"
+
+# Cluster names
+export MGMT_CLUSTER_NAME="mondoo-mgmt"
+export TARGET_CLUSTER_NAME="mondoo-target"
+
+# Workload Identity configuration
+export WI_APP_NAME="mondoo-operator-scanner"
+export WI_SERVICE_ACCOUNT_NAMESPACE="mondoo-operator"
+export WI_SERVICE_ACCOUNT_NAME="mondoo-client-wif-target"
+```
+
+#### Step 2: Create resource group and AKS clusters
+
+```bash
+# Create resource group
+az group create --name $AZURE_RESOURCE_GROUP --location $AZURE_LOCATION
+
+# Create the management cluster with OIDC issuer and workload identity enabled
+az aks create \
+  --resource-group $AZURE_RESOURCE_GROUP \
+  --name $MGMT_CLUSTER_NAME \
+  --node-count 1 \
+  --enable-oidc-issuer \
+  --enable-workload-identity \
+  --generate-ssh-keys
+
+# Create the target cluster
+az aks create \
+  --resource-group $AZURE_RESOURCE_GROUP \
+  --name $TARGET_CLUSTER_NAME \
+  --node-count 1 \
+  --generate-ssh-keys
+
+# Get credentials for both clusters
+az aks get-credentials --resource-group $AZURE_RESOURCE_GROUP --name $MGMT_CLUSTER_NAME --context mgmt
+az aks get-credentials --resource-group $AZURE_RESOURCE_GROUP --name $TARGET_CLUSTER_NAME --context target
+```
+
+#### Step 3: Get the OIDC issuer URL
+
+```bash
+# Get the OIDC issuer URL from the management cluster
+export OIDC_ISSUER_URL=$(az aks show \
+  --resource-group $AZURE_RESOURCE_GROUP \
+  --name $MGMT_CLUSTER_NAME \
+  --query "oidcIssuerProfile.issuerUrl" -o tsv)
+
+echo "OIDC Issuer URL: $OIDC_ISSUER_URL"
+```
+
+#### Step 4: Create Azure AD App Registration
+
+```bash
+# Create an Azure AD application
+az ad app create --display-name $WI_APP_NAME
+
+# Get the application (client) ID
+export WI_CLIENT_ID=$(az ad app list --display-name $WI_APP_NAME --query "[0].appId" -o tsv)
+echo "Client ID: $WI_CLIENT_ID"
+
+# Create a service principal for the application
+az ad sp create --id $WI_CLIENT_ID
+
+# Get the service principal object ID (needed for RBAC)
+export WI_SP_OBJECT_ID=$(az ad sp show --id $WI_CLIENT_ID --query "id" -o tsv)
+echo "Service Principal Object ID: $WI_SP_OBJECT_ID"
+```
+
+#### Step 5: Create Federated Identity Credential
+
+This links the Kubernetes ServiceAccount to the Azure AD application:
+
+```bash
+# Create the federated identity credential
+az ad app federated-credential create \
+  --id $WI_CLIENT_ID \
+  --parameters '{
+    "name": "mondoo-operator-federation",
+    "issuer": "'$OIDC_ISSUER_URL'",
+    "subject": "system:serviceaccount:'$WI_SERVICE_ACCOUNT_NAMESPACE':'$WI_SERVICE_ACCOUNT_NAME'",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
+# Verify the federated credential
+az ad app federated-credential list --id $WI_CLIENT_ID
+```
+
+#### Step 6: Grant RBAC on target cluster
+
+```bash
+# Get the target cluster's resource ID
+export TARGET_CLUSTER_ID=$(az aks show \
+  --resource-group $AZURE_RESOURCE_GROUP \
+  --name $TARGET_CLUSTER_NAME \
+  --query "id" -o tsv)
+
+# Grant "Azure Kubernetes Service Cluster User Role" to access the cluster
+az role assignment create \
+  --assignee-object-id $WI_SP_OBJECT_ID \
+  --assignee-principal-type ServicePrincipal \
+  --role "Azure Kubernetes Service Cluster User Role" \
+  --scope $TARGET_CLUSTER_ID
+
+# Also grant "Azure Kubernetes Service RBAC Reader" for reading K8s resources
+az role assignment create \
+  --assignee-object-id $WI_SP_OBJECT_ID \
+  --assignee-principal-type ServicePrincipal \
+  --role "Azure Kubernetes Service RBAC Reader" \
+  --scope $TARGET_CLUSTER_ID
+```
+
+#### Step 7: Set up the management cluster
+
+```bash
+# Switch to management cluster
+kubectl config use-context mgmt
+
+# Create namespace and RBAC
+kubectl create namespace mondoo-operator
+
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mondoo-operator-k8s-resources-scanning
+  namespace: mondoo-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mondoo-operator-k8s-resources-scanning
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mondoo-operator-k8s-resources-scanning
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mondoo-operator-k8s-resources-scanning
+subjects:
+- kind: ServiceAccount
+  name: mondoo-operator-k8s-resources-scanning
+  namespace: mondoo-operator
+EOF
+
+# Install CRDs
+make install
+
+# Create Mondoo credentials secret
+kubectl create secret generic mondoo-client \
+  --namespace mondoo-operator \
+  --from-file=config=creds.json
+```
+
+#### Step 8: Deploy MondooAuditConfig with AKS WIF
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    schedule: "*/5 * * * *"
+    externalClusters:
+      - name: target
+        workloadIdentity:
+          provider: aks
+          aks:
+            subscriptionId: "${AZURE_SUBSCRIPTION_ID}"
+            resourceGroup: "${AZURE_RESOURCE_GROUP}"
+            clusterName: "${TARGET_CLUSTER_NAME}"
+            clientId: "${WI_CLIENT_ID}"
+            tenantId: "${AZURE_TENANT_ID}"
+EOF
+```
+
+#### Step 9: Run the operator and test
+
+```bash
+# In one terminal, run the operator
+make run
+
+# In another terminal, verify the WIF ServiceAccount was created
+kubectl get sa -n mondoo-operator
+# Should see: mondoo-client-wif-target with azure.workload.identity annotations
+
+# Verify the ServiceAccount has the correct annotations
+kubectl get sa mondoo-client-wif-target -n mondoo-operator -o yaml
+# Should show:
+#   annotations:
+#     azure.workload.identity/client-id: <your-client-id>
+#   labels:
+#     azure.workload.identity/use: "true"
+
+# Verify the CronJob was created
+kubectl get cronjobs -n mondoo-operator
+
+# Trigger a scan manually
+kubectl create job aks-wif-scan-test \
+  --from=cronjob/mondoo-client-k8s-scan-target \
+  -n mondoo-operator
+
+# Watch the init container (Azure CLI fetching credentials)
+kubectl logs -n mondoo-operator job/aks-wif-scan-test -c wif-init -f
+
+# Then watch the main container
+kubectl logs -n mondoo-operator job/aks-wif-scan-test -f
+```
+
+#### Troubleshooting AKS WIF
+
+**Init container fails with "AADSTS70021" error:**
+```bash
+# This usually means the federated credential subject doesn't match
+# Verify the subject format matches exactly:
+# system:serviceaccount:<namespace>:<service-account-name>
+
+az ad app federated-credential list --id $WI_CLIENT_ID -o table
+```
+
+**"Unauthorized" when accessing target cluster:**
+```bash
+# Verify the role assignments exist
+az role assignment list --assignee $WI_SP_OBJECT_ID --scope $TARGET_CLUSTER_ID -o table
+
+# The service principal needs both:
+# - "Azure Kubernetes Service Cluster User Role" (to get kubeconfig)
+# - "Azure Kubernetes Service RBAC Reader" (to read K8s resources)
+```
+
+**Azure CLI in init container fails:**
+```bash
+# Check the init container logs for detailed error
+kubectl logs -n mondoo-operator job/aks-wif-scan-test -c wif-init
+
+# Verify the ServiceAccount token is being projected
+kubectl get pod -n mondoo-operator -l job-name=aks-wif-scan-test -o yaml | grep -A20 "serviceAccountToken"
+```
+
+**Cleanup Azure Resources:**
+```bash
+# Delete the resource group (deletes everything)
+az group delete --name $AZURE_RESOURCE_GROUP --yes --no-wait
+
+# Or delete individual resources:
+az ad app delete --id $WI_CLIENT_ID
+az aks delete --resource-group $AZURE_RESOURCE_GROUP --name $MGMT_CLUSTER_NAME --yes --no-wait
+az aks delete --resource-group $AZURE_RESOURCE_GROUP --name $TARGET_CLUSTER_NAME --yes --no-wait
+```
+
+### Test Method 5: AWS EKS IRSA (IAM Roles for Service Accounts)
+
+This method tests Workload Identity using AWS EKS IRSA. The management cluster uses IAM Roles
+for Service Accounts to authenticate to a target EKS cluster without static credentials.
+
+> **Note:** This requires AWS resources and two EKS clusters. It cannot be tested locally with k3d.
+
+#### Prerequisites
+
+- AWS CLI (`aws`) installed and configured
+- `eksctl` installed (recommended for EKS cluster creation)
+- Two EKS clusters (management and target)
+- Permissions to create IAM roles and policies
+
+#### Step 1: Set up environment variables
+
+```bash
+# AWS configuration
+export AWS_REGION="us-west-2"
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# Cluster names
+export MGMT_CLUSTER_NAME="mondoo-mgmt"
+export TARGET_CLUSTER_NAME="mondoo-target"
+
+# IAM role configuration
+export IAM_ROLE_NAME="mondoo-operator-scanner"
+export WIF_SERVICE_ACCOUNT_NAMESPACE="mondoo-operator"
+export WIF_SERVICE_ACCOUNT_NAME="mondoo-client-wif-target"
+```
+
+#### Step 2: Create EKS clusters
+
+```bash
+# Create the management cluster with OIDC provider
+eksctl create cluster \
+  --name $MGMT_CLUSTER_NAME \
+  --region $AWS_REGION \
+  --nodes 2 \
+  --with-oidc
+
+# Create the target cluster
+eksctl create cluster \
+  --name $TARGET_CLUSTER_NAME \
+  --region $AWS_REGION \
+  --nodes 2
+
+# Verify clusters are running
+eksctl get cluster --region $AWS_REGION
+
+# Get credentials for both clusters
+aws eks update-kubeconfig --name $MGMT_CLUSTER_NAME --region $AWS_REGION --alias mgmt
+aws eks update-kubeconfig --name $TARGET_CLUSTER_NAME --region $AWS_REGION --alias target
+```
+
+#### Step 3: Get the OIDC provider URL
+
+```bash
+# Get the OIDC provider URL from the management cluster
+export OIDC_PROVIDER=$(aws eks describe-cluster \
+  --name $MGMT_CLUSTER_NAME \
+  --region $AWS_REGION \
+  --query "cluster.identity.oidc.issuer" \
+  --output text | sed 's|https://||')
+
+echo "OIDC Provider: $OIDC_PROVIDER"
+
+# Verify the OIDC provider is associated with IAM
+aws iam list-open-id-connect-providers | grep $OIDC_PROVIDER
+```
+
+#### Step 4: Create IAM role with trust policy
+
+```bash
+# Create the trust policy document
+cat > /tmp/trust-policy.json << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/${OIDC_PROVIDER}"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "${OIDC_PROVIDER}:aud": "sts.amazonaws.com",
+          "${OIDC_PROVIDER}:sub": "system:serviceaccount:${WIF_SERVICE_ACCOUNT_NAMESPACE}:${WIF_SERVICE_ACCOUNT_NAME}"
+        }
+      }
+    }
+  ]
+}
+EOF
+
+# Create the IAM role
+aws iam create-role \
+  --role-name $IAM_ROLE_NAME \
+  --assume-role-policy-document file:///tmp/trust-policy.json \
+  --description "Role for Mondoo Operator to scan EKS clusters"
+
+# Get the role ARN
+export IAM_ROLE_ARN=$(aws iam get-role --role-name $IAM_ROLE_NAME --query 'Role.Arn' --output text)
+echo "IAM Role ARN: $IAM_ROLE_ARN"
+```
+
+#### Step 5: Attach permissions to access target cluster
+
+```bash
+# Create a policy that allows describing and accessing EKS clusters
+cat > /tmp/eks-access-policy.json << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "eks:DescribeCluster",
+        "eks:ListClusters"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+
+# Create and attach the policy
+aws iam put-role-policy \
+  --role-name $IAM_ROLE_NAME \
+  --policy-name eks-access \
+  --policy-document file:///tmp/eks-access-policy.json
+```
+
+#### Step 6: Grant Kubernetes RBAC on target cluster
+
+```bash
+# Switch to target cluster
+kubectl config use-context target
+
+# Create a ClusterRole and ClusterRoleBinding for the IAM role
+# The IAM role will be mapped to a Kubernetes user via aws-auth ConfigMap
+
+# First, get the current aws-auth ConfigMap
+kubectl get configmap aws-auth -n kube-system -o yaml > /tmp/aws-auth.yaml
+
+# Add the IAM role mapping (you may need to edit this manually)
+# Add this to the mapRoles section:
+cat << EOF
+
+# Add this entry to mapRoles in aws-auth ConfigMap:
+# - rolearn: ${IAM_ROLE_ARN}
+#   username: mondoo-scanner
+#   groups:
+#     - mondoo-scanners
+
+EOF
+
+# Apply the updated aws-auth ConfigMap
+# Option 1: Use eksctl (recommended)
+eksctl create iamidentitymapping \
+  --cluster $TARGET_CLUSTER_NAME \
+  --region $AWS_REGION \
+  --arn $IAM_ROLE_ARN \
+  --username mondoo-scanner \
+  --group mondoo-scanners
+
+# Create RBAC for the mondoo-scanners group
+cat <<EOF | kubectl apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mondoo-scanner-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: mondoo-scanners
+EOF
+```
+
+#### Step 7: Set up the management cluster
+
+```bash
+# Switch to management cluster
+kubectl config use-context mgmt
+
+# Create namespace and RBAC
+kubectl create namespace mondoo-operator
+
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mondoo-operator-k8s-resources-scanning
+  namespace: mondoo-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mondoo-operator-k8s-resources-scanning
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mondoo-operator-k8s-resources-scanning
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mondoo-operator-k8s-resources-scanning
+subjects:
+- kind: ServiceAccount
+  name: mondoo-operator-k8s-resources-scanning
+  namespace: mondoo-operator
+EOF
+
+# Install CRDs
+make install
+
+# Create Mondoo credentials secret
+kubectl create secret generic mondoo-client \
+  --namespace mondoo-operator \
+  --from-file=config=creds.json
+```
+
+#### Step 8: Deploy MondooAuditConfig with EKS IRSA
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    schedule: "*/5 * * * *"
+    externalClusters:
+      - name: target
+        workloadIdentity:
+          provider: eks
+          eks:
+            region: "${AWS_REGION}"
+            clusterName: "${TARGET_CLUSTER_NAME}"
+            roleArn: "${IAM_ROLE_ARN}"
+EOF
+```
+
+#### Step 9: Run the operator and test
+
+```bash
+# In one terminal, run the operator
+make run
+
+# In another terminal, verify the IRSA ServiceAccount was created
+kubectl get sa -n mondoo-operator
+# Should see: mondoo-client-wif-target with eks.amazonaws.com/role-arn annotation
+
+# Verify the ServiceAccount has the correct annotation
+kubectl get sa mondoo-client-wif-target -n mondoo-operator -o yaml
+# Should show:
+#   annotations:
+#     eks.amazonaws.com/role-arn: arn:aws:iam::<account>:role/mondoo-operator-scanner
+
+# Verify the CronJob was created
+kubectl get cronjobs -n mondoo-operator
+
+# Trigger a scan manually
+kubectl create job eks-irsa-scan-test \
+  --from=cronjob/mondoo-client-k8s-scan-target \
+  -n mondoo-operator
+
+# Watch the init container (AWS CLI fetching credentials)
+kubectl logs -n mondoo-operator job/eks-irsa-scan-test -c wif-init -f
+
+# Then watch the main container
+kubectl logs -n mondoo-operator job/eks-irsa-scan-test -f
+```
+
+#### Troubleshooting EKS IRSA
+
+**Init container fails with "An error occurred (AccessDenied)":**
+```bash
+# This usually means the trust policy doesn't match the ServiceAccount
+# Verify the trust policy subject matches exactly:
+# system:serviceaccount:<namespace>:<service-account-name>
+
+aws iam get-role --role-name $IAM_ROLE_NAME --query 'Role.AssumeRolePolicyDocument'
+
+# The OIDC provider URL must match exactly (no https://)
+echo "Expected: ${OIDC_PROVIDER}:sub = system:serviceaccount:${WIF_SERVICE_ACCOUNT_NAMESPACE}:${WIF_SERVICE_ACCOUNT_NAME}"
+```
+
+**"error: You must be logged in to the server (Unauthorized)":**
+```bash
+# The IAM role is not mapped in the target cluster's aws-auth ConfigMap
+# Verify the mapping exists:
+kubectl config use-context target
+kubectl get configmap aws-auth -n kube-system -o yaml | grep -A5 $IAM_ROLE_ARN
+
+# Or check with eksctl:
+eksctl get iamidentitymapping --cluster $TARGET_CLUSTER_NAME --region $AWS_REGION
+```
+
+**AWS CLI in init container fails:**
+```bash
+# Check the init container logs for detailed error
+kubectl logs -n mondoo-operator job/eks-irsa-scan-test -c wif-init
+
+# Verify the IRSA webhook is injecting the environment variables
+kubectl get pod -n mondoo-operator -l job-name=eks-irsa-scan-test -o yaml | grep -A5 "AWS_"
+# Should see AWS_ROLE_ARN and AWS_WEB_IDENTITY_TOKEN_FILE
+```
+
+**Verify OIDC provider is correctly associated:**
+```bash
+# List OIDC providers
+aws iam list-open-id-connect-providers
+
+# Verify the provider exists for the management cluster
+aws eks describe-cluster --name $MGMT_CLUSTER_NAME --region $AWS_REGION \
+  --query "cluster.identity.oidc.issuer" --output text
+```
+
+**Cleanup AWS Resources:**
+```bash
+# Delete IAM role and policies
+aws iam delete-role-policy --role-name $IAM_ROLE_NAME --policy-name eks-access
+aws iam delete-role --role-name $IAM_ROLE_NAME
+
+# Delete EKS clusters (this takes several minutes)
+eksctl delete cluster --name $MGMT_CLUSTER_NAME --region $AWS_REGION --wait
+eksctl delete cluster --name $TARGET_CLUSTER_NAME --region $AWS_REGION --wait
+```
+
 ### Cleanup
 
 ```bash
@@ -833,6 +1715,7 @@ kubectl get cronjobs -n mondoo-operator
 ```
 
 Example output:
+
 ```
 NAME                        SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE
 mondoo-client-k8s-scan      5 * * * *     False     0        45m
@@ -903,10 +1786,10 @@ Alternatively, set a frequent schedule during development:
 spec:
   kubernetesResources:
     enable: true
-    schedule: "*/2 * * * *"  # Every 2 minutes
+    schedule: "*/2 * * * *" # Every 2 minutes
   containers:
     enable: true
-    schedule: "*/2 * * * *"  # Every 2 minutes
+    schedule: "*/2 * * * *" # Every 2 minutes
 ```
 
 ### Clean Up
@@ -933,11 +1816,13 @@ minikube delete
 ### Operator not creating resources?
 
 1. Check operator logs:
+
    ```bash
    kubectl logs -n mondoo-operator -l control-plane=controller-manager
    ```
 
 2. Check MondooAuditConfig status:
+
    ```bash
    kubectl describe mondooauditconfig mondoo-client -n mondoo-operator
    ```
@@ -961,13 +1846,16 @@ If missing, run `make install`.
 ### Scan jobs stuck in ContainerCreating?
 
 Check for mount errors:
+
 ```bash
 kubectl describe pod -n mondoo-operator -l job-name=<job-name>
 ```
 
 Common issues:
+
 - **ServiceAccount not found**: Create the RBAC resources (see step 3 above)
 - **Secret key not found**: Ensure secret has key named `config`:
+
   ```bash
   kubectl get secret mondoo-client -n mondoo-operator -o jsonpath='{.data}' | jq 'keys'
   # Should show: ["config"]
