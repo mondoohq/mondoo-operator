@@ -340,6 +340,7 @@ jobs:
 
     permissions:
       contents: write
+      packages: write  # Required for GHCR OCI push
 
     steps:
       - name: Checkout
@@ -358,9 +359,21 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
         id: install
 
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run chart-releaser
         # switch back to helm/chart-releaser-action when #60 is fixed
         # https://github.com/helm/chart-releaser-action/issues/60
         uses: luisico/chart-releaser-action@on-tags
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Push Helm chart to OCI registry
+        run: |
+          helm package charts/mondoo-operator
+          helm push mondoo-operator-*.tgz oci://ghcr.io/${{ github.repository }}/charts
