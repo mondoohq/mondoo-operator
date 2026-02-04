@@ -151,7 +151,7 @@ func (s *ExternalClusterSuite) saveManagementContext() error {
 }
 
 func (s *ExternalClusterSuite) switchToManagementContext() error {
-	cmd := exec.Command("kubectl", "config", "use-context", s.managementContext)
+	cmd := exec.Command("kubectl", "config", "use-context", s.managementContext) // #nosec G204
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to switch to management context %s: %v, output: %s", s.managementContext, err, string(output))
 	}
@@ -197,7 +197,7 @@ func (s *ExternalClusterSuite) connectDockerNetworks() error {
 	}
 
 	targetNetwork := fmt.Sprintf("k3d-%s", targetClusterName)
-	cmd = exec.Command("docker", "network", "connect", targetNetwork, managementContainer)
+	cmd = exec.Command("docker", "network", "connect", targetNetwork, managementContainer) // #nosec G204
 	if output, err := cmd.CombinedOutput(); err != nil {
 		if !strings.Contains(string(output), "already exists") {
 			return fmt.Errorf("failed to connect networks: %v, output: %s", err, string(output))
@@ -211,7 +211,7 @@ func (s *ExternalClusterSuite) connectDockerNetworks() error {
 }
 
 func (s *ExternalClusterSuite) getTargetClusterIP() error {
-	cmd := exec.Command("docker", "inspect", fmt.Sprintf("k3d-%s-server-0", targetClusterName),
+	cmd := exec.Command("docker", "inspect", fmt.Sprintf("k3d-%s-server-0", targetClusterName), // #nosec G204
 		"--format", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}")
 	output, err := cmd.Output()
 	if err != nil {
