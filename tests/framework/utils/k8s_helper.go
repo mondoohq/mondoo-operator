@@ -176,6 +176,18 @@ func (k8sh *K8sHelper) IsPodReady(labelSelector, namespace string) bool {
 	return err == nil
 }
 
+// ListPods returns a list of pods matching the label selector in the given namespace
+func (k8sh *K8sHelper) ListPods(namespace, labelSelector string) (*v1.PodList, error) {
+	listOpts, err := LabelSelectorListOptions(labelSelector)
+	if err != nil {
+		return nil, err
+	}
+	listOpts.Namespace = namespace
+	podList := &v1.PodList{}
+	err = k8sh.Clientset.List(context.Background(), podList, listOpts)
+	return podList, err
+}
+
 // IsPodInExpectedState waits for a pod to be in a Ready state
 // If the pod is in expected state within the time retry limit true is returned, if not false
 func (k8sh *K8sHelper) EnsureNoPodsPresent(listOpts *client.ListOptions) error {
