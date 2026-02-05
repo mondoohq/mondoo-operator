@@ -291,6 +291,13 @@ func (s *SPIFFESuite) getTargetClusterIP() error {
 
 // TestSPIFFE_CronJobCreation verifies that a CronJob with SPIFFE init container is created correctly
 func (s *SPIFFESuite) TestSPIFFE_CronJobCreation() {
+	// This test requires the mondoo-operator CRDs to be installed
+	// Skip if they're not available (infrastructure-only testing)
+	auditConfigList := &mondoov2.MondooAuditConfigList{}
+	if err := s.k8sHelper.Clientset.List(s.ctx, auditConfigList); err != nil {
+		s.T().Skip("Skipping CronJob creation test - MondooAuditConfig CRD not installed")
+	}
+
 	// Create a MondooAuditConfig with SPIFFE authentication
 	targetServer := fmt.Sprintf("https://%s:6443", s.targetClusterIP)
 	auditConfig := utils.DefaultAuditConfigWithSPIFFE(

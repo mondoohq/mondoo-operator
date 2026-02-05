@@ -299,9 +299,8 @@ func (i *Installer) installHelmChart() error {
 		"--create-namespace",
 		"--wait",
 		"--timeout", "5m",
-		// Set trust domain (set at multiple levels to ensure it takes effect)
-		"--set", fmt.Sprintf("global.spiffe.trustDomain=%s", i.trustDomain),
-		"--set", fmt.Sprintf("spire-server.trustDomain=%s", i.trustDomain),
+		// Set trust domain (global.spire.trustDomain is the correct path)
+		"--set", fmt.Sprintf("global.spire.trustDomain=%s", i.trustDomain),
 		// Enable SPIRE server
 		"--set", "spire-server.enabled=true",
 		// Enable SPIRE agent
