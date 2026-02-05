@@ -1,3 +1,6 @@
+# Copyright Mondoo, Inc. 2026
+# SPDX-License-Identifier: BUSL-1.1
+
 # SPIRE Helm values for integration testing
 # These values are used when installing SPIRE for testing SPIFFE authentication
 
