@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-logr/logr"
 
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -130,6 +129,18 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		config = &v1alpha2.MondooOperatorConfig{}
 	}
 
+	// Apply registry configuration to the container image resolver
+	imageResolver := r.ContainerImageResolver
+	if len(config.Spec.RegistryMirrors) > 0 {
+		imageResolver = imageResolver.WithRegistryMirrors(config.Spec.RegistryMirrors)
+	} else if config.Spec.ImageRegistry != nil && *config.Spec.ImageRegistry != "" {
+		imageResolver = imageResolver.WithImageRegistry(*config.Spec.ImageRegistry)
+	}
+	// Apply imagePullSecrets for authentication when resolving images
+	if len(config.Spec.ImagePullSecrets) > 0 {
+		imageResolver = imageResolver.WithImagePullSecrets(config.Spec.ImagePullSecrets)
+	}
+
 	if !mondooAuditConfig.DeletionTimestamp.IsZero() {
 		log.Info("deleting")
 
@@ -233,7 +244,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
-		ContainerImageResolver: r.ContainerImageResolver,
+		ContainerImageResolver: imageResolver,
 		IsOpenshift:            r.RunningOnOpenShift,
 	}
 
@@ -248,7 +259,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	containers := container_image.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
-		ContainerImageResolver: r.ContainerImageResolver,
+		ContainerImageResolver: imageResolver,
 		MondooOperatorConfig:   config,
 	}
 
@@ -264,7 +275,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
-		ContainerImageResolver: r.ContainerImageResolver,
+		ContainerImageResolver: imageResolver,
+		// ScanApiStore:           r.ScanApiStore,
 	}
 
 	result, reconcileError = workloads.Reconcile(ctx)
@@ -279,7 +291,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
-		ContainerImageResolver: r.ContainerImageResolver,
+		ContainerImageResolver: imageResolver,
 	}
 
 	result, reconcileError = resourceWatcher.Reconcile(ctx)
@@ -460,6 +472,7 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 		client.ObjectKeyFromObject(mondooCredsSecret),
 		tokenData,
 		cfg.Spec.HttpProxy,
+		cfg.Spec.NoProxy,
 		log)
 }
 
@@ -507,16 +520,8 @@ func (r *MondooAuditConfigReconciler) cleanupOrphanedAdmissionResources(ctx cont
 	log.Info("WARNING: admission configuration is deprecated and ignored. Cleaning up orphaned resources.",
 		"migration", "see docs/admission-migration-guide.md")
 
-	// Cleanup ValidatingWebhookConfiguration (cluster-scoped)
-	webhookName := fmt.Sprintf("%s-%s-mondoo", m.Namespace, m.Name)
-	webhook := &admissionregistrationv1.ValidatingWebhookConfiguration{}
-	if err := r.Get(ctx, types.NamespacedName{Name: webhookName}, webhook); err == nil {
-		if err := r.Delete(ctx, webhook); err != nil {
-			log.V(1).Info("Failed to delete orphaned ValidatingWebhookConfiguration", "name", webhookName, "error", err)
-		} else {
-			log.Info("Cleaned up orphaned ValidatingWebhookConfiguration", "name", webhookName)
-		}
-	}
+	// Note: ValidatingWebhookConfiguration cleanup is skipped as it requires cluster-scoped permissions
+	// Users should manually delete any orphaned ValidatingWebhookConfiguration resources
 
 	// Cleanup webhook deployment
 	deploymentName := fmt.Sprintf("%s-webhook-manager", m.Name)

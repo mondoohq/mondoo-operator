@@ -364,6 +364,48 @@ type Containers struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
+// Admission defines the settings for the Mondoo admission controller webhook
+type Admission struct {
+	Enable bool `json:"enable,omitempty"`
+	// +kubebuilder:validation:Enum=permissive;enforcing
+	// +kubebuilder:default=permissive
+	Mode AdmissionMode `json:"mode,omitempty"`
+	// Number of replicas for the admission webhook.
+	// For enforcing mode, the minimum should be two to prevent problems during Pod failures,
+	// e.g. node failure, node scaling, etc.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	Replicas *int32 `json:"replicas,omitempty"`
+	// +kubebuilder:default=mondoo-operator-webhook
+	ServiceAccountName      string                  `json:"serviceAccountName,omitempty"`
+	CertificateProvisioning CertificateProvisioning `json:"certificateProvisioning,omitempty"`
+	Image                   Image                   `json:"image,omitempty"`
+}
+
+// CertificateProvisioning defines the certificate provisioning settings for the admission webhook
+type CertificateProvisioning struct {
+	// +kubebuilder:validation:Enum=cert-manager;openshift;manual
+	// +kubebuilder:default=manual
+	Mode CertificateProvisioningMode `json:"mode,omitempty"`
+}
+
+// CertificateProvisioningMode specifies the certificate provisioning mode
+type CertificateProvisioningMode string
+
+const (
+	CertManagerProvisioning CertificateProvisioningMode = "cert-manager"
+	OpenShiftProvisioning   CertificateProvisioningMode = "openshift"
+	ManualProvisioning      CertificateProvisioningMode = "manual"
+)
+
+// AdmissionMode specifies the allowed modes of operation for the webhook admission controller
+type AdmissionMode string
+
+const (
+	Permissive AdmissionMode = "permissive"
+	Enforcing  AdmissionMode = "enforcing"
+)
+
 // DeprecatedAdmission exists for backward compatibility during upgrades.
 // This field is ignored and will be removed in a future version.
 type DeprecatedAdmission struct {
@@ -448,6 +490,10 @@ const (
 	K8sContainerImageScanningDegraded MondooAuditConfigConditionType = "K8sContainerImageScanningDegraded"
 	// Indicates whether the resource watcher is Degraded
 	ResourceWatcherDegraded MondooAuditConfigConditionType = "ResourceWatcherDegraded"
+	// Indicates whether the ScanAPI is Degraded
+	ScanAPIDegraded MondooAuditConfigConditionType = "ScanAPIDegraded"
+	// Indicates whether the Admission controller is Degraded
+	AdmissionDegraded MondooAuditConfigConditionType = "AdmissionDegraded"
 	// Indicates weather the operator itself is Degraded
 	MondooOperatorDegraded MondooAuditConfigConditionType = "MondooOperatorDegraded"
 	// MondooIntegrationDegraded will hold the status for any issues encountered while trying to CheckIn()

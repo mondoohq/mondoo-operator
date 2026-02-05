@@ -52,3 +52,46 @@ metricsService:
     protocol: TCP
     targetPort: metrics
   type: ClusterIP
+webhook:
+  serviceAccount:
+    annotations: {}
+
+# Mondoo Operator Configuration
+# These settings are applied to the MondooOperatorConfig custom resource
+operator:
+  # Create MondooOperatorConfig resource (set to false on first install, then true on upgrade)
+  createConfig: false
+  # HTTP proxy for outbound connections to Mondoo Platform
+  httpProxy: ""
+  # HTTPS proxy for outbound connections to Mondoo Platform
+  httpsProxy: ""
+  # Comma-separated list of hosts that should bypass the proxy
+  noProxy: ""
+  # Container proxy for pulling container images (used in container image scanning)
+  containerProxy: ""
+  # Image pull secrets for pulling Mondoo images from private registries
+  # Example:
+  # imagePullSecrets:
+  #   - name: my-registry-secret
+  imagePullSecrets: []
+  # Custom image registry prefix for corporate registries (deprecated, use registryMirrors)
+  # Example: "registry.example.com/ghcr.io.docker"
+  # This will rewrite image references like:
+  #   ghcr.io/mondoohq/mondoo-operator:v1.0.0 -> registry.example.com/ghcr.io.docker/mondoohq/mondoo-operator:v1.0.0
+  imageRegistry: ""
+  # Registry mirrors for mapping public registries to private mirrors
+  # This is more flexible than imageRegistry as it supports multiple registries
+  # Example:
+  # registryMirrors:
+  #   ghcr.io: registry.example.com/ghcr.io.docker
+  #   docker.io: registry.example.com/hub.docker.com
+  #   quay.io: registry.example.com/quay.io
+  registryMirrors: {}
+  
+  # Skip proxy settings for cnspec-based components (scan-api, container scanning)
+  # Set to true when using an internal Mondoo API mirror that doesn't require proxy
+  # but other components still need proxy for external access (e.g., image resolution)
+  # Default: false (proxy settings are applied to all components)
+  skipProxyForCnspec: false
+  # Skip container image resolution (useful for air-gapped environments)
+  skipContainerResolution: false

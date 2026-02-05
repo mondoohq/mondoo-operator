@@ -28,8 +28,33 @@ type MondooOperatorConfigSpec struct {
 	SkipContainerResolution bool `json:"skipContainerResolution,omitempty"`
 	// HttpProxy specifies a proxy to use for HTTP requests to the Mondoo Platform.
 	HttpProxy *string `json:"httpProxy,omitempty"`
+	// HttpsProxy specifies a proxy to use for HTTPS requests to the Mondoo Platform.
+	HttpsProxy *string `json:"httpsProxy,omitempty"`
+	// NoProxy specifies a comma-separated list of hosts that should not use the proxy.
+	NoProxy *string `json:"noProxy,omitempty"`
 	// ContainerProxy specifies a proxy to use for container images.
 	ContainerProxy *string `json:"containerProxy,omitempty"`
+	// ImagePullSecrets specifies the name of the Secret to use for pulling images for all Mondoo components.
+	// The secret must be of type kubernetes.io/dockerconfigjson.
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	// ImageRegistry specifies a custom container image registry to use for all Mondoo images.
+	// This allows using a private registry mirror (e.g., artifactory.example.com/ghcr.io.docker).
+	// If set, all image references will be prefixed with this registry.
+	// Deprecated: Use RegistryMirrors for more flexible registry mapping.
+	ImageRegistry *string `json:"imageRegistry,omitempty"`
+	// RegistryMirrors specifies a mapping of public registries to private mirrors.
+	// The key is the public registry (e.g., "ghcr.io", "docker.io", "quay.io")
+	// and the value is the private mirror (e.g., "artifactory.example.com/ghcr.io.docker").
+	// Example:
+	//   registryMirrors:
+	//     ghcr.io: artifactory.example.com/ghcr.io.docker
+	//     docker.io: artifactory.example.com/hub.docker.com
+	RegistryMirrors map[string]string `json:"registryMirrors,omitempty"`
+	// SkipProxyForCnspec disables proxy environment variables for cnspec-based components
+	// (scan-api, container scanning). Use this when the Mondoo API is accessible directly
+	// without proxy (e.g., internal mirror) but other components need proxy for external access.
+	// Default: false (proxy settings are applied to all components)
+	SkipProxyForCnspec bool `json:"skipProxyForCnspec,omitempty"`
 }
 
 type Metrics struct {

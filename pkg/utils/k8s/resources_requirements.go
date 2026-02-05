@@ -22,15 +22,19 @@ var DefaultCnspecResources corev1.ResourceRequirements = corev1.ResourceRequirem
 }
 
 // DefaultContainerScanningResources for cnspec container
+// Container scanning downloads images to /tmp, requiring significant ephemeral storage
+// GKE Autopilot defaults to 1Gi but allows up to 10Gi per container
 var DefaultContainerScanningResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("1G"),
-		corev1.ResourceCPU:    resource.MustParse("1"),
+		corev1.ResourceMemory:           resource.MustParse("1G"),
+		corev1.ResourceCPU:              resource.MustParse("1"),
+		corev1.ResourceEphemeralStorage: resource.MustParse("5Gi"),
 	},
 
 	Requests: corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("250M"),
-		corev1.ResourceCPU:    resource.MustParse("400m"),
+		corev1.ResourceMemory:           resource.MustParse("250M"),
+		corev1.ResourceCPU:              resource.MustParse("400m"),
+		corev1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
 	},
 }
 

@@ -9,9 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/stretchr/testify/suite"
+	"go.mondoo.com/mondoo-operator/pkg/imagecache"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -31,6 +33,10 @@ type fakeCacher struct {
 
 func (f *fakeCacher) GetImage(img string) (string, error) {
 	return f.fakeGetImage(img)
+}
+
+func (f *fakeCacher) WithAuth(keychain authn.Keychain) imagecache.ImageCacher {
+	return f
 }
 
 func NewFakeCacher(f func(string) (string, error)) *fakeCacher {
