@@ -10,6 +10,10 @@ on:
         required: true
       MONDOO_CLIENT_EDGE:
         required: true
+      MONDOO_TEST_ORG_TOKEN:
+        required: false
+      SLACK_BOT_TOKEN:
+        required: false
 
 env:
   CNSPEC_IMAGE_TAG: ${{ github.event.inputs.cnspecImageTag }}
@@ -179,7 +183,6 @@ jobs:
     steps:
       - name: Send Slack notification on failure
         uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
-        if: ${{ always() && steps.build-providers.outcome != 'success' }}
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}
