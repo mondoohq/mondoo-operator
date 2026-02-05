@@ -61,13 +61,11 @@ func TestDeleteCompletedJobs(t *testing.T) {
 		name              string
 		existingJobs      []batchv1.Job
 		expectedRemaining int
-		expectedDeleted   int
 	}{
 		{
 			name:              "no jobs to delete",
 			existingJobs:      []batchv1.Job{},
 			expectedRemaining: 0,
-			expectedDeleted:   0,
 		},
 		{
 			name: "delete completed job",
@@ -85,7 +83,6 @@ func TestDeleteCompletedJobs(t *testing.T) {
 				},
 			},
 			expectedRemaining: 0,
-			expectedDeleted:   1,
 		},
 		{
 			name: "delete failed job",
@@ -103,7 +100,6 @@ func TestDeleteCompletedJobs(t *testing.T) {
 				},
 			},
 			expectedRemaining: 0,
-			expectedDeleted:   1,
 		},
 		{
 			name: "preserve active job",
@@ -120,7 +116,6 @@ func TestDeleteCompletedJobs(t *testing.T) {
 				},
 			},
 			expectedRemaining: 1,
-			expectedDeleted:   0,
 		},
 		{
 			name: "mixed jobs - delete completed, preserve active",
@@ -159,7 +154,6 @@ func TestDeleteCompletedJobs(t *testing.T) {
 				},
 			},
 			expectedRemaining: 1,
-			expectedDeleted:   2,
 		},
 	}
 
@@ -191,4 +185,56 @@ func TestDeleteCompletedJobs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDeleteCompletedJobs_PreservesJobsWithDifferentLabels(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, clientgoscheme.AddToScheme(scheme))
+
+	targetLabels := map[string]string{"app": "test-scan", "mondoo_cr": "test"}
+	otherLabels := map[string]string{"app": "other-scan", "mondoo_cr": "other"}
+	namespace := "test-ns"
+
+	// Create jobs: one matching labels (completed), one with different labels (completed)
+	matchingJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "matching-completed-job",
+			Namespace: namespace,
+			Labels:    targetLabels,
+		},
+		Status: batchv1.JobStatus{
+			Active:    0,
+			Succeeded: 1,
+		},
+	}
+	nonMatchingJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "other-completed-job",
+			Namespace: namespace,
+			Labels:    otherLabels,
+		},
+		Status: batchv1.JobStatus{
+			Active:    0,
+			Succeeded: 1,
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithRuntimeObjects(&matchingJob, &nonMatchingJob).
+		Build()
+
+	log := ctrl.Log.WithName("test")
+
+	// Delete jobs with targetLabels
+	err := DeleteCompletedJobs(context.Background(), fakeClient, namespace, targetLabels, log)
+	require.NoError(t, err)
+
+	// Verify only matching job was deleted
+	jobList := &batchv1.JobList{}
+	err = fakeClient.List(context.Background(), jobList)
+	require.NoError(t, err)
+
+	require.Len(t, jobList.Items, 1, "should have exactly one job remaining")
+	assert.Equal(t, "other-completed-job", jobList.Items[0].Name, "non-matching job should be preserved")
 }

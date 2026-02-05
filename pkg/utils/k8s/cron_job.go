@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,16 +44,20 @@ func DeleteCompletedJobs(ctx context.Context, kubeClient client.Client, namespac
 	for _, job := range jobList.Items {
 		// Skip active jobs - only delete completed or failed ones
 		if job.Status.Active > 0 {
-			log.Info("Skipping deletion of active job", "namespace", job.Namespace, "name", job.Name)
+			log.V(1).Info("Skipping deletion of active job", "namespace", job.Namespace, "name", job.Name)
 			continue
 		}
 
 		// Delete the job with foreground propagation to also delete its pods
 		if err := kubeClient.Delete(ctx, &job, client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
+			// Ignore NotFound errors - job may have been deleted by TTL controller or another reconcile
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 			log.Error(err, "Failed to delete completed job", "namespace", job.Namespace, "name", job.Name)
 			return err
 		}
-		log.Info("Deleted completed job", "namespace", job.Namespace, "name", job.Name)
+		log.V(1).Info("Deleted completed job", "namespace", job.Namespace, "name", job.Name)
 	}
 
 	return nil
