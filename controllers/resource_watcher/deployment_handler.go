@@ -51,8 +51,22 @@ func (h *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		return err
 	}
 
+	// Get cluster UID for asset labeling
+	clusterUID, err := k8s.GetClusterUID(ctx, h.KubeClient, deploymentHandlerLogger)
+	if err != nil {
+		deploymentHandlerLogger.Error(err, "Failed to get cluster UID")
+		return err
+	}
+
+	// Get integration MRN if available
+	integrationMRN, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, h.KubeClient, *h.Mondoo)
+	if err != nil {
+		deploymentHandlerLogger.Error(err, "Failed to get integration MRN")
+		return err
+	}
+
 	existing := &appsv1.Deployment{}
-	desired := Deployment(mondooClientImage, h.Mondoo, *h.MondooOperatorConfig)
+	desired := Deployment(mondooClientImage, integrationMRN, clusterUID, h.Mondoo, *h.MondooOperatorConfig)
 
 	if err := ctrl.SetControllerReference(h.Mondoo, desired, h.KubeClient.Scheme()); err != nil {
 		deploymentHandlerLogger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)

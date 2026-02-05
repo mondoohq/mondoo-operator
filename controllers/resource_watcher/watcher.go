@@ -17,7 +17,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/yaml"
 )
 
 var watcherLogger = ctrl.Log.WithName("resource-watcher")
@@ -228,16 +227,6 @@ func (h *resourceEventHandler) handleEvent(obj interface{}, eventType string) {
 		return
 	}
 
-	// Serialize to YAML
-	manifest, err := h.serializeToYAML(obj)
-	if err != nil {
-		watcherLogger.Error(err, "Failed to serialize resource to YAML",
-			"resourceType", h.resourceType,
-			"namespace", namespace,
-			"name", clientObj.GetName())
-		return
-	}
-
 	// Create unique key for the resource
 	key := fmt.Sprintf("%s/%s/%s", namespace, h.resourceType, clientObj.GetName())
 	if namespace == "" {
@@ -250,20 +239,6 @@ func (h *resourceEventHandler) handleEvent(obj interface{}, eventType string) {
 		"namespace", namespace,
 		"name", clientObj.GetName())
 
-	// Add to debouncer
-	h.watcher.debouncer.Add(key, manifest)
-}
-
-func (h *resourceEventHandler) serializeToYAML(obj interface{}) ([]byte, error) {
-	// Convert to unstructured to add API version and kind
-	runtimeObj, ok := obj.(runtime.Object)
-	if !ok {
-		return nil, fmt.Errorf("object does not implement runtime.Object")
-	}
-
-	// Create a copy and set the GVK
-	runtimeObj = runtimeObj.DeepCopyObject()
-	runtimeObj.GetObjectKind().SetGroupVersionKind(h.gvk)
-
-	return yaml.Marshal(runtimeObj)
+	// Add to debouncer with resource type for scanning
+	h.watcher.debouncer.Add(key, h.resourceType)
 }
