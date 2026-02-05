@@ -118,12 +118,23 @@ func (i *Installer) Uninstall(ctx context.Context) error {
 
 	zap.S().Info("Uninstalling SPIRE...")
 
+	// Uninstall main SPIRE chart
 	cmd := exec.Command("helm", "uninstall", HelmReleaseName, "-n", i.namespace, "--wait") // #nosec G204
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Ignore if release not found
 		if !strings.Contains(string(output), "not found") {
 			zap.S().Warnf("Failed to uninstall SPIRE: %v, output: %s", err, string(output))
+		}
+	}
+
+	// Uninstall SPIRE CRDs chart
+	cmd = exec.Command("helm", "uninstall", HelmReleaseName+"-crds", "-n", i.namespace, "--wait") // #nosec G204
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		// Ignore if release not found
+		if !strings.Contains(string(output), "not found") {
+			zap.S().Warnf("Failed to uninstall SPIRE CRDs: %v, output: %s", err, string(output))
 		}
 	}
 
@@ -261,6 +272,24 @@ func (i *Installer) ensureNamespace(ctx context.Context) error {
 }
 
 func (i *Installer) installHelmChart() error {
+	// First, install the SPIRE CRDs chart (required before main chart)
+	zap.S().Info("Installing SPIRE CRDs...")
+	crdArgs := []string{
+		"upgrade", "--install", HelmReleaseName + "-crds",
+		"spiffe/spire-crds",
+		"-n", i.namespace,
+		"--create-namespace",
+		"--wait",
+		"--timeout", "2m",
+	}
+
+	cmd := exec.Command("helm", crdArgs...) // #nosec G204
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to install SPIRE CRDs chart: %v, output: %s", err, string(output))
+	}
+	zap.S().Info("SPIRE CRDs installed successfully")
+
 	// Install SPIRE with configuration suitable for testing
 	// Using the spiffe/spire chart which includes both server and agent
 	args := []string{
@@ -289,8 +318,8 @@ func (i *Installer) installHelmChart() error {
 		"--set", "spire-agent.resources.requests.memory=64Mi",
 	}
 
-	cmd := exec.Command("helm", args...) // #nosec G204
-	output, err := cmd.CombinedOutput()
+	cmd = exec.Command("helm", args...) // #nosec G204
+	output, err = cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to install SPIRE chart: %v, output: %s", err, string(output))
 	}
