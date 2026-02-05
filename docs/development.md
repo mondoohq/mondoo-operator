@@ -541,6 +541,263 @@ minikube start
 K8S_DISTRO=minikube make test/integration
 ```
 
+## Testing Workload Identity Federation (WIF)
+
+This section describes how to test WIF for external cluster scanning. WIF supports three cloud providers:
+- **GKE** (Google Kubernetes Engine) - uses GCP Workload Identity
+- **EKS** (Elastic Kubernetes Service) - uses AWS IAM Roles for Service Accounts (IRSA)
+- **AKS** (Azure Kubernetes Service) - uses Azure Workload Identity
+
+### Local Testing Without Cloud Infrastructure
+
+You can test most WIF functionality locally without setting up cloud infrastructure. This is useful for:
+- Verifying the operator creates correct resources (ServiceAccounts, CronJobs, init containers)
+- Testing validation logic
+- Verifying configuration handling
+
+**What CAN be tested locally:**
+- Unit tests (ServiceAccount annotations, init container configuration, validation)
+- Resource creation (verify the operator creates the right Kubernetes resources)
+- Configuration validation (ensure invalid configs are rejected)
+- Init container structure (correct images, environment variables, volume mounts)
+
+**What CANNOT be tested locally:**
+- Actual authentication to cloud providers (requires real GKE/EKS/AKS clusters with WIF enabled)
+- End-to-end scanning of external clusters via WIF
+
+#### Running WIF Unit Tests
+
+The unit tests comprehensively cover WIF functionality:
+
+```bash
+# Run all unit tests
+make test
+
+# Run only WIF-related tests
+go test -v ./controllers/k8s_scan/... -run "WIF|WorkloadIdentity"
+```
+
+The tests cover:
+- `TestWIFServiceAccount` - Verifies ServiceAccount creation with correct annotations for GKE, EKS, and AKS
+- `TestWIFInitContainer` - Verifies init container configuration (images, env vars, volume mounts)
+- `TestValidateExternalClusterAuth` - Verifies validation rejects invalid configurations
+
+#### Local Resource Verification Testing
+
+You can verify the operator creates correct WIF resources using k3d without any cloud connectivity:
+
+```bash
+# Create a local k3d cluster
+k3d cluster create wif-test
+
+# Install CRDs and create namespace
+make install
+kubectl create namespace mondoo-operator
+
+# Create RBAC
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mondoo-operator-k8s-resources-scanning
+  namespace: mondoo-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mondoo-operator-k8s-resources-scanning
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mondoo-operator-k8s-resources-scanning
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mondoo-operator-k8s-resources-scanning
+subjects:
+- kind: ServiceAccount
+  name: mondoo-operator-k8s-resources-scanning
+  namespace: mondoo-operator
+EOF
+
+# Create a dummy Mondoo credentials secret (required by operator)
+kubectl create secret generic mondoo-client \
+  --namespace mondoo-operator \
+  --from-literal=config='{"mrn":"//example","private_key":"test"}'
+```
+
+**Test GKE WIF Resource Creation:**
+
+```bash
+# Apply a GKE WIF configuration
+cat <<EOF | kubectl apply -f -
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    externalClusters:
+      - name: gke-test
+        workloadIdentity:
+          provider: gke
+          gke:
+            projectId: test-project
+            clusterName: test-cluster
+            clusterLocation: us-central1-a
+            googleServiceAccount: scanner@test-project.iam.gserviceaccount.com
+EOF
+
+# Run the operator
+MONDOO_NAMESPACE_OVERRIDE=mondoo-operator go run ./cmd/mondoo-operator/main.go operator --metrics-bind-address=:9090
+
+# In another terminal, verify resources were created correctly:
+
+# Check ServiceAccount has GKE annotation
+kubectl get sa mondoo-client-wif-gke-test -n mondoo-operator -o yaml
+# Expected annotation: iam.gke.io/gcp-service-account: scanner@test-project.iam.gserviceaccount.com
+
+# Check CronJob has correct init container
+kubectl get cronjob mondoo-client-k8s-scan-gke-test -n mondoo-operator -o yaml | grep -A20 "initContainers"
+# Expected: image contains "google-cloud-cli", env vars include CLUSTER_NAME, PROJECT_ID, CLUSTER_LOCATION
+```
+
+**Test EKS WIF Resource Creation:**
+
+```bash
+# Delete previous config
+kubectl delete mondooauditconfig mondoo-client -n mondoo-operator
+
+# Apply an EKS WIF configuration
+cat <<EOF | kubectl apply -f -
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    externalClusters:
+      - name: eks-test
+        workloadIdentity:
+          provider: eks
+          eks:
+            region: us-west-2
+            clusterName: test-cluster
+            roleArn: arn:aws:iam::123456789012:role/TestRole
+EOF
+
+# Verify resources:
+kubectl get sa mondoo-client-wif-eks-test -n mondoo-operator -o yaml
+# Expected annotation: eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/TestRole
+
+kubectl get cronjob mondoo-client-k8s-scan-eks-test -n mondoo-operator -o yaml | grep -A20 "initContainers"
+# Expected: image contains "aws-cli", env vars include CLUSTER_NAME, AWS_REGION
+```
+
+**Test AKS WIF Resource Creation:**
+
+```bash
+# Delete previous config
+kubectl delete mondooauditconfig mondoo-client -n mondoo-operator
+
+# Apply an AKS WIF configuration
+cat <<EOF | kubectl apply -f -
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    externalClusters:
+      - name: aks-test
+        workloadIdentity:
+          provider: aks
+          aks:
+            subscriptionId: 12345678-1234-1234-1234-123456789012
+            resourceGroup: test-rg
+            clusterName: test-cluster
+            clientId: abcdef12-3456-7890-abcd-ef1234567890
+            tenantId: fedcba98-7654-3210-fedc-ba9876543210
+EOF
+
+# Verify resources:
+kubectl get sa mondoo-client-wif-aks-test -n mondoo-operator -o yaml
+# Expected annotation: azure.workload.identity/client-id: abcdef12-3456-7890-abcd-ef1234567890
+# Expected label: azure.workload.identity/use: "true"
+
+kubectl get cronjob mondoo-client-k8s-scan-aks-test -n mondoo-operator -o yaml | grep -A20 "initContainers"
+# Expected: image contains "azure-cli", env vars include CLUSTER_NAME, RESOURCE_GROUP, SUBSCRIPTION_ID
+```
+
+**Test Validation (Invalid Configurations):**
+
+```bash
+# Test: Missing provider-specific config
+cat <<EOF | kubectl apply -f -
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-invalid
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    externalClusters:
+      - name: invalid-test
+        workloadIdentity:
+          provider: gke
+          # Missing gke config - should fail validation
+EOF
+
+# Check operator logs for validation error
+# Expected: "GKE workload identity requires GKE configuration"
+```
+
+**Cleanup:**
+
+```bash
+kubectl delete mondooauditconfig --all -n mondoo-operator
+k3d cluster delete wif-test
+```
+
+### WIF Testing Checklist
+
+Use this checklist when testing WIF functionality:
+
+| Test | Local (k3d) | Cloud Required |
+|------|-------------|----------------|
+| Unit tests pass | ✅ | - |
+| ServiceAccount created with correct annotations | ✅ | - |
+| ServiceAccount has correct labels (AKS only) | ✅ | - |
+| CronJob created with init container | ✅ | - |
+| Init container uses correct cloud CLI image | ✅ | - |
+| Init container has correct environment variables | ✅ | - |
+| Init container has volume mounts (kubeconfig, temp) | ✅ | - |
+| Validation rejects invalid configs | ✅ | - |
+| Init container successfully authenticates | - | ✅ |
+| Kubeconfig is generated correctly | - | ✅ |
+| Scanner can read resources from target cluster | - | ✅ |
+| End-to-end scan completes successfully | - | ✅ |
+
 ## Testing External Cluster Scanning
 
 This section describes how to test external cluster scanning locally using k3d.
@@ -1643,6 +1900,278 @@ aws iam delete-role --role-name $IAM_ROLE_NAME
 # Delete EKS clusters (this takes several minutes)
 eksctl delete cluster --name $MGMT_CLUSTER_NAME --region $AWS_REGION --wait
 eksctl delete cluster --name $TARGET_CLUSTER_NAME --region $AWS_REGION --wait
+```
+
+### Test Method 6: GKE Workload Identity
+
+This method tests Workload Identity Federation with Google Kubernetes Engine. The management cluster
+uses GCP Workload Identity to authenticate to a target GKE cluster without static credentials.
+
+> **Note:** This requires GCP resources and two GKE clusters. It cannot be tested locally with k3d.
+
+#### Prerequisites
+
+- Google Cloud CLI (`gcloud`) installed and authenticated
+- Two GKE clusters (management and target)
+- Permissions to create IAM service accounts and manage GKE RBAC
+
+#### Step 1: Set up environment variables
+
+```bash
+# GCP configuration
+export GCP_PROJECT_ID="your-project-id"
+export GCP_REGION="us-central1"
+export GCP_ZONE="us-central1-a"
+
+# Cluster names
+export MGMT_CLUSTER_NAME="mondoo-mgmt"
+export TARGET_CLUSTER_NAME="mondoo-target"
+
+# Workload Identity configuration
+export GSA_NAME="mondoo-scanner"
+export WIF_SERVICE_ACCOUNT_NAMESPACE="mondoo-operator"
+export WIF_SERVICE_ACCOUNT_NAME="mondoo-client-wif-target"
+```
+
+#### Step 2: Create GKE clusters
+
+```bash
+# Create the management cluster with Workload Identity enabled
+gcloud container clusters create $MGMT_CLUSTER_NAME \
+  --project=$GCP_PROJECT_ID \
+  --zone=$GCP_ZONE \
+  --num-nodes=2 \
+  --workload-pool=${GCP_PROJECT_ID}.svc.id.goog
+
+# Create the target cluster
+gcloud container clusters create $TARGET_CLUSTER_NAME \
+  --project=$GCP_PROJECT_ID \
+  --zone=$GCP_ZONE \
+  --num-nodes=2
+
+# Verify clusters are running
+gcloud container clusters list --project=$GCP_PROJECT_ID
+
+# Get credentials for both clusters
+gcloud container clusters get-credentials $MGMT_CLUSTER_NAME \
+  --project=$GCP_PROJECT_ID --zone=$GCP_ZONE
+kubectl config rename-context $(kubectl config current-context) mgmt
+
+gcloud container clusters get-credentials $TARGET_CLUSTER_NAME \
+  --project=$GCP_PROJECT_ID --zone=$GCP_ZONE
+kubectl config rename-context $(kubectl config current-context) target
+```
+
+#### Step 3: Create GCP Service Account
+
+```bash
+# Create a Google Service Account (GSA)
+gcloud iam service-accounts create $GSA_NAME \
+  --project=$GCP_PROJECT_ID \
+  --display-name="Mondoo Scanner Service Account"
+
+# Get the GSA email
+export GSA_EMAIL="${GSA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
+echo "GSA Email: $GSA_EMAIL"
+```
+
+#### Step 4: Create IAM binding for Workload Identity
+
+This links the Kubernetes ServiceAccount to the GCP Service Account:
+
+```bash
+# Allow the KSA to impersonate the GSA
+gcloud iam service-accounts add-iam-policy-binding $GSA_EMAIL \
+  --project=$GCP_PROJECT_ID \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="serviceAccount:${GCP_PROJECT_ID}.svc.id.goog[${WIF_SERVICE_ACCOUNT_NAMESPACE}/${WIF_SERVICE_ACCOUNT_NAME}]"
+```
+
+#### Step 5: Grant GSA access to target cluster
+
+```bash
+# Grant the GSA permission to get cluster credentials
+gcloud projects add-iam-policy-binding $GCP_PROJECT_ID \
+  --member="serviceAccount:${GSA_EMAIL}" \
+  --role="roles/container.clusterViewer"
+
+# For reading Kubernetes resources, we need to grant RBAC on the target cluster
+kubectl config use-context target
+
+cat <<EOF | kubectl apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mondoo-scanner-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: ${GSA_EMAIL}
+EOF
+```
+
+#### Step 6: Set up the management cluster
+
+```bash
+# Switch to management cluster
+kubectl config use-context mgmt
+
+# Create namespace and RBAC
+kubectl create namespace mondoo-operator
+
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mondoo-operator-k8s-resources-scanning
+  namespace: mondoo-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mondoo-operator-k8s-resources-scanning
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mondoo-operator-k8s-resources-scanning
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mondoo-operator-k8s-resources-scanning
+subjects:
+- kind: ServiceAccount
+  name: mondoo-operator-k8s-resources-scanning
+  namespace: mondoo-operator
+EOF
+
+# Install CRDs
+make install
+
+# Create Mondoo credentials secret
+kubectl create secret generic mondoo-client \
+  --namespace mondoo-operator \
+  --from-file=config=creds.json
+```
+
+#### Step 7: Deploy MondooAuditConfig with GKE WIF
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    schedule: "*/5 * * * *"
+    externalClusters:
+      - name: target
+        workloadIdentity:
+          provider: gke
+          gke:
+            projectId: "${GCP_PROJECT_ID}"
+            clusterName: "${TARGET_CLUSTER_NAME}"
+            clusterLocation: "${GCP_ZONE}"
+            googleServiceAccount: "${GSA_EMAIL}"
+EOF
+```
+
+#### Step 8: Run the operator and test
+
+```bash
+# In one terminal, run the operator
+make run
+
+# In another terminal, verify the WIF ServiceAccount was created
+kubectl get sa -n mondoo-operator
+# Should see: mondoo-client-wif-target with iam.gke.io/gcp-service-account annotation
+
+# Verify the ServiceAccount has the correct annotation
+kubectl get sa mondoo-client-wif-target -n mondoo-operator -o yaml
+# Should show:
+#   annotations:
+#     iam.gke.io/gcp-service-account: mondoo-scanner@<project>.iam.gserviceaccount.com
+
+# Verify the CronJob was created
+kubectl get cronjobs -n mondoo-operator
+
+# Trigger a scan manually
+kubectl create job gke-wif-scan-test \
+  --from=cronjob/mondoo-client-k8s-scan-target \
+  -n mondoo-operator
+
+# Watch the init container (gcloud fetching credentials)
+kubectl logs -n mondoo-operator job/gke-wif-scan-test -c generate-kubeconfig -f
+
+# Then watch the main container
+kubectl logs -n mondoo-operator job/gke-wif-scan-test -f
+```
+
+#### Troubleshooting GKE WIF
+
+**Init container fails with "ERROR: (gcloud.container.clusters.get-credentials)":**
+```bash
+# This usually means the GSA doesn't have permission to get cluster credentials
+# Verify the GSA has the container.clusterViewer role:
+gcloud projects get-iam-policy $GCP_PROJECT_ID \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:${GSA_EMAIL}" \
+  --format="table(bindings.role)"
+```
+
+**"Forbidden" when accessing target cluster:**
+```bash
+# The GSA needs RBAC on the target cluster
+# Verify the ClusterRoleBinding exists:
+kubectl config use-context target
+kubectl get clusterrolebinding mondoo-scanner-binding -o yaml
+```
+
+**Workload Identity not working:**
+```bash
+# Verify the management cluster has Workload Identity enabled
+gcloud container clusters describe $MGMT_CLUSTER_NAME \
+  --project=$GCP_PROJECT_ID --zone=$GCP_ZONE \
+  --format="value(workloadIdentityConfig.workloadPool)"
+# Should show: <project>.svc.id.goog
+
+# Verify the IAM binding exists
+gcloud iam service-accounts get-iam-policy $GSA_EMAIL --project=$GCP_PROJECT_ID
+# Should show the workloadIdentityUser binding for the KSA
+```
+
+**gcloud in init container fails:**
+```bash
+# Check the init container logs for detailed error
+kubectl logs -n mondoo-operator job/gke-wif-scan-test -c generate-kubeconfig
+
+# Verify the projected token is available
+kubectl get pod -n mondoo-operator -l job-name=gke-wif-scan-test -o yaml | grep -A10 "serviceAccountToken"
+```
+
+**Cleanup GCP Resources:**
+```bash
+# Delete GKE clusters
+gcloud container clusters delete $MGMT_CLUSTER_NAME \
+  --project=$GCP_PROJECT_ID --zone=$GCP_ZONE --quiet
+gcloud container clusters delete $TARGET_CLUSTER_NAME \
+  --project=$GCP_PROJECT_ID --zone=$GCP_ZONE --quiet
+
+# Delete the GSA
+gcloud iam service-accounts delete $GSA_EMAIL --project=$GCP_PROJECT_ID --quiet
 ```
 
 ### Cleanup
