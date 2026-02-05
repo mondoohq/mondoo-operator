@@ -50,16 +50,32 @@ func NewScanner(config ScannerConfig) *Scanner {
 	return &Scanner{config: config}
 }
 
-// ScanResources scans K8s resources using the K8s API connection.
-// resourceTypes is a list of resource types to scan (e.g., "deployments", "pods").
-func (s *Scanner) ScanResources(ctx context.Context, resourceTypes []string) error {
-	if len(resourceTypes) == 0 {
-		scannerLogger.V(1).Info("No resource types to scan, skipping")
+// K8sResourceIdentifier identifies a specific K8s resource.
+type K8sResourceIdentifier struct {
+	Type      string // e.g., "deployment", "pod"
+	Namespace string // empty for cluster-scoped resources
+	Name      string
+}
+
+// String returns the resource identifier in the format expected by cnspec's k8s-resources option.
+// Format: type:namespace:name for namespaced, type:name for cluster-scoped
+func (r K8sResourceIdentifier) String() string {
+	if r.Namespace == "" {
+		return fmt.Sprintf("%s:%s", r.Type, r.Name)
+	}
+	return fmt.Sprintf("%s:%s:%s", r.Type, r.Namespace, r.Name)
+}
+
+// ScanResources scans specific K8s resources using the K8s API connection.
+// resources is a list of specific resource identifiers to scan.
+func (s *Scanner) ScanResources(ctx context.Context, resources []K8sResourceIdentifier) error {
+	if len(resources) == 0 {
+		scannerLogger.V(1).Info("No resources to scan, skipping")
 		return nil
 	}
 
 	// Generate inventory file
-	inv, err := s.generateInventory(resourceTypes)
+	inv, err := s.generateInventory(resources)
 	if err != nil {
 		return fmt.Errorf("failed to generate inventory: %w", err)
 	}
@@ -88,7 +104,7 @@ func (s *Scanner) ScanResources(ctx context.Context, resourceTypes []string) err
 		return fmt.Errorf("failed to close temp file: %w", err)
 	}
 
-	scannerLogger.Info("Scanning resources via K8s API", "resourceTypes", resourceTypes, "inventoryPath", tempPath)
+	scannerLogger.Info("Scanning resources via K8s API", "resourceCount", len(resources), "inventoryPath", tempPath)
 
 	// Build cnspec command using inventory file
 	cnspecArgs := []string{
@@ -131,8 +147,25 @@ func (s *Scanner) ScanResources(ctx context.Context, resourceTypes []string) err
 	return nil
 }
 
-// generateInventory creates an inventory YAML for scanning specific resource types via K8s API.
-func (s *Scanner) generateInventory(resourceTypes []string) ([]byte, error) {
+// generateInventory creates an inventory YAML for scanning specific resources via K8s API.
+func (s *Scanner) generateInventory(resources []K8sResourceIdentifier) ([]byte, error) {
+	// Build resource filter string for k8s-resources option
+	// Format: type:namespace:name,type:namespace:name,...
+	resourceFilters := make([]string, 0, len(resources))
+	for _, r := range resources {
+		resourceFilters = append(resourceFilters, r.String())
+	}
+
+	// Extract unique resource types for discovery targets
+	typeSet := make(map[string]struct{})
+	for _, r := range resources {
+		typeSet[r.Type+"s"] = struct{}{} // cnspec uses plural form (e.g., "deployments")
+	}
+	targets := make([]string, 0, len(typeSet))
+	for t := range typeSet {
+		targets = append(targets, t)
+	}
+
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-resource-watcher-inventory",
@@ -146,9 +179,10 @@ func (s *Scanner) generateInventory(resourceTypes []string) ([]byte, error) {
 							Options: map[string]string{
 								"namespaces":         strings.Join(s.config.Namespaces, ","),
 								"namespaces-exclude": strings.Join(s.config.NamespacesExclude, ","),
+								"k8s-resources":      strings.Join(resourceFilters, ","),
 							},
 							Discover: &inventory.Discovery{
-								Targets: resourceTypes,
+								Targets: targets,
 							},
 						},
 					},
@@ -171,7 +205,7 @@ func (s *Scanner) generateInventory(resourceTypes []string) ([]byte, error) {
 }
 
 // ScanResourcesFunc returns a function suitable for use with the Debouncer.
-func (s *Scanner) ScanResourcesFunc() func(ctx context.Context, resourceTypes []string) error {
+func (s *Scanner) ScanResourcesFunc() func(ctx context.Context, resources []K8sResourceIdentifier) error {
 	return s.ScanResources
 }
 

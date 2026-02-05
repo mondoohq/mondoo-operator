@@ -20,8 +20,8 @@ type Debouncer struct {
 	interval     time.Duration
 	minInterval  time.Duration // minimum time between scans (rate limit)
 	mu           sync.Mutex
-	pending      map[string]string // resource key -> resource type
-	scanFunc     func(ctx context.Context, resourceTypes []string) error
+	pending      map[string]K8sResourceIdentifier // resource key -> resource identifier
+	scanFunc     func(ctx context.Context, resources []K8sResourceIdentifier) error
 	timer        *time.Timer
 	ctx          context.Context
 	cancel       context.CancelFunc
@@ -31,24 +31,23 @@ type Debouncer struct {
 // NewDebouncer creates a new Debouncer with the given intervals and scan function.
 // interval is the debounce interval (time to wait after last change before scanning).
 // minInterval is the minimum time between scans (rate limit). Set to 0 to disable rate limiting.
-func NewDebouncer(interval, minInterval time.Duration, scanFunc func(ctx context.Context, resourceTypes []string) error) *Debouncer {
+func NewDebouncer(interval, minInterval time.Duration, scanFunc func(ctx context.Context, resources []K8sResourceIdentifier) error) *Debouncer {
 	return &Debouncer{
 		interval:    interval,
 		minInterval: minInterval,
-		pending:     make(map[string]string),
+		pending:     make(map[string]K8sResourceIdentifier),
 		scanFunc:    scanFunc,
 	}
 }
 
-// Add adds a resource to the pending queue. The key should be unique per resource
-// (e.g., "namespace/kind/name" or "kind/name" for cluster-scoped resources).
-// The resourceType is extracted from the key for scanning.
-func (d *Debouncer) Add(key string, resourceType string) {
+// Add adds a resource to the pending queue. The key should be unique per resource.
+// resource contains the type, namespace, and name of the K8s resource.
+func (d *Debouncer) Add(key string, resource K8sResourceIdentifier) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.pending[key] = resourceType
-	debouncerLogger.V(1).Info("Added resource to debounce queue", "key", key, "resourceType", resourceType, "queueSize", len(d.pending))
+	d.pending[key] = resource
+	debouncerLogger.V(1).Info("Added resource to debounce queue", "key", key, "resource", resource, "queueSize", len(d.pending))
 
 	// Reset the timer if it exists, or start a new one
 	if d.timer != nil {
@@ -81,8 +80,8 @@ func (d *Debouncer) stop() {
 	debouncerLogger.Info("Debouncer stopped")
 }
 
-// flush processes all pending resources by collecting unique resource types
-// and calling the scan function. It enforces the minimum interval between scans.
+// flush processes all pending resources and calls the scan function.
+// It enforces the minimum interval between scans.
 func (d *Debouncer) flush() {
 	d.mu.Lock()
 	if len(d.pending) == 0 {
@@ -102,26 +101,20 @@ func (d *Debouncer) flush() {
 		}
 	}
 
-	// Collect unique resource types
-	resourceTypeSet := make(map[string]struct{})
+	// Collect all pending resources
+	resources := make([]K8sResourceIdentifier, 0, len(d.pending))
 	keys := make([]string, 0, len(d.pending))
-	for key, resourceType := range d.pending {
-		resourceTypeSet[resourceType] = struct{}{}
+	for key, resource := range d.pending {
+		resources = append(resources, resource)
 		keys = append(keys, key)
 	}
 
-	// Convert set to slice
-	resourceTypes := make([]string, 0, len(resourceTypeSet))
-	for rt := range resourceTypeSet {
-		resourceTypes = append(resourceTypes, rt)
-	}
-
 	// Clear pending and update last scan time
-	d.pending = make(map[string]string)
+	d.pending = make(map[string]K8sResourceIdentifier)
 	d.lastScanTime = time.Now()
 	d.mu.Unlock()
 
-	debouncerLogger.Info("Flushing debounce queue", "resourceCount", len(keys), "resourceTypes", resourceTypes)
+	debouncerLogger.Info("Flushing debounce queue", "resourceCount", len(resources))
 
 	// Execute scan
 	ctx := d.ctx
@@ -129,10 +122,10 @@ func (d *Debouncer) flush() {
 		ctx = context.Background()
 	}
 
-	if err := d.scanFunc(ctx, resourceTypes); err != nil {
-		debouncerLogger.Error(err, "Failed to scan resources", "keys", keys, "resourceTypes", resourceTypes)
+	if err := d.scanFunc(ctx, resources); err != nil {
+		debouncerLogger.Error(err, "Failed to scan resources", "keys", keys)
 	} else {
-		debouncerLogger.Info("Successfully scanned resources", "keys", keys, "resourceTypes", resourceTypes)
+		debouncerLogger.Info("Successfully scanned resources", "keys", keys)
 	}
 }
 

@@ -239,6 +239,20 @@ func (h *resourceEventHandler) handleEvent(obj interface{}, eventType string) {
 		"namespace", namespace,
 		"name", clientObj.GetName())
 
-	// Add to debouncer with resource type for scanning
-	h.watcher.debouncer.Add(key, h.resourceType)
+	// Create resource identifier for scanning
+	// Note: resourceType is plural (e.g., "deployments"), but cnspec's k8s-resources filter
+	// expects singular form (e.g., "deployment"), so we trim the trailing 's'
+	singularType := h.resourceType
+	if len(singularType) > 0 && singularType[len(singularType)-1] == 's' {
+		singularType = singularType[:len(singularType)-1]
+	}
+
+	resource := K8sResourceIdentifier{
+		Type:      singularType,
+		Namespace: namespace,
+		Name:      clientObj.GetName(),
+	}
+
+	// Add to debouncer
+	h.watcher.debouncer.Add(key, resource)
 }
