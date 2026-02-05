@@ -299,8 +299,9 @@ func (i *Installer) installHelmChart() error {
 		"--create-namespace",
 		"--wait",
 		"--timeout", "5m",
-		// Set trust domain
+		// Set trust domain (set at multiple levels to ensure it takes effect)
 		"--set", fmt.Sprintf("global.spiffe.trustDomain=%s", i.trustDomain),
+		"--set", fmt.Sprintf("spire-server.trustDomain=%s", i.trustDomain),
 		// Enable SPIRE server
 		"--set", "spire-server.enabled=true",
 		// Enable SPIRE agent
@@ -311,6 +312,8 @@ func (i *Installer) installHelmChart() error {
 		"--set", "spire-server.service.type=ClusterIP",
 		// Disable federation for simplicity
 		"--set", "spire-server.federation.enabled=false",
+		// Disable tornjak (UI) for simpler setup
+		"--set", "tornjak-frontend.enabled=false",
 		// Set reasonable resource limits for testing
 		"--set", "spire-server.resources.requests.cpu=100m",
 		"--set", "spire-server.resources.requests.memory=128Mi",
