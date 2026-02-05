@@ -4,14 +4,12 @@
 package imagecache
 
 import (
-	"strings"
 	"sync"
 	"time"
 
-	ecr "github.com/awslabs/amazon-ecr-credential-helper/ecr-login"
-	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"go.mondoo.com/cnquery/v12/providers/os/connection/container/auth"
 )
 
 const (
@@ -89,14 +87,7 @@ func queryImageWithSHA(image string) (string, error) {
 		return "", err
 	}
 
-	var kc authn.Keychain = authn.DefaultKeychain
-	if strings.Contains(ref.Name(), ".ecr.") {
-		kc = authn.NewMultiKeychain(
-			authn.DefaultKeychain,
-			authn.NewKeychainFromHelper(ecr.NewECRHelper()),
-		)
-	}
-
+	kc := auth.ConstructKeychain(ref.Name())
 	desc, err := remote.Get(ref, remote.WithAuthFromKeychain(kc))
 	if err != nil {
 		return "", err
