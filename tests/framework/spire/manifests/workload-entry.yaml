@@ -1,3 +1,6 @@
+# Copyright Mondoo, Inc. 2026
+# SPDX-License-Identifier: BUSL-1.1
+
 # Template for SPIRE workload entry registration
 # This template can be used to register mondoo scan pod identities
 #
