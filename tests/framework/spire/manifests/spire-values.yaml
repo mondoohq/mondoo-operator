@@ -1,0 +1,65 @@
+# SPIRE Helm values for integration testing
+# These values are used when installing SPIRE for testing SPIFFE authentication
+
+global:
+  spiffe:
+    # Trust domain for SPIFFE IDs
+    # Format: spiffe://<trust-domain>/ns/<namespace>/sa/<service-account>
+    trustDomain: "test.mondoo.local"
+
+# SPIRE Server configuration
+spire-server:
+  enabled: true
+
+  # Use ClusterIP for simplicity in k3d testing
+  service:
+    type: ClusterIP
+
+  # Disable federation (not needed for testing)
+  federation:
+    enabled: false
+
+  # CA configuration
+  ca_subject:
+    country: "US"
+    organization: "Mondoo Test"
+    common_name: "Test SPIRE CA"
+
+  # Reasonable resource limits for testing
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Configure node attestor for Kubernetes
+  nodeAttestor:
+    k8sPsat:
+      enabled: true
+      serviceAccountAllowList:
+        - "spire:spire-agent"
+
+# SPIRE Agent configuration
+spire-agent:
+  enabled: true
+
+  # Socket path where workloads connect
+  hostPathSocket: /run/spire/sockets
+
+  # Resource limits for testing
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  # Workload attestor configuration
+  workloadAttestors:
+    k8s:
+      enabled: true
+      # Allow impersonation for testing
+      disableContainerSelectors: false
