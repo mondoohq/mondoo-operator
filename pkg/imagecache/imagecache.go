@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"go.mondoo.com/cnquery/v12/providers/os/connection/container/auth"
 )
 
 const (
@@ -86,7 +87,8 @@ func queryImageWithSHA(image string) (string, error) {
 		return "", err
 	}
 
-	desc, err := remote.Get(ref)
+	kc := auth.ConstructKeychain(ref.Name())
+	desc, err := remote.Get(ref, remote.WithAuthFromKeychain(kc))
 	if err != nil {
 		return "", err
 	}
