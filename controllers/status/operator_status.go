@@ -4,7 +4,6 @@
 package status
 
 import (
-	"context"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -31,9 +30,7 @@ type OperatorCustomState struct {
 	Nodes                  []string
 	MondooAuditConfig      MondooAuditConfig
 	OperatorVersion        string
-	OperatorImageDigest    string
 	CnspecVersion          string
-	CnspecImageDigest      string
 	K8sResourcesScanning   bool
 	ContainerImageScanning bool
 	NodeScanning           bool
@@ -46,7 +43,7 @@ type MondooAuditConfig struct {
 }
 
 func ReportStatusRequestFromAuditConfig(
-	ctx context.Context, integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node, k8sVersion *k8sversion.Info, containerImageResolver mondoo.ContainerImageResolver, log logr.Logger,
+	integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node, k8sVersion *k8sversion.Info, isOpenShift bool, log logr.Logger,
 ) mondooclient.ReportStatusRequest {
 	nodeNames := make([]string, len(nodes))
 	for i := range nodes {
@@ -166,33 +163,13 @@ func ReportStatusRequestFromAuditConfig(
 		}
 	}
 
-	// Resolve cnspec and operator images to get version and digest
-	var cnspecVersion, cnspecImageDigest, operatorImageDigest string
-	if containerImageResolver != nil {
-		resolvedImage, err := containerImageResolver.CnspecImage(m.Spec.Scanner.Image.Name, m.Spec.Scanner.Image.Tag, m.Spec.Scanner.Image.Digest, false)
-		if err != nil {
-			log.Error(err, "Failed to resolve cnspec image for status reporting")
-		} else {
-			// Extract digest from resolved image (format: image@sha256:...)
-			if idx := strings.Index(resolvedImage, "@"); idx != -1 {
-				cnspecImageDigest = resolvedImage[idx+1:]
-			}
-		}
-		// Get the tag separately (without resolution) for the version field
-		tagImage, _ := containerImageResolver.CnspecImage(m.Spec.Scanner.Image.Name, m.Spec.Scanner.Image.Tag, m.Spec.Scanner.Image.Digest, true)
-		if idx := strings.LastIndex(tagImage, ":"); idx != -1 {
-			cnspecVersion = tagImage[idx+1:]
-		}
-
-		// Resolve operator image digest
-		resolvedOperator, err := containerImageResolver.MondooOperatorImage(ctx, "", "", "", false)
-		if err != nil {
-			log.Error(err, "Failed to resolve operator image for status reporting")
-		} else {
-			if idx := strings.Index(resolvedOperator, "@"); idx != -1 {
-				operatorImageDigest = resolvedOperator[idx+1:]
-			}
-		}
+	// Determine cnspec version based on OpenShift and user overrides
+	cnspecVersion := mondoo.CnspecTag
+	if isOpenShift {
+		cnspecVersion = mondoo.OpenShiftMondooClientTag
+	}
+	if m.Spec.Scanner.Image.Tag != "" {
+		cnspecVersion = m.Spec.Scanner.Image.Tag
 	}
 
 	return mondooclient.ReportStatusRequest{
@@ -203,9 +180,7 @@ func ReportStatusRequestFromAuditConfig(
 			KubernetesVersion:      k8sVersion.GitVersion,
 			MondooAuditConfig:      MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
 			OperatorVersion:        version.Version,
-			OperatorImageDigest:    operatorImageDigest,
 			CnspecVersion:          cnspecVersion,
-			CnspecImageDigest:      cnspecImageDigest,
 			K8sResourcesScanning:   m.Spec.KubernetesResources.Enable,
 			ContainerImageScanning: m.Spec.Containers.Enable || m.Spec.KubernetesResources.ContainerImageScanning,
 			NodeScanning:           m.Spec.Nodes.Enable,

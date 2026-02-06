@@ -4,7 +4,6 @@
 package status
 
 import (
-	"context"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -16,6 +15,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 )
@@ -30,7 +30,7 @@ func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
 	v := &k8sversion.Info{GitVersion: "v1.24.0"}
 
 	m := testMondooAuditConfig()
-	reportStatus := ReportStatusRequestFromAuditConfig(context.Background(), integrationMrn, m, nodes, v, nil, logger)
+	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, false, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ACTIVE, reportStatus.Status)
 	assert.Equal(t, OperatorCustomState{
@@ -38,6 +38,7 @@ func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
 		KubernetesVersion: v.GitVersion,
 		MondooAuditConfig: MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
 		OperatorVersion:   version.Version,
+		CnspecVersion:     mondoo.CnspecTag,
 		FilteringConfig:   v1alpha2.Filtering{},
 	}, reportStatus.LastState)
 	messages := []mondooclient.IntegrationMessage{
@@ -74,7 +75,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		{Message: "Mondoo Operator controller is available", Status: v1.ConditionFalse, Type: v1alpha2.MondooOperatorDegraded},
 	}
 
-	reportStatus := ReportStatusRequestFromAuditConfig(context.Background(), integrationMrn, m, nodes, v, nil, logger)
+	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, false, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ACTIVE, reportStatus.Status)
 	assert.Equal(t, OperatorCustomState{
@@ -82,6 +83,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		KubernetesVersion:      v.GitVersion,
 		MondooAuditConfig:      MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
 		OperatorVersion:        version.Version,
+		CnspecVersion:          mondoo.CnspecTag,
 		K8sResourcesScanning:   m.Spec.KubernetesResources.Enable,
 		ContainerImageScanning: m.Spec.Containers.Enable,
 		NodeScanning:           m.Spec.Nodes.Enable,
@@ -126,7 +128,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_DeprecatedFields(t *testi
 		{Message: "Mondoo Operator controller is available", Status: v1.ConditionFalse, Type: v1alpha2.MondooOperatorDegraded},
 	}
 
-	reportStatus := ReportStatusRequestFromAuditConfig(context.Background(), integrationMrn, m, nodes, v, nil, logger)
+	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, false, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ACTIVE, reportStatus.Status)
 	assert.Equal(t, OperatorCustomState{
@@ -134,6 +136,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_DeprecatedFields(t *testi
 		KubernetesVersion:      v.GitVersion,
 		MondooAuditConfig:      MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
 		OperatorVersion:        version.Version,
+		CnspecVersion:          mondoo.CnspecTag,
 		K8sResourcesScanning:   m.Spec.KubernetesResources.Enable,
 		ContainerImageScanning: m.Spec.KubernetesResources.ContainerImageScanning,
 		NodeScanning:           m.Spec.Nodes.Enable,
@@ -174,7 +177,7 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		{Message: "Mondoo Operator controller is unavailable", Status: v1.ConditionTrue, Type: v1alpha2.MondooOperatorDegraded},
 	}
 
-	reportStatus := ReportStatusRequestFromAuditConfig(context.Background(), integrationMrn, m, nodes, v, nil, logger)
+	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, false, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ERROR, reportStatus.Status)
 	assert.Equal(t, OperatorCustomState{
@@ -182,6 +185,7 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		KubernetesVersion:      v.GitVersion,
 		MondooAuditConfig:      MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
 		OperatorVersion:        version.Version,
+		CnspecVersion:          mondoo.CnspecTag,
 		K8sResourcesScanning:   m.Spec.KubernetesResources.Enable,
 		ContainerImageScanning: m.Spec.KubernetesResources.ContainerImageScanning,
 		NodeScanning:           m.Spec.Nodes.Enable,

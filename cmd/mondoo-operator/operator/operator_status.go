@@ -22,8 +22,7 @@ import (
 )
 
 func checkForTerminatedState(ctx context.Context, nonCacheClient client.Client, v *k8sversion.Info, isOpenShift bool, logger logr.Logger) error {
-	containerImageResolver := mondoo.NewContainerImageResolver(nonCacheClient, isOpenShift)
-	statusReport := status.NewStatusReporter(nonCacheClient, controllers.MondooClientBuilder, v, containerImageResolver)
+	statusReport := status.NewStatusReporter(nonCacheClient, controllers.MondooClientBuilder, v, isOpenShift)
 
 	var err error
 	config := &k8sv1alpha2.MondooOperatorConfig{}
