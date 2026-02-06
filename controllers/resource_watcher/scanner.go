@@ -178,11 +178,18 @@ func (s *Scanner) generateInventory(resources []K8sResourceIdentifier) ([]byte, 
 					Connections: []*inventory.Config{
 						{
 							Type: "k8s",
-							Options: map[string]string{
-								"namespaces":         strings.Join(s.config.Namespaces, ","),
-								"namespaces-exclude": strings.Join(s.config.NamespacesExclude, ","),
-								"k8s-resources":      strings.Join(resourceFilters, ","),
-							},
+							Options: func() map[string]string {
+								opts := map[string]string{
+									"k8s-resources": strings.Join(resourceFilters, ","),
+								}
+								if len(s.config.Namespaces) > 0 {
+									opts["namespaces"] = strings.Join(s.config.Namespaces, ",")
+								}
+								if len(s.config.NamespacesExclude) > 0 {
+									opts["namespaces-exclude"] = strings.Join(s.config.NamespacesExclude, ",")
+								}
+								return opts
+							}(),
 							Discover: &inventory.Discovery{
 								Targets: targets,
 							},

@@ -66,14 +66,14 @@ var resourceTypePluralization = map[string]string{
 
 // ToSingular converts a plural resource type to singular form.
 func ToSingular(plural string) string {
-	if singular, ok := resourceTypePluralization[strings.ToLower(plural)]; ok {
+	lower := strings.ToLower(plural)
+	if singular, ok := resourceTypePluralization[lower]; ok {
 		return singular
 	}
-	// Fallback for unknown types: strip trailing 's'
-	if len(plural) > 0 && plural[len(plural)-1] == 's' {
-		return plural[:len(plural)-1]
-	}
-	return plural
+	// Unknown type — return lowercase as-is rather than guessing.
+	// If this fires, the type should be added to resourceTypePluralization.
+	watcherLogger.V(1).Info("Unknown resource type for singularization, returning as-is", "type", plural)
+	return lower
 }
 
 // WatcherConfig holds configuration for the ResourceWatcher.

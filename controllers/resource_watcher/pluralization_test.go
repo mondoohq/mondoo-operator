@@ -30,9 +30,9 @@ func TestToSingular(t *testing.T) {
 		// Case insensitivity
 		{"Deployments", "deployment"},
 		{"INGRESSES", "ingress"},
-		// Fallback for unknown types
-		{"unknownresources", "unknownresource"},
-		{"widgets", "widget"},
+		// Fallback: unknown types returned as-is (lowercased)
+		{"unknownresources", "unknownresources"},
+		{"widgets", "widgets"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.plural, func(t *testing.T) {

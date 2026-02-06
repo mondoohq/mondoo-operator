@@ -223,7 +223,7 @@ func TestDebouncer_MultipleNamespaces(t *testing.T) {
 	// Add resources from different namespaces
 	d.Add("default/pods/test1", K8sResourceIdentifier{Type: "pod", Namespace: "default", Name: "test1"})
 	d.Add("kube-system/pods/test2", K8sResourceIdentifier{Type: "pod", Namespace: "kube-system", Name: "test2"})
-	d.Add("production/deployment/nginx", K8sResourceIdentifier{Type: "deployment", Namespace: "production", Name: "nginx"})
+	d.Add("production/deployments/nginx", K8sResourceIdentifier{Type: "deployment", Namespace: "production", Name: "nginx"})
 
 	// Wait for debounce to flush
 	time.Sleep(100 * time.Millisecond)
