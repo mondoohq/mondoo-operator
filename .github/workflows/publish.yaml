@@ -96,6 +96,8 @@ jobs:
             type=ref,event=pr
           flavor: |
             suffix=-${{ matrix.arch }},onlatest=true
+            # Only apply 'latest' for non-prerelease version tags (no hyphen after version)
+            latest=${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
 
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
@@ -213,6 +215,9 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=ref,event=pr
+          flavor: |
+            # Only apply 'latest' for non-prerelease version tags (no hyphen after version)
+            latest=${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
 
       - name: Push multi-platform virtual tag and sign
         run: bash scripts/push-virtual-tag.sh

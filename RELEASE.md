@@ -1,43 +1,65 @@
 # Operator Release
 
-This document describes the release process for the operator
+## Automated Release Process
 
-## Versioning
+Releases are fully automated via GitHub Actions.
 
-Always consider what is the suitable version number to be released based on the [Operator upgrade manual](docs/operator-upgrades.md).
+### To Release a New Version:
 
-## Release script
+1. Go to the repository's **Releases** page
+2. Click **Draft a new release**
+3. Click **Choose a tag** and type the new version (e.g., `v12.1.0`)
+4. Select **Create new tag: v12.1.0 on publish**
+5. Set the release title (e.g., `v12.1.0`)
+6. Optionally add release notes describing the changes
+7. Click **Publish release**
 
-The `release.sh` script will generate/update the Helm chart files.
+The release workflow will automatically:
+- Update version in Chart.yaml and kustomization.yaml
+- Regenerate Helm chart and manifests
+- Commit changes to main
+- Move the tag to include version updates
+- Trigger container image builds (multi-arch)
+- Publish Helm chart to GitHub Pages and OCI registry
+- Update the GitHub release with manifest files
 
-Ensure the following software is installed before running the release script:
+### Versioning
 
-- `yq`
-- `operator-sdk`
+Follow [semantic versioning](https://semver.org/):
+- **Patch** (12.0.X): Bug fixes, no breaking changes
+- **Minor** (12.X.0): New features, backwards compatible
+- **Major** (X.0.0): Breaking changes (see [upgrade docs](docs/operator-upgrades.md))
 
-Run the release script:
+### Pre-Releases
 
-1. Run the `release.sh` script from the root of the mondoo-operator repo with the previous version of the operator as the first parameter and the new version of the operator as the second parameter (without any leading 'v' in the version string). For example:
+For alpha, beta, or release candidate versions:
 
-```bash
-$ ./release.sh 1.4.0 1.4.1
-```
+1. Follow the same release process above
+2. Use semver pre-release format: `v12.1.0-alpha.1`, `v12.1.0-rc.1`
+3. **Check the "Set as a pre-release" checkbox** in GitHub Release UI
 
-### Helm Chart and Operator bundle
+Pre-releases will:
+- Build and publish container images (tagged with the pre-release version)
+- Publish Helm chart (with pre-release version)
+- **NOT** update the "latest" Docker tag
+- **NOT** be marked as the latest GitHub release
 
-Mondoo Operator helm chart has been auto-generated using the [helmify](https://github.com/arttor/helmify) tool via the `release.sh` script. The CI uses [chart-releaser-action](https://github.com/helm/chart-releaser-action) to self host the charts using GitHub pages.
+Users can deploy a specific pre-release by specifying the version explicitly.
 
-The following steps need to be followed to release Helm chart.
+### Manual Release (Emergency)
 
-#### Helm Chart Release Workflow
+If the automated workflow fails, you can release manually:
 
-Helm chart release action is executed against release tags. It checks each chart in the charts folder, and whenever there's a new chart version, creates a corresponding GitHub release named for the chart version, adds Helm chart artifacts to the release, and creates or updates an index.yaml file with metadata about those releases, which is then hosted on GitHub Pages.
+1. Run the release script:
+   ```bash
+   ./release.sh <previous_version> <new_version>
+   ```
 
-### Committing the release
+2. Create a PR with the changes
 
-After running the `release.sh` script, you can create a pull request containing the changes made to the repo (mainly the files under ./charts and ./config. Once the pull request has merged, you need to tag the release.
-
-1. git checkout main
-2. git pull
-3. git tag v1.4.1
-4. git push origin v1.4.1
+3. After merge, tag and push:
+   ```bash
+   git checkout main && git pull
+   git tag v<new_version>
+   git push origin v<new_version>
+   ```
