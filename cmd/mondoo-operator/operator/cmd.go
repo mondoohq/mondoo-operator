@@ -120,7 +120,7 @@ func init() {
 			Client:                 mgr.GetClient(),
 			MondooClientBuilder:    controllers.MondooClientBuilder,
 			ContainerImageResolver: containerImageResolver,
-			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder, v, isOpenShift),
+			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder, v, containerImageResolver),
 			RunningOnOpenShift:     isOpenShift,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "MondooAuditConfig")
