@@ -1039,7 +1039,7 @@ kubectl exec -n spire-system $SPIRE_SERVER -- /opt/spire/bin/spire-server entry 
 docker logs k3d-target-server-0 2>&1 | grep -i "client certificate"
 ```
 
-### Test Method 8: AKS Azure Workload Identity
+### Test Method 4: AKS Azure Workload Identity
 
 This method tests Workload Identity Federation (WIF) with Azure AKS. The management cluster
 uses Azure AD Workload Identity to authenticate to a target AKS cluster without static credentials.
@@ -1329,7 +1329,7 @@ az aks delete --resource-group $AZURE_RESOURCE_GROUP --name $MGMT_CLUSTER_NAME -
 az aks delete --resource-group $AZURE_RESOURCE_GROUP --name $TARGET_CLUSTER_NAME --yes --no-wait
 ```
 
-### Test Method 7: EKS IAM Roles for Service Accounts (IRSA)
+### Test Method 5: EKS IAM Roles for Service Accounts (IRSA)
 
 This method tests Workload Identity using AWS EKS IRSA. The management cluster uses IAM Roles
 for Service Accounts to authenticate to a target EKS cluster without static credentials.
@@ -1965,9 +1965,9 @@ gcloud iam service-accounts delete $GSA_EMAIL --project=$GCP_PROJECT_ID --quiet
 | Test Type | How to Run |
 |-----------|-----------|
 | Unit tests (all providers) | `go test -v ./controllers/k8s_scan/... -run "WIF\|WorkloadIdentity"` |
+| AKS end-to-end | Follow Test Method 4 |
+| EKS end-to-end | Follow Test Method 5 |
 | GKE end-to-end | Follow Test Method 6 |
-| EKS end-to-end | Follow Test Method 7 |
-| AKS end-to-end | Follow Test Method 8 |
 
 ### Cleanup
 
