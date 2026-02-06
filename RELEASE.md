@@ -7,12 +7,12 @@ Releases are fully automated via GitHub Actions.
 ### To Release a New Version:
 
 1. Go to the repository's **Releases** page
-2. Click **Draft a new release**
-3. Click **Choose a tag** and type the new version (e.g., `v12.1.0`)
+2. Select **Draft a new release**
+3. Select **Choose a tag** and type the new version (e.g., `v12.1.0`)
 4. Select **Create new tag: v12.1.0 on publish**
 5. Set the release title (e.g., `v12.1.0`)
 6. Optionally add release notes describing the changes
-7. Click **Publish release**
+7. Select **Publish release**
 
 The release workflow will automatically:
 - Update version in Chart.yaml and kustomization.yaml
