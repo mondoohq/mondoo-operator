@@ -385,6 +385,8 @@ subjects:
 - **EKS**: Configure IRSA on management cluster, create IAM trust policy, grant role cluster access
 - **AKS**: Install Azure Workload Identity, create federated identity credential, grant managed identity RBAC on target cluster
 
+> **Terraform automation:** Terraform configurations for provisioning WIF test infrastructure (GKE, GKE Autopilot, EKS, AKS) are available in `tests/terraform/wif/`. See [Test Methods 4-6](#test-method-4-aks-azure-workload-identity) for cloud-specific instructions, or the [WIF Terraform README](../tests/terraform/wif/README.md) for the automated alternative.
+
 **Additional External Cluster Options:**
 
 Each external cluster also supports these optional fields:
@@ -1045,6 +1047,8 @@ This method tests Workload Identity Federation (WIF) with Azure AKS. The managem
 uses Azure AD Workload Identity to authenticate to a target AKS cluster without static credentials.
 
 > **Note:** This requires Azure resources and two AKS clusters. It cannot be tested locally with k3d.
+>
+> **Terraform alternative:** Instead of the manual steps below, you can use `tests/terraform/wif/aks/` to create both clusters and all IAM/RBAC plumbing automatically. See the [WIF Terraform README](../tests/terraform/wif/README.md).
 
 **Key AKS-specific details:**
 - ServiceAccount annotation: `azure.workload.identity/client-id`
@@ -1335,6 +1339,8 @@ This method tests Workload Identity using AWS EKS IRSA. The management cluster u
 for Service Accounts to authenticate to a target EKS cluster without static credentials.
 
 > **Note:** This requires AWS resources and two EKS clusters. It cannot be tested locally with k3d.
+>
+> **Terraform alternative:** Instead of the manual steps below, you can use `tests/terraform/wif/eks/` to create both clusters, the VPC, and all IAM plumbing automatically. See the [WIF Terraform README](../tests/terraform/wif/README.md).
 
 **Key EKS-specific details:**
 - ServiceAccount annotation: `eks.amazonaws.com/role-arn`
@@ -1687,6 +1693,8 @@ This method tests Workload Identity Federation with Google Kubernetes Engine. Th
 uses GCP Workload Identity to authenticate to a target GKE cluster without static credentials.
 
 > **Note:** This requires GCP resources and two GKE clusters. It cannot be tested locally with k3d.
+>
+> **Terraform alternative:** Instead of the manual steps below, you can use `tests/terraform/wif/gke/` (or `gke-autopilot/` for Autopilot clusters) to create both clusters and all IAM plumbing automatically. See the [WIF Terraform README](../tests/terraform/wif/README.md).
 
 **Key GKE-specific details:**
 - ServiceAccount annotation: `iam.gke.io/gcp-service-account`
