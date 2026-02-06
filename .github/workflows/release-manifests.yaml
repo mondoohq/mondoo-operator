@@ -3,6 +3,9 @@ name: Release Manifests
 on:
   workflow_call:
 
+permissions:
+  contents: write
+
 env:
   # Use docker.io for Docker Hub if empty
   REGISTRY: ghcr.io

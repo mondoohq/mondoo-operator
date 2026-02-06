@@ -16,6 +16,10 @@ on:
         default: main
         description: The image tag to use for the mondoo operator image
 
+permissions:
+  contents: read
+  checks: write
+
 env:
   MONDOO_OPERATOR_IMAGE_TAG: ${{ github.event.inputs.mondooOperatorImageTag || 'main' }}
   CNSPEC_IMAGE_TAG: ${{ github.event.inputs.cnspecImageTag || 'latest-rootless' }}
