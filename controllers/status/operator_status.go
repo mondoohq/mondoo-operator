@@ -31,6 +31,7 @@ type OperatorCustomState struct {
 	MondooAuditConfig      MondooAuditConfig
 	OperatorVersion        string
 	CnspecVersion          string
+	CnspecImageDigest      string
 	K8sResourcesScanning   bool
 	ContainerImageScanning bool
 	NodeScanning           bool
@@ -43,7 +44,7 @@ type MondooAuditConfig struct {
 }
 
 func ReportStatusRequestFromAuditConfig(
-	integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node, k8sVersion *k8sversion.Info, isOpenShift bool, log logr.Logger,
+	integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node, k8sVersion *k8sversion.Info, containerImageResolver mondoo.ContainerImageResolver, log logr.Logger,
 ) mondooclient.ReportStatusRequest {
 	nodeNames := make([]string, len(nodes))
 	for i := range nodes {
@@ -163,13 +164,23 @@ func ReportStatusRequestFromAuditConfig(
 		}
 	}
 
-	// Determine cnspec version based on OpenShift and user overrides
-	cnspecVersion := mondoo.CnspecTag
-	if isOpenShift {
-		cnspecVersion = mondoo.OpenShiftMondooClientTag
-	}
-	if m.Spec.Scanner.Image.Tag != "" {
-		cnspecVersion = m.Spec.Scanner.Image.Tag
+	// Resolve cnspec image to get version and digest
+	var cnspecVersion, cnspecImageDigest string
+	if containerImageResolver != nil {
+		resolvedImage, err := containerImageResolver.CnspecImage(m.Spec.Scanner.Image.Name, m.Spec.Scanner.Image.Tag, false)
+		if err != nil {
+			log.Error(err, "Failed to resolve cnspec image for status reporting")
+		} else {
+			// Extract digest from resolved image (format: image@sha256:...)
+			if idx := strings.Index(resolvedImage, "@"); idx != -1 {
+				cnspecImageDigest = resolvedImage[idx+1:]
+			}
+		}
+		// Get the tag separately (without resolution) for the version field
+		tagImage, _ := containerImageResolver.CnspecImage(m.Spec.Scanner.Image.Name, m.Spec.Scanner.Image.Tag, true)
+		if idx := strings.LastIndex(tagImage, ":"); idx != -1 {
+			cnspecVersion = tagImage[idx+1:]
+		}
 	}
 
 	return mondooclient.ReportStatusRequest{
@@ -181,6 +192,7 @@ func ReportStatusRequestFromAuditConfig(
 			MondooAuditConfig:      MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
 			OperatorVersion:        version.Version,
 			CnspecVersion:          cnspecVersion,
+			CnspecImageDigest:      cnspecImageDigest,
 			K8sResourcesScanning:   m.Spec.KubernetesResources.Enable,
 			ContainerImageScanning: m.Spec.Containers.Enable || m.Spec.KubernetesResources.ContainerImageScanning,
 			NodeScanning:           m.Spec.Nodes.Enable,

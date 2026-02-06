@@ -6,6 +6,7 @@ package status
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -14,6 +15,8 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient/mock"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
+	mondoofake "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	operatorVersion "go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/credentials"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
@@ -113,6 +116,7 @@ func (s *StatusReporterSuite) TestReport() {
 			MondooAuditConfig:      MondooAuditConfig{Name: s.auditConfig.Name, Namespace: s.auditConfig.Namespace},
 			OperatorVersion:        operatorVersion.Version,
 			CnspecVersion:          s.auditConfig.Spec.Scanner.Image.Tag,
+			CnspecImageDigest:      "sha256:abc123def456",
 			K8sResourcesScanning:   s.auditConfig.Spec.KubernetesResources.Enable,
 			ContainerImageScanning: s.auditConfig.Spec.KubernetesResources.ContainerImageScanning,
 			NodeScanning:           s.auditConfig.Spec.Nodes.Enable,
@@ -140,6 +144,7 @@ func (s *StatusReporterSuite) TestReport_StatusChange() {
 		MondooAuditConfig:      MondooAuditConfig{Name: s.auditConfig.Name, Namespace: s.auditConfig.Namespace},
 		OperatorVersion:        operatorVersion.Version,
 		CnspecVersion:          s.auditConfig.Spec.Scanner.Image.Tag,
+		CnspecImageDigest:      "sha256:abc123def456",
 		K8sResourcesScanning:   s.auditConfig.Spec.KubernetesResources.Enable,
 		ContainerImageScanning: s.auditConfig.Spec.KubernetesResources.ContainerImageScanning,
 		NodeScanning:           s.auditConfig.Spec.Nodes.Enable,
@@ -207,11 +212,29 @@ func (s *StatusReporterSuite) seedNodes() []client.Object {
 }
 
 func (s *StatusReporterSuite) createStatusReporter() StatusReporter {
+	mockResolver := &mondoofake.ContainerImageResolverMock{
+		CnspecImageFunc: func(userImage, userTag string, skipResolveImage bool) (string, error) {
+			image := mondoo.CnspecImage
+			tag := mondoo.CnspecTag
+			if userImage != "" {
+				image = userImage
+			}
+			if userTag != "" {
+				tag = userTag
+			}
+			if skipResolveImage {
+				return fmt.Sprintf("%s:%s", image, tag), nil
+			}
+			// Return image with digest when resolving
+			return fmt.Sprintf("%s@sha256:abc123def456", image), nil
+		},
+	}
 	return StatusReporter{
 		kubeClient: s.fakeClientBuilder.Build(),
 		k8sVersion: &version.Info{GitVersion: "v1.24.0"},
 		mondooClientBuilder: func(opts mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
 			return s.mockMondooClient, nil
 		},
+		containerImageResolver: mockResolver,
 	}
 }

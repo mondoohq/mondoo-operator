@@ -115,11 +115,12 @@ func init() {
 
 		ctx := ctrl.SetupSignalHandler()
 
+		containerImageResolver := mondoo.NewContainerImageResolver(mgr.GetClient(), isOpenShift)
 		if err = (&controllers.MondooAuditConfigReconciler{
 			Client:                 mgr.GetClient(),
 			MondooClientBuilder:    controllers.MondooClientBuilder,
-			ContainerImageResolver: mondoo.NewContainerImageResolver(mgr.GetClient(), isOpenShift),
-			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder, v, isOpenShift),
+			ContainerImageResolver: containerImageResolver,
+			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder, v, containerImageResolver),
 			RunningOnOpenShift:     isOpenShift,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "MondooAuditConfig")
