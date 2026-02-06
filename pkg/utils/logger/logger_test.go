@@ -37,14 +37,14 @@ func (t *testEncoder) AppendUint16(uint16)         {}
 func (t *testEncoder) AppendUint8(uint8)           {}
 func (t *testEncoder) AppendUintptr(uintptr)       {}
 
-func TestGcpLevelEncoder(t *testing.T) {
+func TestSeverityLevelEncoder(t *testing.T) {
 	tests := []struct {
 		level    zapcore.Level
 		expected string
 	}{
 		{zapcore.DebugLevel, "DEBUG"},
 		{zapcore.InfoLevel, "INFO"},
-		{zapcore.WarnLevel, "WARNING"}, // GCP expects WARNING, not WARN
+		{zapcore.WarnLevel, "WARNING"}, // Cloud log explorers expect WARNING, not WARN
 		{zapcore.ErrorLevel, "ERROR"},
 		{zapcore.DPanicLevel, "CRITICAL"},
 		{zapcore.PanicLevel, "CRITICAL"},
@@ -54,7 +54,7 @@ func TestGcpLevelEncoder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.level.String(), func(t *testing.T) {
 			enc := &testEncoder{}
-			gcpLevelEncoder(tt.level, enc)
+			severityLevelEncoder(tt.level, enc)
 			assert.Equal(t, tt.expected, enc.result)
 		})
 	}
