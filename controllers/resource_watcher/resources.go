@@ -5,6 +5,7 @@ package resource_watcher
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -85,9 +86,14 @@ func Deployment(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.Mondoo
 		cmd = append(cmd, "--api-proxy", *cfg.Spec.HttpProxy)
 	}
 
-	// Add annotations
-	for key, value := range m.Spec.Annotations {
-		cmd = append(cmd, "--annotation", fmt.Sprintf("%s=%s", key, value))
+	// Add annotations (sorted for deterministic ordering)
+	annotationKeys := make([]string, 0, len(m.Spec.Annotations))
+	for k := range m.Spec.Annotations {
+		annotationKeys = append(annotationKeys, k)
+	}
+	sort.Strings(annotationKeys)
+	for _, key := range annotationKeys {
+		cmd = append(cmd, "--annotation", fmt.Sprintf("%s=%s", key, m.Spec.Annotations[key]))
 	}
 
 	envVars := feature_flags.AllFeatureFlagsAsEnv()

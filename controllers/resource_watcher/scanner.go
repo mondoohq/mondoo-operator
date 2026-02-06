@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"time"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -80,9 +81,14 @@ func (s *Scanner) ScanManifests(ctx context.Context, manifests []byte) error {
 	if s.config.APIProxy != "" {
 		cnspecArgs = append(cnspecArgs, "--api-proxy", s.config.APIProxy)
 	}
-	// Add annotations as command-line arguments
-	for key, value := range s.config.Annotations {
-		cnspecArgs = append(cnspecArgs, "--annotation", fmt.Sprintf("%s=%s", key, value))
+	// Add annotations as command-line arguments (sorted for deterministic ordering)
+	annotationKeys := make([]string, 0, len(s.config.Annotations))
+	for k := range s.config.Annotations {
+		annotationKeys = append(annotationKeys, k)
+	}
+	sort.Strings(annotationKeys)
+	for _, key := range annotationKeys {
+		cnspecArgs = append(cnspecArgs, "--annotation", fmt.Sprintf("%s=%s", key, s.config.Annotations[key]))
 	}
 
 	// Create context with timeout

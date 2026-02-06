@@ -234,6 +234,39 @@ func TestDeployment_WatchAllResources(t *testing.T) {
 	assert.Contains(t, cmdStr, "--watch-all-resources")
 }
 
+func TestDeployment_WithAnnotations(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-config",
+			Namespace: "mondoo-operator",
+		},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable: true,
+				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
+					Enable: true,
+				},
+			},
+			Annotations: map[string]string{
+				"env":  "prod",
+				"team": "platform",
+			},
+		},
+	}
+
+	operatorConfig := v1alpha2.MondooOperatorConfig{}
+
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", config, operatorConfig)
+
+	container := deployment.Spec.Template.Spec.Containers[0]
+	cmdStr := ""
+	for _, c := range container.Command {
+		cmdStr += c + " "
+	}
+	assert.Contains(t, cmdStr, "--annotation env=prod")
+	assert.Contains(t, cmdStr, "--annotation team=platform")
+}
+
 func TestDeployment_HighPriorityByDefault(t *testing.T) {
 	config := &v1alpha2.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{

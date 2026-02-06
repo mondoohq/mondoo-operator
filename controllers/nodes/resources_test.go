@@ -242,6 +242,25 @@ func TestInventory(t *testing.T) {
 	assert.Contains(t, inventory, integrationMRN)
 }
 
+func TestInventory_WithAnnotations(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Annotations: map[string]string{
+				"env":  "prod",
+				"team": "platform",
+			},
+		},
+	}
+
+	inv, err := Inventory("", testClusterUID, auditConfig)
+	assert.NoError(t, err, "unexpected error generating inventory")
+	assert.Contains(t, inv, "env")
+	assert.Contains(t, inv, "prod")
+	assert.Contains(t, inv, "team")
+	assert.Contains(t, inv, "platform")
+}
+
 func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {
 	return &v1alpha2.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{
