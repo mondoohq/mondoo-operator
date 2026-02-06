@@ -32,6 +32,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	resourcewatcher "go.mondoo.com/mondoo-operator/controllers/resource_watcher"
 	"go.mondoo.com/mondoo-operator/controllers/status"
+	"go.mondoo.com/mondoo-operator/pkg/annotations"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -181,6 +182,12 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// Validate annotations before using them in inventory or CLI args
+	if err := annotations.Validate(mondooAuditConfig.Spec.Annotations); err != nil {
+		log.Error(err, "invalid annotations in MondooAuditConfig")
+		return ctrl.Result{}, err
 	}
 
 	mondooAuditConfigCopy := mondooAuditConfig.DeepCopy()

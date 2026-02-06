@@ -259,12 +259,17 @@ func TestDeployment_WithAnnotations(t *testing.T) {
 	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", config, operatorConfig)
 
 	container := deployment.Spec.Template.Spec.Containers[0]
-	cmdStr := ""
-	for _, c := range container.Command {
-		cmdStr += c + " "
+	cmd := container.Command
+
+	// Find --annotation flags and collect their values
+	annotationArgs := map[string]bool{}
+	for i, arg := range cmd {
+		if arg == "--annotation" && i+1 < len(cmd) {
+			annotationArgs[cmd[i+1]] = true
+		}
 	}
-	assert.Contains(t, cmdStr, "--annotation env=prod")
-	assert.Contains(t, cmdStr, "--annotation team=platform")
+	assert.True(t, annotationArgs["env=prod"], "expected --annotation env=prod")
+	assert.True(t, annotationArgs["team=platform"], "expected --annotation team=platform")
 }
 
 func TestDeployment_HighPriorityByDefault(t *testing.T) {

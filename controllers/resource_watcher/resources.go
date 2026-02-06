@@ -5,7 +5,6 @@ package resource_watcher
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/annotations"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -87,14 +87,7 @@ func Deployment(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.Mondoo
 	}
 
 	// Add annotations (sorted for deterministic ordering)
-	annotationKeys := make([]string, 0, len(m.Spec.Annotations))
-	for k := range m.Spec.Annotations {
-		annotationKeys = append(annotationKeys, k)
-	}
-	sort.Strings(annotationKeys)
-	for _, key := range annotationKeys {
-		cmd = append(cmd, "--annotation", fmt.Sprintf("%s=%s", key, m.Spec.Annotations[key]))
-	}
+	cmd = append(cmd, annotations.AnnotationArgs(m.Spec.Annotations)...)
 
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})

@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"go.mondoo.com/mondoo-operator/controllers/resource_watcher"
+	annot "go.mondoo.com/mondoo-operator/pkg/annotations"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 )
 
@@ -108,6 +109,11 @@ func init() {
 					}
 				}
 			}
+		}
+
+		// Validate annotations
+		if err := annot.Validate(*annotations); err != nil {
+			return fmt.Errorf("invalid annotations: %w", err)
 		}
 
 		logger.Info("Starting resource watcher",
