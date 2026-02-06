@@ -6,6 +6,7 @@ package resource_watcher
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -72,7 +73,6 @@ func ToSingular(plural string) string {
 	}
 	// Unknown type — return lowercase as-is rather than guessing.
 	// If this fires, the type should be added to resourceTypePluralization.
-	watcherLogger.V(1).Info("Unknown resource type for singularization, returning as-is", "type", plural)
 	return lower
 }
 
@@ -198,22 +198,11 @@ func (w *ResourceWatcher) getObjectForResourceType(resourceType string) (client.
 func (w *ResourceWatcher) shouldWatchNamespace(namespace string) bool {
 	// If include list is specified, only watch those namespaces
 	if len(w.config.Namespaces) > 0 {
-		for _, ns := range w.config.Namespaces {
-			if ns == namespace {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(w.config.Namespaces, namespace)
 	}
 
 	// Check exclude list
-	for _, ns := range w.config.NamespacesExclude {
-		if ns == namespace {
-			return false
-		}
-	}
-
-	return true
+	return !slices.Contains(w.config.NamespacesExclude, namespace)
 }
 
 // resourceEventHandler handles resource events from informers.
@@ -223,7 +212,7 @@ type resourceEventHandler struct {
 	gvk          schema.GroupVersionKind
 }
 
-func (h *resourceEventHandler) OnAdd(obj interface{}, isInInitialList bool) {
+func (h *resourceEventHandler) OnAdd(obj any, isInInitialList bool) {
 	// Skip initial list sync - we only want to scan changes
 	if isInInitialList {
 		return
@@ -231,16 +220,16 @@ func (h *resourceEventHandler) OnAdd(obj interface{}, isInInitialList bool) {
 	h.handleEvent(obj, "add")
 }
 
-func (h *resourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
+func (h *resourceEventHandler) OnUpdate(oldObj, newObj any) {
 	h.handleEvent(newObj, "update")
 }
 
-func (h *resourceEventHandler) OnDelete(obj interface{}) {
+func (h *resourceEventHandler) OnDelete(obj any) {
 	// We don't scan on delete - the resource is gone
 	watcherLogger.V(1).Info("Resource deleted", "resourceType", h.resourceType)
 }
 
-func (h *resourceEventHandler) handleEvent(obj interface{}, eventType string) {
+func (h *resourceEventHandler) handleEvent(obj any, eventType string) {
 	clientObj, ok := obj.(client.Object)
 	if !ok {
 		watcherLogger.Error(nil, "Failed to convert object to client.Object")
