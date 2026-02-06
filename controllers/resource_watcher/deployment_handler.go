@@ -51,18 +51,16 @@ func (h *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		return err
 	}
 
-	// Get cluster UID for asset labeling
+	// Get cluster UID for asset labeling (best-effort)
 	clusterUID, err := k8s.GetClusterUID(ctx, h.KubeClient, deploymentHandlerLogger)
 	if err != nil {
-		deploymentHandlerLogger.Error(err, "Failed to get cluster UID")
-		return err
+		deploymentHandlerLogger.Info("Failed to get cluster UID, continuing without it", "error", err)
 	}
 
-	// Get integration MRN if available
+	// Get integration MRN if available (best-effort)
 	integrationMRN, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, h.KubeClient, *h.Mondoo)
 	if err != nil {
-		deploymentHandlerLogger.Error(err, "Failed to get integration MRN")
-		return err
+		deploymentHandlerLogger.Info("Failed to get integration MRN, continuing without it", "error", err)
 	}
 
 	existing := &appsv1.Deployment{}
