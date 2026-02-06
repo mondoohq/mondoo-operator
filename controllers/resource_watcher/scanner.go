@@ -168,6 +168,21 @@ func (s *Scanner) generateInventory(resources []K8sResourceIdentifier) ([]byte, 
 		targets = append(targets, t)
 	}
 
+	opts := map[string]string{
+		"k8s-resources": strings.Join(resourceFilters, ","),
+	}
+	if len(s.config.Namespaces) > 0 {
+		opts["namespaces"] = strings.Join(s.config.Namespaces, ",")
+	}
+	if len(s.config.NamespacesExclude) > 0 {
+		opts["namespaces-exclude"] = strings.Join(s.config.NamespacesExclude, ",")
+	}
+
+	managedBy := "mondoo-operator"
+	if s.config.ClusterUID != "" {
+		managedBy = "mondoo-operator-" + s.config.ClusterUID
+	}
+
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-resource-watcher-inventory",
@@ -177,19 +192,8 @@ func (s *Scanner) generateInventory(resources []K8sResourceIdentifier) ([]byte, 
 				{
 					Connections: []*inventory.Config{
 						{
-							Type: "k8s",
-							Options: func() map[string]string {
-								opts := map[string]string{
-									"k8s-resources": strings.Join(resourceFilters, ","),
-								}
-								if len(s.config.Namespaces) > 0 {
-									opts["namespaces"] = strings.Join(s.config.Namespaces, ",")
-								}
-								if len(s.config.NamespacesExclude) > 0 {
-									opts["namespaces-exclude"] = strings.Join(s.config.NamespacesExclude, ",")
-								}
-								return opts
-							}(),
+							Type:    "k8s",
+							Options: opts,
 							Discover: &inventory.Discovery{
 								Targets: targets,
 							},
@@ -198,7 +202,7 @@ func (s *Scanner) generateInventory(resources []K8sResourceIdentifier) ([]byte, 
 					Labels: map[string]string{
 						"k8s.mondoo.com/kind": "cluster",
 					},
-					ManagedBy: "mondoo-operator-" + s.config.ClusterUID,
+					ManagedBy: managedBy,
 				},
 			},
 		},
