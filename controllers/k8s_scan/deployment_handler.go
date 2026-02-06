@@ -137,7 +137,7 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 
 func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(
-		ctx, n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+		ctx, n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.Mondoo.Spec.Scanner.Image.Digest, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		logger.Error(err, "Failed to resolve mondoo-operator container image")
 		return err
@@ -271,7 +271,7 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, integrationMrn, c
 // reconcileExternalClusters reconciles CronJobs for external clusters
 func (n *DeploymentHandler) reconcileExternalClusters(ctx context.Context) error {
 	mondooClientImage, err := n.ContainerImageResolver.CnspecImage(
-		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.Mondoo.Spec.Scanner.Image.Digest, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		logger.Error(err, "Failed to resolve cnspec container image")
 		return err

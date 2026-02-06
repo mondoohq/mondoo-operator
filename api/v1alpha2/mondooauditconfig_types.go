@@ -397,6 +397,10 @@ type DeprecatedCertificateProvisioning struct {
 type Image struct {
 	Name string `json:"name,omitempty"`
 	Tag  string `json:"tag,omitempty"`
+	// Digest specifies the image digest (e.g., sha256:abc123...).
+	// When specified, this takes precedence over Tag.
+	// +optional
+	Digest string `json:"digest,omitempty"`
 }
 
 // MondooAuditConfigStatus defines the observed state of MondooAuditConfig

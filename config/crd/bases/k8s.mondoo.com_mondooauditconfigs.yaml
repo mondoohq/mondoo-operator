@@ -59,6 +59,11 @@ spec:
                   image:
                     description: Image is DEPRECATED.
                     properties:
+                      digest:
+                        description: |-
+                          Digest specifies the image digest (e.g., sha256:abc123...).
+                          When specified, this takes precedence over Tag.
+                        type: string
                       name:
                         type: string
                       tag:
@@ -1092,6 +1097,11 @@ spec:
                     type: array
                   image:
                     properties:
+                      digest:
+                        description: |-
+                          Digest specifies the image digest (e.g., sha256:abc123...).
+                          When specified, this takes precedence over Tag.
+                        type: string
                       name:
                         type: string
                       tag:

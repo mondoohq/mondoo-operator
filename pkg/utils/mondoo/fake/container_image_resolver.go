@@ -16,10 +16,32 @@ func NewNoOpContainerImageResolver() mondoo.ContainerImageResolver {
 	return &noOpContainerImageResolver{}
 }
 
-func (c *noOpContainerImageResolver) CnspecImage(userImage, userTag string, skipResolveImage bool) (string, error) {
-	return fmt.Sprintf("%s:%s", mondoo.CnspecImage, mondoo.CnspecTag), nil
+func (c *noOpContainerImageResolver) CnspecImage(userImage, userTag, userDigest string, skipResolveImage bool) (string, error) {
+	image := mondoo.CnspecImage
+	if userImage != "" {
+		image = userImage
+	}
+	if userDigest != "" {
+		return fmt.Sprintf("%s@%s", image, userDigest), nil
+	}
+	tag := mondoo.CnspecTag
+	if userTag != "" {
+		tag = userTag
+	}
+	return fmt.Sprintf("%s:%s", image, tag), nil
 }
 
-func (c *noOpContainerImageResolver) MondooOperatorImage(ctx context.Context, userImage, userTag string, skipResolveImage bool) (string, error) {
-	return fmt.Sprintf("%s:%s", mondoo.MondooOperatorImage, mondoo.MondooOperatorTag), nil
+func (c *noOpContainerImageResolver) MondooOperatorImage(ctx context.Context, userImage, userTag, userDigest string, skipResolveImage bool) (string, error) {
+	image := mondoo.MondooOperatorImage
+	if userImage != "" {
+		image = userImage
+	}
+	if userDigest != "" {
+		return fmt.Sprintf("%s@%s", image, userDigest), nil
+	}
+	tag := mondoo.MondooOperatorTag
+	if userTag != "" {
+		tag = userTag
+	}
+	return fmt.Sprintf("%s:%s", image, tag), nil
 }
