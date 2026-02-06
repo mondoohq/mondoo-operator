@@ -8,6 +8,7 @@ eksctl
 fullname
 iamidentitymapping
 irsa
+mcr
 oidc
 openssl
 psat
