@@ -51,6 +51,20 @@ echo "$CRD_OUTPUT" | yq eval 'select(.metadata.name == "mondoooperatorconfigs.k8
     sed 's/name: mondoooperatorconfigs.k8s.mondoo.com/name: mondoooperatorconfigs.k8s.mondoo.com\n  labels:\n  {{- include "mondoo-operator.labels" . | nindent 4 }}/' \
     > "${CHART_DIR}/mondoooperatorconfig-crd.yaml"
 
+# Validate that Helm template directives were injected correctly
+echo "Validating Helm template directives..."
+for crd_file in "${CHART_DIR}/mondooauditconfig-crd.yaml" "${CHART_DIR}/mondoooperatorconfig-crd.yaml"; do
+    if ! grep -q 'include "mondoo-operator.labels"' "$crd_file"; then
+        echo "Error: Helm labels template not found in $(basename "$crd_file")"
+        exit 1
+    fi
+done
+
+if ! grep -q '\.Release\.Namespace' "${CHART_DIR}/mondooauditconfig-crd.yaml"; then
+    echo "Error: Helm namespace template not found in mondooauditconfig-crd.yaml"
+    exit 1
+fi
+
 echo "CRDs updated successfully in ${CHART_DIR}"
 echo ""
 echo "Please review the changes with: git diff charts/mondoo-operator/templates/*-crd.yaml"

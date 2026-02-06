@@ -52,9 +52,6 @@ metricsService:
     protocol: TCP
     targetPort: metrics
   type: ClusterIP
-webhook:
-  serviceAccount:
-    annotations: {}
 # Pre-delete cleanup hook configuration
 # This hook runs before uninstall to delete MondooAuditConfig resources,
 # allowing finalizers to clean up operator-created resources properly.
