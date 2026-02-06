@@ -125,6 +125,9 @@ vet: ## Run go vet against code.
 lint: golangci-lint generate
 	$(GOLANGCI_LINT) run
 
+lint/actions: actionlint ## Lint GitHub Actions workflows.
+	$(ACTIONLINT) -shellcheck=
+
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) --arch=amd64 use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(UNIT_TEST_PACKAGES) -coverprofile cover.out
 
@@ -298,6 +301,12 @@ GOMOCKGEN = $(LOCALBIN)/mockgen
 gomockgen: $(GOMOCKGEN) ## Download go mockgen locally if necessary.
 $(GOMOCKGEN): $(LOCALBIN)
 	test -s $(LOCALBIN)/mockgen || GOBIN=$(LOCALBIN) go install github.com/golang/mock/mockgen@v1.6.0
+
+ACTIONLINT = $(LOCALBIN)/actionlint
+.PHONY: actionlint
+actionlint: $(ACTIONLINT) ## Download actionlint locally if necessary.
+$(ACTIONLINT): $(LOCALBIN)
+	test -s $(LOCALBIN)/actionlint || GOBIN=$(LOCALBIN) go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.10
 
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 

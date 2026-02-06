@@ -15,23 +15,6 @@ on:
         type: string
         default: main
         description: The image tag to use for the mondoo operator image
-    secrets:
-      MONDOO_CLIENT:
-        required: true
-      AZURE_CLIENT_ID:
-        required: true
-      AZURE_CLIENT_SECRET:
-        required: true
-      AZURE_SUBSCRIPTION_ID:
-        required: true
-      AZURE_TENANT_ID:
-        required: true
-      AWS_ACCESS_KEY_ID:
-        required: true
-      AWS_SECRET_ACCESS_KEY:
-        required: true
-      GCP_SERVICE_ACCOUNT:
-        required: true
 
 env:
   MONDOO_OPERATOR_IMAGE_TAG: ${{ github.event.inputs.mondooOperatorImageTag || 'main' }}
@@ -314,7 +297,6 @@ jobs:
     steps:
       - name: Send Slack notification on failure
         uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
-        if: ${{ always() && steps.build-providers.outcome != 'success' }}
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}
