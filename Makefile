@@ -306,7 +306,7 @@ ACTIONLINT = $(LOCALBIN)/actionlint
 .PHONY: actionlint
 actionlint: $(ACTIONLINT) ## Download actionlint locally if necessary.
 $(ACTIONLINT): $(LOCALBIN)
-	test -s $(LOCALBIN)/actionlint || GOBIN=$(LOCALBIN) go install github.com/rhysd/actionlint/cmd/actionlint@latest
+	test -s $(LOCALBIN)/actionlint || GOBIN=$(LOCALBIN) go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.10
 
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 

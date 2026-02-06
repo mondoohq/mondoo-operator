@@ -11,7 +11,7 @@ on:
       MONDOO_CLIENT_EDGE:
         required: true
       MONDOO_TEST_ORG_TOKEN:
-        required: false
+        required: true
       SLACK_BOT_TOKEN:
         required: false
 
