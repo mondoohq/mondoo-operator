@@ -45,6 +45,37 @@ var DefaultResourceTypes = []string{
 	"namespaces",
 }
 
+// resourceTypePluralization maps plural resource type names to their singular form.
+// This is needed because Kubernetes uses plural forms (e.g., "ingresses") but cnspec
+// expects singular forms (e.g., "ingress") for resource filtering.
+var resourceTypePluralization = map[string]string{
+	"pods":            "pod",
+	"deployments":     "deployment",
+	"daemonsets":      "daemonset",
+	"statefulsets":    "statefulset",
+	"replicasets":     "replicaset",
+	"jobs":            "job",
+	"cronjobs":        "cronjob",
+	"services":        "service",
+	"ingresses":       "ingress",
+	"namespaces":      "namespace",
+	"configmaps":      "configmap",
+	"secrets":         "secret",
+	"serviceaccounts": "serviceaccount",
+}
+
+// ToSingular converts a plural resource type to singular form.
+func ToSingular(plural string) string {
+	if singular, ok := resourceTypePluralization[strings.ToLower(plural)]; ok {
+		return singular
+	}
+	// Fallback for unknown types: strip trailing 's'
+	if len(plural) > 0 && plural[len(plural)-1] == 's' {
+		return plural[:len(plural)-1]
+	}
+	return plural
+}
+
 // WatcherConfig holds configuration for the ResourceWatcher.
 type WatcherConfig struct {
 	// Namespaces is the list of namespaces to watch. Empty means all namespaces.
@@ -240,15 +271,8 @@ func (h *resourceEventHandler) handleEvent(obj interface{}, eventType string) {
 		"name", clientObj.GetName())
 
 	// Create resource identifier for scanning
-	// Note: resourceType is plural (e.g., "deployments"), but cnspec's k8s-resources filter
-	// expects singular form (e.g., "deployment"), so we trim the trailing 's'
-	singularType := h.resourceType
-	if len(singularType) > 0 && singularType[len(singularType)-1] == 's' {
-		singularType = singularType[:len(singularType)-1]
-	}
-
 	resource := K8sResourceIdentifier{
-		Type:      singularType,
+		Type:      h.resourceType, // plural form (e.g., "deployments")
 		Namespace: namespace,
 		Name:      clientObj.GetName(),
 	}

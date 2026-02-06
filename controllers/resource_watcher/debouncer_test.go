@@ -242,11 +242,15 @@ func TestDebouncer_MultipleNamespaces(t *testing.T) {
 }
 
 func TestK8sResourceIdentifier_String(t *testing.T) {
-	// Namespaced resource
-	r := K8sResourceIdentifier{Type: "deployment", Namespace: "default", Name: "nginx"}
+	// Namespaced resource - Type is plural, String() returns singular
+	r := K8sResourceIdentifier{Type: "deployments", Namespace: "default", Name: "nginx"}
 	assert.Equal(t, "deployment:default:nginx", r.String())
 
 	// Cluster-scoped resource
-	r = K8sResourceIdentifier{Type: "namespace", Namespace: "", Name: "kube-system"}
+	r = K8sResourceIdentifier{Type: "namespaces", Namespace: "", Name: "kube-system"}
 	assert.Equal(t, "namespace:kube-system", r.String())
+
+	// Ingress - verifies proper pluralization (not just stripping 's')
+	r = K8sResourceIdentifier{Type: "ingresses", Namespace: "default", Name: "my-ingress"}
+	assert.Equal(t, "ingress:default:my-ingress", r.String())
 }

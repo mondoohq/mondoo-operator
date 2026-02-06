@@ -52,18 +52,20 @@ func NewScanner(config ScannerConfig) *Scanner {
 
 // K8sResourceIdentifier identifies a specific K8s resource.
 type K8sResourceIdentifier struct {
-	Type      string // e.g., "deployment", "pod"
+	Type      string // plural form, e.g., "deployments", "ingresses"
 	Namespace string // empty for cluster-scoped resources
 	Name      string
 }
 
 // String returns the resource identifier in the format expected by cnspec's k8s-resources option.
 // Format: type:namespace:name for namespaced, type:name for cluster-scoped
+// Note: cnspec expects singular type names (e.g., "deployment" not "deployments")
 func (r K8sResourceIdentifier) String() string {
+	singularType := ToSingular(r.Type)
 	if r.Namespace == "" {
-		return fmt.Sprintf("%s:%s", r.Type, r.Name)
+		return fmt.Sprintf("%s:%s", singularType, r.Name)
 	}
-	return fmt.Sprintf("%s:%s:%s", r.Type, r.Namespace, r.Name)
+	return fmt.Sprintf("%s:%s:%s", singularType, r.Namespace, r.Name)
 }
 
 // ScanResources scans specific K8s resources using the K8s API connection.
@@ -159,7 +161,7 @@ func (s *Scanner) generateInventory(resources []K8sResourceIdentifier) ([]byte, 
 	// Extract unique resource types for discovery targets
 	typeSet := make(map[string]struct{})
 	for _, r := range resources {
-		typeSet[r.Type+"s"] = struct{}{} // cnspec uses plural form (e.g., "deployments")
+		typeSet[r.Type] = struct{}{} // Type is already plural (e.g., "deployments")
 	}
 	targets := make([]string, 0, len(typeSet))
 	for t := range typeSet {
