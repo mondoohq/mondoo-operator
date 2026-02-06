@@ -184,12 +184,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Validate annotations before using them in inventory or CLI args
-	if err := annotations.Validate(mondooAuditConfig.Spec.Annotations); err != nil {
-		log.Error(err, "invalid annotations in MondooAuditConfig")
-		return ctrl.Result{}, err
-	}
-
 	mondooAuditConfigCopy := mondooAuditConfig.DeepCopy()
 
 	// Conditions might be updated before this reconciler reaches the end
@@ -227,6 +221,34 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			reconcileError = deferFuncErr
 		}
 	}()
+
+	// Validate annotations before using them in inventory or CLI args.
+	// Set a degraded condition so users can see the problem via kubectl describe.
+	if err := annotations.Validate(mondooAuditConfig.Spec.Annotations); err != nil {
+		mondooAuditConfig.Status.Conditions = mondoo.SetMondooAuditCondition(
+			mondooAuditConfig.Status.Conditions,
+			v1alpha2.MondooOperatorDegraded,
+			corev1.ConditionTrue,
+			"InvalidAnnotations",
+			fmt.Sprintf("Invalid annotations in MondooAuditConfig: %s", err),
+			mondoo.UpdateConditionIfReasonOrMessageChange,
+			nil, "",
+		)
+		log.Error(err, "invalid annotations in MondooAuditConfig, skipping reconciliation")
+		return ctrl.Result{}, nil
+	}
+	// Clear any previous annotation validation error
+	if cond := mondoo.FindMondooAuditConditions(mondooAuditConfig.Status.Conditions, v1alpha2.MondooOperatorDegraded); cond != nil && cond.Reason == "InvalidAnnotations" {
+		mondooAuditConfig.Status.Conditions = mondoo.SetMondooAuditCondition(
+			mondooAuditConfig.Status.Conditions,
+			v1alpha2.MondooOperatorDegraded,
+			corev1.ConditionFalse,
+			"AnnotationsValid",
+			"Annotations are valid",
+			mondoo.UpdateConditionAlways,
+			nil, "",
+		)
+	}
 
 	// If spec.MondooTokenSecretRef != "" and the Secret referenced in spec.MondooCredsSecretRef
 	// does not exist, then attempt to trade the token for a Mondoo service account and save it
