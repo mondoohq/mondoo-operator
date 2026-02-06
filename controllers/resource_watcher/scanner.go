@@ -23,6 +23,8 @@ type ScannerConfig struct {
 	APIProxy string
 	// Timeout is the timeout for scan operations.
 	Timeout time.Duration
+	// Annotations are key-value pairs to attach to all scanned assets.
+	Annotations map[string]string
 }
 
 // Scanner executes cnspec scans on K8s manifests.
@@ -77,6 +79,10 @@ func (s *Scanner) ScanManifests(ctx context.Context, manifests []byte) error {
 	}
 	if s.config.APIProxy != "" {
 		cnspecArgs = append(cnspecArgs, "--api-proxy", s.config.APIProxy)
+	}
+	// Add annotations as command-line arguments
+	for key, value := range s.config.Annotations {
+		cnspecArgs = append(cnspecArgs, "--annotation", fmt.Sprintf("%s=%s", key, value))
 	}
 
 	// Create context with timeout

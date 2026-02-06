@@ -80,6 +80,14 @@ spec:
                     description: ServiceAccountName is DEPRECATED.
                     type: string
                 type: object
+              annotations:
+                additionalProperties:
+                  type: string
+                description: |-
+                  Annotations allows adding custom annotations to all scanned assets. These key-value pairs
+                  will be attached to every asset discovered by the operator, making them searchable
+                  and filterable in the Mondoo Console.
+                type: object
               consoleIntegration:
                 properties:
                   enable:

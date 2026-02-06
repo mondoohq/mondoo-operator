@@ -85,6 +85,11 @@ func Deployment(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.Mondoo
 		cmd = append(cmd, "--api-proxy", *cfg.Spec.HttpProxy)
 	}
 
+	// Add annotations
+	for key, value := range m.Spec.Annotations {
+		cmd = append(cmd, "--annotation", fmt.Sprintf("%s=%s", key, value))
+	}
+
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 

@@ -374,6 +374,13 @@ func (in *MondooAuditConfigSpec) DeepCopyInto(out *MondooAuditConfigSpec) {
 	out.ConsoleIntegration = in.ConsoleIntegration
 	in.Filtering.DeepCopyInto(&out.Filtering)
 	in.Containers.DeepCopyInto(&out.Containers)
+	if in.Annotations != nil {
+		in, out := &in.Annotations, &out.Annotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Admission != nil {
 		in, out := &in.Admission, &out.Admission
 		*out = new(DeprecatedAdmission)

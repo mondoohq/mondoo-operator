@@ -54,6 +54,7 @@ func init() {
 	resourceTypes := Cmd.Flags().StringSlice("resource-types", nil, "Resource types to watch (comma-separated). Overrides --watch-all-resources if specified.")
 	apiProxy := Cmd.Flags().String("api-proxy", "", "HTTP proxy to use for API requests.")
 	timeout := Cmd.Flags().Duration("timeout", 25*time.Minute, "Timeout for scan operations.")
+	annotations := Cmd.Flags().StringToString("annotation", nil, "Annotations to add to scanned assets (can specify multiple, e.g., --annotation env=prod --annotation team=platform).")
 
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(logger.NewLogger())
@@ -117,7 +118,8 @@ func init() {
 			"minimumScanInterval", *minimumScanInterval,
 			"watchAllResources", *watchAllResources,
 			"resourceTypes", resourceTypesList,
-			"timeout", *timeout)
+			"timeout", *timeout,
+			"annotations", *annotations)
 
 		// Create context with signal handling
 		ctx, cancel := context.WithCancel(context.Background())
@@ -159,9 +161,10 @@ func init() {
 
 		// Create scanner
 		scanner := resource_watcher.NewScanner(resource_watcher.ScannerConfig{
-			ConfigPath: *configPath,
-			APIProxy:   *apiProxy,
-			Timeout:    *timeout,
+			ConfigPath:  *configPath,
+			APIProxy:    *apiProxy,
+			Timeout:     *timeout,
+			Annotations: *annotations,
 		})
 
 		// Create debouncer with rate limiting
