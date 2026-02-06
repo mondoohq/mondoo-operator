@@ -46,36 +46,6 @@ var DefaultResourceTypes = []string{
 	"namespaces",
 }
 
-// resourceTypePluralization maps plural resource type names to their singular form.
-// This is needed because Kubernetes uses plural forms (e.g., "ingresses") but cnspec
-// expects singular forms (e.g., "ingress") for resource filtering.
-var resourceTypePluralization = map[string]string{
-	"pods":            "pod",
-	"deployments":     "deployment",
-	"daemonsets":      "daemonset",
-	"statefulsets":    "statefulset",
-	"replicasets":     "replicaset",
-	"jobs":            "job",
-	"cronjobs":        "cronjob",
-	"services":        "service",
-	"ingresses":       "ingress",
-	"namespaces":      "namespace",
-	"configmaps":      "configmap",
-	"secrets":         "secret",
-	"serviceaccounts": "serviceaccount",
-}
-
-// ToSingular converts a plural resource type to singular form.
-func ToSingular(plural string) string {
-	lower := strings.ToLower(plural)
-	if singular, ok := resourceTypePluralization[lower]; ok {
-		return singular
-	}
-	// Unknown type — return lowercase as-is rather than guessing.
-	// If this fires, the type should be added to resourceTypePluralization.
-	return lower
-}
-
 // WatcherConfig holds configuration for the ResourceWatcher.
 type WatcherConfig struct {
 	// Namespaces is the list of namespaces to watch. Empty means all namespaces.
