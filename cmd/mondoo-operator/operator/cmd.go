@@ -119,7 +119,7 @@ func init() {
 			Client:                 mgr.GetClient(),
 			MondooClientBuilder:    controllers.MondooClientBuilder,
 			ContainerImageResolver: mondoo.NewContainerImageResolver(mgr.GetClient(), isOpenShift),
-			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder, v),
+			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder, v, isOpenShift),
 			RunningOnOpenShift:     isOpenShift,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "MondooAuditConfig")
@@ -149,7 +149,7 @@ func init() {
 			setupLog.Error(err, "unable to create non-caching k8s client")
 			return err
 		}
-		err = checkForTerminatedState(ctx, client, v, setupLog)
+		err = checkForTerminatedState(ctx, client, v, isOpenShift, setupLog)
 		if err != nil {
 			setupLog.Error(err, "unable to check for terminated state of mondoo-operator-controller")
 		}

@@ -30,6 +30,7 @@ type OperatorCustomState struct {
 	Nodes                  []string
 	MondooAuditConfig      MondooAuditConfig
 	OperatorVersion        string
+	CnspecVersion          string
 	K8sResourcesScanning   bool
 	ContainerImageScanning bool
 	NodeScanning           bool
@@ -42,7 +43,7 @@ type MondooAuditConfig struct {
 }
 
 func ReportStatusRequestFromAuditConfig(
-	integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node, k8sVersion *k8sversion.Info, log logr.Logger,
+	integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node, k8sVersion *k8sversion.Info, isOpenShift bool, log logr.Logger,
 ) mondooclient.ReportStatusRequest {
 	nodeNames := make([]string, len(nodes))
 	for i := range nodes {
@@ -162,6 +163,15 @@ func ReportStatusRequestFromAuditConfig(
 		}
 	}
 
+	// Determine cnspec version based on OpenShift and user overrides
+	cnspecVersion := mondoo.CnspecTag
+	if isOpenShift {
+		cnspecVersion = mondoo.OpenShiftMondooClientTag
+	}
+	if m.Spec.Scanner.Image.Tag != "" {
+		cnspecVersion = m.Spec.Scanner.Image.Tag
+	}
+
 	return mondooclient.ReportStatusRequest{
 		Mrn:    integrationMrn,
 		Status: status,
@@ -170,6 +180,7 @@ func ReportStatusRequestFromAuditConfig(
 			KubernetesVersion:      k8sVersion.GitVersion,
 			MondooAuditConfig:      MondooAuditConfig{Name: m.Name, Namespace: m.Namespace},
 			OperatorVersion:        version.Version,
+			CnspecVersion:          cnspecVersion,
 			K8sResourcesScanning:   m.Spec.KubernetesResources.Enable,
 			ContainerImageScanning: m.Spec.Containers.Enable || m.Spec.KubernetesResources.ContainerImageScanning,
 			NodeScanning:           m.Spec.Nodes.Enable,

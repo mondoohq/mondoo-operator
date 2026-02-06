@@ -26,13 +26,15 @@ type StatusReporter struct {
 	mondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
 	mu                  sync.RWMutex
 	lastReportedStatus  mondooclient.ReportStatusRequest
+	isOpenShift         bool
 }
 
-func NewStatusReporter(kubeClient client.Client, mondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error), k8sVersion *version.Info) *StatusReporter {
+func NewStatusReporter(kubeClient client.Client, mondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error), k8sVersion *version.Info, isOpenShift bool) *StatusReporter {
 	return &StatusReporter{
 		kubeClient:          kubeClient,
 		k8sVersion:          k8sVersion,
 		mondooClientBuilder: mondooClientBuilder,
+		isOpenShift:         isOpenShift,
 	}
 }
 
@@ -56,7 +58,7 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 		return err
 	}
 
-	operatorStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes.Items, r.k8sVersion, logger)
+	operatorStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes.Items, r.k8sVersion, r.isOpenShift, logger)
 
 	r.mu.RLock()
 	statusUnchanged := reflect.DeepEqual(operatorStatus, r.lastReportedStatus)

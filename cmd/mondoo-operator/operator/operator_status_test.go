@@ -101,7 +101,7 @@ func (s *DeploymentHandlerSuite) TestOOMDetect() {
 	s.Require().NoError(err, "failed to set up logging for test cases")
 	testLogger := zapr.NewLogger(zapLog)
 
-	err = checkForTerminatedState(s.ctx, k8sClient, v, testLogger)
+	err = checkForTerminatedState(s.ctx, k8sClient, v, false, testLogger)
 	s.NoError(err)
 
 	mondooAuditConfigs := &mondoov1alpha2.MondooAuditConfigList{}
@@ -122,7 +122,7 @@ func (s *DeploymentHandlerSuite) TestOOMDetect() {
 	oomPod.Status.ContainerStatuses[0].State.Running = &corev1.ContainerStateRunning{}
 	s.NoError(k8sClient.Status().Update(s.ctx, oomPod))
 
-	err = checkForTerminatedState(s.ctx, k8sClient, v, testLogger)
+	err = checkForTerminatedState(s.ctx, k8sClient, v, false, testLogger)
 	s.NoError(err)
 
 	mondooAuditConfigs = &mondoov1alpha2.MondooAuditConfigList{}
