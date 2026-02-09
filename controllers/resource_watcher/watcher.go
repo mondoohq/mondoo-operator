@@ -13,8 +13,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -66,11 +64,10 @@ type ResourceWatcher struct {
 	cache     cache.Cache
 	debouncer *Debouncer
 	config    WatcherConfig
-	scheme    *runtime.Scheme
 }
 
 // NewResourceWatcher creates a new ResourceWatcher.
-func NewResourceWatcher(c cache.Cache, debouncer *Debouncer, config WatcherConfig, scheme *runtime.Scheme) *ResourceWatcher {
+func NewResourceWatcher(c cache.Cache, debouncer *Debouncer, config WatcherConfig) *ResourceWatcher {
 	if len(config.ResourceTypes) == 0 {
 		// Use high-priority resources by default (stable workload resources).
 		// Only use all resources if explicitly requested via WatchAllResources.
@@ -84,7 +81,6 @@ func NewResourceWatcher(c cache.Cache, debouncer *Debouncer, config WatcherConfi
 		cache:     c,
 		debouncer: debouncer,
 		config:    config,
-		scheme:    scheme,
 	}
 }
 
@@ -97,7 +93,7 @@ func (w *ResourceWatcher) Start(ctx context.Context) error {
 
 	// Set up informers for each resource type
 	for _, resourceType := range w.config.ResourceTypes {
-		obj, gvk, err := w.getObjectForResourceType(resourceType)
+		obj, err := w.getObjectForResourceType(resourceType)
 		if err != nil {
 			watcherLogger.Error(err, "Failed to get object for resource type", "resourceType", resourceType)
 			continue
@@ -112,7 +108,6 @@ func (w *ResourceWatcher) Start(ctx context.Context) error {
 		handler := &resourceEventHandler{
 			watcher:      w,
 			resourceType: resourceType,
-			gvk:          gvk,
 		}
 
 		_, err = informer.AddEventHandler(handler)
@@ -130,37 +125,37 @@ func (w *ResourceWatcher) Start(ctx context.Context) error {
 	return nil
 }
 
-// getObjectForResourceType returns the client.Object and GroupVersionKind for a resource type string.
-func (w *ResourceWatcher) getObjectForResourceType(resourceType string) (client.Object, schema.GroupVersionKind, error) {
+// getObjectForResourceType returns the client.Object for a resource type string.
+func (w *ResourceWatcher) getObjectForResourceType(resourceType string) (client.Object, error) {
 	switch strings.ToLower(resourceType) {
 	case "pods", "pod":
-		return &corev1.Pod{}, corev1.SchemeGroupVersion.WithKind("Pod"), nil
+		return &corev1.Pod{}, nil
 	case "deployments", "deployment":
-		return &appsv1.Deployment{}, appsv1.SchemeGroupVersion.WithKind("Deployment"), nil
+		return &appsv1.Deployment{}, nil
 	case "daemonsets", "daemonset":
-		return &appsv1.DaemonSet{}, appsv1.SchemeGroupVersion.WithKind("DaemonSet"), nil
+		return &appsv1.DaemonSet{}, nil
 	case "statefulsets", "statefulset":
-		return &appsv1.StatefulSet{}, appsv1.SchemeGroupVersion.WithKind("StatefulSet"), nil
+		return &appsv1.StatefulSet{}, nil
 	case "replicasets", "replicaset":
-		return &appsv1.ReplicaSet{}, appsv1.SchemeGroupVersion.WithKind("ReplicaSet"), nil
+		return &appsv1.ReplicaSet{}, nil
 	case "jobs", "job":
-		return &batchv1.Job{}, batchv1.SchemeGroupVersion.WithKind("Job"), nil
+		return &batchv1.Job{}, nil
 	case "cronjobs", "cronjob":
-		return &batchv1.CronJob{}, batchv1.SchemeGroupVersion.WithKind("CronJob"), nil
+		return &batchv1.CronJob{}, nil
 	case "services", "service":
-		return &corev1.Service{}, corev1.SchemeGroupVersion.WithKind("Service"), nil
+		return &corev1.Service{}, nil
 	case "ingresses", "ingress":
-		return &networkingv1.Ingress{}, networkingv1.SchemeGroupVersion.WithKind("Ingress"), nil
+		return &networkingv1.Ingress{}, nil
 	case "namespaces", "namespace":
-		return &corev1.Namespace{}, corev1.SchemeGroupVersion.WithKind("Namespace"), nil
+		return &corev1.Namespace{}, nil
 	case "configmaps", "configmap":
-		return &corev1.ConfigMap{}, corev1.SchemeGroupVersion.WithKind("ConfigMap"), nil
+		return &corev1.ConfigMap{}, nil
 	case "secrets", "secret":
-		return &corev1.Secret{}, corev1.SchemeGroupVersion.WithKind("Secret"), nil
+		return &corev1.Secret{}, nil
 	case "serviceaccounts", "serviceaccount":
-		return &corev1.ServiceAccount{}, corev1.SchemeGroupVersion.WithKind("ServiceAccount"), nil
+		return &corev1.ServiceAccount{}, nil
 	default:
-		return nil, schema.GroupVersionKind{}, fmt.Errorf("unknown resource type: %s", resourceType)
+		return nil, fmt.Errorf("unknown resource type: %s", resourceType)
 	}
 }
 
@@ -179,7 +174,6 @@ func (w *ResourceWatcher) shouldWatchNamespace(namespace string) bool {
 type resourceEventHandler struct {
 	watcher      *ResourceWatcher
 	resourceType string
-	gvk          schema.GroupVersionKind
 }
 
 func (h *resourceEventHandler) OnAdd(obj any, isInInitialList bool) {

@@ -109,9 +109,8 @@ func (d *Debouncer) flush() {
 		keys = append(keys, key)
 	}
 
-	// Clear pending and update last scan time
+	// Clear pending
 	d.pending = make(map[string]K8sResourceIdentifier)
-	d.lastScanTime = time.Now()
 	d.mu.Unlock()
 
 	debouncerLogger.Info("Flushing debounce queue", "resourceCount", len(resources))
@@ -127,6 +126,11 @@ func (d *Debouncer) flush() {
 	} else {
 		debouncerLogger.Info("Successfully scanned resources", "keys", keys)
 	}
+
+	// Update last scan time after scan completes
+	d.mu.Lock()
+	d.lastScanTime = time.Now()
+	d.mu.Unlock()
 }
 
 // QueueSize returns the current number of pending resources.

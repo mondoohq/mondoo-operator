@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 
@@ -149,6 +150,7 @@ func (s *Scanner) generateInventory(resources []K8sResourceIdentifier) ([]byte, 
 	for t := range typeSet {
 		targets = append(targets, t)
 	}
+	sort.Strings(targets)
 
 	opts := map[string]string{
 		"k8s-resources": strings.Join(resourceFilters, ","),

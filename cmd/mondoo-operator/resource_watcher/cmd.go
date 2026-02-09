@@ -188,7 +188,7 @@ func init() {
 			NamespacesExclude: namespacesExcludeList,
 			ResourceTypes:     resourceTypesList,
 			WatchAllResources: *watchAllResources,
-		}, scheme)
+		})
 
 		// Start components
 		errChan := make(chan error, 3)
