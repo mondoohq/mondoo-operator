@@ -230,6 +230,13 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 		}
 	}
 
+	// Add user-defined annotations to all assets
+	if len(m.Spec.Annotations) > 0 {
+		for i := range inv.Spec.Assets {
+			inv.Spec.Assets[i].AddAnnotations(m.Spec.Annotations)
+		}
+	}
+
 	invBytes, err := yaml.Marshal(inv)
 	if err != nil {
 		return "", err

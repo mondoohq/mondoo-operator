@@ -11,6 +11,8 @@ import (
 	"time"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"go.mondoo.com/mondoo-operator/pkg/annotations"
 )
 
 var scannerLogger = ctrl.Log.WithName("resource-watcher-scanner")
@@ -23,6 +25,8 @@ type ScannerConfig struct {
 	APIProxy string
 	// Timeout is the timeout for scan operations.
 	Timeout time.Duration
+	// Annotations are key-value pairs to attach to all scanned assets.
+	Annotations map[string]string
 }
 
 // Scanner executes cnspec scans on K8s manifests.
@@ -78,6 +82,8 @@ func (s *Scanner) ScanManifests(ctx context.Context, manifests []byte) error {
 	if s.config.APIProxy != "" {
 		cnspecArgs = append(cnspecArgs, "--api-proxy", s.config.APIProxy)
 	}
+	// Add annotations as command-line arguments (sorted for deterministic ordering)
+	cnspecArgs = append(cnspecArgs, annotations.AnnotationArgs(s.config.Annotations)...)
 
 	// Create context with timeout
 	scanCtx := ctx

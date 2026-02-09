@@ -9,6 +9,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
+
+	"go.mondoo.com/cnquery/v12/providers-sdk/v1/inventory"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -240,6 +244,30 @@ func TestInventory(t *testing.T) {
 	assert.NoError(t, err, "unexpected error generating inventory")
 	assert.Contains(t, inventory, constants.MondooAssetsIntegrationLabel)
 	assert.Contains(t, inventory, integrationMRN)
+}
+
+func TestInventory_WithAnnotations(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Annotations: map[string]string{
+				"env":  "prod",
+				"team": "platform",
+			},
+		},
+	}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig)
+	require.NoError(t, err, "unexpected error generating inventory")
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	require.NotEmpty(t, inv.Spec.Assets, "expected at least one asset")
+
+	for _, asset := range inv.Spec.Assets {
+		assert.Equal(t, "prod", asset.Annotations["env"], "asset %s missing env annotation", asset.Name)
+		assert.Equal(t, "platform", asset.Annotations["team"], "asset %s missing team annotation", asset.Name)
+	}
 }
 
 func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {

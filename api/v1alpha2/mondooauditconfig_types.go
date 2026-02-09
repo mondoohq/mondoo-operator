@@ -29,6 +29,11 @@ type MondooAuditConfigSpec struct {
 	Filtering           Filtering           `json:"filtering,omitempty"`
 	Containers          Containers          `json:"containers,omitempty"`
 
+	// Annotations allows adding custom annotations to all scanned assets. These key-value pairs
+	// will be attached to every asset discovered by the operator, making them searchable
+	// and filterable in the Mondoo Console.
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// Admission is DEPRECATED and ignored. Admission webhooks were removed in v12.1.0.
 	// The operator will automatically clean up any orphaned admission resources.
 	// See docs/admission-migration-guide.md for migration instructions.

@@ -14,6 +14,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/annotations"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -84,6 +85,9 @@ func Deployment(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.Mondoo
 	if cfg.Spec.HttpProxy != nil {
 		cmd = append(cmd, "--api-proxy", *cfg.Spec.HttpProxy)
 	}
+
+	// Add annotations (sorted for deterministic ordering)
+	cmd = append(cmd, annotations.AnnotationArgs(m.Spec.Annotations)...)
 
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})

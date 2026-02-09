@@ -876,7 +876,7 @@ func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 }
 
 func ExternalClusterConfigMap(integrationMRN, operatorClusterUID string, cluster v1alpha2.ExternalCluster, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (*corev1.ConfigMap, error) {
-	inv, err := ExternalClusterInventory(integrationMRN, operatorClusterUID, cluster, cfg)
+	inv, err := ExternalClusterInventory(integrationMRN, operatorClusterUID, cluster, m, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -932,6 +932,13 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 		}
 	}
 
+	// Add user-defined annotations to all assets
+	if len(m.Spec.Annotations) > 0 {
+		for i := range inv.Spec.Assets {
+			inv.Spec.Assets[i].AddAnnotations(m.Spec.Annotations)
+		}
+	}
+
 	invBytes, err := yaml.Marshal(inv)
 	if err != nil {
 		return "", err
@@ -940,7 +947,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 	return string(invBytes), nil
 }
 
-func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster v1alpha2.ExternalCluster, cfg v1alpha2.MondooOperatorConfig) (string, error) {
+func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster v1alpha2.ExternalCluster, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (string, error) {
 	// Use cluster-specific filtering if provided, otherwise fall back to empty filtering
 	filtering := cluster.Filtering
 
@@ -991,6 +998,13 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 	if cfg.Spec.ContainerProxy != nil {
 		for i := range inv.Spec.Assets {
 			inv.Spec.Assets[i].Connections[0].Options["container-proxy"] = *cfg.Spec.ContainerProxy
+		}
+	}
+
+	// Add user-defined annotations to all assets
+	if len(m.Spec.Annotations) > 0 {
+		for i := range inv.Spec.Assets {
+			inv.Spec.Assets[i].AddAnnotations(m.Spec.Annotations)
 		}
 	}
 

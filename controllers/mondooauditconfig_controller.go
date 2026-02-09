@@ -32,6 +32,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	resourcewatcher "go.mondoo.com/mondoo-operator/controllers/resource_watcher"
 	"go.mondoo.com/mondoo-operator/controllers/status"
+	"go.mondoo.com/mondoo-operator/pkg/annotations"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -220,6 +221,34 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			reconcileError = deferFuncErr
 		}
 	}()
+
+	// Validate annotations before using them in inventory or CLI args.
+	// Set a degraded condition so users can see the problem via kubectl describe.
+	if err := annotations.Validate(mondooAuditConfig.Spec.Annotations); err != nil {
+		mondooAuditConfig.Status.Conditions = mondoo.SetMondooAuditCondition(
+			mondooAuditConfig.Status.Conditions,
+			v1alpha2.MondooOperatorDegraded,
+			corev1.ConditionTrue,
+			"InvalidAnnotations",
+			fmt.Sprintf("Invalid annotations in MondooAuditConfig: %s", err),
+			mondoo.UpdateConditionIfReasonOrMessageChange,
+			nil, "",
+		)
+		log.Error(err, "invalid annotations in MondooAuditConfig, skipping reconciliation")
+		return ctrl.Result{}, nil
+	}
+	// Clear any previous annotation validation error
+	if cond := mondoo.FindMondooAuditConditions(mondooAuditConfig.Status.Conditions, v1alpha2.MondooOperatorDegraded); cond != nil && cond.Reason == "InvalidAnnotations" {
+		mondooAuditConfig.Status.Conditions = mondoo.SetMondooAuditCondition(
+			mondooAuditConfig.Status.Conditions,
+			v1alpha2.MondooOperatorDegraded,
+			corev1.ConditionFalse,
+			"AnnotationsValid",
+			"Annotations are valid",
+			mondoo.UpdateConditionAlways,
+			nil, "",
+		)
+	}
 
 	// If spec.MondooTokenSecretRef != "" and the Secret referenced in spec.MondooCredsSecretRef
 	// does not exist, then attempt to trade the token for a Mondoo service account and save it

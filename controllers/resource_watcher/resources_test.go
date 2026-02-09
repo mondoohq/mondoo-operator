@@ -234,6 +234,44 @@ func TestDeployment_WatchAllResources(t *testing.T) {
 	assert.Contains(t, cmdStr, "--watch-all-resources")
 }
 
+func TestDeployment_WithAnnotations(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-config",
+			Namespace: "mondoo-operator",
+		},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable: true,
+				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
+					Enable: true,
+				},
+			},
+			Annotations: map[string]string{
+				"env":  "prod",
+				"team": "platform",
+			},
+		},
+	}
+
+	operatorConfig := v1alpha2.MondooOperatorConfig{}
+
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", config, operatorConfig)
+
+	container := deployment.Spec.Template.Spec.Containers[0]
+	cmd := container.Command
+
+	// Find --annotation flags and collect their values
+	annotationArgs := map[string]bool{}
+	for i, arg := range cmd {
+		if arg == "--annotation" && i+1 < len(cmd) {
+			annotationArgs[cmd[i+1]] = true
+		}
+	}
+	assert.True(t, annotationArgs["env=prod"], "expected --annotation env=prod")
+	assert.True(t, annotationArgs["team=platform"], "expected --annotation team=platform")
+}
+
 func TestDeployment_HighPriorityByDefault(t *testing.T) {
 	config := &v1alpha2.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{
