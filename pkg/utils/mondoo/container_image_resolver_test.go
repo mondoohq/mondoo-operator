@@ -93,7 +93,7 @@ func (s *ContainerImageResolverSuite) TestNewContainerImageResolver() {
 	s.NoError(err)
 	expected := fmt.Sprintf("%s@%s", ref.Context().Name(), desc.Digest.String())
 
-	imageWithDigest, err := resolver.CnspecImage(CnspecImage, CnspecTag, false)
+	imageWithDigest, err := resolver.CnspecImage(CnspecImage, CnspecTag, "", false)
 	s.NoError(err)
 	s.Equal(expected, imageWithDigest)
 }
@@ -101,7 +101,7 @@ func (s *ContainerImageResolverSuite) TestNewContainerImageResolver() {
 func (s *ContainerImageResolverSuite) TestCnspecImage() {
 	resolver := s.containerImageResolver()
 	image := "ghcr.io/mondoo/testimage"
-	res, err := resolver.CnspecImage(image, "testtag", false)
+	res, err := resolver.CnspecImage(image, "testtag", "", false)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s@sha256:%s", image, s.testHex), res)
@@ -110,7 +110,7 @@ func (s *ContainerImageResolverSuite) TestCnspecImage() {
 
 func (s *ContainerImageResolverSuite) TestCnspecImage_Defaults() {
 	resolver := s.containerImageResolver()
-	res, err := resolver.CnspecImage("", "", true)
+	res, err := resolver.CnspecImage("", "", "", true)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s:%s", CnspecImage, CnspecTag), res)
@@ -122,7 +122,7 @@ func (s *ContainerImageResolverSuite) TestCnspecImage_SkipImageResolution() {
 	image := "ghcr.io/mondoo/testimage"
 	tag := "testtag"
 
-	res, err := resolver.CnspecImage(image, tag, true)
+	res, err := resolver.CnspecImage(image, tag, "", true)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s:%s", image, tag), res)
@@ -133,7 +133,7 @@ func (s *ContainerImageResolverSuite) TestCnspecImage_OpenShift() {
 	resolver := s.containerImageResolver()
 	resolver.resolveForOpenShift = true
 
-	res, err := resolver.CnspecImage("", "", true)
+	res, err := resolver.CnspecImage("", "", "", true)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s:%s", CnspecImage, OpenShiftMondooClientTag), res)
@@ -142,7 +142,7 @@ func (s *ContainerImageResolverSuite) TestCnspecImage_OpenShift() {
 
 func (s *ContainerImageResolverSuite) TestMondooOperatorImage() {
 	resolver := s.containerImageResolver()
-	res, err := resolver.MondooOperatorImage(context.Background(), "", "", false)
+	res, err := resolver.MondooOperatorImage(context.Background(), "", "", "", false)
 	s.NoError(err)
 
 	s.Equal("ghcr.io/mondoohq/mondoo-operator@sha256:test", res)
@@ -153,7 +153,7 @@ func (s *ContainerImageResolverSuite) TestMondooOperatorImage_CustomImage() {
 	tag := "testtag"
 
 	resolver := s.containerImageResolver()
-	res, err := resolver.MondooOperatorImage(context.Background(), image, tag, false)
+	res, err := resolver.MondooOperatorImage(context.Background(), image, tag, "", false)
 	s.NoError(err)
 
 	s.Equal("ghcr.io/mondoo/testimage@sha256:test", res)
@@ -164,12 +164,78 @@ func (s *ContainerImageResolverSuite) TestMondooOperatorImage_SkipImageResolutio
 	tag := "testtag"
 
 	resolver := s.containerImageResolver()
-	res, err := resolver.MondooOperatorImage(context.Background(), image, tag, true)
+	res, err := resolver.MondooOperatorImage(context.Background(), image, tag, "", true)
 	s.NoError(err)
 
 	s.Equal(fmt.Sprintf("%s:%s", image, tag), res)
 	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
 	s.Equal("ghcr.io/mondoo/testimage:testtag", res)
+}
+
+func (s *ContainerImageResolverSuite) TestCnspecImage_DigestOnly() {
+	resolver := s.containerImageResolver()
+	image := "ghcr.io/mondoo/testimage"
+	digest := "sha256:abc123def456"
+
+	res, err := resolver.CnspecImage(image, "", digest, false)
+	s.NoError(err)
+
+	// When digest is specified, it should be used and no image resolution should occur
+	s.Equal(fmt.Sprintf("%s@%s", image, digest), res)
+	s.Equalf(0, s.remoteCallsCount, "remote call should not be performed when digest is specified")
+}
+
+func (s *ContainerImageResolverSuite) TestCnspecImage_DigestWithTag() {
+	resolver := s.containerImageResolver()
+	image := "ghcr.io/mondoo/testimage"
+	tag := "v2"
+	digest := "sha256:abc123def456"
+
+	res, err := resolver.CnspecImage(image, tag, digest, false)
+	s.NoError(err)
+
+	// Digest takes precedence over tag
+	s.Equal(fmt.Sprintf("%s@%s", image, digest), res)
+	s.Equalf(0, s.remoteCallsCount, "remote call should not be performed when digest is specified")
+}
+
+func (s *ContainerImageResolverSuite) TestCnspecImage_DigestWithDefaultImage() {
+	resolver := s.containerImageResolver()
+	digest := "sha256:abc123def456"
+
+	res, err := resolver.CnspecImage("", "", digest, false)
+	s.NoError(err)
+
+	// Uses default image with user-specified digest
+	s.Equal(fmt.Sprintf("%s@%s", CnspecImage, digest), res)
+	s.Equalf(0, s.remoteCallsCount, "remote call should not be performed when digest is specified")
+}
+
+func (s *ContainerImageResolverSuite) TestMondooOperatorImage_DigestOnly() {
+	resolver := s.containerImageResolver()
+	image := "ghcr.io/mondoo/testimage"
+	digest := "sha256:abc123def456"
+
+	res, err := resolver.MondooOperatorImage(context.Background(), image, "", digest, false)
+	s.NoError(err)
+
+	// When digest is specified, it should be used and no image resolution should occur
+	s.Equal(fmt.Sprintf("%s@%s", image, digest), res)
+	s.Equalf(0, s.remoteCallsCount, "remote call should not be performed when digest is specified")
+}
+
+func (s *ContainerImageResolverSuite) TestMondooOperatorImage_DigestWithTag() {
+	resolver := s.containerImageResolver()
+	image := "ghcr.io/mondoo/testimage"
+	tag := "v2"
+	digest := "sha256:abc123def456"
+
+	res, err := resolver.MondooOperatorImage(context.Background(), image, tag, digest, false)
+	s.NoError(err)
+
+	// Digest takes precedence over tag
+	s.Equal(fmt.Sprintf("%s@%s", image, digest), res)
+	s.Equalf(0, s.remoteCallsCount, "remote call should not be performed when digest is specified")
 }
 
 func TestContainerImageResolverSuite(t *testing.T) {

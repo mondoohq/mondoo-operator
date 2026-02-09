@@ -35,12 +35,14 @@ var MondooOperatorTag = version.Version
 
 type ContainerImageResolver interface {
 	// CnspecImage return the cnspec image. If skipResolveImage is false, then the image tag is replaced
-	// by a digest. If userImage or userTag are empty strings, default values are used.
-	CnspecImage(userImage, userTag string, skipImageResolution bool) (string, error)
+	// by a digest. If userImage, userTag, or userDigest are empty strings, default values are used.
+	// When userDigest is specified, it takes precedence over userTag.
+	CnspecImage(userImage, userTag, userDigest string, skipImageResolution bool) (string, error)
 
 	// MondooOperatorImage return the Mondoo operator image. If skipResolveImage is false, then the image tag is replaced
-	// by a digest. If userImage or userTag are empty strings, default values are used.
-	MondooOperatorImage(ctx context.Context, userImage, userTag string, skipImageResolution bool) (string, error)
+	// by a digest. If userImage, userTag, or userDigest are empty strings, default values are used.
+	// When userDigest is specified, it takes precedence over userTag.
+	MondooOperatorImage(ctx context.Context, userImage, userTag, userDigest string, skipImageResolution bool) (string, error)
 }
 
 type containerImageResolver struct {
@@ -72,7 +74,7 @@ func NewContainerImageResolver(kubeClient client.Client, isOpenShift bool) Conta
 	}
 }
 
-func (c *containerImageResolver) CnspecImage(userImage, userTag string, skipImageResolution bool) (string, error) {
+func (c *containerImageResolver) CnspecImage(userImage, userTag, userDigest string, skipImageResolution bool) (string, error) {
 	defaultTag := CnspecTag
 
 	if c.resolveForOpenShift {
@@ -80,15 +82,21 @@ func (c *containerImageResolver) CnspecImage(userImage, userTag string, skipImag
 	}
 
 	defaultImage := CnspecImage
-	image := userImageOrDefault(defaultImage, defaultTag, userImage, userTag)
+	image := userImageOrDefault(defaultImage, defaultTag, userImage, userTag, userDigest)
+
+	// If user specified a digest, skip image resolution since we already have a digest
+	if userDigest != "" {
+		skipImageResolution = true
+	}
+
 	return c.resolveImage(image, skipImageResolution)
 }
 
-func (c *containerImageResolver) MondooOperatorImage(ctx context.Context, userImage, userTag string, skipImageResolution bool) (string, error) {
+func (c *containerImageResolver) MondooOperatorImage(ctx context.Context, userImage, userTag, userDigest string, skipImageResolution bool) (string, error) {
 	image := ""
 
-	// If we have no user image or tag, we read the image from the operator pod
-	if userImage == "" || userTag == "" {
+	// If we have no user image, tag, or digest, we read the image from the operator pod
+	if userImage == "" || (userTag == "" && userDigest == "") {
 		operatorPod := &corev1.Pod{}
 		if err := c.kubeClient.Get(ctx, client.ObjectKey{Namespace: c.operatorPodNamespace, Name: c.operatorPodName}, operatorPod); err == nil {
 			for _, container := range operatorPod.Spec.Containers {
@@ -107,7 +115,12 @@ func (c *containerImageResolver) MondooOperatorImage(ctx context.Context, userIm
 
 	// If still no image, then load the image user-specified image or use the defaults as last resort
 	if image == "" {
-		image = userImageOrDefault(MondooOperatorImage, MondooOperatorTag, userImage, userTag)
+		image = userImageOrDefault(MondooOperatorImage, MondooOperatorTag, userImage, userTag, userDigest)
+	}
+
+	// If user specified a digest, skip image resolution since we already have a digest
+	if userDigest != "" {
+		skipImageResolution = true
 	}
 
 	return c.resolveImage(image, skipImageResolution)
@@ -127,12 +140,18 @@ func (c *containerImageResolver) resolveImage(image string, skipImageResolution 
 	return imageWithDigest, nil
 }
 
-func userImageOrDefault(defaultImage, defaultTag, userImage, userTag string) string {
+func userImageOrDefault(defaultImage, defaultTag, userImage, userTag, userDigest string) string {
 	image := defaultImage
-	tag := defaultTag
 	if userImage != "" {
 		image = userImage
 	}
+
+	// Digest takes precedence over tag
+	if userDigest != "" {
+		return fmt.Sprintf("%s@%s", image, userDigest)
+	}
+
+	tag := defaultTag
 	if userTag != "" {
 		tag = userTag
 	}

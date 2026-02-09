@@ -233,7 +233,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	image, err := s.containerImageResolver.CnspecImage(
-		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	for _, n := range nodes.Items {
@@ -268,7 +268,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_CustomEnvVars() {
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	image, err := s.containerImageResolver.CnspecImage(
-		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	for _, n := range nodes.Items {
@@ -302,7 +302,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_Switch() {
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	image, err := s.containerImageResolver.CnspecImage(
-		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	for _, n := range nodes.Items {
@@ -346,7 +346,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	image, err := s.containerImageResolver.CnspecImage(
-		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	// Make sure a cron job exists for one of the nodes
@@ -395,7 +395,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 	s.True(result.IsZero())
 
 	image, err := s.containerImageResolver.CnspecImage(
-		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	listOpts := &client.ListOptions{
@@ -433,7 +433,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets() {
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	image, err := s.containerImageResolver.CnspecImage(
-		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
@@ -467,7 +467,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_Switch() {
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	image, err := s.containerImageResolver.CnspecImage(
-		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
@@ -508,7 +508,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateDaemonSets() {
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
 	image, err := s.containerImageResolver.CnspecImage(
-		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, false)
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	// Make sure a daemonset exists

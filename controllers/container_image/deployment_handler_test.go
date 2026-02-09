@@ -60,7 +60,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	image, err := s.containerImageResolver.CnspecImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
@@ -87,7 +88,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_CustomEnvVars() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	image, err := s.containerImageResolver.CnspecImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
@@ -120,7 +122,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomImage() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	image, err := s.containerImageResolver.CnspecImage("ubuntu", "22.04", false)
+	image, err := s.containerImageResolver.CnspecImage("ubuntu", "22.04", "", false)
 	s.NoError(err)
 
 	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
@@ -149,7 +151,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateWithCustomSchedule() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	image, err := s.containerImageResolver.CnspecImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	expected := CronJob(image, "", test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
@@ -184,7 +187,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_PrivateRegistriesSecret() 
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	image, err := s.containerImageResolver.CnspecImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	expected := CronJob(image, "", test.KubeSystemNamespaceUid, s.auditConfig.Spec.Scanner.PrivateRegistriesPullSecretRef.Name, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
@@ -283,7 +287,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	image, err := s.containerImageResolver.CnspecImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	expected := CronJob(image, integrationMrn, test.KubeSystemNamespaceUid, "", &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
@@ -305,7 +310,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	mondooAuditConfig := &s.auditConfig
 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
-	image, err := s.containerImageResolver.CnspecImage("", "", false)
+	image, err := s.containerImageResolver.CnspecImage(
+		s.auditConfig.Spec.Scanner.Image.Name, s.auditConfig.Spec.Scanner.Image.Tag, s.auditConfig.Spec.Scanner.Image.Digest, false)
 	s.NoError(err)
 
 	// Make sure a cron job exists with different container command
