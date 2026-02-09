@@ -29,9 +29,12 @@ func AnnotationArgs(annotations map[string]string) []string {
 	return args
 }
 
+const maxAnnotationLength = 256
+
 // Validate checks that annotation keys and values are well-formed for use as
-// cnspec --annotation key=value CLI arguments. Keys must be non-empty and must
-// not contain '='. Values must be non-empty.
+// cnspec --annotation key=value CLI arguments. Keys must be non-empty, must
+// not contain '=', and both keys and values must not exceed 256 characters.
+// Values must be non-empty.
 func Validate(annotations map[string]string) error {
 	for k, v := range annotations {
 		if k == "" {
@@ -40,8 +43,14 @@ func Validate(annotations map[string]string) error {
 		if strings.Contains(k, "=") {
 			return fmt.Errorf("annotation key %q must not contain '='", k)
 		}
+		if len(k) > maxAnnotationLength {
+			return fmt.Errorf("annotation key %q exceeds maximum length of %d characters", k, maxAnnotationLength)
+		}
 		if v == "" {
 			return fmt.Errorf("annotation value for key %q must not be empty", k)
+		}
+		if len(v) > maxAnnotationLength {
+			return fmt.Errorf("annotation value for key %q exceeds maximum length of %d characters", k, maxAnnotationLength)
 		}
 	}
 	return nil

@@ -4,6 +4,7 @@
 package annotations
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,5 +72,29 @@ func TestValidate(t *testing.T) {
 		err := Validate(map[string]string{"key": ""})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must not be empty")
+	})
+
+	t.Run("key at max length is valid", func(t *testing.T) {
+		longKey := strings.Repeat("k", 256)
+		assert.NoError(t, Validate(map[string]string{longKey: "value"}))
+	})
+
+	t.Run("key exceeding max length is rejected", func(t *testing.T) {
+		longKey := strings.Repeat("k", 257)
+		err := Validate(map[string]string{longKey: "value"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "exceeds maximum length of 256")
+	})
+
+	t.Run("value at max length is valid", func(t *testing.T) {
+		longVal := strings.Repeat("v", 256)
+		assert.NoError(t, Validate(map[string]string{"key": longVal}))
+	})
+
+	t.Run("value exceeding max length is rejected", func(t *testing.T) {
+		longVal := strings.Repeat("v", 257)
+		err := Validate(map[string]string{"key": longVal})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "exceeds maximum length of 256")
 	})
 }
