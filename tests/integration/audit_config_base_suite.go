@@ -208,15 +208,15 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 }
 
 func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondoov2.MondooAuditConfig) {
-	nginxLabel := "app.kubernetes.io/name=nginx"
-	_, err := s.testCluster.K8sHelper.Kubectl("run", "-n", "default", "nginx", "--image", "ghcr.io/nginx/nginx-unprivileged", "-l", nginxLabel)
-	s.Require().NoError(err, "Failed to create nginx pod.")
-	redisLabel := "app.kubernetes.io/name=redis"
-	_, err = s.testCluster.K8sHelper.Kubectl("run", "-n", "default", "redis", "--image", "quay.io/opstree/redis", "-l", redisLabel)
-	s.Require().NoError(err, "Failed to create redis pod.")
+	pauseLabel := "app.kubernetes.io/name=pause"
+	_, err := s.testCluster.K8sHelper.Kubectl("run", "-n", "default", "pause", "--image", "registry.k8s.io/pause:3.10", "-l", pauseLabel)
+	s.Require().NoError(err, "Failed to create pause pod.")
+	busyboxLabel := "app.kubernetes.io/name=busybox"
+	_, err = s.testCluster.K8sHelper.Kubectl("run", "-n", "default", "busybox", "--image", "registry.k8s.io/e2e-test-images/busybox:1.36.1-1", "-l", busyboxLabel, "--command", "--", "sleep", "3600")
+	s.Require().NoError(err, "Failed to create busybox pod.")
 
-	s.True(s.testCluster.K8sHelper.IsPodReady(nginxLabel, "default"), "nginx pod is not ready")
-	s.True(s.testCluster.K8sHelper.IsPodReady(redisLabel, "default"), "redis pod is not ready")
+	s.True(s.testCluster.K8sHelper.IsPodReady(pauseLabel, "default"), "pause pod is not ready")
+	s.True(s.testCluster.K8sHelper.IsPodReady(busyboxLabel, "default"), "busybox pod is not ready")
 	s.auditConfig = auditConfig
 
 	// Disable container image resolution to be able to run the k8s resources scan CronJob with a local image.
@@ -479,7 +479,7 @@ func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []assets.AssetWithScore)
 			expectedPolicies := defaultK8sNodePolicyMrns
 			if strings.Contains(asset.Platform.Name, "k8s") {
 				expectedPolicies = defaultK8sPolicyMrns
-			} else if strings.Contains(asset.Name, "nginx") || strings.Contains(asset.Name, "redis") || strings.Contains(asset.Name, "k3d") || asset.Platform.Runtime == "docker-image" {
+			} else if strings.Contains(asset.Name, "pause") || strings.Contains(asset.Name, "busybox") || strings.Contains(asset.Name, "k3d") || asset.Platform.Runtime == "docker-image" {
 				expectedPolicies = defaultOsPolicyMrns
 			}
 			s.ElementsMatchf(expectedPolicies, scoredPolicies, "Scored policies for asset %s should be the default k8s policies", asset.Name)
