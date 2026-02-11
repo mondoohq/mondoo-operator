@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,6 +24,7 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/container_image"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
+	"go.mondoo.com/mondoo-operator/controllers/resource_watcher"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"go.mondoo.com/mondoo-operator/pkg/version"
@@ -106,10 +108,17 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(nodeScanListOpts)
 		s.NoErrorf(err, "Failed to wait for node scan pods to be gone")
 
+		resourceWatcherListOpts := &client.ListOptions{Namespace: s.auditConfig.Namespace, LabelSelector: labels.SelectorFromSet(resource_watcher.DeploymentLabels(s.auditConfig))}
+		err = s.testCluster.K8sHelper.EnsureNoPodsPresent(resourceWatcherListOpts)
+		s.NoErrorf(err, "Failed to wait for resource watcher pods to be gone")
+
 		zap.S().Info("Cleanup done. Cluster should be good to go for the next test.")
 
 		s.Require().NoError(s.spaceClient.DeleteAssets(s.ctx), "Failed to delete assets in space")
 		s.Require().NoError(s.integration.DeleteCiCdProjectIfExists(s.ctx), "Failed to delete CICD project for integration")
+
+		_, err = s.testCluster.K8sHelper.Kubectl("delete", "deployments", "-n", "default", "--all", "--ignore-not-found", "--wait")
+		s.Require().NoError(err, "Failed to delete all deployments in default namespace")
 
 		_, err = s.testCluster.K8sHelper.Kubectl("delete", "pods", "-n", "default", "--all", "--wait")
 		s.Require().NoError(err, "Failed to delete all pods")
@@ -385,6 +394,97 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesCronjobs(auditConfig mo
 
 	s.ElementsMatch(assetNames, nodeNames, "Node names do not match")
 	s.AssetsNotUnscored(assets)
+
+	status, err := s.integration.GetStatus(s.ctx)
+	s.NoError(err, "Failed to get status")
+	s.Equal("ACTIVE", status)
+}
+
+func (s *AuditConfigBaseSuite) testMondooAuditConfigResourceWatcher(auditConfig mondoov2.MondooAuditConfig) {
+	s.auditConfig = auditConfig
+
+	// Disable container image resolution to be able to run with a local image.
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
+
+	zap.S().Info("Create an audit config that enables the resource watcher.")
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
+		"Failed to create Mondoo audit config.")
+
+	s.Require().True(s.testCluster.K8sHelper.WaitUntilMondooClientSecretExists(s.ctx, s.auditConfig.Namespace), "Mondoo SA not created")
+
+	// Wait for resource watcher deployment to be created.
+	zap.S().Info("Make sure the resource watcher Deployment is created.")
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: resource_watcher.DeploymentName(auditConfig.Name), Namespace: auditConfig.Namespace},
+	}
+	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		if err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(dep), dep); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	s.NoError(err, "Resource watcher Deployment was not created.")
+
+	// Wait for the resource watcher pod to be ready.
+	zap.S().Info("Waiting for resource watcher pod to be ready.")
+	labelSelector := utils.LabelsToLabelSelector(resource_watcher.DeploymentLabels(auditConfig))
+	s.True(s.testCluster.K8sHelper.IsPodReady(labelSelector, auditConfig.Namespace), "Resource watcher pod is not ready.")
+
+	// Wait for good condition.
+	err = s.testCluster.K8sHelper.WaitForGoodCondition(&auditConfig, mondoov2.ResourceWatcherDegraded)
+	s.NoError(err, "Resource watcher condition is degraded.")
+
+	err = s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "resource-watcher")
+	s.NoErrorf(err, "Couldn't find resource-watcher pod in Podlist of the MondooAuditConfig Status")
+
+	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
+	s.NoErrorf(err, "Couldn't find expected version in MondooAuditConfig.Status.ReconciledByOperatorVersion")
+
+	// Trigger a resource change to make the watcher scan.
+	zap.S().Info("Creating a test deployment to trigger the resource watcher.")
+	_, _ = s.testCluster.K8sHelper.Kubectl("delete", "deployment", "nginx-test", "-n", "default", "--ignore-not-found")
+	_, err = s.testCluster.K8sHelper.Kubectl("create", "deployment", "nginx-test", "--image=nginx:latest", "-n", "default")
+	s.Require().NoError(err, "Failed to create test deployment.")
+
+	// Poll for assets to appear upstream and be scored. The resource watcher needs time
+	// to detect the change, debounce, scan, and upload results. Scoring is also asynchronous,
+	// so we poll until assets are both present and scored.
+	zap.S().Info("Waiting for resource watcher scan results to appear and be scored upstream.")
+	var scoredAssets []assets.AssetWithScore
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		var listErr error
+		scoredAssets, listErr = s.spaceClient.ListAssetsWithScores(s.ctx)
+		if listErr != nil {
+			zap.S().Infof("Failed to list assets: %v", listErr)
+			return false, nil
+		}
+		if len(scoredAssets) == 0 {
+			zap.S().Info("No assets found upstream yet, retrying...")
+			return false, nil
+		}
+		// Check if all scorable assets have been scored
+		allScored := true
+		for _, asset := range scoredAssets {
+			if asset.Platform.Name == "scratch" || asset.Platform.Name == "k8s-cluster" || asset.Platform.Name == "k8s-namespace" || asset.Platform.Name == "k8s-service" {
+				continue
+			}
+			if asset.Grade == "U" || asset.Grade == "" {
+				allScored = false
+				break
+			}
+		}
+		if !allScored {
+			zap.S().Infof("Found %d assets upstream but not all scored yet, retrying...", len(scoredAssets))
+			return false, nil
+		}
+		zap.S().Infof("Found %d scored assets upstream", len(scoredAssets))
+		return true, nil
+	})
+	s.NoError(err, "Assets were not sent upstream or not scored by the resource watcher.")
+
+	s.AssetsNotUnscored(scoredAssets)
 
 	status, err := s.integration.GetStatus(s.ctx)
 	s.NoError(err, "Failed to get status")

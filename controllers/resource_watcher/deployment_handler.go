@@ -44,10 +44,10 @@ func (h *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 }
 
 func (h *DeploymentHandler) syncDeployment(ctx context.Context) error {
-	mondooClientImage, err := h.ContainerImageResolver.CnspecImage(
-		h.Mondoo.Spec.Scanner.Image.Name, h.Mondoo.Spec.Scanner.Image.Tag, h.Mondoo.Spec.Scanner.Image.Digest, h.MondooOperatorConfig.Spec.SkipContainerResolution)
+	mondooClientImage, err := h.ContainerImageResolver.MondooOperatorImage(
+		ctx, h.Mondoo.Spec.Scanner.Image.Name, h.Mondoo.Spec.Scanner.Image.Tag, h.Mondoo.Spec.Scanner.Image.Digest, h.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
-		deploymentHandlerLogger.Error(err, "Failed to resolve cnspec container image")
+		deploymentHandlerLogger.Error(err, "Failed to resolve mondoo-operator container image")
 		return err
 	}
 
