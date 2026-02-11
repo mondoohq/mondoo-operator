@@ -1,6 +1,7 @@
 # Mondoo Operator for Kubernetes
 
 [![Tests](https://github.com/mondoohq/mondoo-operator/actions/workflows/tests.yaml/badge.svg)](https://github.com/mondoohq/mondoo-operator/actions/workflows/tests.yaml)
+
 <!-- [![Edge integration tests](https://github.com/mondoohq/mondoo-operator/actions/workflows/edge-integration-tests.yaml/badge.svg)](https://github.com/mondoohq/mondoo-operator/actions/workflows/edge-integration-tests.yaml) -->
 <!-- [![Cloud tests](https://github.com/mondoohq/mondoo-operator/actions/workflows/cloud-tests.yaml/badge.svg)](https://github.com/mondoohq/mondoo-operator/actions/workflows/cloud-tests.yaml) -->
 
@@ -32,13 +33,13 @@ Install the operator in each cluster you want to scan. The operator scans the cl
 ┌─────────────────────────────────────┐
 │         Your Kubernetes Cluster     │
 │                                     │
-│  ┌─────────────────────────────┐   │
-│  │      Mondoo Operator        │   │
-│  │                             │   │
-│  │  • K8s Resources Scanning   │   │
-│  │  • Node Scanning            │   │
-│  │  • Container Image Scanning │   │
-│  └─────────────────────────────┘   │
+│  ┌─────────────────────────────┐    │
+│  │      Mondoo Operator        │    │
+│  │                             │    │
+│  │  • K8s Resources Scanning   │    │
+│  │  • Node Scanning            │    │
+│  │  • Container Image Scanning │    │
+│  └─────────────────────────────┘    │
 │               │                     │
 │               ▼                     │
 │     Scans this cluster directly     │
@@ -53,11 +54,11 @@ apiVersion: k8s.mondoo.com/v1alpha2
 kind: MondooAuditConfig
 spec:
   kubernetesResources:
-    enable: true        # Scan K8s resources in this cluster
+    enable: true # Scan K8s resources in this cluster
   nodes:
-    enable: true        # Scan nodes in this cluster
+    enable: true # Scan nodes in this cluster
   containers:
-    enable: true        # Scan container images
+    enable: true # Scan container images
 ```
 
 ### External Cluster Scanning
@@ -68,9 +69,9 @@ Install the operator in a central management cluster and scan remote clusters vi
 ┌─────────────────────────────────────┐
 │       Management Cluster            │
 │                                     │
-│  ┌─────────────────────────────┐   │
-│  │      Mondoo Operator        │   │
-│  └──────────┬──────────────────┘   │
+│  ┌─────────────────────────────┐    │
+│  │      Mondoo Operator        │    │
+│  └──────────┬──────────────────┘    │
 └─────────────┼───────────────────────┘
               │
               │ kubeconfig / WIF / SPIFFE
@@ -86,6 +87,7 @@ Install the operator in a central management cluster and scan remote clusters vi
 **Use when:** You want centralized scanning, cannot install operators in target clusters, or want to reduce operational overhead.
 
 **Authentication methods:**
+
 - **Kubeconfig**: Use a kubeconfig file stored in a Secret
 - **Workload Identity (WIF)**: Native cloud provider authentication for GKE, EKS, AKS
 - **SPIFFE**: Use SPIFFE/SPIRE for cross-cluster authentication
@@ -96,7 +98,7 @@ apiVersion: k8s.mondoo.com/v1alpha2
 kind: MondooAuditConfig
 spec:
   kubernetesResources:
-    enable: false       # Don't scan local cluster
+    enable: false # Don't scan local cluster
     externalClusters:
       - name: production
         kubeconfigSecretRef:
@@ -115,28 +117,28 @@ apiVersion: k8s.mondoo.com/v1alpha2
 kind: MondooAuditConfig
 spec:
   kubernetesResources:
-    enable: true        # Scan local cluster
-    externalClusters:   # Also scan remote clusters
+    enable: true # Scan local cluster
+    externalClusters: # Also scan remote clusters
       - name: production
         kubeconfigSecretRef:
           name: prod-kubeconfig
   nodes:
-    enable: true        # Scan local nodes
+    enable: true # Scan local nodes
   containers:
-    enable: true        # Scan container images
+    enable: true # Scan container images
 ```
 
 ## Features
 
-| Feature | Self-Cluster | External Cluster |
-|---------|:------------:|:----------------:|
-| Kubernetes Resources Scanning | ✅ | ✅ |
-| Node Scanning | ✅ | ❌ |
-| Container Image Scanning | ✅ | ✅ |
-| Namespace Filtering | ✅ | ✅ |
-| Kubeconfig Auth | - | ✅ |
-| Workload Identity (GKE/EKS/AKS) | - | ✅ |
-| SPIFFE Auth | - | ✅ |
+| Feature                         | Self-Cluster | External Cluster |
+| ------------------------------- | :----------: | :--------------: |
+| Kubernetes Resources Scanning   |      ✅      |        ✅        |
+| Node Scanning                   |      ✅      |        ❌        |
+| Container Image Scanning        |      ✅      |        ✅        |
+| Namespace Filtering             |      ✅      |        ✅        |
+| Kubeconfig Auth                 |      -       |        ✅        |
+| Workload Identity (GKE/EKS/AKS) |      -       |        ✅        |
+| SPIFFE Auth                     |      -       |        ✅        |
 
 ![Architecture](docs/img/architecture.svg)
 
@@ -153,6 +155,7 @@ The following Kubernetes environments are tested:
 <!-- - AWS EKS 1.23, 1.24, 1.25, and 1.26
 - Azure AKS 1.24, 1.25, and 1.26
 - GCP GKE 1.23, 1.24, 1.25, and 1.26 -->
+
 - Minikube with Kubernetes versions 1.31, 1.32, 1.33, and 1.34
 - K3S 1.31, 1.32, 1.33, and 1.34
 
