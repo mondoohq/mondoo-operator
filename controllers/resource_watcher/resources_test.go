@@ -256,7 +256,7 @@ func TestDeployment_WithAnnotations(t *testing.T) {
 
 	operatorConfig := v1alpha2.MondooOperatorConfig{}
 
-	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", config, operatorConfig)
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
 
 	container := deployment.Spec.Template.Spec.Containers[0]
 	cmd := container.Command
