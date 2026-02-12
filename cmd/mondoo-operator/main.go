@@ -5,6 +5,7 @@ package main
 
 import (
 	"github.com/spf13/cobra"
+	"go.mondoo.com/mondoo-operator/cmd/mondoo-operator/cleanup"
 	"go.mondoo.com/mondoo-operator/cmd/mondoo-operator/garbage_collect"
 	"go.mondoo.com/mondoo-operator/cmd/mondoo-operator/k8s_scan"
 	"go.mondoo.com/mondoo-operator/cmd/mondoo-operator/operator"
@@ -19,7 +20,7 @@ var rootCmd = &cobra.Command{
 }
 
 func main() {
-	rootCmd.AddCommand(operator.Cmd, version.Cmd, garbage_collect.Cmd, k8s_scan.Cmd, resourcewatcher.Cmd)
+	rootCmd.AddCommand(operator.Cmd, version.Cmd, garbage_collect.Cmd, k8s_scan.Cmd, resourcewatcher.Cmd, cleanup.Cmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		panic(err)

@@ -122,7 +122,7 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code. 
 	go vet ./...
 
-lint: golangci-lint generate
+lint: golangci-lint generate helm/lint
 	$(GOLANGCI_LINT) run
 
 lint/actions: actionlint ## Lint GitHub Actions workflows.
@@ -146,7 +146,7 @@ test/integration: manifests generate generate-manifests load-k3d
 else
 test/integration: manifests generate generate-manifests load-minikube
 endif
-	go test -ldflags $(LDFLAGS) -v -timeout 20m -p 1 ./tests/integration/...
+	MONDOO_OPERATOR_IMAGE_TAG=$(VERSION) go test -ldflags $(LDFLAGS) -v -timeout 20m -p 1 ./tests/integration/...
 
 ifeq ($(K8S_DISTRO),gke)
 test/integration/ci: gotestsum
@@ -159,10 +159,14 @@ test/integration/ci: gotestsum load-k3d/ci
 else
 test/integration/ci: gotestsum load-minikube/ci
 endif
-	$(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -ldflags $(LDFLAGS) -v -timeout 20m -p 1
+	MONDOO_OPERATOR_IMAGE_TAG=$(VERSION) $(GOTESTSUM) --junitfile integration-tests.xml -- ./tests/integration/... -ldflags $(LDFLAGS) -v -timeout 20m -p 1
 
 test/integration/external-cluster: ## Run external cluster integration test (requires k3d management cluster)
 	K8S_DISTRO=k3d go test -ldflags $(LDFLAGS) -v -timeout 15m -p 1 ./tests/integration/... -run TestExternalClusterSuite
+
+.PHONY: test/integration/helm
+test/integration/helm: load-k3d ## Run Helm chart integration tests
+	MONDOO_OPERATOR_IMAGE_TAG=$(VERSION) go test -ldflags $(LDFLAGS) -v -timeout 15m -p 1 ./tests/integration/... -run TestHelmChartSuite
 
 ##@ Build
 
@@ -351,17 +355,27 @@ catalog-build: opm ## Build a catalog image.
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
-HELMIFY = $(LOCALBIN)/helmify
-helmify: $(LOCALBIN) ## Download helmify locally if necessary.
-	GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@v0.4.18
+##@ Helm Chart Management
+# The Helm chart templates are hand-maintained. Only CRDs are auto-generated.
+# See: https://github.com/mondoohq/mondoo-operator/issues/821
 
-helm: manifests kustomize helmify
-	$(KUSTOMIZE) build config/default | $(HELMIFY) $(CHART_NAME)
-	# The above command creates a helm chart, which has duplicate labels after templating
-	# We can remove the static doublicate labels here
-	sed -i -z 's#\(\n[[:blank:]]*selector:\)\n[[:blank:]]*app.kubernetes.io/name: mondoo-operator#\1#' charts/mondoo-operator/templates/metrics-service.yaml
-	sed -i -z 's#\([[:blank:]]*selector:\n[[:blank:]]*matchLabels:\)\n[[:blank:]]*app.kubernetes.io/name: mondoo-operator#\1#' charts/mondoo-operator/templates/deployment.yaml
-	sed -i -z 's#\([[:blank:]]*template:\n[[:blank:]]*metadata:\n[[:blank:]]*labels:\)\n[[:blank:]]*app.kubernetes.io/name: mondoo-operator#\1#' charts/mondoo-operator/templates/deployment.yaml
+.PHONY: helm/crds
+helm/crds: manifests kustomize ## Update only the CRD templates in the Helm chart from generated CRDs.
+	./hack/update-helm-crds.sh
+
+.PHONY: helm/lint
+helm/lint: ## Lint the Helm chart using chart-testing (ct).
+	@if command -v ct >/dev/null 2>&1; then \
+		ct lint --charts charts/mondoo-operator --validate-maintainers=false; \
+	else \
+		echo "chart-testing (ct) not found, falling back to helm lint"; \
+		echo "Install ct for more comprehensive linting: brew install chart-testing"; \
+		helm lint charts/mondoo-operator; \
+	fi
+
+.PHONY: helm/template
+helm/template: ## Render Helm chart templates for debugging.
+	helm template test charts/mondoo-operator
 
 # Install prettier gloablly via
 # yarn global add prettier --prefix /usr/local
