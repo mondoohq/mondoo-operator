@@ -32,4 +32,5 @@ jobs:
         with:
           files: mondoo-operator-manifests.yaml
           generate_release_notes: false
-          make_latest: true
+          # Only mark as latest if not a pre-release version (no hyphen after version)
+          make_latest: ${{ !contains(github.ref_name, '-') }}

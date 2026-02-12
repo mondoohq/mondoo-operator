@@ -1,0 +1,94 @@
+# Copyright (c) Mondoo, Inc.
+# SPDX-License-Identifier: BUSL-1.1
+
+name: Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    # Only run for version tags
+    if: startsWith(github.event.release.tag_name, 'v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Import environment variables from file
+        run: cat ".github/env" >> $GITHUB_ENV
+
+      - name: Setup Go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version: "${{ env.golang-version }}"
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Update version files
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Update Chart.yaml
+          yq -i ".version = \"${VERSION}\"" charts/mondoo-operator/Chart.yaml
+          yq -i ".appVersion = \"${VERSION}\"" charts/mondoo-operator/Chart.yaml
+
+          # Update kustomization.yaml
+          yq -i ".images[0].newTag = \"v${VERSION}\"" config/manager/kustomization.yaml
+
+      - name: Generate manifests and Helm chart
+        run: |
+          make manifests
+          CHART_NAME=charts/mondoo-operator make helm
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit version updates
+        id: commit
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            git commit -m "🚀 Release v${VERSION}"
+            git push origin main
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Move tag to include version updates
+        if: steps.commit.outputs.changed == 'true'
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+
+          # Delete the old tag (local and remote)
+          git tag -d "${TAG}" || true
+          git push origin ":refs/tags/${TAG}" || true
+
+          # Create new tag at current HEAD (which includes version updates)
+          git tag "${TAG}"
+          git push origin "${TAG}"
