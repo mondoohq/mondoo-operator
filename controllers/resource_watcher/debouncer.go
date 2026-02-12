@@ -20,8 +20,8 @@ type Debouncer struct {
 	interval     time.Duration
 	minInterval  time.Duration // minimum time between scans (rate limit)
 	mu           sync.Mutex
-	pending      map[string][]byte // resource key -> YAML manifest
-	scanFunc     func(ctx context.Context, manifests []byte) error
+	pending      map[string]K8sResourceIdentifier // resource key -> resource identifier
+	scanFunc     func(ctx context.Context, resources []K8sResourceIdentifier) error
 	timer        *time.Timer
 	ctx          context.Context
 	cancel       context.CancelFunc
@@ -31,24 +31,23 @@ type Debouncer struct {
 // NewDebouncer creates a new Debouncer with the given intervals and scan function.
 // interval is the debounce interval (time to wait after last change before scanning).
 // minInterval is the minimum time between scans (rate limit). Set to 0 to disable rate limiting.
-func NewDebouncer(interval, minInterval time.Duration, scanFunc func(ctx context.Context, manifests []byte) error) *Debouncer {
+func NewDebouncer(interval, minInterval time.Duration, scanFunc func(ctx context.Context, resources []K8sResourceIdentifier) error) *Debouncer {
 	return &Debouncer{
 		interval:    interval,
 		minInterval: minInterval,
-		pending:     make(map[string][]byte),
+		pending:     make(map[string]K8sResourceIdentifier),
 		scanFunc:    scanFunc,
 	}
 }
 
-// Add adds a resource to the pending queue. The key should be unique per resource
-// (e.g., "namespace/kind/name"). If a resource with the same key is already pending,
-// it will be replaced with the new manifest.
-func (d *Debouncer) Add(key string, manifest []byte) {
+// Add adds a resource to the pending queue. The key should be unique per resource.
+// resource contains the type, namespace, and name of the K8s resource.
+func (d *Debouncer) Add(key string, resource K8sResourceIdentifier) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.pending[key] = manifest
-	debouncerLogger.V(1).Info("Added resource to debounce queue", "key", key, "queueSize", len(d.pending))
+	d.pending[key] = resource
+	debouncerLogger.V(1).Info("Added resource to debounce queue", "key", key, "resource", resource, "queueSize", len(d.pending))
 
 	// Reset the timer if it exists, or start a new one
 	if d.timer != nil {
@@ -81,8 +80,8 @@ func (d *Debouncer) stop() {
 	debouncerLogger.Info("Debouncer stopped")
 }
 
-// flush processes all pending resources by combining them into a single manifest
-// and calling the scan function. It enforces the minimum interval between scans.
+// flush processes all pending resources and calls the scan function.
+// It enforces the minimum interval between scans.
 func (d *Debouncer) flush() {
 	d.mu.Lock()
 	if len(d.pending) == 0 {
@@ -102,23 +101,19 @@ func (d *Debouncer) flush() {
 		}
 	}
 
-	// Collect all pending manifests
-	manifests := make([][]byte, 0, len(d.pending))
+	// Collect all pending resources
+	resources := make([]K8sResourceIdentifier, 0, len(d.pending))
 	keys := make([]string, 0, len(d.pending))
-	for key, manifest := range d.pending {
-		manifests = append(manifests, manifest)
+	for key, resource := range d.pending {
+		resources = append(resources, resource)
 		keys = append(keys, key)
 	}
 
-	// Clear pending and update last scan time
-	d.pending = make(map[string][]byte)
-	d.lastScanTime = time.Now()
+	// Clear pending
+	d.pending = make(map[string]K8sResourceIdentifier)
 	d.mu.Unlock()
 
-	debouncerLogger.Info("Flushing debounce queue", "resourceCount", len(manifests))
-
-	// Combine all manifests with YAML document separators
-	combined := combineManifests(manifests)
+	debouncerLogger.Info("Flushing debounce queue", "resourceCount", len(resources))
 
 	// Execute scan
 	ctx := d.ctx
@@ -126,11 +121,16 @@ func (d *Debouncer) flush() {
 		ctx = context.Background()
 	}
 
-	if err := d.scanFunc(ctx, combined); err != nil {
+	if err := d.scanFunc(ctx, resources); err != nil {
 		debouncerLogger.Error(err, "Failed to scan resources", "keys", keys)
 	} else {
 		debouncerLogger.Info("Successfully scanned resources", "keys", keys)
 	}
+
+	// Update last scan time after scan completes
+	d.mu.Lock()
+	d.lastScanTime = time.Now()
+	d.mu.Unlock()
 }
 
 // QueueSize returns the current number of pending resources.
@@ -138,33 +138,4 @@ func (d *Debouncer) QueueSize() int {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return len(d.pending)
-}
-
-// combineManifests combines multiple YAML manifests into a single multi-document YAML.
-func combineManifests(manifests [][]byte) []byte {
-	if len(manifests) == 0 {
-		return nil
-	}
-
-	// Calculate total size
-	totalSize := 0
-	separator := []byte("---\n")
-	for _, m := range manifests {
-		totalSize += len(m) + len(separator)
-	}
-
-	// Combine
-	result := make([]byte, 0, totalSize)
-	for i, m := range manifests {
-		if i > 0 {
-			result = append(result, separator...)
-		}
-		result = append(result, m...)
-		// Ensure each manifest ends with a newline
-		if len(m) > 0 && m[len(m)-1] != '\n' {
-			result = append(result, '\n')
-		}
-	}
-
-	return result
 }

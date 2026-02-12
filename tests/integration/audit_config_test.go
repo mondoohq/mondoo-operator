@@ -5,10 +5,12 @@ package integration
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type AuditConfigSuite struct {
@@ -42,6 +44,15 @@ func (s *AuditConfigSuite) TestReconcile_Containers() {
 func (s *AuditConfigSuite) TestReconcile_Nodes_CronJobs() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true)
 	s.testMondooAuditConfigNodesCronjobs(auditConfig)
+}
+
+func (s *AuditConfigSuite) TestReconcile_ResourceWatcher() {
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, true, false, false)
+	// Enable resource watcher with short intervals for testing.
+	auditConfig.Spec.KubernetesResources.ResourceWatcher.Enable = true
+	auditConfig.Spec.KubernetesResources.ResourceWatcher.DebounceInterval = metav1.Duration{Duration: 5 * time.Second}
+	auditConfig.Spec.KubernetesResources.ResourceWatcher.MinimumScanInterval = metav1.Duration{Duration: 10 * time.Second}
+	s.testMondooAuditConfigResourceWatcher(auditConfig)
 }
 
 func (s *AuditConfigSuite) TearDownSuite() {

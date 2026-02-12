@@ -54,7 +54,7 @@ func TestDeployment(t *testing.T) {
 
 	operatorConfig := v1alpha2.MondooOperatorConfig{}
 
-	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", config, operatorConfig)
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
 
 	assert.Equal(t, "my-config-resource-watcher", deployment.Name)
 	assert.Equal(t, "mondoo-operator", deployment.Namespace)
@@ -99,7 +99,7 @@ func TestDeployment_DefaultDebounceInterval(t *testing.T) {
 
 	operatorConfig := v1alpha2.MondooOperatorConfig{}
 
-	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", config, operatorConfig)
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
 
 	container := deployment.Spec.Template.Spec.Containers[0]
 	cmdStr := ""
@@ -134,7 +134,7 @@ func TestDeployment_WithHttpProxy(t *testing.T) {
 		},
 	}
 
-	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", config, operatorConfig)
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
 
 	container := deployment.Spec.Template.Spec.Containers[0]
 	cmdStr := ""
@@ -164,7 +164,7 @@ func TestDeployment_MinimumScanInterval(t *testing.T) {
 
 	operatorConfig := v1alpha2.MondooOperatorConfig{}
 
-	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", config, operatorConfig)
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
 
 	container := deployment.Spec.Template.Spec.Containers[0]
 	cmdStr := ""
@@ -194,7 +194,7 @@ func TestDeployment_DefaultMinimumScanInterval(t *testing.T) {
 
 	operatorConfig := v1alpha2.MondooOperatorConfig{}
 
-	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", config, operatorConfig)
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
 
 	container := deployment.Spec.Template.Spec.Containers[0]
 	cmdStr := ""
@@ -224,7 +224,7 @@ func TestDeployment_WatchAllResources(t *testing.T) {
 
 	operatorConfig := v1alpha2.MondooOperatorConfig{}
 
-	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", config, operatorConfig)
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
 
 	container := deployment.Spec.Template.Spec.Containers[0]
 	cmdStr := ""
@@ -256,7 +256,7 @@ func TestDeployment_WithAnnotations(t *testing.T) {
 
 	operatorConfig := v1alpha2.MondooOperatorConfig{}
 
-	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", config, operatorConfig)
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
 
 	container := deployment.Spec.Template.Spec.Containers[0]
 	cmd := container.Command
@@ -291,7 +291,7 @@ func TestDeployment_HighPriorityByDefault(t *testing.T) {
 
 	operatorConfig := v1alpha2.MondooOperatorConfig{}
 
-	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", config, operatorConfig)
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
 
 	container := deployment.Spec.Template.Spec.Containers[0]
 	cmdStr := ""
@@ -300,4 +300,65 @@ func TestDeployment_HighPriorityByDefault(t *testing.T) {
 	}
 	// Should NOT contain --watch-all-resources when false (default)
 	assert.NotContains(t, cmdStr, "--watch-all-resources")
+}
+
+func TestDeployment_WithClusterUIDAndIntegrationMRN(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-config",
+			Namespace: "mondoo-operator",
+		},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable: true,
+				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
+					Enable: true,
+				},
+			},
+		},
+	}
+
+	operatorConfig := v1alpha2.MondooOperatorConfig{}
+
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "//integration/mrn/123", "cluster-uid-456", config, operatorConfig)
+
+	container := deployment.Spec.Template.Spec.Containers[0]
+	cmdStr := ""
+	for _, c := range container.Command {
+		cmdStr += c + " "
+	}
+	assert.Contains(t, cmdStr, "--cluster-uid")
+	assert.Contains(t, cmdStr, "cluster-uid-456")
+	assert.Contains(t, cmdStr, "--integration-mrn")
+	assert.Contains(t, cmdStr, "//integration/mrn/123")
+}
+
+func TestDeployment_EmptyClusterUIDAndIntegrationMRN(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-config",
+			Namespace: "mondoo-operator",
+		},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable: true,
+				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
+					Enable: true,
+				},
+			},
+		},
+	}
+
+	operatorConfig := v1alpha2.MondooOperatorConfig{}
+
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
+
+	container := deployment.Spec.Template.Spec.Containers[0]
+	cmdStr := ""
+	for _, c := range container.Command {
+		cmdStr += c + " "
+	}
+	// Should NOT contain flags when empty
+	assert.NotContains(t, cmdStr, "--cluster-uid")
+	assert.NotContains(t, cmdStr, "--integration-mrn")
 }

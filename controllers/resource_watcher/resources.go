@@ -40,13 +40,23 @@ func DeploymentLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 }
 
 // Deployment creates a Deployment spec for the resource watcher.
-func Deployment(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *appsv1.Deployment {
+func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *appsv1.Deployment {
 	ls := DeploymentLabels(*m)
 
 	// Build command arguments
 	cmd := []string{
 		"/mondoo-operator", "resource-watcher",
 		"--config", "/etc/opt/mondoo/config/mondoo.yml",
+	}
+
+	// Add cluster UID for asset labeling
+	if clusterUID != "" {
+		cmd = append(cmd, "--cluster-uid", clusterUID)
+	}
+
+	// Add integration MRN for asset labeling
+	if integrationMRN != "" {
+		cmd = append(cmd, "--integration-mrn", integrationMRN)
 	}
 
 	// Add debounce interval if configured

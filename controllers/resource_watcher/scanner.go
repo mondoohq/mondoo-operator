@@ -8,9 +8,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
+	"strings"
 	"time"
 
+	"go.mondoo.com/cnquery/v12/providers-sdk/v1/inventory"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/yaml"
 
 	"go.mondoo.com/mondoo-operator/pkg/annotations"
 )
@@ -27,9 +31,17 @@ type ScannerConfig struct {
 	Timeout time.Duration
 	// Annotations are key-value pairs to attach to all scanned assets.
 	Annotations map[string]string
+	// Namespaces to include in scanning. Empty means all namespaces.
+	Namespaces []string
+	// NamespacesExclude are namespaces to exclude from scanning.
+	NamespacesExclude []string
+	// ClusterUID is the unique identifier of the cluster.
+	ClusterUID string
+	// IntegrationMRN is the integration MRN for asset labeling.
+	IntegrationMRN string
 }
 
-// Scanner executes cnspec scans on K8s manifests.
+// Scanner executes cnspec scans on K8s resources.
 type Scanner struct {
 	config ScannerConfig
 }
@@ -39,18 +51,25 @@ func NewScanner(config ScannerConfig) *Scanner {
 	return &Scanner{config: config}
 }
 
-// ScanManifests writes the given manifests to a temporary file and executes cnspec scan.
-func (s *Scanner) ScanManifests(ctx context.Context, manifests []byte) error {
-	if len(manifests) == 0 {
-		scannerLogger.V(1).Info("No manifests to scan, skipping")
+// ScanResources scans specific K8s resources using the K8s API connection.
+// resources is a list of specific resource identifiers to scan.
+func (s *Scanner) ScanResources(ctx context.Context, resources []K8sResourceIdentifier) error {
+	if len(resources) == 0 {
+		scannerLogger.V(1).Info("No resources to scan, skipping")
 		return nil
 	}
 
-	// Create temp file for manifests
-	tempDir := os.TempDir()
-	tempFile, err := os.CreateTemp(tempDir, "mondoo-resource-watcher-*.yaml")
+	// Generate inventory file
+	inv, err := s.generateInventory(resources)
 	if err != nil {
-		return fmt.Errorf("failed to create temp file for manifests: %w", err)
+		return fmt.Errorf("failed to generate inventory: %w", err)
+	}
+
+	// Create temp file for inventory
+	tempDir := os.TempDir()
+	tempFile, err := os.CreateTemp(tempDir, "mondoo-resource-watcher-inventory-*.yaml")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file for inventory: %w", err)
 	}
 	tempPath := tempFile.Name()
 
@@ -61,22 +80,22 @@ func (s *Scanner) ScanManifests(ctx context.Context, manifests []byte) error {
 		}
 	}()
 
-	// Write manifests to temp file
-	if _, err := tempFile.Write(manifests); err != nil {
-		_ = tempFile.Close() // Ignore close error since we're already returning an error
-		return fmt.Errorf("failed to write manifests to temp file: %w", err)
+	// Write inventory to temp file
+	if _, err := tempFile.Write(inv); err != nil {
+		_ = tempFile.Close()
+		return fmt.Errorf("failed to write inventory to temp file: %w", err)
 	}
 	if err := tempFile.Close(); err != nil {
 		return fmt.Errorf("failed to close temp file: %w", err)
 	}
 
-	scannerLogger.Info("Scanning manifests", "path", tempPath, "size", len(manifests))
+	scannerLogger.Info("Scanning resources via K8s API", "resourceCount", len(resources), "inventoryPath", tempPath)
 
-	// Build cnspec command
-	// cnspec scan k8s <manifest-file> --config <config-path>
+	// Build cnspec command using inventory file
 	cnspecArgs := []string{
-		"scan", "k8s", tempPath,
+		"scan", "k8s",
 		"--config", s.config.ConfigPath,
+		"--inventory-file", tempPath,
 		"--score-threshold", "0",
 	}
 	if s.config.APIProxy != "" {
@@ -113,9 +132,78 @@ func (s *Scanner) ScanManifests(ctx context.Context, manifests []byte) error {
 	return nil
 }
 
-// ScanManifestsFunc returns a function suitable for use with the Debouncer.
-func (s *Scanner) ScanManifestsFunc() func(ctx context.Context, manifests []byte) error {
-	return s.ScanManifests
+// generateInventory creates an inventory YAML for scanning specific resources via K8s API.
+func (s *Scanner) generateInventory(resources []K8sResourceIdentifier) ([]byte, error) {
+	// Build resource filter string for k8s-resources option
+	// Format: type:namespace:name,type:namespace:name,...
+	resourceFilters := make([]string, 0, len(resources))
+	for _, r := range resources {
+		resourceFilters = append(resourceFilters, r.String())
+	}
+
+	// Extract unique resource types for discovery targets
+	typeSet := make(map[string]struct{})
+	for _, r := range resources {
+		typeSet[r.Type] = struct{}{} // Type is already plural (e.g., "deployments")
+	}
+	targets := make([]string, 0, len(typeSet))
+	for t := range typeSet {
+		targets = append(targets, t)
+	}
+	sort.Strings(targets)
+
+	opts := map[string]string{
+		"k8s-resources": strings.Join(resourceFilters, ","),
+	}
+	if len(s.config.Namespaces) > 0 {
+		opts["namespaces"] = strings.Join(s.config.Namespaces, ",")
+	}
+	if len(s.config.NamespacesExclude) > 0 {
+		opts["namespaces-exclude"] = strings.Join(s.config.NamespacesExclude, ",")
+	}
+
+	managedBy := "mondoo-operator"
+	if s.config.ClusterUID != "" {
+		managedBy = "mondoo-operator-" + s.config.ClusterUID
+	}
+
+	inv := &inventory.Inventory{
+		Metadata: &inventory.ObjectMeta{
+			Name: "mondoo-resource-watcher-inventory",
+		},
+		Spec: &inventory.InventorySpec{
+			Assets: []*inventory.Asset{
+				{
+					Connections: []*inventory.Config{
+						{
+							Type:    "k8s",
+							Options: opts,
+							Discover: &inventory.Discovery{
+								Targets: targets,
+							},
+						},
+					},
+					Labels: map[string]string{
+						"k8s.mondoo.com/kind": "cluster",
+					},
+					ManagedBy: managedBy,
+				},
+			},
+		},
+	}
+
+	if s.config.IntegrationMRN != "" {
+		for i := range inv.Spec.Assets {
+			inv.Spec.Assets[i].Labels["mondoo.com/integration-mrn"] = s.config.IntegrationMRN
+		}
+	}
+
+	return yaml.Marshal(inv)
+}
+
+// ScanResourcesFunc returns a function suitable for use with the Debouncer.
+func (s *Scanner) ScanResourcesFunc() func(ctx context.Context, resources []K8sResourceIdentifier) error {
+	return s.ScanResources
 }
 
 // ValidateConfig checks if the scanner configuration is valid.

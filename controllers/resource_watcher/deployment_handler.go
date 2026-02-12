@@ -44,15 +44,27 @@ func (h *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 }
 
 func (h *DeploymentHandler) syncDeployment(ctx context.Context) error {
-	mondooClientImage, err := h.ContainerImageResolver.CnspecImage(
-		h.Mondoo.Spec.Scanner.Image.Name, h.Mondoo.Spec.Scanner.Image.Tag, h.Mondoo.Spec.Scanner.Image.Digest, h.MondooOperatorConfig.Spec.SkipContainerResolution)
+	mondooClientImage, err := h.ContainerImageResolver.MondooOperatorImage(
+		ctx, h.Mondoo.Spec.Scanner.Image.Name, h.Mondoo.Spec.Scanner.Image.Tag, h.Mondoo.Spec.Scanner.Image.Digest, h.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
-		deploymentHandlerLogger.Error(err, "Failed to resolve cnspec container image")
+		deploymentHandlerLogger.Error(err, "Failed to resolve mondoo-operator container image")
 		return err
 	}
 
+	// Get cluster UID for asset labeling (best-effort)
+	clusterUID, err := k8s.GetClusterUID(ctx, h.KubeClient, deploymentHandlerLogger)
+	if err != nil {
+		deploymentHandlerLogger.Info("Failed to get cluster UID, continuing without it", "error", err)
+	}
+
+	// Get integration MRN if available (best-effort)
+	integrationMRN, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, h.KubeClient, *h.Mondoo)
+	if err != nil {
+		deploymentHandlerLogger.Info("Failed to get integration MRN, continuing without it", "error", err)
+	}
+
 	existing := &appsv1.Deployment{}
-	desired := Deployment(mondooClientImage, h.Mondoo, *h.MondooOperatorConfig)
+	desired := Deployment(mondooClientImage, integrationMRN, clusterUID, h.Mondoo, *h.MondooOperatorConfig)
 
 	if err := ctrl.SetControllerReference(h.Mondoo, desired, h.KubeClient.Scheme()); err != nil {
 		deploymentHandlerLogger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)

@@ -56,6 +56,8 @@ func init() {
 	apiProxy := Cmd.Flags().String("api-proxy", "", "HTTP proxy to use for API requests.")
 	timeout := Cmd.Flags().Duration("timeout", 25*time.Minute, "Timeout for scan operations.")
 	annotations := Cmd.Flags().StringToString("annotation", nil, "Annotations to add to scanned assets (can specify multiple, e.g., --annotation env=prod --annotation team=platform).")
+	clusterUID := Cmd.Flags().String("cluster-uid", "", "The unique identifier of the cluster for asset labeling.")
+	integrationMRN := Cmd.Flags().String("integration-mrn", "", "The integration MRN for asset labeling.")
 
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(logger.NewLogger())
@@ -167,14 +169,18 @@ func init() {
 
 		// Create scanner
 		scanner := resource_watcher.NewScanner(resource_watcher.ScannerConfig{
-			ConfigPath:  *configPath,
-			APIProxy:    *apiProxy,
-			Timeout:     *timeout,
-			Annotations: *annotations,
+			ConfigPath:        *configPath,
+			APIProxy:          *apiProxy,
+			Timeout:           *timeout,
+			Annotations:       *annotations,
+			Namespaces:        namespacesList,
+			NamespacesExclude: namespacesExcludeList,
+			ClusterUID:        *clusterUID,
+			IntegrationMRN:    *integrationMRN,
 		})
 
 		// Create debouncer with rate limiting
-		debouncer := resource_watcher.NewDebouncer(*debounceInterval, *minimumScanInterval, scanner.ScanManifestsFunc())
+		debouncer := resource_watcher.NewDebouncer(*debounceInterval, *minimumScanInterval, scanner.ScanResourcesFunc())
 
 		// Create watcher
 		watcher := resource_watcher.NewResourceWatcher(c, debouncer, resource_watcher.WatcherConfig{
@@ -182,7 +188,7 @@ func init() {
 			NamespacesExclude: namespacesExcludeList,
 			ResourceTypes:     resourceTypesList,
 			WatchAllResources: *watchAllResources,
-		}, scheme)
+		})
 
 		// Start components
 		errChan := make(chan error, 3)
