@@ -122,7 +122,7 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code. 
 	go vet ./...
 
-lint: golangci-lint generate
+lint: golangci-lint generate helm/lint
 	$(GOLANGCI_LINT) run
 
 lint/actions: actionlint ## Lint GitHub Actions workflows.
