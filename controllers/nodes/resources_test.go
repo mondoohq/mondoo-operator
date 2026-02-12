@@ -17,8 +17,6 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
-	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -114,14 +112,13 @@ func TestResources(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			testNode := &corev1.Node{
+			testNode := corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-node-name",
 				},
 			}
-			mac := *test.mondooauditconfig()
-			cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: mac.Namespace}}
-			UpdateCronJob(cj, "test123", *testNode, &mac, false, v1alpha2.MondooOperatorConfig{})
+			mac := test.mondooauditconfig()
+			cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 			assert.Equal(t, test.expectedResources, cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Resources)
 		})
 	}
@@ -170,14 +167,13 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			testNode := &corev1.Node{
+			testNode := corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-node-name",
 				},
 			}
-			mac := *test.mondooauditconfig()
-			cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: mac.Namespace}}
-			UpdateCronJob(cj, "test123", *testNode, &mac, false, v1alpha2.MondooOperatorConfig{})
+			mac := test.mondooauditconfig()
+			cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 			goMemLimitEnv := corev1.EnvVar{}
 			for _, env := range cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
 				if env.Name == "GOMEMLIMIT" {
@@ -192,8 +188,7 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			mac := *test.mondooauditconfig()
-			ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: mac.Namespace}}
-			UpdateDaemonSet(ds, mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
+			ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
 			goMemLimitEnv := corev1.EnvVar{}
 			for _, env := range ds.Spec.Template.Spec.Containers[0].Env {
 				if env.Name == "GOMEMLIMIT" {
@@ -207,27 +202,25 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 }
 
 func TestCronJob_PrivilegedOpenshift(t *testing.T) {
-	testNode := &corev1.Node{
+	testNode := corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node-name",
 		},
 	}
 	mac := testMondooAuditConfig()
-	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: mac.Namespace}}
-	UpdateCronJob(cj, "test123", *testNode, mac, true, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test123", testNode, mac, true, v1alpha2.MondooOperatorConfig{})
 	assert.True(t, *cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.Privileged)
 	assert.True(t, *cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
 }
 
 func TestCronJob_Privileged(t *testing.T) {
-	testNode := &corev1.Node{
+	testNode := corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node-name",
 		},
 	}
 	mac := testMondooAuditConfig()
-	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: mac.Namespace}}
-	UpdateCronJob(cj, "test123", *testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 	assert.False(t, *cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.Privileged)
 	assert.False(t, *cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
 }

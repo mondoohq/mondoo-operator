@@ -106,6 +106,10 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 	envVars = append(envVars, m.Spec.Scanner.Env...)
 
 	deployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "apps/v1",
+			Kind:       "Deployment",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DeploymentName(m.Name),
 			Namespace: m.Namespace,

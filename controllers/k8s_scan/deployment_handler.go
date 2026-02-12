@@ -6,7 +6,6 @@ package k8s_scan
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -156,48 +155,24 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
-	updated, err := n.syncConfigMap(ctx, integrationMrn, clusterUid)
-	if err != nil {
+	if err := n.syncConfigMap(ctx, integrationMrn, clusterUid); err != nil {
 		return err
 	}
 
-	// If ConfigMap was just updated, the job will pick up the new config during the next scheduled run
-	if updated {
-		logger.Info(
-			"Inventory ConfigMap was just updated. The job will use the new config during the next scheduled run.",
-			"namespace", n.Mondoo.Namespace,
-			"name", CronJobName(n.Mondoo.Name))
-	}
-
-	existing := &batchv1.CronJob{}
 	desired := CronJob(mondooOperatorImage, integrationMrn, clusterUid, n.Mondoo, *n.MondooOperatorConfig)
-	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
-		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
-		return err
-	}
-
-	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
+	op, err := k8s.Apply(ctx, n.KubeClient, desired, n.Mondoo, logger, k8s.DefaultApplyOptions())
 	if err != nil {
-		logger.Error(err, "Failed to create CronJob", "namespace", desired.Namespace, "name", desired.Name)
+		logger.Error(err, "Failed to apply CronJob", "namespace", desired.Namespace, "name", desired.Name)
 		return err
 	}
 
-	if created {
-		logger.Info("Created CronJob", "namespace", desired.Namespace, "name", desired.Name)
-	} else if !k8s.AreCronJobsEqual(*existing, *desired) {
-		existing.Spec.JobTemplate = desired.Spec.JobTemplate
-		existing.Spec.Schedule = desired.Spec.Schedule
-		existing.Spec.ConcurrencyPolicy = desired.Spec.ConcurrencyPolicy
-		existing.SetOwnerReferences(desired.GetOwnerReferences())
-
-		// Remove completed/failed jobs because they won't be updated when the cronjob changes.
-		// Active jobs are preserved to avoid killing in-progress scans.
-		if err := k8s.DeleteCompletedJobs(ctx, n.KubeClient, n.Mondoo.Namespace, CronJobLabels(*n.Mondoo), logger); err != nil {
-			return err
-		}
-
-		if err := n.KubeClient.Update(ctx, existing); err != nil {
-			logger.Error(err, "Failed to update CronJob", "namespace", existing.Namespace, "name", existing.Name)
+	// When a CronJob is updated, remove old Jobs so they don't continue running with stale config
+	if op == k8s.ApplyUpdated {
+		if err := n.KubeClient.DeleteAllOf(ctx, &batchv1.Job{},
+			client.InNamespace(n.Mondoo.Namespace),
+			client.MatchingLabels(CronJobLabels(*n.Mondoo)),
+			client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
+			logger.Error(err, "Failed to clean up old Jobs after CronJob update")
 			return err
 		}
 	}
@@ -225,45 +200,20 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	return n.cleanupWorkloadDeployment(ctx)
 }
 
-// syncConfigMap syncs the inventory ConfigMap. Returns a boolean indicating whether the ConfigMap has been updated.
-func (n *DeploymentHandler) syncConfigMap(ctx context.Context, integrationMrn, clusterUid string) (bool, error) {
-	existing := &corev1.ConfigMap{}
-
+// syncConfigMap syncs the inventory ConfigMap using Server-Side Apply.
+func (n *DeploymentHandler) syncConfigMap(ctx context.Context, integrationMrn, clusterUid string) error {
 	desired, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo, *n.MondooOperatorConfig)
 	if err != nil {
 		logger.Error(err, "failed to generate desired ConfigMap with inventory")
-		return false, err
+		return err
 	}
 
-	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
-		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
-		return false, err
+	if _, err := k8s.Apply(ctx, n.KubeClient, desired, n.Mondoo, logger, k8s.DefaultApplyOptions()); err != nil {
+		logger.Error(err, "Failed to apply inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
+		return err
 	}
 
-	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
-	if err != nil {
-		logger.Error(err, "Failed to create inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
-		return false, err
-	}
-
-	if created {
-		logger.Info("Created inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
-		return false, nil
-	}
-
-	updated := false
-	if existing.Data["inventory"] != desired.Data["inventory"] ||
-		!reflect.DeepEqual(existing.GetOwnerReferences(), desired.GetOwnerReferences()) {
-		existing.Data["inventory"] = desired.Data["inventory"]
-		existing.SetOwnerReferences(desired.GetOwnerReferences())
-
-		if err := n.KubeClient.Update(ctx, existing); err != nil {
-			logger.Error(err, "Failed to update inventory ConfigMap", "namespace", existing.Namespace, "name", existing.Name)
-			return false, err
-		}
-		updated = true
-	}
-	return updated, nil
+	return nil
 }
 
 // reconcileExternalClusters reconciles CronJobs for external clusters
@@ -333,78 +283,36 @@ func (n *DeploymentHandler) reconcileExternalClusters(ctx context.Context) error
 }
 
 func (n *DeploymentHandler) syncExternalClusterConfigMap(ctx context.Context, integrationMrn, clusterUid string, cluster v1alpha2.ExternalCluster) error {
-	existing := &corev1.ConfigMap{}
-
 	desired, err := ExternalClusterConfigMap(integrationMrn, clusterUid, cluster, *n.Mondoo, *n.MondooOperatorConfig)
 	if err != nil {
 		logger.Error(err, "failed to generate desired ConfigMap for external cluster", "cluster", cluster.Name)
 		return err
 	}
 
-	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
-		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
+	if _, err := k8s.Apply(ctx, n.KubeClient, desired, n.Mondoo, logger, k8s.DefaultApplyOptions()); err != nil {
+		logger.Error(err, "Failed to apply inventory ConfigMap for external cluster", "cluster", cluster.Name)
 		return err
-	}
-
-	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
-	if err != nil {
-		logger.Error(err, "Failed to create inventory ConfigMap for external cluster", "cluster", cluster.Name)
-		return err
-	}
-
-	if created {
-		logger.Info("Created inventory ConfigMap for external cluster", "cluster", cluster.Name)
-		return nil
-	}
-
-	if existing.Data["inventory"] != desired.Data["inventory"] ||
-		!reflect.DeepEqual(existing.GetOwnerReferences(), desired.GetOwnerReferences()) {
-		existing.Data["inventory"] = desired.Data["inventory"]
-		existing.SetOwnerReferences(desired.GetOwnerReferences())
-
-		if err := n.KubeClient.Update(ctx, existing); err != nil {
-			logger.Error(err, "Failed to update inventory ConfigMap for external cluster", "cluster", cluster.Name)
-			return err
-		}
 	}
 
 	return nil
 }
 
 func (n *DeploymentHandler) syncExternalClusterCronJob(ctx context.Context, image string, cluster v1alpha2.ExternalCluster) error {
-	existing := &batchv1.CronJob{}
 	desired := ExternalClusterCronJob(image, cluster, n.Mondoo, *n.MondooOperatorConfig)
 
-	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
-		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
-		return err
-	}
-
-	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
+	op, err := k8s.Apply(ctx, n.KubeClient, desired, n.Mondoo, logger, k8s.DefaultApplyOptions())
 	if err != nil {
-		logger.Error(err, "Failed to create CronJob for external cluster", "cluster", cluster.Name)
+		logger.Error(err, "Failed to apply CronJob for external cluster", "cluster", cluster.Name)
 		return err
 	}
 
-	if created {
-		logger.Info("Created CronJob for external cluster", "cluster", cluster.Name)
-		return nil
-	}
-
-	if !k8s.AreCronJobsEqual(*existing, *desired) {
-		existing.Spec.JobTemplate = desired.Spec.JobTemplate
-		existing.Spec.Schedule = desired.Spec.Schedule
-		existing.Spec.ConcurrencyPolicy = desired.Spec.ConcurrencyPolicy
-		existing.SetOwnerReferences(desired.GetOwnerReferences())
-
-		// Remove completed/failed jobs because they won't be updated when the cronjob changes.
-		// Active jobs are preserved to avoid killing in-progress scans.
-		if err := k8s.DeleteCompletedJobs(ctx, n.KubeClient, n.Mondoo.Namespace, ExternalClusterCronJobLabels(*n.Mondoo, cluster.Name), logger); err != nil {
-			return err
-		}
-
-		if err := n.KubeClient.Update(ctx, existing); err != nil {
-			logger.Error(err, "Failed to update CronJob for external cluster", "cluster", cluster.Name)
+	// When a CronJob is updated, remove old Jobs so they don't continue running with stale config
+	if op == k8s.ApplyUpdated {
+		if err := n.KubeClient.DeleteAllOf(ctx, &batchv1.Job{},
+			client.InNamespace(n.Mondoo.Namespace),
+			client.MatchingLabels(ExternalClusterCronJobLabels(*n.Mondoo, cluster.Name)),
+			client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
+			logger.Error(err, "Failed to clean up old Jobs after CronJob update for external cluster", "cluster", cluster.Name)
 			return err
 		}
 	}
@@ -553,34 +461,11 @@ func (n *DeploymentHandler) cleanupWorkloadDeployment(ctx context.Context) error
 
 // syncExternalClusterSAKubeconfigConfigMap syncs a ConfigMap containing the generated kubeconfig for ServiceAccountAuth
 func (n *DeploymentHandler) syncExternalClusterSAKubeconfigConfigMap(ctx context.Context, cluster v1alpha2.ExternalCluster) error {
-	existing := &corev1.ConfigMap{}
 	desired := ExternalClusterSAKubeconfigConfigMap(cluster, n.Mondoo)
 
-	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
-		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
+	if _, err := k8s.Apply(ctx, n.KubeClient, desired, n.Mondoo, logger, k8s.DefaultApplyOptions()); err != nil {
+		logger.Error(err, "Failed to apply SA kubeconfig ConfigMap for external cluster", "cluster", cluster.Name)
 		return err
-	}
-
-	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
-	if err != nil {
-		logger.Error(err, "Failed to create SA kubeconfig ConfigMap for external cluster", "cluster", cluster.Name)
-		return err
-	}
-
-	if created {
-		logger.Info("Created SA kubeconfig ConfigMap for external cluster", "cluster", cluster.Name)
-		return nil
-	}
-
-	if existing.Data["kubeconfig"] != desired.Data["kubeconfig"] ||
-		!reflect.DeepEqual(existing.GetOwnerReferences(), desired.GetOwnerReferences()) {
-		existing.Data["kubeconfig"] = desired.Data["kubeconfig"]
-		existing.SetOwnerReferences(desired.GetOwnerReferences())
-
-		if err := n.KubeClient.Update(ctx, existing); err != nil {
-			logger.Error(err, "Failed to update SA kubeconfig ConfigMap for external cluster", "cluster", cluster.Name)
-			return err
-		}
 	}
 
 	return nil
@@ -590,43 +475,9 @@ func (n *DeploymentHandler) syncExternalClusterSAKubeconfigConfigMap(ctx context
 func (n *DeploymentHandler) syncWIFServiceAccount(ctx context.Context, cluster v1alpha2.ExternalCluster) error {
 	desired := WIFServiceAccount(cluster, n.Mondoo)
 
-	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
-		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
+	if _, err := k8s.Apply(ctx, n.KubeClient, desired, n.Mondoo, logger, k8s.DefaultApplyOptions()); err != nil {
+		logger.Error(err, "Failed to apply WIF ServiceAccount for external cluster", "cluster", cluster.Name)
 		return err
-	}
-
-	existing := &corev1.ServiceAccount{}
-	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
-	if err != nil {
-		logger.Error(err, "Failed to create WIF ServiceAccount for external cluster", "cluster", cluster.Name)
-		return err
-	}
-
-	if created {
-		logger.Info("Created WIF ServiceAccount for external cluster", "cluster", cluster.Name)
-		return nil
-	}
-
-	// Update if annotations or labels changed
-	needsUpdate := false
-	if !reflect.DeepEqual(existing.Annotations, desired.Annotations) {
-		existing.Annotations = desired.Annotations
-		needsUpdate = true
-	}
-	if !reflect.DeepEqual(existing.Labels, desired.Labels) {
-		existing.Labels = desired.Labels
-		needsUpdate = true
-	}
-	if !reflect.DeepEqual(existing.GetOwnerReferences(), desired.GetOwnerReferences()) {
-		existing.SetOwnerReferences(desired.GetOwnerReferences())
-		needsUpdate = true
-	}
-
-	if needsUpdate {
-		if err := n.KubeClient.Update(ctx, existing); err != nil {
-			logger.Error(err, "Failed to update WIF ServiceAccount for external cluster", "cluster", cluster.Name)
-			return err
-		}
 	}
 
 	return nil
