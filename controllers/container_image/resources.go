@@ -47,10 +47,6 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 	envVars = k8s.MergeEnv(envVars, m.Spec.Containers.Env)
 
 	cronjob := &batchv1.CronJob{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "batch/v1",
-			Kind:       "CronJob",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CronJobName(m.Name),
 			Namespace: m.Namespace,
@@ -102,7 +98,9 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 											MountPath: "/tmp",
 										},
 									},
-									Env: envVars,
+									Env:                      envVars,
+									TerminationMessagePath:   "/dev/termination-log",
+									TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 								},
 							},
 							ServiceAccountName: m.Spec.Scanner.ServiceAccountName,
@@ -181,10 +179,6 @@ func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 	}
 
 	return &corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: m.Namespace,
 			Name:      ConfigMapName(m.Name),

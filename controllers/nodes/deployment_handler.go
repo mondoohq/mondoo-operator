@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var logger = ctrl.Log.WithName("node-scanning")
@@ -89,26 +90,26 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 			return err
 		}
 
-		cronJob := CronJob(mondooClientImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
-		op, err := k8s.Apply(ctx, n.KubeClient, cronJob, n.Mondoo, logger, k8s.DefaultApplyOptions())
+		desired := CronJob(mondooClientImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
+		cronJob := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+		op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, cronJob, n.Mondoo, logger, func() error {
+			k8s.UpdateCronJobFields(cronJob, desired)
+			return nil
+		})
 		if err != nil {
-			logger.Error(err, "Failed to apply CronJob", "namespace", cronJob.Namespace, "name", cronJob.Name)
 			return err
 		}
 
 		switch op {
-		case k8s.ApplyCreated:
+		case controllerutil.OperationResultCreated:
 			if err := mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger); err != nil {
 				logger.Error(err, "Failed to update MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
 				return err
 			}
-		case k8s.ApplyUpdated:
-			// Remove old Jobs so they don't continue running with stale config
-			if err := n.KubeClient.DeleteAllOf(ctx, &batchv1.Job{},
-				client.InNamespace(n.Mondoo.Namespace),
-				client.MatchingLabels(NodeScanningLabels(*n.Mondoo)),
-				client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
-				logger.Error(err, "Failed to clean up old Jobs after CronJob update")
+		case controllerutil.OperationResultUpdated:
+			// Remove completed Jobs so they don't linger with stale config
+			if err := k8s.DeleteCompletedJobs(ctx, n.KubeClient, n.Mondoo.Namespace, NodeScanningLabels(*n.Mondoo), logger); err != nil {
+				logger.Error(err, "Failed to clean up completed Jobs after CronJob update")
 				return err
 			}
 		}
@@ -209,14 +210,17 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		}
 	}
 
-	ds := DaemonSet(*n.Mondoo, n.IsOpenshift, mondooClientImage, *n.MondooOperatorConfig, slices.Collect(maps.Keys(tolerations)))
-	op, err := k8s.Apply(ctx, n.KubeClient, ds, n.Mondoo, logger, k8s.DefaultApplyOptions())
+	desired := DaemonSet(*n.Mondoo, n.IsOpenshift, mondooClientImage, *n.MondooOperatorConfig, slices.Collect(maps.Keys(tolerations)))
+	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+	op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, ds, n.Mondoo, logger, func() error {
+		k8s.UpdateDaemonSetFields(ds, desired)
+		return nil
+	})
 	if err != nil {
-		logger.Error(err, "Failed to apply DaemonSet", "namespace", ds.Namespace, "name", ds.Name)
 		return err
 	}
 
-	if op == k8s.ApplyCreated {
+	if op == controllerutil.OperationResultCreated {
 		if err := mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger); err != nil {
 			logger.Error(err, "Failed to update MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
 			return err
@@ -253,7 +257,6 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 	return nil
 }
 
-// syncConfigMap syncs the inventory ConfigMap using Server-Side Apply.
 func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string) error {
 	integrationMrn, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
 	if err != nil {
@@ -261,14 +264,18 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string
 		return err
 	}
 
-	cm, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo)
+	desired, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo)
 	if err != nil {
 		logger.Error(err, "failed to generate ConfigMap")
 		return err
 	}
 
-	if _, err := k8s.Apply(ctx, n.KubeClient, cm, n.Mondoo, logger, k8s.DefaultApplyOptions()); err != nil {
-		logger.Error(err, "Failed to apply ConfigMap", "namespace", cm.Namespace, "name", cm.Name)
+	obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+	if _, err := k8s.CreateOrUpdate(ctx, n.KubeClient, obj, n.Mondoo, logger, func() error {
+		obj.Labels = desired.Labels
+		obj.Data = desired.Data
+		return nil
+	}); err != nil {
 		return err
 	}
 

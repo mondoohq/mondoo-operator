@@ -69,10 +69,6 @@ func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditCo
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 
 	cronjob := &batchv1.CronJob{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "batch/v1",
-			Kind:       "CronJob",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CronJobName(m.Name),
 			Namespace: m.Namespace,
@@ -124,7 +120,9 @@ func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditCo
 											MountPath: "/tmp",
 										},
 									},
-									Env: envVars,
+									Env:                      envVars,
+									TerminationMessagePath:   "/dev/termination-log",
+									TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 								},
 							},
 							ServiceAccountName: m.Spec.Scanner.ServiceAccountName,
@@ -396,10 +394,6 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 	}
 
 	cronjob := &batchv1.CronJob{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "batch/v1",
-			Kind:       "CronJob",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ExternalClusterCronJobName(m.Name, cluster.Name),
 			Namespace: m.Namespace,
@@ -439,8 +433,10 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 										RunAsUser:    ptr.To(int64(101)),
 										Privileged:   ptr.To(false),
 									},
-									VolumeMounts: volumeMounts,
-									Env:          envVars,
+									VolumeMounts:             volumeMounts,
+									Env:                      envVars,
+									TerminationMessagePath:   "/dev/termination-log",
+									TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 								},
 							},
 							Volumes: volumes,
@@ -576,10 +572,6 @@ users:
 // ExternalClusterSAKubeconfigConfigMap creates a ConfigMap containing the generated kubeconfig for SA auth
 func ExternalClusterSAKubeconfigConfigMap(cluster v1alpha2.ExternalCluster, m *v1alpha2.MondooAuditConfig) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: m.Namespace,
 			Name:      ExternalClusterSAKubeconfigName(m.Name, cluster.Name),
@@ -594,10 +586,6 @@ func ExternalClusterSAKubeconfigConfigMap(cluster v1alpha2.ExternalCluster, m *v
 // WIFServiceAccount creates a ServiceAccount with cloud-specific annotations for Workload Identity Federation
 func WIFServiceAccount(cluster v1alpha2.ExternalCluster, m *v1alpha2.MondooAuditConfig) *corev1.ServiceAccount {
 	sa := &corev1.ServiceAccount{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ServiceAccount",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        WIFServiceAccountName(m.Name, cluster.Name),
 			Namespace:   m.Namespace,
@@ -738,6 +726,8 @@ retry az aks get-credentials \
 				corev1.ResourceMemory: resource.MustParse("256Mi"),
 			},
 		},
+		TerminationMessagePath:   "/dev/termination-log",
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 		SecurityContext: &corev1.SecurityContext{
 			AllowPrivilegeEscalation: ptr.To(false),
 			ReadOnlyRootFilesystem:   ptr.To(true),
@@ -864,6 +854,8 @@ kill $HELPER_PID 2>/dev/null || true
 				corev1.ResourceMemory: resource.MustParse("128Mi"),
 			},
 		},
+		TerminationMessagePath:   "/dev/termination-log",
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 		SecurityContext: &corev1.SecurityContext{
 			AllowPrivilegeEscalation: ptr.To(false),
 			ReadOnlyRootFilesystem:   ptr.To(true),
@@ -883,10 +875,6 @@ func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 	}
 
 	return &corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: m.Namespace,
 			Name:      ConfigMapName(m.Name),
@@ -902,10 +890,6 @@ func ExternalClusterConfigMap(integrationMRN, operatorClusterUID string, cluster
 	}
 
 	return &corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: m.Namespace,
 			Name:      ExternalClusterConfigMapName(m.Name, cluster.Name),

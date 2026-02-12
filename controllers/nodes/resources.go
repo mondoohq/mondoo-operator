@@ -54,10 +54,6 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
 
 	return &batchv1.CronJob{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "batch/v1",
-			Kind:       "CronJob",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CronJobName(m.Name, node.Name),
 			Namespace: m.Namespace,
@@ -189,10 +185,6 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
 
 	return &appsv1.DaemonSet{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "apps/v1",
-			Kind:       "DaemonSet",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DaemonSetName(m.Name),
 			Namespace: m.Namespace,
@@ -298,10 +290,6 @@ func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 		return nil, err
 	}
 	return &corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ConfigMapName(m.Name),
 			Namespace: m.Namespace,

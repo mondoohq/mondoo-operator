@@ -63,8 +63,11 @@ func (h *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	}
 
 	desired := Deployment(mondooClientImage, integrationMRN, clusterUID, h.Mondoo, *h.MondooOperatorConfig)
-	if _, err := k8s.Apply(ctx, h.KubeClient, desired, h.Mondoo, deploymentHandlerLogger, k8s.DefaultApplyOptions()); err != nil {
-		deploymentHandlerLogger.Error(err, "Failed to apply resource watcher Deployment", "namespace", desired.Namespace, "name", desired.Name)
+	obj := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+	if _, err := k8s.CreateOrUpdate(ctx, h.KubeClient, obj, h.Mondoo, deploymentHandlerLogger, func() error {
+		k8s.UpdateDeploymentFields(obj, desired)
+		return nil
+	}); err != nil {
 		return err
 	}
 

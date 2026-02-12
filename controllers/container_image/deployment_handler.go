@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var logger = ctrl.Log.WithName("k8s-images-scanning")
@@ -82,19 +83,19 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, privateRegistrySecretName, n.Mondoo, *n.MondooOperatorConfig)
-	op, err := k8s.Apply(ctx, n.KubeClient, desired, n.Mondoo, logger, k8s.DefaultApplyOptions())
+	obj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+	op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, obj, n.Mondoo, logger, func() error {
+		k8s.UpdateCronJobFields(obj, desired)
+		return nil
+	})
 	if err != nil {
-		logger.Error(err, "Failed to apply CronJob", "namespace", desired.Namespace, "name", desired.Name)
 		return err
 	}
 
-	// When a CronJob is updated, remove old Jobs so they don't continue running with stale config
-	if op == k8s.ApplyUpdated {
-		if err := n.KubeClient.DeleteAllOf(ctx, &batchv1.Job{},
-			client.InNamespace(n.Mondoo.Namespace),
-			client.MatchingLabels(CronJobLabels(*n.Mondoo)),
-			client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
-			logger.Error(err, "Failed to clean up old Jobs after CronJob update")
+	// When a CronJob is updated, remove completed Jobs so they don't linger with stale config
+	if op == controllerutil.OperationResultUpdated {
+		if err := k8s.DeleteCompletedJobs(ctx, n.KubeClient, n.Mondoo.Namespace, CronJobLabels(*n.Mondoo), logger); err != nil {
+			logger.Error(err, "Failed to clean up completed Jobs after CronJob update")
 			return err
 		}
 	}
@@ -128,7 +129,6 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	return nil
 }
 
-// syncConfigMap syncs the inventory ConfigMap using Server-Side Apply.
 func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string) error {
 	integrationMrn, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
 	if err != nil {
@@ -142,8 +142,12 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string
 		return err
 	}
 
-	if _, err := k8s.Apply(ctx, n.KubeClient, desired, n.Mondoo, logger, k8s.DefaultApplyOptions()); err != nil {
-		logger.Error(err, "Failed to apply inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
+	obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+	if _, err := k8s.CreateOrUpdate(ctx, n.KubeClient, obj, n.Mondoo, logger, func() error {
+		obj.Labels = desired.Labels
+		obj.Data = desired.Data
+		return nil
+	}); err != nil {
 		return err
 	}
 
