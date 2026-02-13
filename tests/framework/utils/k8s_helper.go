@@ -43,7 +43,7 @@ import (
 const (
 	cmd                    = "kubectl"
 	RetryInterval          = 2
-	RetryLoop              = 50
+	RetryLoop              = 100
 	SkipVersionCheckEnvVar = "SKIP_VERSION_CHECK"
 )
 
