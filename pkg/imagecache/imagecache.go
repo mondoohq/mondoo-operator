@@ -34,7 +34,7 @@ type ImageCacher interface {
 
 type imageCache struct {
 	images      map[string]imageData
-	imagesMutex sync.RWMutex
+	imagesMutex *sync.RWMutex
 	fetchImage  func(string) (string, error)
 	keychain    authn.Keychain
 }
@@ -121,7 +121,8 @@ func queryImageWithSHA(image string, keychain authn.Keychain) (string, error) {
 
 func NewImageCacher() ImageCacher {
 	return &imageCache{
-		images: map[string]imageData{},
+		images:      map[string]imageData{},
+		imagesMutex: &sync.RWMutex{},
 		fetchImage: func(image string) (string, error) {
 			return queryImageWithSHA(image, nil)
 		},
@@ -130,7 +131,8 @@ func NewImageCacher() ImageCacher {
 
 func (i *imageCache) WithAuth(keychain authn.Keychain) ImageCacher {
 	return &imageCache{
-		images: map[string]imageData{},
+		images:      i.images,
+		imagesMutex: i.imagesMutex,
 		fetchImage: func(image string) (string, error) {
 			return queryImageWithSHA(image, keychain)
 		},

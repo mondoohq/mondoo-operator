@@ -47,8 +47,10 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 	}
 
 	// Add API proxy if configured (respect SkipProxyForCnspec since node scanning uses cnspec)
-	if !cfg.Spec.SkipProxyForCnspec && cfg.Spec.HttpProxy != nil {
-		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
+	if !cfg.Spec.SkipProxyForCnspec {
+		if apiProxy := k8s.APIProxyURL(cfg); apiProxy != nil {
+			cmd = append(cmd, "--api-proxy", *apiProxy)
+		}
 	}
 
 	var proxyEnvVars []corev1.EnvVar
@@ -175,7 +177,9 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 
 	// Add imagePullSecrets from MondooOperatorConfig
 	if len(cfg.Spec.ImagePullSecrets) > 0 {
-		cj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = cfg.Spec.ImagePullSecrets
+		cj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = append(
+			cj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets,
+			cfg.Spec.ImagePullSecrets...)
 	}
 
 	return cj
@@ -191,8 +195,10 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 		"--timer", fmt.Sprintf("%d", m.Spec.Nodes.IntervalTimer),
 	}
 	// Add API proxy if configured (respect SkipProxyForCnspec since node scanning uses cnspec)
-	if !cfg.Spec.SkipProxyForCnspec && cfg.Spec.HttpProxy != nil {
-		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
+	if !cfg.Spec.SkipProxyForCnspec {
+		if apiProxy := k8s.APIProxyURL(cfg); apiProxy != nil {
+			cmd = append(cmd, "--api-proxy", *apiProxy)
+		}
 	}
 
 	var proxyEnvVars []corev1.EnvVar
@@ -303,7 +309,9 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 
 	// Add imagePullSecrets from MondooOperatorConfig
 	if len(cfg.Spec.ImagePullSecrets) > 0 {
-		ds.Spec.Template.Spec.ImagePullSecrets = cfg.Spec.ImagePullSecrets
+		ds.Spec.Template.Spec.ImagePullSecrets = append(
+			ds.Spec.Template.Spec.ImagePullSecrets,
+			cfg.Spec.ImagePullSecrets...)
 	}
 
 	return ds

@@ -111,7 +111,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		if errors.IsNotFound(reconcileError) {
 			log.Info("MondooOperatorConfig not found, using defaults")
 		} else {
-			log.Error(reconcileError, "Failed to check for MondooOpertorConfig")
+			log.Error(reconcileError, "Failed to check for MondooOperatorConfig")
 			return ctrl.Result{}, reconcileError
 		}
 	}
@@ -507,6 +507,23 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 		log)
 }
 
+// operatorConfigRequestMapper maps MondooOperatorConfig changes to enqueue all MondooAuditConfigs
+// for reconciliation, so proxy/registry changes take effect without waiting for the next scheduled reconcile.
+func (r *MondooAuditConfigReconciler) operatorConfigRequestMapper(ctx context.Context, o client.Object) []reconcile.Request {
+	var requests []reconcile.Request
+	auditConfigs := &v1alpha2.MondooAuditConfigList{}
+	if err := r.List(ctx, auditConfigs); err != nil {
+		logger := ctrllog.Log.WithName("operator-config-watcher")
+		logger.Error(err, "Failed to list MondooAuditConfigs")
+		return requests
+	}
+
+	for _, a := range auditConfigs.Items {
+		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&a)})
+	}
+	return requests
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -521,6 +538,9 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.nodeEventsRequestMapper),
 			builder.WithPredicates(k8s.IgnoreGenericEventsPredicate{})).
+		Watches(
+			&v1alpha2.MondooOperatorConfig{},
+			handler.EnqueueRequestsFromMapFunc(r.operatorConfigRequestMapper)).
 		Complete(r)
 }
 

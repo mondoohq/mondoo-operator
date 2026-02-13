@@ -35,3 +35,12 @@ func ProxyEnvVars(cfg v1alpha2.MondooOperatorConfig) []corev1.EnvVar {
 
 	return envVars
 }
+
+// APIProxyURL returns the proxy URL to use for Mondoo API calls.
+// Since the Mondoo API is always HTTPS, it prefers HttpsProxy over HttpProxy.
+func APIProxyURL(cfg v1alpha2.MondooOperatorConfig) *string {
+	if cfg.Spec.HttpsProxy != nil {
+		return cfg.Spec.HttpsProxy
+	}
+	return cfg.Spec.HttpProxy
+}

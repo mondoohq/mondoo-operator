@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -82,8 +83,9 @@ func TestCache(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			testCache := &imageCache{
-				images:     test.imagesMap,
-				fetchImage: test.fetchImageFunc,
+				images:      test.imagesMap,
+				imagesMutex: &sync.RWMutex{},
+				fetchImage:  test.fetchImageFunc,
 			}
 
 			// Act

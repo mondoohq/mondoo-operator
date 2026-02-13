@@ -14,14 +14,8 @@ const (
 	MondooOperatorConfigName = "mondoo-operator-config"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // MondooOperatorConfigSpec defines the desired state of MondooOperatorConfig
 type MondooOperatorConfigSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Metrics controls the enabling/disabling of metrics report of mondoo-operator
 	Metrics Metrics `json:"metrics,omitempty"`
 	// Allows skipping Image resolution from upstream repository
@@ -68,9 +62,6 @@ type Metrics struct {
 
 // MondooOperatorConfigStatus defines the observed state of MondooOperatorConfig
 type MondooOperatorConfigStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Conditions includes more detailed status for the mondoo config
 	// +optional
 	Conditions []MondooOperatorConfigCondition `json:"conditions,omitempty"`

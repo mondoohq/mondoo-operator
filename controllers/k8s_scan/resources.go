@@ -60,8 +60,10 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 	}
 
 	// Only add proxy if configured and not skipped for cnspec
-	if cfg.Spec.HttpProxy != nil && !cfg.Spec.SkipProxyForCnspec {
-		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
+	if !cfg.Spec.SkipProxyForCnspec {
+		if apiProxy := k8s.APIProxyURL(cfg); apiProxy != nil {
+			cmd = append(cmd, "--api-proxy", *apiProxy)
+		}
 	}
 
 	envVars := buildEnvVars(cfg)
@@ -161,7 +163,6 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 									},
 								},
 							},
-							ImagePullSecrets: cfg.Spec.ImagePullSecrets,
 						},
 					},
 				},
@@ -169,6 +170,13 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
 			FailedJobsHistoryLimit:     ptr.To(int32(1)),
 		},
+	}
+
+	// Add imagePullSecrets from MondooOperatorConfig
+	if len(cfg.Spec.ImagePullSecrets) > 0 {
+		cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = append(
+			cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets,
+			cfg.Spec.ImagePullSecrets...)
 	}
 
 	return cronjob
@@ -186,8 +194,10 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 	}
 
 	// Only add proxy if configured and not skipped for cnspec
-	if cfg.Spec.HttpProxy != nil && !cfg.Spec.SkipProxyForCnspec {
-		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
+	if !cfg.Spec.SkipProxyForCnspec {
+		if apiProxy := k8s.APIProxyURL(cfg); apiProxy != nil {
+			cmd = append(cmd, "--api-proxy", *apiProxy)
+		}
 	}
 
 	envVars := buildEnvVars(cfg)
@@ -452,7 +462,9 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 
 	// Add imagePullSecrets from MondooOperatorConfig
 	if len(cfg.Spec.ImagePullSecrets) > 0 {
-		cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = cfg.Spec.ImagePullSecrets
+		cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = append(
+			cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets,
+			cfg.Spec.ImagePullSecrets...)
 	}
 
 	// Add private registry pull secrets if configured
