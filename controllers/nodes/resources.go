@@ -37,6 +37,24 @@ const (
 	ignoreAnnotationValue = "ignore"
 )
 
+// buildProxyEnvVars builds proxy environment variables from MondooOperatorConfig
+func buildProxyEnvVars(cfg v1alpha2.MondooOperatorConfig) []corev1.EnvVar {
+	var proxyEnvVars []corev1.EnvVar
+	if cfg.Spec.HttpProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTP_PROXY", Value: *cfg.Spec.HttpProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "http_proxy", Value: *cfg.Spec.HttpProxy})
+	}
+	if cfg.Spec.HttpsProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTPS_PROXY", Value: *cfg.Spec.HttpsProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "https_proxy", Value: *cfg.Spec.HttpsProxy})
+	}
+	if cfg.Spec.NoProxy != nil {
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "NO_PROXY", Value: *cfg.Spec.NoProxy})
+		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "no_proxy", Value: *cfg.Spec.NoProxy})
+	}
+	return proxyEnvVars
+}
+
 // CronJob creates a CronJob for node scanning
 func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := NodeScanningLabels(*m)
@@ -50,10 +68,12 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
+	proxyEnvVars := buildProxyEnvVars(cfg)
+
 	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
 
-	return &batchv1.CronJob{
+	cj := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CronJobName(m.Name, node.Name),
 			Namespace: m.Namespace,
@@ -114,13 +134,13 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 										{Name: "config", ReadOnly: true, MountPath: "/etc/opt/"},
 										{Name: "temp", MountPath: "/tmp"},
 									},
-									Env: k8s.MergeEnv([]corev1.EnvVar{
+									Env: k8s.MergeEnv(append([]corev1.EnvVar{
 										{Name: "DEBUG", Value: "false"},
 										{Name: "MONDOO_PROCFS", Value: "on"},
 										{Name: "MONDOO_AUTO_UPDATE", Value: "false"},
 										{Name: "NODE_NAME", Value: node.Name},
 										{Name: "GOMEMLIMIT", Value: gcLimit},
-									}, m.Spec.Nodes.Env),
+									}, proxyEnvVars...), m.Spec.Nodes.Env),
 									TerminationMessagePath:   "/dev/termination-log",
 									TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 									ImagePullPolicy:          corev1.PullIfNotPresent,
@@ -166,6 +186,13 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 			},
 		},
 	}
+
+	// Add imagePullSecrets from MondooOperatorConfig
+	if len(cfg.Spec.ImagePullSecrets) > 0 {
+		cj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = cfg.Spec.ImagePullSecrets
+	}
+
+	return cj
 }
 
 // DaemonSet creates a DaemonSet for node scanning
@@ -181,10 +208,12 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
+	proxyEnvVars := buildProxyEnvVars(cfg)
+
 	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
 
-	return &appsv1.DaemonSet{
+	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DaemonSetName(m.Name),
 			Namespace: m.Namespace,
@@ -234,13 +263,13 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 								{Name: "config", ReadOnly: true, MountPath: "/etc/opt/"},
 								{Name: "temp", MountPath: "/tmp"},
 							},
-							Env: k8s.MergeEnv([]corev1.EnvVar{
+							Env: k8s.MergeEnv(append([]corev1.EnvVar{
 								{Name: "DEBUG", Value: "false"},
 								{Name: "MONDOO_PROCFS", Value: "on"},
 								{Name: "MONDOO_AUTO_UPDATE", Value: "false"},
 								{Name: "GOMEMLIMIT", Value: gcLimit},
 								{Name: "NODE_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"}}},
-							}, m.Spec.Nodes.Env),
+							}, proxyEnvVars...), m.Spec.Nodes.Env),
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -281,6 +310,13 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 			},
 		},
 	}
+
+	// Add imagePullSecrets from MondooOperatorConfig
+	if len(cfg.Spec.ImagePullSecrets) > 0 {
+		ds.Spec.Template.Spec.ImagePullSecrets = cfg.Spec.ImagePullSecrets
+	}
+
+	return ds
 }
 
 // ConfigMap creates a ConfigMap for node scanning inventory

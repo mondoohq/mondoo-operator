@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/stretchr/testify/suite"
@@ -16,6 +17,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"go.mondoo.com/mondoo-operator/pkg/imagecache"
 )
 
 type ContainerImageResolverSuite struct {
@@ -31,6 +34,10 @@ type fakeCacher struct {
 
 func (f *fakeCacher) GetImage(img string) (string, error) {
 	return f.fakeGetImage(img)
+}
+
+func (f *fakeCacher) WithAuth(keychain authn.Keychain) imagecache.ImageCacher {
+	return f // Return itself since we don't need auth in tests
 }
 
 func NewFakeCacher(f func(string) (string, error)) *fakeCacher {

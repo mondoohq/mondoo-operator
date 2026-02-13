@@ -63,7 +63,7 @@ var MondooClientBuilder = mondooclient.NewClient
 //+kubebuilder:rbac:groups=apps,resources=deployments;daemonsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments;replicasets;daemonsets;statefulsets,verbs=get;list;watch
 //+kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=deletecollection
+//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=delete;deletecollection
 //+kubebuilder:rbac:groups=batch,resources=cronjobs;jobs,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods;namespaces;nodes,verbs=get;list;watch
@@ -129,6 +129,18 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if !config.DeletionTimestamp.IsZero() {
 		// Going to proceed as if there is no MondooOperatorConfig
 		config = &v1alpha2.MondooOperatorConfig{}
+	}
+
+	// Apply registry configuration to the container image resolver
+	imageResolver := r.ContainerImageResolver
+	if len(config.Spec.RegistryMirrors) > 0 {
+		imageResolver = imageResolver.WithRegistryMirrors(config.Spec.RegistryMirrors)
+	} else if config.Spec.ImageRegistry != nil && *config.Spec.ImageRegistry != "" {
+		imageResolver = imageResolver.WithImageRegistry(*config.Spec.ImageRegistry)
+	}
+	// Apply imagePullSecrets for authentication when resolving images
+	if len(config.Spec.ImagePullSecrets) > 0 {
+		imageResolver = imageResolver.WithImagePullSecrets(config.Spec.ImagePullSecrets)
 	}
 
 	if !mondooAuditConfig.DeletionTimestamp.IsZero() {
@@ -262,7 +274,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
-		ContainerImageResolver: r.ContainerImageResolver,
+		ContainerImageResolver: imageResolver,
 		IsOpenshift:            r.RunningOnOpenShift,
 	}
 
@@ -277,7 +289,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	containers := container_image.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
-		ContainerImageResolver: r.ContainerImageResolver,
+		ContainerImageResolver: imageResolver,
 		MondooOperatorConfig:   config,
 	}
 
@@ -293,7 +305,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
-		ContainerImageResolver: r.ContainerImageResolver,
+		ContainerImageResolver: imageResolver,
 		MondooClientBuilder:    r.MondooClientBuilder,
 	}
 
@@ -309,7 +321,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
-		ContainerImageResolver: r.ContainerImageResolver,
+		ContainerImageResolver: imageResolver,
 	}
 
 	result, reconcileError = resourceWatcher.Reconcile(ctx)
@@ -490,6 +502,7 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 		client.ObjectKeyFromObject(mondooCredsSecret),
 		tokenData,
 		cfg.Spec.HttpProxy,
+		cfg.Spec.NoProxy,
 		log)
 }
 

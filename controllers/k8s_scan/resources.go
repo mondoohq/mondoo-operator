@@ -59,11 +59,12 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 		"--score-threshold", "0",
 	}
 
-	if cfg.Spec.HttpProxy != nil {
+	// Only add proxy if configured and not skipped for cnspec
+	if cfg.Spec.HttpProxy != nil && !cfg.Spec.SkipProxyForCnspec {
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
-	envVars := feature_flags.AllFeatureFlagsAsEnv()
+	envVars := buildEnvVars(cfg)
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 
 	cronjob := &batchv1.CronJob{
@@ -160,6 +161,7 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 									},
 								},
 							},
+							ImagePullSecrets: cfg.Spec.ImagePullSecrets,
 						},
 					},
 				},
@@ -183,11 +185,12 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 		"--score-threshold", "0",
 	}
 
-	if cfg.Spec.HttpProxy != nil {
+	// Only add proxy if configured and not skipped for cnspec
+	if cfg.Spec.HttpProxy != nil && !cfg.Spec.SkipProxyForCnspec {
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
-	envVars := feature_flags.AllFeatureFlagsAsEnv()
+	envVars := buildEnvVars(cfg)
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 	// Point KUBECONFIG to the mounted kubeconfig file
 	envVars = append(envVars, corev1.EnvVar{Name: "KUBECONFIG", Value: "/etc/opt/mondoo/kubeconfig/kubeconfig"})
@@ -1020,4 +1023,24 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 	}
 
 	return string(invBytes), nil
+}
+
+func buildEnvVars(cfg v1alpha2.MondooOperatorConfig) []corev1.EnvVar {
+	envVars := feature_flags.AllFeatureFlagsAsEnv()
+
+	// Add proxy environment variables from MondooOperatorConfig
+	if cfg.Spec.HttpProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{Name: "HTTP_PROXY", Value: *cfg.Spec.HttpProxy})
+		envVars = append(envVars, corev1.EnvVar{Name: "http_proxy", Value: *cfg.Spec.HttpProxy})
+	}
+	if cfg.Spec.HttpsProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{Name: "HTTPS_PROXY", Value: *cfg.Spec.HttpsProxy})
+		envVars = append(envVars, corev1.EnvVar{Name: "https_proxy", Value: *cfg.Spec.HttpsProxy})
+	}
+	if cfg.Spec.NoProxy != nil {
+		envVars = append(envVars, corev1.EnvVar{Name: "NO_PROXY", Value: *cfg.Spec.NoProxy})
+		envVars = append(envVars, corev1.EnvVar{Name: "no_proxy", Value: *cfg.Spec.NoProxy})
+	}
+
+	return envVars
 }

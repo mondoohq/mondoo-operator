@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
@@ -64,4 +66,16 @@ func (c *ContainerImageResolverMock) MondooOperatorImage(ctx context.Context, us
 		return c.MondooOperatorImageFunc(ctx, userImage, userTag, userDigest, skipResolveImage)
 	}
 	return fmt.Sprintf("%s:%s", mondoo.MondooOperatorImage, mondoo.MondooOperatorTag), nil
+}
+
+func (c *noOpContainerImageResolver) WithImageRegistry(imageRegistry string) mondoo.ContainerImageResolver {
+	return c
+}
+
+func (c *noOpContainerImageResolver) WithRegistryMirrors(registryMirrors map[string]string) mondoo.ContainerImageResolver {
+	return c
+}
+
+func (c *noOpContainerImageResolver) WithImagePullSecrets(imagePullSecrets []corev1.LocalObjectReference) mondoo.ContainerImageResolver {
+	return c
 }
