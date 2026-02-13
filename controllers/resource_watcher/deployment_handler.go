@@ -5,7 +5,6 @@ package resource_watcher
 
 import (
 	"context"
-	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -63,31 +62,13 @@ func (h *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		deploymentHandlerLogger.Info("Failed to get integration MRN, continuing without it", "error", err)
 	}
 
-	existing := &appsv1.Deployment{}
 	desired := Deployment(mondooClientImage, integrationMRN, clusterUID, h.Mondoo, *h.MondooOperatorConfig)
-
-	if err := ctrl.SetControllerReference(h.Mondoo, desired, h.KubeClient.Scheme()); err != nil {
-		deploymentHandlerLogger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
+	obj := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+	if _, err := k8s.CreateOrUpdate(ctx, h.KubeClient, obj, h.Mondoo, deploymentHandlerLogger, func() error {
+		k8s.UpdateDeploymentFields(obj, desired)
+		return nil
+	}); err != nil {
 		return err
-	}
-
-	created, err := k8s.CreateIfNotExist(ctx, h.KubeClient, existing, desired)
-	if err != nil {
-		deploymentHandlerLogger.Error(err, "Failed to create resource watcher Deployment", "namespace", desired.Namespace, "name", desired.Name)
-		return err
-	}
-
-	if created {
-		deploymentHandlerLogger.Info("Created resource watcher Deployment", "namespace", desired.Namespace, "name", desired.Name)
-	} else if !areDeploymentsEqual(*existing, *desired) {
-		existing.Spec = desired.Spec
-		existing.SetOwnerReferences(desired.GetOwnerReferences())
-
-		if err := h.KubeClient.Update(ctx, existing); err != nil {
-			deploymentHandlerLogger.Error(err, "Failed to update resource watcher Deployment", "namespace", existing.Namespace, "name", existing.Name)
-			return err
-		}
-		deploymentHandlerLogger.Info("Updated resource watcher Deployment", "namespace", existing.Namespace, "name", existing.Name)
 	}
 
 	// Get deployment status for condition updates
@@ -153,25 +134,4 @@ func (h *DeploymentHandler) down(ctx context.Context) error {
 	updateResourceWatcherConditions(h.Mondoo, false, &corev1.PodList{})
 
 	return nil
-}
-
-// areDeploymentsEqual compares two deployments for equality in the fields we care about.
-func areDeploymentsEqual(existing, desired appsv1.Deployment) bool {
-	// Compare specs (excluding status and metadata that changes)
-	if !reflect.DeepEqual(existing.Spec.Template.Spec.Containers, desired.Spec.Template.Spec.Containers) {
-		return false
-	}
-	if !reflect.DeepEqual(existing.Spec.Template.Spec.Volumes, desired.Spec.Template.Spec.Volumes) {
-		return false
-	}
-	if existing.Spec.Template.Spec.ServiceAccountName != desired.Spec.Template.Spec.ServiceAccountName {
-		return false
-	}
-	if !reflect.DeepEqual(existing.Spec.Selector, desired.Spec.Selector) {
-		return false
-	}
-	if !reflect.DeepEqual(existing.GetOwnerReferences(), desired.GetOwnerReferences()) {
-		return false
-	}
-	return true
 }

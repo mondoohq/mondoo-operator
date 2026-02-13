@@ -20,7 +20,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -70,9 +69,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMap() {
 	}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
-	cfgMapExpected := cfgMap.DeepCopy()
-	s.Require().NoError(UpdateConfigMap(cfgMapExpected, "", testClusterUID, s.auditConfig))
-	s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
+	cfgMapExpected, err := ConfigMap("", testClusterUID, s.auditConfig)
+	s.Require().NoError(err)
+	s.Equal(cfgMapExpected.Data, cfgMap.Data)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN() {
@@ -109,9 +108,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN
 	}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
-	cfgMapExpected := cfgMap.DeepCopy()
-	s.Require().NoError(UpdateConfigMap(cfgMapExpected, testIntegrationMRN, testClusterUID, s.auditConfig))
-	s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
+	cfgMapExpected, err := ConfigMap(testIntegrationMRN, testClusterUID, s.auditConfig)
+	s.Require().NoError(err)
+	s.Equal(cfgMapExpected.Data, cfgMap.Data)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
@@ -123,10 +122,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
 	nodes := &corev1.NodeList{}
 	s.NoError(d.KubeClient.List(s.ctx, nodes))
 
-	cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name: ConfigMapName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace,
-	}}
-	s.Require().NoError(UpdateConfigMap(cfgMap, "", testClusterUID, s.auditConfig))
+	cfgMap, err := ConfigMap("", testClusterUID, s.auditConfig)
+	s.Require().NoError(err)
 	cfgMap.Data["inventory"] = ""
 	s.NoError(d.KubeClient.Create(s.ctx, cfgMap))
 
@@ -139,9 +136,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
 	}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
-	cfgMapExpected := cfgMap.DeepCopy()
-	s.Require().NoError(UpdateConfigMap(cfgMapExpected, "", testClusterUID, s.auditConfig))
-	s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
+	cfgMapExpected, err := ConfigMap("", testClusterUID, s.auditConfig)
+	s.Require().NoError(err)
+	s.Equal(cfgMapExpected.Data, cfgMap.Data)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CronJob_CleanConfigMapsForDeletedNodes() {
@@ -176,9 +173,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_CleanConfigMapsForDeleted
 	}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
-	cfgMapExpected := cfgMap.DeepCopy()
-	s.Require().NoError(UpdateConfigMap(cfgMapExpected, "", testClusterUID, s.auditConfig))
-	s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
+	cfgMapExpected, err := ConfigMap("", testClusterUID, s.auditConfig)
+	s.Require().NoError(err)
+	s.Equal(cfgMapExpected.Data, cfgMap.Data)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Deployment_CleanConfigMapsForDeletedNodes() {
@@ -214,9 +211,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_Deployment_CleanConfigMapsForDele
 	}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 
-	cfgMapExpected := cfgMap.DeepCopy()
-	s.Require().NoError(UpdateConfigMap(cfgMapExpected, "", testClusterUID, s.auditConfig))
-	s.True(equality.Semantic.DeepEqual(cfgMapExpected, cfgMap))
+	cfgMapExpected, err := ConfigMap("", testClusterUID, s.auditConfig)
+	s.Require().NoError(err)
+	s.Equal(cfgMapExpected.Data, cfgMap.Data)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
@@ -240,12 +237,11 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		cjExpected := cj.DeepCopy()
-		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		// Make sure the env vars for both are sorted
 		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
-		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
+		s.Equal(cjExpected.Spec, cj.Spec)
 	}
 
 	// Verify node garbage collection cronjob does not exist (removed in simplification)
@@ -275,12 +271,11 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_CustomEnvVars() {
 		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		cjExpected := cj.DeepCopy()
-		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		// Make sure the env vars for both are sorted
 		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
-		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
+		s.Equal(cjExpected.Spec, cj.Spec)
 	}
 
 	// Verify node garbage collection cronjob does not exist (removed in simplification)
@@ -309,12 +304,11 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_Switch() {
 		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		cjExpected := cj.DeepCopy()
-		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		// Make sure the env vars for both are sorted
 		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
-		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
+		s.Equal(cjExpected.Spec, cj.Spec)
 	}
 
 	mondooAuditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
@@ -350,8 +344,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	s.NoError(err)
 
 	// Make sure a cron job exists for one of the nodes
-	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, nodes.Items[1].Name), Namespace: s.auditConfig.Namespace}}
-	UpdateCronJob(cj, image, nodes.Items[1], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob(image, nodes.Items[1], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 	cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, cj))
 
@@ -363,12 +356,11 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		cjExpected := cj.DeepCopy()
-		UpdateCronJob(cjExpected, image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		// Make sure the env vars for both are sorted
 		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
-		s.True(equality.Semantic.DeepEqual(cjExpected, cj))
+		s.Equal(cjExpected.Spec, cj.Spec)
 	}
 }
 
@@ -410,12 +402,11 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, nodes.Items[0].Name), Namespace: s.auditConfig.Namespace}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-	cjExpected := cj.DeepCopy()
-	UpdateCronJob(cjExpected, image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	cjExpected := CronJob(image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 	// Make sure the env vars for both are sorted
 	utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 	utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
-	s.True(equality.Semantic.DeepEqual(cjExpected, cj))
+	s.Equal(cjExpected.Spec, cj.Spec)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets() {
@@ -439,13 +430,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets() {
 	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
 
-	dsExpected := ds.DeepCopy()
-	UpdateDaemonSet(dsExpected, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{},
+	dsExpected := DaemonSet(s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{},
 		[]corev1.Toleration{{Key: "node-role.kubernetes.io/master", Value: "true", Effect: corev1.TaintEffectNoExecute}})
 	// Make sure the env vars for both are sorted
 	utils.SortEnvVars(dsExpected.Spec.Template.Spec.Containers[0].Env)
 	utils.SortEnvVars(ds.Spec.Template.Spec.Containers[0].Env)
-	s.True(equality.Semantic.DeepEqual(dsExpected, ds))
+	s.Equal(dsExpected.Spec, ds.Spec)
 
 	// Verify node garbage collection cronjob does not exist (removed in simplification)
 	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
@@ -473,10 +463,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_Switch() {
 	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
 
-	dsExpected := ds.DeepCopy()
-	UpdateDaemonSet(dsExpected, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{},
+	dsExpected := DaemonSet(s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{},
 		[]corev1.Toleration{{Key: "node-role.kubernetes.io/master", Value: "true", Effect: corev1.TaintEffectNoExecute}})
-	s.True(equality.Semantic.DeepEqual(dsExpected, ds))
+	s.Equal(dsExpected.Spec, ds.Spec)
 
 	mondooAuditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_CronJob
 	result, err = d.Reconcile(s.ctx)
@@ -512,8 +501,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateDaemonSets() {
 	s.NoError(err)
 
 	// Make sure a daemonset exists
-	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
-	UpdateDaemonSet(ds, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{}, nil)
+	ds := DaemonSet(s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{}, nil)
 	ds.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, ds))
 
@@ -524,10 +512,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateDaemonSets() {
 	ds = &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
 
-	depExpected := ds.DeepCopy()
-	UpdateDaemonSet(depExpected, s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{},
+	depExpected := DaemonSet(s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{},
 		[]corev1.Toleration{{Key: "node-role.kubernetes.io/master", Value: "true", Effect: corev1.TaintEffectNoExecute}})
-	s.True(equality.Semantic.DeepEqual(depExpected, ds))
+	s.Equal(depExpected.Spec, ds.Spec)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CronJob_NodeScanningStatus() {

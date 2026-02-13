@@ -37,7 +37,8 @@ const (
 	ignoreAnnotationValue = "ignore"
 )
 
-func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) {
+// CronJob creates a CronJob for node scanning
+func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := NodeScanningLabels(*m)
 	cmd := []string{
 		"cnspec", "scan", "local",
@@ -49,148 +50,126 @@ func UpdateCronJob(cj *batchv1.CronJob, image string, node corev1.Node, m *v1alp
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
-	cj.Labels = ls
-	cj.Annotations = map[string]string{
-		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-cronjob-runasnonroot": ignoreAnnotationValue,
-	}
-	cj.Spec.Schedule = m.Spec.Nodes.Schedule
-	cj.Spec.ConcurrencyPolicy = batchv1.ForbidConcurrent
-	cj.Spec.SuccessfulJobsHistoryLimit = ptr.To(int32(1))
-	cj.Spec.FailedJobsHistoryLimit = ptr.To(int32(1))
-	// Allow one retry for node scanning (transient issues possible)
-	cj.Spec.JobTemplate.Spec.BackoffLimit = ptr.To(int32(1))
-	cj.Spec.JobTemplate.Annotations = map[string]string{
-		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-job-runasnonroot": ignoreAnnotationValue,
-	}
-	cj.Spec.JobTemplate.Labels = ls
-	cj.Spec.JobTemplate.Spec.Template.Annotations = map[string]string{
-		ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-pod-runasnonroot": ignoreAnnotationValue,
-	}
-	cj.Spec.JobTemplate.Spec.Template.Labels = ls
-	cj.Spec.JobTemplate.Spec.Template.Spec.NodeName = node.Name
-	cj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
-	cj.Spec.JobTemplate.Spec.Template.Spec.Tolerations = k8s.TaintsToTolerations(node.Spec.Taints)
-	// The node scanning does not use the Kubernetes API at all, therefore the service account token
-	// should not be mounted at all.
-	cj.Spec.JobTemplate.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
 	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
 
-	cj.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{
-		{
-			Image:     image,
-			Name:      "cnspec",
-			Command:   cmd,
-			Resources: containerResources,
-			SecurityContext: &corev1.SecurityContext{
-				AllowPrivilegeEscalation: ptr.To(isOpenshift),
-				ReadOnlyRootFilesystem:   ptr.To(true),
-				RunAsNonRoot:             ptr.To(false),
-				RunAsUser:                ptr.To(int64(0)),
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{
-						"ALL",
+	return &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      CronJobName(m.Name, node.Name),
+			Namespace: m.Namespace,
+			Labels:    ls,
+			Annotations: map[string]string{
+				ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-cronjob-runasnonroot": ignoreAnnotationValue,
+			},
+		},
+		Spec: batchv1.CronJobSpec{
+			Schedule:                   m.Spec.Nodes.Schedule,
+			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
+			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
+			FailedJobsHistoryLimit:     ptr.To(int32(1)),
+			JobTemplate: batchv1.JobTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: ls,
+					Annotations: map[string]string{
+						ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-job-runasnonroot": ignoreAnnotationValue,
 					},
 				},
-				// RHCOS requires to run as privileged to properly do node scanning. If the container
-				// is not privileged, then we have no access to /proc.
-				Privileged: ptr.To(isOpenshift),
-			},
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      "root",
-					ReadOnly:  true,
-					MountPath: "/mnt/host/",
-				},
-				{
-					Name:      "config",
-					ReadOnly:  true,
-					MountPath: "/etc/opt/",
-				},
-				{
-					Name:      "temp",
-					MountPath: "/tmp",
-				},
-			},
-			Env: k8s.MergeEnv([]corev1.EnvVar{
-				{
-					Name:  "DEBUG",
-					Value: "false",
-				},
-				{
-					Name:  "MONDOO_PROCFS",
-					Value: "on",
-				},
-				{
-					Name:  "MONDOO_AUTO_UPDATE",
-					Value: "false",
-				},
-				{
-					Name:  "NODE_NAME",
-					Value: node.Name,
-				},
-				{
-					Name:  "GOMEMLIMIT",
-					Value: gcLimit,
-				},
-			}, m.Spec.Nodes.Env),
-			TerminationMessagePath:   "/dev/termination-log",
-			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-			ImagePullPolicy:          corev1.PullIfNotPresent,
-		},
-	}
-	cj.Spec.JobTemplate.Spec.Template.Spec.Volumes = []corev1.Volume{
-		{
-			Name: "root",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{Path: "/", Type: ptr.To(corev1.HostPathUnset)},
-			},
-		},
-		{
-			Name: "config",
-			VolumeSource: corev1.VolumeSource{
-				Projected: &corev1.ProjectedVolumeSource{
-					DefaultMode: ptr.To(corev1.ProjectedVolumeSourceDefaultMode),
-					Sources: []corev1.VolumeProjection{
-						{
-							ConfigMap: &corev1.ConfigMapProjection{
-								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name)},
-								Items: []corev1.KeyToPath{{
-									Key:  "inventory",
-									Path: "mondoo/inventory_template.yml",
-								}},
+				Spec: batchv1.JobSpec{
+					// Allow one retry for node scanning (transient issues possible)
+					BackoffLimit: ptr.To(int32(1)),
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: ls,
+							Annotations: map[string]string{
+								ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-pod-runasnonroot": ignoreAnnotationValue,
 							},
 						},
-						{
-							Secret: &corev1.SecretProjection{
-								LocalObjectReference: m.Spec.MondooCredsSecretRef,
-								Items: []corev1.KeyToPath{{
-									Key:  "config",
-									Path: "mondoo/mondoo.yml",
-								}},
+						Spec: corev1.PodSpec{
+							NodeName:      node.Name,
+							RestartPolicy: corev1.RestartPolicyOnFailure,
+							Tolerations:   k8s.TaintsToTolerations(node.Spec.Taints),
+							// The node scanning does not use the Kubernetes API at all, therefore the service account token
+							// should not be mounted at all.
+							AutomountServiceAccountToken: ptr.To(false),
+							Containers: []corev1.Container{
+								{
+									Image:     image,
+									Name:      "cnspec",
+									Command:   cmd,
+									Resources: containerResources,
+									SecurityContext: &corev1.SecurityContext{
+										AllowPrivilegeEscalation: ptr.To(isOpenshift),
+										ReadOnlyRootFilesystem:   ptr.To(true),
+										RunAsNonRoot:             ptr.To(false),
+										RunAsUser:                ptr.To(int64(0)),
+										Capabilities: &corev1.Capabilities{
+											Drop: []corev1.Capability{"ALL"},
+										},
+										// RHCOS requires to run as privileged to properly do node scanning. If the container
+										// is not privileged, then we have no access to /proc.
+										Privileged: ptr.To(isOpenshift),
+									},
+									VolumeMounts: []corev1.VolumeMount{
+										{Name: "root", ReadOnly: true, MountPath: "/mnt/host/"},
+										{Name: "config", ReadOnly: true, MountPath: "/etc/opt/"},
+										{Name: "temp", MountPath: "/tmp"},
+									},
+									Env: k8s.MergeEnv([]corev1.EnvVar{
+										{Name: "DEBUG", Value: "false"},
+										{Name: "MONDOO_PROCFS", Value: "on"},
+										{Name: "MONDOO_AUTO_UPDATE", Value: "false"},
+										{Name: "NODE_NAME", Value: node.Name},
+										{Name: "GOMEMLIMIT", Value: gcLimit},
+									}, m.Spec.Nodes.Env),
+									TerminationMessagePath:   "/dev/termination-log",
+									TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+									ImagePullPolicy:          corev1.PullIfNotPresent,
+								},
+							},
+							Volumes: []corev1.Volume{
+								{
+									Name: "root",
+									VolumeSource: corev1.VolumeSource{
+										HostPath: &corev1.HostPathVolumeSource{Path: "/", Type: ptr.To(corev1.HostPathUnset)},
+									},
+								},
+								{
+									Name: "config",
+									VolumeSource: corev1.VolumeSource{
+										Projected: &corev1.ProjectedVolumeSource{
+											DefaultMode: ptr.To(corev1.ProjectedVolumeSourceDefaultMode),
+											Sources: []corev1.VolumeProjection{
+												{
+													ConfigMap: &corev1.ConfigMapProjection{
+														LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name)},
+														Items:                []corev1.KeyToPath{{Key: "inventory", Path: "mondoo/inventory_template.yml"}},
+													},
+												},
+												{
+													Secret: &corev1.SecretProjection{
+														LocalObjectReference: m.Spec.MondooCredsSecretRef,
+														Items:                []corev1.KeyToPath{{Key: "config", Path: "mondoo/mondoo.yml"}},
+													},
+												},
+											},
+										},
+									},
+								},
+								{
+									Name:         "temp",
+									VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+								},
 							},
 						},
 					},
 				},
-			},
-		},
-		{
-			Name: "temp",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
 	}
 }
 
-func UpdateDaemonSet(
-	ds *appsv1.DaemonSet,
-	m v1alpha2.MondooAuditConfig,
-	isOpenshift bool,
-	image string,
-	cfg v1alpha2.MondooOperatorConfig,
-	tolerations []corev1.Toleration,
-) {
+// DaemonSet creates a DaemonSet for node scanning
+func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg v1alpha2.MondooOperatorConfig, tolerations []corev1.Toleration) *appsv1.DaemonSet {
 	labels := NodeScanningLabels(m)
 	cmd := []string{
 		"cnspec", "serve",
@@ -202,147 +181,121 @@ func UpdateDaemonSet(
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
-	ds.Labels = labels
-	if ds.Annotations == nil {
-		ds.Annotations = map[string]string{}
-	}
-	ds.Annotations[ignoreQueryAnnotationPrefix+"mondoo-kubernetes-security-deployment-runasnonroot"] = ignoreAnnotationValue
-	ds.Spec.Selector = &metav1.LabelSelector{
-		MatchLabels: labels,
-	}
-	ds.Spec.Template.Labels = labels
-	if ds.Spec.Template.Annotations == nil {
-		ds.Spec.Template.Annotations = map[string]string{}
-	}
-	ds.Spec.Template.Annotations[ignoreQueryAnnotationPrefix+"mondoo-kubernetes-security-pod-runasnonroot"] = ignoreAnnotationValue
-	ds.Spec.Template.Spec.PriorityClassName = m.Spec.Nodes.PriorityClassName
-	// The node scanning does not use the Kubernetes API at all, therefore the service account token
-	// should not be mounted at all.
-	ds.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(false)
 	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
-
-	ds.Spec.Template.Spec.Tolerations = tolerations
-
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
 
-	ds.Spec.Template.Spec.Containers = []corev1.Container{
-		{
-			Image:     image,
-			Name:      "cnspec",
-			Command:   cmd,
-			Resources: containerResources,
-			SecurityContext: &corev1.SecurityContext{
-				AllowPrivilegeEscalation: ptr.To(isOpenshift),
-				ReadOnlyRootFilesystem:   ptr.To(true),
-				RunAsNonRoot:             ptr.To(false),
-				RunAsUser:                ptr.To(int64(0)),
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{
-						"ALL",
+	return &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      DaemonSetName(m.Name),
+			Namespace: m.Namespace,
+			Labels:    labels,
+			Annotations: map[string]string{
+				ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-deployment-runasnonroot": ignoreAnnotationValue,
+			},
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+					Annotations: map[string]string{
+						ignoreQueryAnnotationPrefix + "mondoo-kubernetes-security-pod-runasnonroot": ignoreAnnotationValue,
 					},
 				},
-				// RHCOS requires to run as privileged to properly do node scanning. If the container
-				// is not privileged, then we have no access to /proc.
-				Privileged: ptr.To(isOpenshift),
-			},
-			TerminationMessagePath:   "/dev/termination-log",
-			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-			ImagePullPolicy:          corev1.PullIfNotPresent,
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      "root",
-					ReadOnly:  true,
-					MountPath: "/mnt/host/",
-				},
-				{
-					Name:      "config",
-					ReadOnly:  true,
-					MountPath: "/etc/opt/",
-				},
-				{
-					Name:      "temp",
-					MountPath: "/tmp",
-				},
-			},
-			Env: k8s.MergeEnv([]corev1.EnvVar{
-				{
-					Name:  "DEBUG",
-					Value: "false",
-				},
-				{
-					Name:  "MONDOO_PROCFS",
-					Value: "on",
-				},
-				{
-					Name:  "MONDOO_AUTO_UPDATE",
-					Value: "false",
-				},
-				{
-					Name:  "GOMEMLIMIT",
-					Value: gcLimit,
-				},
-				{
-					Name: "NODE_NAME",
-					ValueFrom: &corev1.EnvVarSource{
-						FieldRef: &corev1.ObjectFieldSelector{
-							FieldPath: "spec.nodeName",
+				Spec: corev1.PodSpec{
+					PriorityClassName: m.Spec.Nodes.PriorityClassName,
+					// The node scanning does not use the Kubernetes API at all, therefore the service account token
+					// should not be mounted at all.
+					AutomountServiceAccountToken: ptr.To(false),
+					Tolerations:                  tolerations,
+					Containers: []corev1.Container{
+						{
+							Image:     image,
+							Name:      "cnspec",
+							Command:   cmd,
+							Resources: containerResources,
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: ptr.To(isOpenshift),
+								ReadOnlyRootFilesystem:   ptr.To(true),
+								RunAsNonRoot:             ptr.To(false),
+								RunAsUser:                ptr.To(int64(0)),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+								// RHCOS requires to run as privileged to properly do node scanning. If the container
+								// is not privileged, then we have no access to /proc.
+								Privileged: ptr.To(isOpenshift),
+							},
+							TerminationMessagePath:   "/dev/termination-log",
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							VolumeMounts: []corev1.VolumeMount{
+								{Name: "root", ReadOnly: true, MountPath: "/mnt/host/"},
+								{Name: "config", ReadOnly: true, MountPath: "/etc/opt/"},
+								{Name: "temp", MountPath: "/tmp"},
+							},
+							Env: k8s.MergeEnv([]corev1.EnvVar{
+								{Name: "DEBUG", Value: "false"},
+								{Name: "MONDOO_PROCFS", Value: "on"},
+								{Name: "MONDOO_AUTO_UPDATE", Value: "false"},
+								{Name: "GOMEMLIMIT", Value: gcLimit},
+								{Name: "NODE_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"}}},
+							}, m.Spec.Nodes.Env),
 						},
 					},
-				},
-			}, m.Spec.Nodes.Env),
-		},
-	}
-	ds.Spec.Template.Spec.Volumes = []corev1.Volume{
-		{
-			Name: "root",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{Path: "/", Type: ptr.To(corev1.HostPathUnset)},
-			},
-		},
-		{
-			Name: "config",
-			VolumeSource: corev1.VolumeSource{
-				Projected: &corev1.ProjectedVolumeSource{
-					DefaultMode: ptr.To(corev1.ProjectedVolumeSourceDefaultMode),
-					Sources: []corev1.VolumeProjection{
+					Volumes: []corev1.Volume{
 						{
-							ConfigMap: &corev1.ConfigMapProjection{
-								LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name)},
-								Items: []corev1.KeyToPath{{
-									Key:  "inventory",
-									Path: "mondoo/inventory_template.yml",
-								}},
+							Name: "root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/", Type: ptr.To(corev1.HostPathUnset)},
 							},
 						},
 						{
-							Secret: &corev1.SecretProjection{
-								LocalObjectReference: m.Spec.MondooCredsSecretRef,
-								Items: []corev1.KeyToPath{{
-									Key:  "config",
-									Path: "mondoo/mondoo.yml",
-								}},
+							Name: "config",
+							VolumeSource: corev1.VolumeSource{
+								Projected: &corev1.ProjectedVolumeSource{
+									DefaultMode: ptr.To(corev1.ProjectedVolumeSourceDefaultMode),
+									Sources: []corev1.VolumeProjection{
+										{
+											ConfigMap: &corev1.ConfigMapProjection{
+												LocalObjectReference: corev1.LocalObjectReference{Name: ConfigMapName(m.Name)},
+												Items:                []corev1.KeyToPath{{Key: "inventory", Path: "mondoo/inventory_template.yml"}},
+											},
+										},
+										{
+											Secret: &corev1.SecretProjection{
+												LocalObjectReference: m.Spec.MondooCredsSecretRef,
+												Items:                []corev1.KeyToPath{{Key: "config", Path: "mondoo/mondoo.yml"}},
+											},
+										},
+									},
+								},
 							},
+						},
+						{
+							Name:         "temp",
+							VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 						},
 					},
 				},
-			},
-		},
-		{
-			Name: "temp",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
 	}
 }
 
-func UpdateConfigMap(cm *corev1.ConfigMap, integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) error {
+// ConfigMap creates a ConfigMap for node scanning inventory
+func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (*corev1.ConfigMap, error) {
 	inv, err := Inventory(integrationMRN, clusterUID, m)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	cm.Data = map[string]string{"inventory": inv}
-	return nil
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ConfigMapName(m.Name),
+			Namespace: m.Namespace,
+		},
+		Data: map[string]string{"inventory": inv},
+	}, nil
 }
 
 func CronJobName(prefix, suffix string) string {

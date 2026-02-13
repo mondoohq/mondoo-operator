@@ -112,25 +112,18 @@ func ReconcilePrivateRegistriesSecret(ctx context.Context, kubeClient client.Cli
 	}
 
 	mergedSecretName := MergedSecretName(m)
-	mergedSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mergedSecretName,
-			Namespace: m.Namespace,
-		},
-	}
-
-	_, err = CreateOrUpdate(ctx, kubeClient, mergedSecret, m, prLogger, func() error {
-		mergedSecret.Labels = map[string]string{
+	obj := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: mergedSecretName, Namespace: m.Namespace}}
+	if _, err := CreateOrUpdate(ctx, kubeClient, obj, m, prLogger, func() error {
+		obj.Labels = map[string]string{
 			"app.kubernetes.io/managed-by": "mondoo-operator",
 			"mondoo_cr":                    m.Name,
 		}
-		mergedSecret.Type = corev1.SecretTypeDockerConfigJson
-		mergedSecret.Data = map[string][]byte{
+		obj.Type = corev1.SecretTypeDockerConfigJson
+		obj.Data = map[string][]byte{
 			".dockerconfigjson": mergedConfig,
 		}
 		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		return "", fmt.Errorf("failed to create/update merged secret: %w", err)
 	}
 

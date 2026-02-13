@@ -40,6 +40,10 @@ func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes bool) mon
 	startScan := now.Add(time.Minute).Add(time.Second * 15)
 	schedule := fmt.Sprintf("%d * * * *", startScan.Minute())
 	auditConfig := mondoov2.MondooAuditConfig{
+		TypeMeta: v1.TypeMeta{
+			APIVersion: "k8s.mondoo.com/v1alpha2",
+			Kind:       "MondooAuditConfig",
+		},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "mondoo-client",
 			Namespace: ns,
@@ -77,6 +81,10 @@ func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes bool) mon
 // make sure a tests passes (e.g. setting the correct secret name).
 func DefaultAuditConfig(ns string, workloads, containers, nodes bool) mondoov2.MondooAuditConfig {
 	return mondoov2.MondooAuditConfig{
+		TypeMeta: v1.TypeMeta{
+			APIVersion: "k8s.mondoo.com/v1alpha2",
+			Kind:       "MondooAuditConfig",
+		},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "mondoo-client",
 			Namespace: ns,

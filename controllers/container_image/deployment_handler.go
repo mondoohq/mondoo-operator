@@ -5,7 +5,6 @@ package container_image
 
 import (
 	"context"
-	"reflect"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -16,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var logger = ctrl.Log.WithName("k8s-images-scanning")
@@ -71,18 +71,8 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
-	updated, err := n.syncConfigMap(ctx, clusterUid)
-	if err != nil {
+	if err := n.syncConfigMap(ctx, clusterUid); err != nil {
 		return err
-	}
-
-	// TODO: for CronJob we might consider triggering the CronJob now after the ConfigMap has been changed. It will make sense from the
-	// user perspective to want to run the jobs after you have updated the config.
-	if updated {
-		logger.Info(
-			"Inventory ConfigMap was just updated. The job will use the new config during the next scheduled run.",
-			"namespace", n.Mondoo.Namespace,
-			"name", CronJobName(n.Mondoo.Name))
 	}
 
 	// Reconcile private registry secrets (merges multiple secrets if needed)
@@ -92,35 +82,20 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
-	existing := &batchv1.CronJob{}
 	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, privateRegistrySecretName, n.Mondoo, *n.MondooOperatorConfig)
-	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
-		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
-		return err
-	}
-
-	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
+	obj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+	op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, obj, n.Mondoo, logger, func() error {
+		k8s.UpdateCronJobFields(obj, desired)
+		return nil
+	})
 	if err != nil {
-		logger.Error(err, "Failed to create CronJob", "namespace", desired.Namespace, "name", desired.Name)
 		return err
 	}
 
-	if created {
-		logger.Info("Created CronJob", "namespace", desired.Namespace, "name", desired.Name)
-	} else if !k8s.AreCronJobsEqual(*existing, *desired) {
-		existing.Spec.JobTemplate = desired.Spec.JobTemplate
-		existing.Spec.Schedule = desired.Spec.Schedule
-		existing.Spec.ConcurrencyPolicy = desired.Spec.ConcurrencyPolicy
-		existing.SetOwnerReferences(desired.GetOwnerReferences())
-
-		// Remove completed/failed jobs because they won't be updated when the cronjob changes.
-		// Active jobs are preserved to avoid killing in-progress scans.
+	// When a CronJob is updated, remove completed Jobs so they don't linger with stale config
+	if op == controllerutil.OperationResultUpdated {
 		if err := k8s.DeleteCompletedJobs(ctx, n.KubeClient, n.Mondoo.Namespace, CronJobLabels(*n.Mondoo), logger); err != nil {
-			return err
-		}
-
-		if err := n.KubeClient.Update(ctx, existing); err != nil {
-			logger.Error(err, "Failed to update CronJob", "namespace", existing.Namespace, "name", existing.Name)
+			logger.Error(err, "Failed to clean up completed Jobs after CronJob update")
 			return err
 		}
 	}
@@ -154,53 +129,29 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	return nil
 }
 
-// syncConfigMap syncs the inventory ConfigMap. Returns a boolean indicating whether the ConfigMap has been updated. It
-// can only be "true", if the ConfigMap existed before this reconcile cycle and the inventory was different from the
-// desired state.
-func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string) (bool, error) {
-	existing := &corev1.ConfigMap{}
-
+func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string) error {
 	integrationMrn, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
 	if err != nil {
 		logger.Error(err, "failed to retrieve IntegrationMRN")
-		return false, err
+		return err
 	}
 
 	desired, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo, *n.MondooOperatorConfig)
 	if err != nil {
 		logger.Error(err, "failed to generate desired ConfigMap with inventory")
-		return false, err
+		return err
 	}
 
-	if err := ctrl.SetControllerReference(n.Mondoo, desired, n.KubeClient.Scheme()); err != nil {
-		logger.Error(err, "Failed to set ControllerReference", "namespace", desired.Namespace, "name", desired.Name)
-		return false, err
+	obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+	if _, err := k8s.CreateOrUpdate(ctx, n.KubeClient, obj, n.Mondoo, logger, func() error {
+		obj.Labels = desired.Labels
+		obj.Data = desired.Data
+		return nil
+	}); err != nil {
+		return err
 	}
 
-	created, err := k8s.CreateIfNotExist(ctx, n.KubeClient, existing, desired)
-	if err != nil {
-		logger.Error(err, "Failed to create inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
-		return false, err
-	}
-
-	if created {
-		logger.Info("Created inventory ConfigMap", "namespace", desired.Namespace, "name", desired.Name)
-		return false, nil
-	}
-
-	updated := false
-	if existing.Data["inventory"] != desired.Data["inventory"] ||
-		!reflect.DeepEqual(existing.GetOwnerReferences(), desired.GetOwnerReferences()) {
-		existing.Data["inventory"] = desired.Data["inventory"]
-		existing.SetOwnerReferences(desired.GetOwnerReferences())
-
-		if err := n.KubeClient.Update(ctx, existing); err != nil {
-			logger.Error(err, "Failed to update inventory ConfigMap", "namespace", existing.Namespace, "name", existing.Name)
-			return false, err
-		}
-		updated = true
-	}
-	return updated, nil
+	return nil
 }
 
 func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]batchv1.CronJob, error) {

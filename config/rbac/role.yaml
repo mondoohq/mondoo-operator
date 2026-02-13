@@ -85,7 +85,6 @@ rules:
   resources:
   - jobs
   verbs:
-  - delete
   - deletecollection
   - get
   - list

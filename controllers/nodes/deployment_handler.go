@@ -86,23 +86,14 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 			return err
 		}
 
-		updated, err := n.syncConfigMap(ctx, clusterUid)
-		if err != nil {
+		if err := n.syncConfigMap(ctx, clusterUid); err != nil {
 			return err
 		}
 
-		// TODO: for CronJob we might consider triggering the CronJob now after the ConfigMap has been changed. It will make sense from the
-		// user perspective to want to run the jobs after you have updated the config.
-		if updated {
-			logger.Info(
-				"Inventory ConfigMap was just updated. The job will use the new config during the next scheduled run.",
-				"namespace", n.Mondoo.Namespace,
-				"name", CronJobName(n.Mondoo.Name, node.Name))
-		}
-
-		cronJob := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace}}
+		desired := CronJob(mondooClientImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
+		cronJob := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
 		op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, cronJob, n.Mondoo, logger, func() error {
-			UpdateCronJob(cronJob, mondooClientImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
+			k8s.UpdateCronJobFields(cronJob, desired)
 			return nil
 		})
 		if err != nil {
@@ -111,15 +102,14 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 
 		switch op {
 		case controllerutil.OperationResultCreated:
-			if err = mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger); err != nil {
+			if err := mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger); err != nil {
 				logger.Error(err, "Failed to update MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
 				return err
 			}
-			continue
 		case controllerutil.OperationResultUpdated:
-			// Remove completed/failed jobs because they won't be updated when the cronjob changes.
-			// Active jobs are preserved to avoid killing in-progress scans.
+			// Remove completed Jobs so they don't linger with stale config
 			if err := k8s.DeleteCompletedJobs(ctx, n.KubeClient, n.Mondoo.Namespace, NodeScanningLabels(*n.Mondoo), logger); err != nil {
+				logger.Error(err, "Failed to clean up completed Jobs after CronJob update")
 				return err
 			}
 		}
@@ -201,16 +191,8 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 			return err
 		}
 
-		updated, err := n.syncConfigMap(ctx, clusterUid)
-		if err != nil {
+		if err := n.syncConfigMap(ctx, clusterUid); err != nil {
 			return err
-		}
-
-		if updated {
-			logger.Info(
-				"Inventory ConfigMap was just updated. The daemonset will use the new config during the next scheduled run.",
-				"namespace", n.Mondoo.Namespace,
-				"name", DeploymentName(n.Mondoo.Name, node.Name))
 		}
 
 		if n.Mondoo.Spec.Nodes.Style == v1alpha2.NodeScanStyle_Deployment {
@@ -228,10 +210,10 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		}
 	}
 
-	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
+	desired := DaemonSet(*n.Mondoo, n.IsOpenshift, mondooClientImage, *n.MondooOperatorConfig, slices.Collect(maps.Keys(tolerations)))
+	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
 	op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, ds, n.Mondoo, logger, func() error {
-		UpdateDaemonSet(ds, *n.Mondoo, n.IsOpenshift, mondooClientImage, *n.MondooOperatorConfig,
-			slices.Collect(maps.Keys(tolerations)))
+		k8s.UpdateDaemonSetFields(ds, desired)
 		return nil
 	})
 	if err != nil {
@@ -239,8 +221,7 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 	}
 
 	if op == controllerutil.OperationResultCreated {
-		err = mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger)
-		if err != nil {
+		if err := mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger); err != nil {
 			logger.Error(err, "Failed to update MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
 			return err
 		}
@@ -276,25 +257,29 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 	return nil
 }
 
-// syncConfigMap syncs the inventory ConfigMap. Returns a boolean indicating whether the ConfigMap has been updated. It
-// can only be "true", if the ConfigMap existed before this reconcile cycle and the inventory was different from the
-// desired state.
-func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string) (bool, error) {
+func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string) error {
 	integrationMrn, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
 	if err != nil {
 		logger.Error(err, "failed to retrieve IntegrationMRN")
-		return false, err
+		return err
 	}
 
-	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ConfigMapName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
-	op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, cm, n.Mondoo, logger, func() error {
-		return UpdateConfigMap(cm, integrationMrn, clusterUid, *n.Mondoo)
-	})
+	desired, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo)
 	if err != nil {
-		return false, err
+		logger.Error(err, "failed to generate ConfigMap")
+		return err
 	}
 
-	return op == controllerutil.OperationResultUpdated, nil
+	obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+	if _, err := k8s.CreateOrUpdate(ctx, n.KubeClient, obj, n.Mondoo, logger, func() error {
+		obj.Labels = desired.Labels
+		obj.Data = desired.Data
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // cleanupCronJobsForDeletedNodes deletes dangling CronJobs for nodes that have been deleted from the cluster.
