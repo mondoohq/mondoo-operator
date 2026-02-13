@@ -1,10 +1,15 @@
+## @section Controller Manager Configuration
+## Configuration for the mondoo-operator controller manager deployment
+
 controllerManager:
   manager:
+    ## @param controllerManager.manager.args Command-line arguments passed to the operator manager container
     args:
     - operator
     - --health-probe-bind-address=:8081
     - --metrics-bind-address=:8080
     - --leader-elect
+    ## @param controllerManager.manager.containerSecurityContext [object] Security context for the manager container
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:
@@ -13,9 +18,13 @@ controllerManager:
       privileged: false
       readOnlyRootFilesystem: true
     image:
+      ## @param controllerManager.manager.image.repository Container image repository for the operator
       repository: ghcr.io/mondoohq/mondoo-operator
+      ## @param controllerManager.manager.image.tag Container image tag for the operator
       tag: v12.0.1
+    ## @param controllerManager.manager.imagePullPolicy Image pull policy for the operator container
     imagePullPolicy: IfNotPresent
+    ## @param controllerManager.manager.resources [object] Resource requests and limits for the manager container
     resources:
       limits:
         cpu: 200m
@@ -23,16 +32,32 @@ controllerManager:
       requests:
         cpu: 100m
         memory: 70Mi
+  ## @param controllerManager.podSecurityContext [object] Pod-level security context for the controller manager
   podSecurityContext:
     runAsNonRoot: true
+  ## @param controllerManager.replicas Number of controller manager replicas
   replicas: 1
   serviceAccount:
+    ## @param controllerManager.serviceAccount.annotations [object] Annotations to add to the controller manager service account
     annotations: {}
+
+## @section Kubernetes Resources Scanning Configuration
+
 k8SResourcesScanning:
   serviceAccount:
+    ## @param k8SResourcesScanning.serviceAccount.annotations [object] Annotations to add to the Kubernetes resources scanning service account
     annotations: {}
+
+## @section General Configuration
+
+## @param kubernetesClusterDomain Kubernetes cluster domain used for DNS
 kubernetesClusterDomain: cluster.local
+
+## @section Manager Config
+## Configuration for the controller manager runtime settings
+
 managerConfig:
+  ## @param managerConfig.controllerManagerConfigYaml Embedded YAML configuration for the controller manager
   controllerManagerConfigYaml: |-
     # Copyright (c) Mondoo, Inc.
     # SPDX-License-Identifier: BUSL-1.1
@@ -45,18 +70,26 @@ managerConfig:
     leaderElection:
       leaderElect: true
       resourceName: 60679458.mondoo.com
+
+## @section Metrics Service Configuration
+
 metricsService:
+  ## @param metricsService.ports [array] Ports configuration for the metrics service
   ports:
   - name: metrics
     port: 8080
     protocol: TCP
     targetPort: metrics
+  ## @param metricsService.type Kubernetes service type for the metrics service
   type: ClusterIP
-# Pre-delete cleanup hook configuration
-# This hook runs before uninstall to delete MondooAuditConfig resources,
-# allowing finalizers to clean up operator-created resources properly.
-# The cleanup job uses the same image as the operator.
+
+## @section Pre-delete Cleanup Hook Configuration
+## This hook runs before uninstall to delete MondooAuditConfig resources,
+## allowing finalizers to clean up operator-created resources properly.
+## The cleanup job uses the same image as the operator.
+
 cleanup:
+  ## @param cleanup.enabled Enable or disable the pre-delete cleanup hook
   enabled: true
-  # Timeout for waiting for MondooAuditConfig resources to be deleted
+  ## @param cleanup.timeout Timeout for waiting for MondooAuditConfig resources to be deleted
   timeout: 2m

@@ -16,6 +16,7 @@ psat
 rolearn
 selfsigned
 servicemonitors
+SResources
 spiffe
 SVIDs
 tekton

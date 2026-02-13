@@ -377,6 +377,23 @@ helm/lint: ## Lint the Helm chart using chart-testing (ct).
 helm/template: ## Render Helm chart templates for debugging.
 	helm template test charts/mondoo-operator
 
+README_GENERATOR_DIR = $(LOCALBIN)/readme-generator-for-helm
+README_GENERATOR = $(README_GENERATOR_DIR)/bin/index.js
+
+.PHONY: helm/docs
+helm/docs: $(README_GENERATOR) ## Generate Helm chart README from values.yaml annotations.
+	node $(README_GENERATOR) \
+		--values charts/mondoo-operator/values.yaml \
+		--readme charts/mondoo-operator/README.md
+
+$(README_GENERATOR): $(LOCALBIN)
+	@if [ ! -f $(README_GENERATOR) ]; then \
+		echo "Installing readme-generator-for-helm..."; \
+		rm -rf $(README_GENERATOR_DIR); \
+		git clone --depth 1 https://github.com/bitnami/readme-generator-for-helm.git $(README_GENERATOR_DIR); \
+		cd $(README_GENERATOR_DIR) && npm install --production; \
+	fi
+
 # Install prettier gloablly via
 # yarn global add prettier --prefix /usr/local
 .PHONY: fmt/docs
