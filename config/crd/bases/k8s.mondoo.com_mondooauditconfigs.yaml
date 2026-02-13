@@ -1278,6 +1278,12 @@ spec:
                   - type
                   type: object
                 type: array
+              lastK8sResourceGarbageCollectionTime:
+                description: |-
+                  LastK8sResourceGarbageCollectionTime tracks the last time the operator performed
+                  garbage collection of stale K8s resource scan assets.
+                format: date-time
+                type: string
               pods:
                 description: Pods store the name of the pods which are running mondoo
                   instances
