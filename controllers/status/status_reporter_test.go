@@ -213,7 +213,7 @@ func (s *StatusReporterSuite) seedNodes() []client.Object {
 
 func (s *StatusReporterSuite) createStatusReporter() StatusReporter {
 	mockResolver := &mondoofake.ContainerImageResolverMock{
-		CnspecImageFunc: func(userImage, userTag string, skipResolveImage bool) (string, error) {
+		CnspecImageFunc: func(userImage, userTag, userDigest string, skipResolveImage bool) (string, error) {
 			image := mondoo.CnspecImage
 			tag := mondoo.CnspecTag
 			if userImage != "" {

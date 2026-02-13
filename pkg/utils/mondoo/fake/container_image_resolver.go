@@ -48,20 +48,20 @@ func (c *noOpContainerImageResolver) MondooOperatorImage(ctx context.Context, us
 
 // ContainerImageResolverMock is a configurable mock for ContainerImageResolver
 type ContainerImageResolverMock struct {
-	CnspecImageFunc         func(userImage, userTag string, skipResolveImage bool) (string, error)
-	MondooOperatorImageFunc func(ctx context.Context, userImage, userTag string, skipResolveImage bool) (string, error)
+	CnspecImageFunc         func(userImage, userTag, userDigest string, skipResolveImage bool) (string, error)
+	MondooOperatorImageFunc func(ctx context.Context, userImage, userTag, userDigest string, skipResolveImage bool) (string, error)
 }
 
-func (c *ContainerImageResolverMock) CnspecImage(userImage, userTag string, skipResolveImage bool) (string, error) {
+func (c *ContainerImageResolverMock) CnspecImage(userImage, userTag, userDigest string, skipResolveImage bool) (string, error) {
 	if c.CnspecImageFunc != nil {
-		return c.CnspecImageFunc(userImage, userTag, skipResolveImage)
+		return c.CnspecImageFunc(userImage, userTag, userDigest, skipResolveImage)
 	}
 	return fmt.Sprintf("%s:%s", mondoo.CnspecImage, mondoo.CnspecTag), nil
 }
 
-func (c *ContainerImageResolverMock) MondooOperatorImage(ctx context.Context, userImage, userTag string, skipResolveImage bool) (string, error) {
+func (c *ContainerImageResolverMock) MondooOperatorImage(ctx context.Context, userImage, userTag, userDigest string, skipResolveImage bool) (string, error) {
 	if c.MondooOperatorImageFunc != nil {
-		return c.MondooOperatorImageFunc(ctx, userImage, userTag, skipResolveImage)
+		return c.MondooOperatorImageFunc(ctx, userImage, userTag, userDigest, skipResolveImage)
 	}
 	return fmt.Sprintf("%s:%s", mondoo.MondooOperatorImage, mondoo.MondooOperatorTag), nil
 }
