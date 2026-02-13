@@ -64,8 +64,9 @@ cleanup:
 # Mondoo Operator Configuration
 # These settings are applied to the MondooOperatorConfig custom resource
 operator:
-  # Create MondooOperatorConfig resource (set to false on first install, then true on upgrade)
-  createConfig: false
+  # Create MondooOperatorConfig resource
+  # Set to false to skip creating the MondooOperatorConfig CR (e.g., if managing it separately)
+  createConfig: true
   # HTTP proxy for outbound connections to Mondoo Platform
   httpProxy: ""
   # HTTPS proxy for outbound connections to Mondoo Platform
@@ -79,18 +80,20 @@ operator:
   # imagePullSecrets:
   #   - name: my-registry-secret
   imagePullSecrets: []
-  # Custom image registry prefix for corporate registries (deprecated, use registryMirrors)
+  # Custom image registry prefix for simple registry mirror setups
+  # Use this when all Mondoo images should be pulled from the same mirror
   # Example: "registry.example.com/ghcr.io.docker"
   # This will rewrite image references like:
   #   ghcr.io/mondoohq/mondoo-operator:v1.0.0 -> registry.example.com/ghcr.io.docker/mondoohq/mondoo-operator:v1.0.0
   imageRegistry: ""
-  # Registry mirrors for mapping public registries to private mirrors
-  # This is more flexible than imageRegistry as it supports multiple registries
+  # Registry mirrors for mapping multiple public registries to private mirrors
+  # Use this when you need different mirrors for different source registries
   # Example:
   # registryMirrors:
   #   ghcr.io: registry.example.com/ghcr.io.docker
   #   docker.io: registry.example.com/hub.docker.com
   #   quay.io: registry.example.com/quay.io
+  # Note: If both imageRegistry and registryMirrors are set, registryMirrors takes precedence
   registryMirrors: {}
 
   # Skip proxy settings for cnspec-based components (scan-api, container scanning)

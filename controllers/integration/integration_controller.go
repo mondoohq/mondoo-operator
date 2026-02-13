@@ -123,7 +123,7 @@ func (r *IntegrationReconciler) processMondooAuditConfig(m v1alpha2.MondooAuditC
 		}
 	}
 
-	if err = mondoo.IntegrationCheckIn(r.ctx, integrationMrn, *serviceAccount, r.MondooClientBuilder, config.Spec.HttpProxy, config.Spec.NoProxy, logger); err != nil {
+	if err = mondoo.IntegrationCheckIn(r.ctx, integrationMrn, *serviceAccount, r.MondooClientBuilder, config.Spec.HttpProxy, config.Spec.HttpsProxy, config.Spec.NoProxy, logger); err != nil {
 		logger.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
 		return err
 	}

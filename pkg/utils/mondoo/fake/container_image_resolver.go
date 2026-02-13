@@ -79,3 +79,15 @@ func (c *noOpContainerImageResolver) WithRegistryMirrors(registryMirrors map[str
 func (c *noOpContainerImageResolver) WithImagePullSecrets(imagePullSecrets []corev1.LocalObjectReference) mondoo.ContainerImageResolver {
 	return c
 }
+
+func (c *ContainerImageResolverMock) WithImageRegistry(imageRegistry string) mondoo.ContainerImageResolver {
+	return c
+}
+
+func (c *ContainerImageResolverMock) WithRegistryMirrors(registryMirrors map[string]string) mondoo.ContainerImageResolver {
+	return c
+}
+
+func (c *ContainerImageResolverMock) WithImagePullSecrets(imagePullSecrets []corev1.LocalObjectReference) mondoo.ContainerImageResolver {
+	return c
+}

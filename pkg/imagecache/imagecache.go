@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,7 +17,9 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"go.mondoo.com/cnquery/v12/providers/os/connection/container/auth"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -148,6 +152,8 @@ type DockerConfigEntry struct {
 
 // KeychainFromSecrets creates an authn.Keychain from Kubernetes imagePullSecrets
 func KeychainFromSecrets(ctx context.Context, kubeClient client.Client, namespace string, secretRefs []corev1.LocalObjectReference) (authn.Keychain, error) {
+	log := ctrl.Log.WithName("imagecache")
+
 	if len(secretRefs) == 0 {
 		return authn.DefaultKeychain, nil
 	}
@@ -156,7 +162,11 @@ func KeychainFromSecrets(ctx context.Context, kubeClient client.Client, namespac
 	for _, secretRef := range secretRefs {
 		secret := &corev1.Secret{}
 		if err := kubeClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretRef.Name}, secret); err != nil {
-			continue // Skip secrets that don't exist
+			if errors.IsNotFound(err) {
+				log.Info("imagePullSecret not found, skipping", "secret", secretRef.Name, "namespace", namespace)
+				continue
+			}
+			return nil, fmt.Errorf("failed to get imagePullSecret %s/%s: %w", namespace, secretRef.Name, err)
 		}
 
 		// Handle both .dockerconfigjson and .dockercfg formats
@@ -166,11 +176,13 @@ func KeychainFromSecrets(ctx context.Context, kubeClient client.Client, namespac
 		} else if data, ok := secret.Data[".dockercfg"]; ok {
 			configData = data
 		} else {
+			log.Info("imagePullSecret has no .dockerconfigjson or .dockercfg data, skipping", "secret", secretRef.Name, "namespace", namespace)
 			continue
 		}
 
 		var config DockerConfigJSON
 		if err := json.Unmarshal(configData, &config); err != nil {
+			log.Error(err, "failed to parse imagePullSecret data", "secret", secretRef.Name, "namespace", namespace)
 			continue
 		}
 		configs = append(configs, config)
@@ -187,13 +199,21 @@ type multiKeychain struct {
 func (k *multiKeychain) Resolve(resource authn.Resource) (authn.Authenticator, error) {
 	registry := resource.RegistryStr()
 
+	// Build candidate keys to look up in the docker config auths map.
+	// Docker configs can use various formats: "registry.io", "https://registry.io",
+	// "https://registry.io/v1/", "https://registry.io/v2/", etc.
+	candidates := []string{
+		registry,
+		"https://" + registry,
+		"https://" + registry + "/v1/",
+		"https://" + registry + "/v2/",
+	}
+
 	for _, config := range k.configs {
-		if entry, ok := config.Auths[registry]; ok {
-			return resolveAuth(entry)
-		}
-		// Also try with https:// prefix
-		if entry, ok := config.Auths["https://"+registry]; ok {
-			return resolveAuth(entry)
+		for _, candidate := range candidates {
+			if entry, ok := config.Auths[candidate]; ok {
+				return resolveAuth(entry)
+			}
 		}
 	}
 
@@ -204,17 +224,15 @@ func resolveAuth(entry DockerConfigEntry) (authn.Authenticator, error) {
 	if entry.Auth != "" {
 		decoded, err := base64.StdEncoding.DecodeString(entry.Auth)
 		if err != nil {
-			return authn.Anonymous, nil
+			return nil, fmt.Errorf("failed to decode auth field: %w", err)
 		}
 		// Auth is base64 encoded "username:password"
-		parts := string(decoded)
-		for i, c := range parts {
-			if c == ':' {
-				return authn.FromConfig(authn.AuthConfig{
-					Username: parts[:i],
-					Password: parts[i+1:],
-				}), nil
-			}
+		parts := strings.SplitN(string(decoded), ":", 2)
+		if len(parts) == 2 {
+			return authn.FromConfig(authn.AuthConfig{
+				Username: parts[0],
+				Password: parts[1],
+			}), nil
 		}
 	}
 

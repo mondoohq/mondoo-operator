@@ -31,6 +31,24 @@ spec:
               fieldPath: metadata.namespace
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
+        {{- if .Values.operator.httpProxy }}
+        - name: HTTP_PROXY
+          value: {{ .Values.operator.httpProxy | quote }}
+        - name: http_proxy
+          value: {{ .Values.operator.httpProxy | quote }}
+        {{- end }}
+        {{- if .Values.operator.httpsProxy }}
+        - name: HTTPS_PROXY
+          value: {{ .Values.operator.httpsProxy | quote }}
+        - name: https_proxy
+          value: {{ .Values.operator.httpsProxy | quote }}
+        {{- end }}
+        {{- if .Values.operator.noProxy }}
+        - name: NO_PROXY
+          value: {{ .Values.operator.noProxy | quote }}
+        - name: no_proxy
+          value: {{ .Values.operator.noProxy | quote }}
+        {{- end }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.controllerManager.manager.imagePullPolicy }}

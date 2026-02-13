@@ -24,10 +24,10 @@ const (
 )
 
 func DefaultHttpClient(httpProxy *string, httpTimeout *time.Duration) (http.Client, error) {
-	return DefaultHttpClientWithNoProxy(httpProxy, nil, httpTimeout)
+	return DefaultHttpClientWithProxy(httpProxy, nil, nil, httpTimeout)
 }
 
-func DefaultHttpClientWithNoProxy(httpProxy *string, noProxy *string, httpTimeout *time.Duration) (http.Client, error) {
+func DefaultHttpClientWithProxy(httpProxy *string, httpsProxy *string, noProxy *string, httpTimeout *time.Duration) (http.Client, error) {
 	tr := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
@@ -40,17 +40,33 @@ func DefaultHttpClientWithNoProxy(httpProxy *string, noProxy *string, httpTimeou
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 
-	if httpProxy != nil {
-		urlParsed, err := url.Parse(*httpProxy)
-		if err != nil {
-			return http.Client{}, err
+	if httpProxy != nil || httpsProxy != nil {
+		var httpProxyURL, httpsProxyURL *url.URL
+		var err error
+		if httpProxy != nil {
+			httpProxyURL, err = url.Parse(*httpProxy)
+			if err != nil {
+				return http.Client{}, fmt.Errorf("failed to parse httpProxy: %w", err)
+			}
 		}
-		// Create a proxy function that respects noProxy settings
+		if httpsProxy != nil {
+			httpsProxyURL, err = url.Parse(*httpsProxy)
+			if err != nil {
+				return http.Client{}, fmt.Errorf("failed to parse httpsProxy: %w", err)
+			}
+		}
+		// Create a proxy function that respects noProxy and uses the correct proxy per scheme
 		tr.Proxy = func(req *http.Request) (*url.URL, error) {
 			if noProxy != nil && shouldBypassProxy(req.URL.Host, *noProxy) {
 				return nil, nil // No proxy for this host
 			}
-			return urlParsed, nil
+			if req.URL.Scheme == "https" && httpsProxyURL != nil {
+				return httpsProxyURL, nil
+			}
+			if httpProxyURL != nil {
+				return httpProxyURL, nil
+			}
+			return nil, nil
 		}
 	}
 	timeout := defaultHttpTimeout
@@ -63,17 +79,21 @@ func DefaultHttpClientWithNoProxy(httpProxy *string, noProxy *string, httpTimeou
 	}, nil
 }
 
-// shouldBypassProxy checks if the given host should bypass the proxy based on noProxy settings
+// shouldBypassProxy checks if the given host should bypass the proxy based on noProxy settings.
+// Matching is case-insensitive since DNS names are case-insensitive.
 func shouldBypassProxy(host string, noProxy string) bool {
 	if noProxy == "" {
 		return false
 	}
 
-	// Remove port from host if present
+	// Remove port from host if present (handles IPv6 correctly)
 	hostWithoutPort := host
-	if colonIndex := strings.LastIndex(host, ":"); colonIndex != -1 {
-		hostWithoutPort = host[:colonIndex]
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		hostWithoutPort = h
 	}
+
+	// Lowercase for case-insensitive comparison (DNS is case-insensitive)
+	hostLower := strings.ToLower(hostWithoutPort)
 
 	// Check each entry in the noProxy list
 	for _, entry := range strings.Split(noProxy, ",") {
@@ -87,9 +107,12 @@ func shouldBypassProxy(host string, noProxy string) bool {
 			return true
 		}
 
+		// Lowercase entry for case-insensitive comparison
+		entryLower := strings.ToLower(entry)
+
 		// Handle domain suffix matching (e.g., ".example.com" matches "api.mondoo.example.com")
-		if strings.HasPrefix(entry, ".") {
-			if strings.HasSuffix(hostWithoutPort, entry) || hostWithoutPort == entry[1:] {
+		if strings.HasPrefix(entryLower, ".") {
+			if strings.HasSuffix(hostLower, entryLower) || hostLower == entryLower[1:] {
 				return true
 			}
 			continue
@@ -108,7 +131,7 @@ func shouldBypassProxy(host string, noProxy string) bool {
 		}
 
 		// Exact match or suffix match
-		if hostWithoutPort == entry || strings.HasSuffix(hostWithoutPort, "."+entry) {
+		if hostLower == entryLower || strings.HasSuffix(hostLower, "."+entryLower) {
 			return true
 		}
 	}

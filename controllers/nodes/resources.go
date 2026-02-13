@@ -37,24 +37,6 @@ const (
 	ignoreAnnotationValue = "ignore"
 )
 
-// buildProxyEnvVars builds proxy environment variables from MondooOperatorConfig
-func buildProxyEnvVars(cfg v1alpha2.MondooOperatorConfig) []corev1.EnvVar {
-	var proxyEnvVars []corev1.EnvVar
-	if cfg.Spec.HttpProxy != nil {
-		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTP_PROXY", Value: *cfg.Spec.HttpProxy})
-		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "http_proxy", Value: *cfg.Spec.HttpProxy})
-	}
-	if cfg.Spec.HttpsProxy != nil {
-		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "HTTPS_PROXY", Value: *cfg.Spec.HttpsProxy})
-		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "https_proxy", Value: *cfg.Spec.HttpsProxy})
-	}
-	if cfg.Spec.NoProxy != nil {
-		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "NO_PROXY", Value: *cfg.Spec.NoProxy})
-		proxyEnvVars = append(proxyEnvVars, corev1.EnvVar{Name: "no_proxy", Value: *cfg.Spec.NoProxy})
-	}
-	return proxyEnvVars
-}
-
 // CronJob creates a CronJob for node scanning
 func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := NodeScanningLabels(*m)
@@ -64,11 +46,15 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 		"--inventory-template", "/etc/opt/mondoo/inventory_template.yml",
 	}
 
-	if cfg.Spec.HttpProxy != nil {
+	// Add API proxy if configured (respect SkipProxyForCnspec since node scanning uses cnspec)
+	if !cfg.Spec.SkipProxyForCnspec && cfg.Spec.HttpProxy != nil {
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
-	proxyEnvVars := buildProxyEnvVars(cfg)
+	var proxyEnvVars []corev1.EnvVar
+	if !cfg.Spec.SkipProxyForCnspec {
+		proxyEnvVars = k8s.ProxyEnvVars(cfg)
+	}
 
 	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
@@ -204,11 +190,15 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 		"--inventory-template", "/etc/opt/mondoo/inventory_template.yml",
 		"--timer", fmt.Sprintf("%d", m.Spec.Nodes.IntervalTimer),
 	}
-	if cfg.Spec.HttpProxy != nil {
+	// Add API proxy if configured (respect SkipProxyForCnspec since node scanning uses cnspec)
+	if !cfg.Spec.SkipProxyForCnspec && cfg.Spec.HttpProxy != nil {
 		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
 	}
 
-	proxyEnvVars := buildProxyEnvVars(cfg)
+	var proxyEnvVars []corev1.EnvVar
+	if !cfg.Spec.SkipProxyForCnspec {
+		proxyEnvVars = k8s.ProxyEnvVars(cfg)
+	}
 
 	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)

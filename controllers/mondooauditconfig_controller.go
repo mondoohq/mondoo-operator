@@ -502,6 +502,7 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 		client.ObjectKeyFromObject(mondooCredsSecret),
 		tokenData,
 		cfg.Spec.HttpProxy,
+		cfg.Spec.HttpsProxy,
 		cfg.Spec.NoProxy,
 		log)
 }

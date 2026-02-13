@@ -37,18 +37,20 @@ type MondooOperatorConfigSpec struct {
 	// ImagePullSecrets specifies the name of the Secret to use for pulling images for all Mondoo components.
 	// The secret must be of type kubernetes.io/dockerconfigjson.
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
-	// ImageRegistry specifies a custom container image registry to use for all Mondoo images.
-	// This allows using a private registry mirror (e.g., artifactory.example.com/ghcr.io.docker).
-	// If set, all image references will be prefixed with this registry.
-	// Deprecated: Use RegistryMirrors for more flexible registry mapping.
+	// ImageRegistry specifies a custom container image registry prefix for all Mondoo images.
+	// Use this for simple registry mirrors where all images go to the same mirror.
+	// Example: "artifactory.example.com/ghcr.io.docker"
+	// For more complex setups with multiple source registries, use RegistryMirrors instead.
 	ImageRegistry *string `json:"imageRegistry,omitempty"`
 	// RegistryMirrors specifies a mapping of public registries to private mirrors.
+	// Use this when you need to map different source registries to different mirrors.
 	// The key is the public registry (e.g., "ghcr.io", "docker.io", "quay.io")
 	// and the value is the private mirror (e.g., "artifactory.example.com/ghcr.io.docker").
 	// Example:
 	//   registryMirrors:
 	//     ghcr.io: artifactory.example.com/ghcr.io.docker
 	//     docker.io: artifactory.example.com/hub.docker.com
+	// Note: If both ImageRegistry and RegistryMirrors are set, RegistryMirrors takes precedence.
 	RegistryMirrors map[string]string `json:"registryMirrors,omitempty"`
 	// SkipProxyForCnspec disables proxy environment variables for cnspec-based components
 	// (scan-api, container scanning). Use this when the Mondoo API is accessible directly

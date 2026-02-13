@@ -450,6 +450,11 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 		},
 	}
 
+	// Add imagePullSecrets from MondooOperatorConfig
+	if len(cfg.Spec.ImagePullSecrets) > 0 {
+		cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = cfg.Spec.ImagePullSecrets
+	}
+
 	// Add private registry pull secrets if configured
 	if cluster.PrivateRegistriesPullSecretRef != nil && cluster.PrivateRegistriesPullSecretRef.Name != "" {
 		cronjob.Spec.JobTemplate.Spec.Template.Spec.Volumes = append(cronjob.Spec.JobTemplate.Spec.Template.Spec.Volumes, corev1.Volume{
@@ -1028,18 +1033,9 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 func buildEnvVars(cfg v1alpha2.MondooOperatorConfig) []corev1.EnvVar {
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 
-	// Add proxy environment variables from MondooOperatorConfig
-	if cfg.Spec.HttpProxy != nil {
-		envVars = append(envVars, corev1.EnvVar{Name: "HTTP_PROXY", Value: *cfg.Spec.HttpProxy})
-		envVars = append(envVars, corev1.EnvVar{Name: "http_proxy", Value: *cfg.Spec.HttpProxy})
-	}
-	if cfg.Spec.HttpsProxy != nil {
-		envVars = append(envVars, corev1.EnvVar{Name: "HTTPS_PROXY", Value: *cfg.Spec.HttpsProxy})
-		envVars = append(envVars, corev1.EnvVar{Name: "https_proxy", Value: *cfg.Spec.HttpsProxy})
-	}
-	if cfg.Spec.NoProxy != nil {
-		envVars = append(envVars, corev1.EnvVar{Name: "NO_PROXY", Value: *cfg.Spec.NoProxy})
-		envVars = append(envVars, corev1.EnvVar{Name: "no_proxy", Value: *cfg.Spec.NoProxy})
+	// Add proxy environment variables only if not skipped for cnspec components
+	if !cfg.Spec.SkipProxyForCnspec {
+		envVars = append(envVars, k8s.ProxyEnvVars(cfg)...)
 	}
 
 	return envVars

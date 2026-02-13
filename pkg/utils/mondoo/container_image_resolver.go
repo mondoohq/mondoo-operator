@@ -45,12 +45,12 @@ type ContainerImageResolver interface {
 	// When userDigest is specified, it takes precedence over userTag.
 	MondooOperatorImage(ctx context.Context, userImage, userTag, userDigest string, skipImageResolution bool) (string, error)
 
-	// WithImageRegistry returns a new ContainerImageResolver that uses the specified image registry.
-	// This allows rewriting image references to use a custom registry (e.g., corporate Artifactory mirror).
-	// Deprecated: Use WithRegistryMirrors for more flexible registry mapping.
+	// WithImageRegistry returns a new ContainerImageResolver that uses the specified image registry prefix.
+	// Use this for simple registry mirrors where all images go to the same mirror.
 	WithImageRegistry(imageRegistry string) ContainerImageResolver
 
 	// WithRegistryMirrors returns a new ContainerImageResolver that uses the specified registry mirrors.
+	// Use this when you need to map different source registries to different mirrors.
 	// The mirrors map public registries to private mirrors (e.g., "ghcr.io" -> "artifactory.example.com/ghcr.io.docker").
 	WithRegistryMirrors(registryMirrors map[string]string) ContainerImageResolver
 
@@ -110,7 +110,7 @@ func (c *containerImageResolver) CnspecImage(userImage, userTag, userDigest stri
 		skipImageResolution = true
 	}
 
-	return c.resolveImage(image, skipImageResolution)
+	return c.resolveImage(context.Background(), image, skipImageResolution)
 }
 
 func (c *containerImageResolver) MondooOperatorImage(ctx context.Context, userImage, userTag, userDigest string, skipImageResolution bool) (string, error) {
@@ -144,10 +144,10 @@ func (c *containerImageResolver) MondooOperatorImage(ctx context.Context, userIm
 		skipImageResolution = true
 	}
 
-	return c.resolveImage(image, skipImageResolution)
+	return c.resolveImage(ctx, image, skipImageResolution)
 }
 
-func (c *containerImageResolver) resolveImage(image string, skipImageResolution bool) (string, error) {
+func (c *containerImageResolver) resolveImage(ctx context.Context, image string, skipImageResolution bool) (string, error) {
 	// Apply custom image registry prefix if configured
 	image = c.applyImageRegistry(image)
 
@@ -158,7 +158,7 @@ func (c *containerImageResolver) resolveImage(image string, skipImageResolution 
 	// Apply authentication if imagePullSecrets are configured
 	cacher := c.imageCacher
 	if len(c.imagePullSecrets) > 0 {
-		keychain, err := imagecache.KeychainFromSecrets(context.Background(), c.kubeClient, c.operatorPodNamespace, c.imagePullSecrets)
+		keychain, err := imagecache.KeychainFromSecrets(ctx, c.kubeClient, c.operatorPodNamespace, c.imagePullSecrets)
 		if err == nil {
 			cacher = cacher.WithAuth(keychain)
 		}
@@ -236,7 +236,8 @@ func splitImageParts(image string) imageParts {
 	return imageParts{registry: "", repositoryWithTag: image}
 }
 
-func (c *containerImageResolver) WithImageRegistry(imageRegistry string) ContainerImageResolver {
+// clone creates a shallow copy of the resolver
+func (c *containerImageResolver) clone() *containerImageResolver {
 	return &containerImageResolver{
 		logger:               c.logger,
 		resolveForOpenShift:  c.resolveForOpenShift,
@@ -244,38 +245,28 @@ func (c *containerImageResolver) WithImageRegistry(imageRegistry string) Contain
 		kubeClient:           c.kubeClient,
 		operatorPodName:      c.operatorPodName,
 		operatorPodNamespace: c.operatorPodNamespace,
-		imageRegistry:        imageRegistry,
+		imageRegistry:        c.imageRegistry,
 		registryMirrors:      c.registryMirrors,
 		imagePullSecrets:     c.imagePullSecrets,
 	}
+}
+
+func (c *containerImageResolver) WithImageRegistry(imageRegistry string) ContainerImageResolver {
+	clone := c.clone()
+	clone.imageRegistry = imageRegistry
+	return clone
 }
 
 func (c *containerImageResolver) WithRegistryMirrors(registryMirrors map[string]string) ContainerImageResolver {
-	return &containerImageResolver{
-		logger:               c.logger,
-		resolveForOpenShift:  c.resolveForOpenShift,
-		imageCacher:          c.imageCacher,
-		kubeClient:           c.kubeClient,
-		operatorPodName:      c.operatorPodName,
-		operatorPodNamespace: c.operatorPodNamespace,
-		imageRegistry:        c.imageRegistry,
-		registryMirrors:      registryMirrors,
-		imagePullSecrets:     c.imagePullSecrets,
-	}
+	clone := c.clone()
+	clone.registryMirrors = registryMirrors
+	return clone
 }
 
 func (c *containerImageResolver) WithImagePullSecrets(imagePullSecrets []corev1.LocalObjectReference) ContainerImageResolver {
-	return &containerImageResolver{
-		logger:               c.logger,
-		resolveForOpenShift:  c.resolveForOpenShift,
-		imageCacher:          c.imageCacher,
-		kubeClient:           c.kubeClient,
-		operatorPodName:      c.operatorPodName,
-		operatorPodNamespace: c.operatorPodNamespace,
-		imageRegistry:        c.imageRegistry,
-		registryMirrors:      c.registryMirrors,
-		imagePullSecrets:     imagePullSecrets,
-	}
+	clone := c.clone()
+	clone.imagePullSecrets = imagePullSecrets
+	return clone
 }
 
 func userImageOrDefault(defaultImage, defaultTag, userImage, userTag, userDigest string) string {
