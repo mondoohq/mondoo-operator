@@ -37,7 +37,10 @@ func init() {
 // DefaultAuditConfig instead.
 func DefaultAuditConfigMinimal(ns string, workloads, containers, nodes bool) mondoov2.MondooAuditConfig {
 	now := time.Now()
-	startScan := now.Add(time.Minute).Add(time.Second * 15)
+	// The cron schedule only uses the minute field, so the real buffer is
+	// (targetMinuteStart - now). With 2m30s offset the minimum buffer is ~91s,
+	// which safely covers leader election (~45s) plus CronJob creation time.
+	startScan := now.Add(2 * time.Minute).Add(30 * time.Second)
 	schedule := fmt.Sprintf("%d * * * *", startScan.Minute())
 	auditConfig := mondoov2.MondooAuditConfig{
 		TypeMeta: v1.TypeMeta{
