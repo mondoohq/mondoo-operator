@@ -4,6 +4,7 @@
 package status
 
 import (
+	"context"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -29,7 +30,7 @@ func TestReportStatusRequestFromAuditConfig_AllDisabled(t *testing.T) {
 	v := &k8sversion.Info{GitVersion: "v1.24.0"}
 
 	m := testMondooAuditConfig()
-	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
+	reportStatus := ReportStatusRequestFromAuditConfig(context.Background(), integrationMrn, m, nodes, v, nil, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ACTIVE, reportStatus.Status)
 	assert.Equal(t, OperatorCustomState{
@@ -73,7 +74,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled(t *testing.T) {
 		{Message: "Mondoo Operator controller is available", Status: v1.ConditionFalse, Type: v1alpha2.MondooOperatorDegraded},
 	}
 
-	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
+	reportStatus := ReportStatusRequestFromAuditConfig(context.Background(), integrationMrn, m, nodes, v, nil, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ACTIVE, reportStatus.Status)
 	assert.Equal(t, OperatorCustomState{
@@ -125,7 +126,7 @@ func TestReportStatusRequestFromAuditConfig_AllEnabled_DeprecatedFields(t *testi
 		{Message: "Mondoo Operator controller is available", Status: v1.ConditionFalse, Type: v1alpha2.MondooOperatorDegraded},
 	}
 
-	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
+	reportStatus := ReportStatusRequestFromAuditConfig(context.Background(), integrationMrn, m, nodes, v, nil, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ACTIVE, reportStatus.Status)
 	assert.Equal(t, OperatorCustomState{
@@ -173,7 +174,7 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		{Message: "Mondoo Operator controller is unavailable", Status: v1.ConditionTrue, Type: v1alpha2.MondooOperatorDegraded},
 	}
 
-	reportStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes, v, logger)
+	reportStatus := ReportStatusRequestFromAuditConfig(context.Background(), integrationMrn, m, nodes, v, nil, logger)
 	assert.Equal(t, integrationMrn, reportStatus.Mrn)
 	assert.Equal(t, mondooclient.Status_ERROR, reportStatus.Status)
 	assert.Equal(t, OperatorCustomState{

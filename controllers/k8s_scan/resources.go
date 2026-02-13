@@ -49,16 +49,14 @@ const (
 	GarbageCollectOlderThan = "2h"
 )
 
-func CronJob(image, integrationMrn, clusterUid string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
+func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(*m)
 
-	managedBy := "mondoo-operator-" + clusterUid
 	cmd := []string{
-		"/mondoo-operator", "k8s-scan",
+		"cnspec", "scan", "k8s",
 		"--config", "/etc/opt/mondoo/config/mondoo.yml",
 		"--inventory-file", "/etc/opt/mondoo/config/inventory.yml",
-		"--cleanup-assets-older-than", GarbageCollectOlderThan,
-		"--set-managed-by", managedBy,
+		"--score-threshold", "0",
 	}
 
 	if cfg.Spec.HttpProxy != nil {

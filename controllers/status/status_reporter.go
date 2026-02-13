@@ -21,18 +21,20 @@ import (
 var logger = ctrl.Log.WithName("status-reporter")
 
 type StatusReporter struct {
-	kubeClient          client.Client
-	k8sVersion          *version.Info
-	mondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
-	mu                  sync.RWMutex
-	lastReportedStatus  mondooclient.ReportStatusRequest
+	kubeClient             client.Client
+	k8sVersion             *version.Info
+	mondooClientBuilder    func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
+	mu                     sync.RWMutex
+	lastReportedStatus     mondooclient.ReportStatusRequest
+	containerImageResolver mondoo.ContainerImageResolver
 }
 
-func NewStatusReporter(kubeClient client.Client, mondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error), k8sVersion *version.Info) *StatusReporter {
+func NewStatusReporter(kubeClient client.Client, mondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error), k8sVersion *version.Info, containerImageResolver mondoo.ContainerImageResolver) *StatusReporter {
 	return &StatusReporter{
-		kubeClient:          kubeClient,
-		k8sVersion:          k8sVersion,
-		mondooClientBuilder: mondooClientBuilder,
+		kubeClient:             kubeClient,
+		k8sVersion:             k8sVersion,
+		mondooClientBuilder:    mondooClientBuilder,
+		containerImageResolver: containerImageResolver,
 	}
 }
 
@@ -56,7 +58,7 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 		return err
 	}
 
-	operatorStatus := ReportStatusRequestFromAuditConfig(integrationMrn, m, nodes.Items, r.k8sVersion, logger)
+	operatorStatus := ReportStatusRequestFromAuditConfig(ctx, integrationMrn, m, nodes.Items, r.k8sVersion, r.containerImageResolver, logger)
 
 	r.mu.RLock()
 	statusUnchanged := reflect.DeepEqual(operatorStatus, r.lastReportedStatus)

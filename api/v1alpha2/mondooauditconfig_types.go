@@ -420,6 +420,11 @@ type MondooAuditConfigStatus struct {
 
 	// ReconciledByOperatorVersion contains the version of the operator which reconciled this MondooAuditConfig
 	ReconciledByOperatorVersion string `json:"reconciledByOperatorVersion,omitempty"`
+
+	// LastK8sResourceGarbageCollectionTime tracks the last time the operator performed
+	// garbage collection of stale K8s resource scan assets.
+	// +optional
+	LastK8sResourceGarbageCollectionTime *metav1.Time `json:"lastK8sResourceGarbageCollectionTime,omitempty"`
 }
 
 type MondooAuditConfigCondition struct {

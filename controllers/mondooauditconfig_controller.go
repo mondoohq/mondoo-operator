@@ -294,6 +294,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: r.ContainerImageResolver,
+		MondooClientBuilder:    r.MondooClientBuilder,
 	}
 
 	result, reconcileError = workloads.Reconcile(ctx)

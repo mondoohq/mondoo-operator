@@ -6,6 +6,7 @@ package k8s_scan
 import (
 	"context"
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -14,11 +15,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var logger = ctrl.Log.WithName("k8s-resources-scanning")
@@ -103,6 +106,7 @@ type DeploymentHandler struct {
 	Mondoo                 *v1alpha2.MondooAuditConfig
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
+	MondooClientBuilder    func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
@@ -132,14 +136,24 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		}
 	}
 
+	// Perform garbage collection of stale K8s resource scan assets if a new successful scan has completed
+	if n.Mondoo.Spec.KubernetesResources.Enable || hasExternalClusters {
+		clusterUid, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
+		if err != nil {
+			logger.Error(err, "Failed to get cluster's UID for garbage collection")
+		} else {
+			n.garbageCollectIfNeeded(ctx, clusterUid)
+		}
+	}
+
 	return ctrl.Result{}, nil
 }
 
 func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
-	mondooOperatorImage, err := n.ContainerImageResolver.MondooOperatorImage(
-		ctx, n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.Mondoo.Spec.Scanner.Image.Digest, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	cnspecImage, err := n.ContainerImageResolver.CnspecImage(
+		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.Mondoo.Spec.Scanner.Image.Digest, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
-		logger.Error(err, "Failed to resolve mondoo-operator container image")
+		logger.Error(err, "Failed to resolve cnspec container image")
 		return err
 	}
 
@@ -160,7 +174,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
-	desired := CronJob(mondooOperatorImage, integrationMrn, clusterUid, n.Mondoo, *n.MondooOperatorConfig)
+	desired := CronJob(cnspecImage, n.Mondoo, *n.MondooOperatorConfig)
 	obj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
 	op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, obj, n.Mondoo, logger, func() error {
 		k8s.UpdateCronJobFields(obj, desired)
@@ -480,6 +494,113 @@ func (n *DeploymentHandler) syncExternalClusterSAKubeconfigConfigMap(ctx context
 		return err
 	}
 
+	return nil
+}
+
+// garbageCollectIfNeeded checks whether a new successful K8s scan has completed since the last GC run,
+// and if so, performs garbage collection of stale assets via the Mondoo API.
+func (n *DeploymentHandler) garbageCollectIfNeeded(ctx context.Context, clusterUid string) {
+	// List all k8s-scan CronJobs (local + external) for this audit config
+	cronJobs := &batchv1.CronJobList{}
+	listOpts := &client.ListOptions{
+		Namespace: n.Mondoo.Namespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"app":       "mondoo-k8s-scan",
+			"mondoo_cr": n.Mondoo.Name,
+		}),
+	}
+	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
+		logger.Error(err, "Failed to list CronJobs for garbage collection")
+		return
+	}
+
+	// Find the latest lastSuccessfulTime across all CronJobs
+	var latestSuccess *metav1.Time
+	for i := range cronJobs.Items {
+		t := cronJobs.Items[i].Status.LastSuccessfulTime
+		if t != nil && (latestSuccess == nil || t.After(latestSuccess.Time)) {
+			latestSuccess = t
+		}
+	}
+
+	if latestSuccess == nil {
+		// No successful scans yet
+		return
+	}
+
+	// Skip if we already ran GC for this (or a newer) successful scan
+	if n.Mondoo.Status.LastK8sResourceGarbageCollectionTime != nil &&
+		!latestSuccess.After(n.Mondoo.Status.LastK8sResourceGarbageCollectionTime.Time) {
+		return
+	}
+
+	managedBy := "mondoo-operator-" + clusterUid
+	if err := n.performGarbageCollection(ctx, managedBy); err != nil {
+		logger.Error(err, "Failed to perform garbage collection of K8s resource scan assets")
+	}
+
+	// Always update the timestamp so we don't retry until the next new successful scan.
+	// GC failure is non-critical — stale assets will be cleaned up on the next attempt.
+	now := metav1.Now()
+	n.Mondoo.Status.LastK8sResourceGarbageCollectionTime = &now
+}
+
+// performGarbageCollection calls the Mondoo API to garbage collect stale K8s resource scan assets.
+func (n *DeploymentHandler) performGarbageCollection(ctx context.Context, managedBy string) error {
+	if n.MondooClientBuilder == nil {
+		logger.Info("MondooClientBuilder not configured, skipping garbage collection")
+		return nil
+	}
+
+	// Read service account credentials from the creds secret
+	credsSecret := &corev1.Secret{}
+	credsSecretKey := client.ObjectKey{
+		Namespace: n.Mondoo.Namespace,
+		Name:      n.Mondoo.Spec.MondooCredsSecretRef.Name,
+	}
+	if err := n.KubeClient.Get(ctx, credsSecretKey, credsSecret); err != nil {
+		return fmt.Errorf("failed to get credentials secret: %w", err)
+	}
+
+	saData, ok := credsSecret.Data[constants.MondooCredsSecretServiceAccountKey]
+	if !ok {
+		return fmt.Errorf("credentials secret missing key %q", constants.MondooCredsSecretServiceAccountKey)
+	}
+
+	sa, err := mondoo.LoadServiceAccountFromFile(saData)
+	if err != nil {
+		return fmt.Errorf("failed to load service account: %w", err)
+	}
+
+	token, err := mondoo.GenerateTokenFromServiceAccount(*sa, logger)
+	if err != nil {
+		return fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	opts := mondooclient.MondooClientOptions{
+		ApiEndpoint: sa.ApiEndpoint,
+		Token:       token,
+	}
+	if n.MondooOperatorConfig != nil {
+		opts.HttpProxy = n.MondooOperatorConfig.Spec.HttpProxy
+	}
+
+	mondooClient, err := n.MondooClientBuilder(opts)
+	if err != nil {
+		return fmt.Errorf("failed to create mondoo client: %w", err)
+	}
+
+	gcOpts := &mondooclient.GarbageCollectOptions{
+		ManagedBy:       managedBy,
+		PlatformRuntime: "k8s-cluster",
+		OlderThan:       time.Now().Add(-2 * time.Hour).Format(time.RFC3339),
+	}
+
+	if err := mondooClient.GarbageCollectAssets(ctx, gcOpts); err != nil {
+		return fmt.Errorf("garbage collection API call failed: %w", err)
+	}
+
+	logger.Info("Successfully performed garbage collection of K8s resource scan assets")
 	return nil
 }
 

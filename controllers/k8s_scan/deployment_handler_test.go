@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
+
 	"github.com/stretchr/testify/suite"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -26,6 +28,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	"go.mondoo.com/mondoo-operator/pkg/utils/test"
+	"go.mondoo.com/mondoo-operator/tests/credentials"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 )
 
@@ -118,11 +121,11 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 func (s *DeploymentHandlerSuite) TestReconcile_Update() {
 	d := s.createDeploymentHandler()
 
-	image, err := s.containerImageResolver.MondooOperatorImage(s.ctx, "", "", "", false)
+	image, err := s.containerImageResolver.CnspecImage("", "", "", false)
 	s.NoError(err)
 
 	// Make sure a cron job exists with different container command
-	cronJob := CronJob(image, "", test.KubeSystemNamespaceUid, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
+	cronJob := CronJob(image, &s.auditConfig, mondoov1alpha2.MondooOperatorConfig{})
 	cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, cronJob))
 
@@ -576,6 +579,7 @@ func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {
 		Mondoo:                 &s.auditConfig,
 		ContainerImageResolver: s.containerImageResolver,
 		MondooOperatorConfig:   &mondoov1alpha2.MondooOperatorConfig{},
+		MondooClientBuilder:    mondooclient.NewClient,
 	}
 }
 
@@ -1235,6 +1239,150 @@ func TestExternalClusterNaming(t *testing.T) {
 			}
 		})
 	}
+}
+
+func (s *DeploymentHandlerSuite) TestGarbageCollection_RunsAfterSuccessfulScan() {
+	gcCalled := false
+	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.GarbageCollectOptions) error {
+		gcCalled = true
+		s.Equal("k8s-cluster", opts.PlatformRuntime)
+		s.Contains(opts.ManagedBy, "mondoo-operator-")
+		s.NotEmpty(opts.OlderThan)
+		return nil
+	})
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	// First reconcile - creates resources
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Set lastSuccessfulTime on the CronJob
+	cronJobs := &batchv1.CronJobList{}
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs))
+	s.Require().NotEmpty(cronJobs.Items)
+
+	now := metav1.Now()
+	cronJobs.Items[0].Status.LastSuccessfulTime = &now
+	s.NoError(d.KubeClient.Status().Update(s.ctx, &cronJobs.Items[0]))
+
+	// Second reconcile - should trigger GC
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	s.True(gcCalled, "GarbageCollectAssets should have been called")
+	s.NotNil(d.Mondoo.Status.LastK8sResourceGarbageCollectionTime, "GC timestamp should be set in status")
+}
+
+func (s *DeploymentHandlerSuite) TestGarbageCollection_SkipsWhenAlreadyRun() {
+	gcCalled := false
+	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.GarbageCollectOptions) error {
+		gcCalled = true
+		return nil
+	})
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	// First reconcile
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Set lastSuccessfulTime on the CronJob
+	cronJobs := &batchv1.CronJobList{}
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs))
+	s.Require().NotEmpty(cronJobs.Items)
+
+	successTime := metav1.NewTime(time.Now().Add(-1 * time.Hour))
+	cronJobs.Items[0].Status.LastSuccessfulTime = &successTime
+	s.NoError(d.KubeClient.Status().Update(s.ctx, &cronJobs.Items[0]))
+
+	// Set status to indicate GC was already done at a newer time
+	gcTime := metav1.Now()
+	d.Mondoo.Status.LastK8sResourceGarbageCollectionTime = &gcTime
+
+	// Reconcile - should NOT trigger GC
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	s.False(gcCalled, "GarbageCollectAssets should NOT have been called")
+}
+
+func (s *DeploymentHandlerSuite) TestGarbageCollection_FailureStillUpdatesTimestamp() {
+	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.GarbageCollectOptions) error {
+		return fmt.Errorf("API error")
+	})
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	// First reconcile
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Set lastSuccessfulTime on the CronJob
+	cronJobs := &batchv1.CronJobList{}
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs))
+	s.Require().NotEmpty(cronJobs.Items)
+
+	now := metav1.Now()
+	cronJobs.Items[0].Status.LastSuccessfulTime = &now
+	s.NoError(d.KubeClient.Status().Update(s.ctx, &cronJobs.Items[0]))
+
+	// Reconcile - GC fails but reconcile should still succeed
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Timestamp should still be updated so we don't retry until the next new successful scan
+	s.NotNil(d.Mondoo.Status.LastK8sResourceGarbageCollectionTime, "GC timestamp should be set even when GC fails")
+}
+
+// createDeploymentHandlerWithGCMock creates a DeploymentHandler with a mock MondooClientBuilder
+// that captures calls to GarbageCollectAssets.
+func (s *DeploymentHandlerSuite) createDeploymentHandlerWithGCMock(gcFunc func(context.Context, *mondooclient.GarbageCollectOptions) error) DeploymentHandler {
+	// Create a mock credentials secret so GC can read it
+	key := credentials.MondooServiceAccount(s.T())
+	mockSA := mondooclient.ServiceAccountCredentials{
+		Mrn:         "//agents.api.mondoo.app/spaces/test/serviceaccounts/test",
+		PrivateKey:  key,
+		ApiEndpoint: "https://us.api.mondoo.com",
+	}
+	saData, err := json.Marshal(mockSA)
+	s.Require().NoError(err)
+	credsSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      s.auditConfig.Spec.MondooCredsSecretRef.Name,
+			Namespace: s.auditConfig.Namespace,
+		},
+		Data: map[string][]byte{
+			constants.MondooCredsSecretServiceAccountKey: saData,
+		},
+	}
+	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(credsSecret)
+
+	return DeploymentHandler{
+		KubeClient:             s.fakeClientBuilder.Build(),
+		Mondoo:                 &s.auditConfig,
+		ContainerImageResolver: s.containerImageResolver,
+		MondooOperatorConfig:   &mondoov1alpha2.MondooOperatorConfig{},
+		MondooClientBuilder: func(opts mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+			return &fakeMondooClient{gcFunc: gcFunc}, nil
+		},
+	}
+}
+
+// fakeMondooClient implements just enough of MondooClient to test GC
+type fakeMondooClient struct {
+	mondooclient.MondooClient
+	gcFunc func(context.Context, *mondooclient.GarbageCollectOptions) error
+}
+
+func (f *fakeMondooClient) GarbageCollectAssets(ctx context.Context, opts *mondooclient.GarbageCollectOptions) error {
+	if f.gcFunc != nil {
+		return f.gcFunc(ctx, opts)
+	}
+	return nil
 }
 
 func TestDeploymentHandlerSuite(t *testing.T) {

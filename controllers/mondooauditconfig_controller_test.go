@@ -33,6 +33,8 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/status"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	mockmondoo "go.mondoo.com/mondoo-operator/pkg/client/mondooclient/mock"
+	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
+	mondoofake "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/credentials"
 	k8sversion "k8s.io/apimachinery/pkg/version"
@@ -262,6 +264,7 @@ func TestTokenRegistration(t *testing.T) {
 						Nodes:             make([]string, 0),
 						MondooAuditConfig: status.MondooAuditConfig{Name: testMondooAuditConfigName, Namespace: testNamespace},
 						OperatorVersion:   version.Version,
+						CnspecVersion:     mondoo.CnspecTag,
 					},
 				}).Times(1).Return(nil)
 
@@ -316,7 +319,7 @@ func TestTokenRegistration(t *testing.T) {
 			reconciler := &MondooAuditConfigReconciler{
 				MondooClientBuilder: testMondooClientBuilder,
 				Client:              fakeClient,
-				StatusReporter:      status.NewStatusReporter(fakeClient, testMondooClientBuilder, k8sVersion),
+				StatusReporter:      status.NewStatusReporter(fakeClient, testMondooClientBuilder, k8sVersion, mondoofake.NewNoOpContainerImageResolver()),
 			}
 
 			// Act
