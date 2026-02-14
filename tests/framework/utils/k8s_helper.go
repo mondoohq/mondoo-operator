@@ -44,6 +44,7 @@ const (
 	cmd                    = "kubectl"
 	RetryInterval          = 2
 	RetryLoop              = 100
+	CronJobRetryLoop       = 300 // CronJobs need more time: schedule delay + scan execution (600s)
 	SkipVersionCheckEnvVar = "SKIP_VERSION_CHECK"
 )
 
@@ -221,7 +222,8 @@ func (k8sh *K8sHelper) WaitUntilMondooClientSecretExists(ctx context.Context, ns
 }
 
 // WaitUntilCronJobsSuccessful waits for the CronJobs with the specified selector to have at least
-// one successful run.
+// one successful run. Uses CronJobRetryLoop for a longer timeout since CronJobs need time for
+// schedule delay plus scan execution.
 func (k8sh *K8sHelper) WaitUntilCronJobsSuccessful(labelSelector, namespace string) bool {
 	listOpts, err := LabelSelectorListOptions(labelSelector)
 	if err != nil {
@@ -231,25 +233,26 @@ func (k8sh *K8sHelper) WaitUntilCronJobsSuccessful(labelSelector, namespace stri
 	ctx := context.Background()
 	cronJobs := &batchv1.CronJobList{}
 
-	err = k8sh.ExecuteWithRetries(func() (bool, error) {
+	for i := 0; i < CronJobRetryLoop; i++ {
 		if err := k8sh.Clientset.List(ctx, cronJobs, listOpts); err != nil {
 			zap.S().Errorf("Failed to list CronJobs. %v", err)
-			return false, err
+			return false
 		}
+
+		allReady := true
 		for _, c := range cronJobs.Items {
-			// Make sure the job has been scheduled and is not active
 			if c.Status.LastScheduleTime == nil || len(c.Status.Active) > 0 {
-				return false, nil
+				allReady = false
+				break
 			}
 		}
 
-		// Make sure all jobs have succeeded
-		if k8s.AreCronJobsSuccessful(cronJobs.Items) {
-			return true, nil
+		if allReady && k8s.AreCronJobsSuccessful(cronJobs.Items) {
+			return true
 		}
-		return false, nil
-	})
-	return err == nil
+		time.Sleep(RetryInterval * time.Second)
+	}
+	return false
 }
 
 func LabelSelectorListOptions(labelSelector string) (*client.ListOptions, error) {
@@ -505,7 +508,8 @@ func (k8sh *K8sHelper) getPodDescribe(namespace string, args ...string) string {
 	args = append([]string{"get", "pod", "-o", "yaml", "-n", namespace}, args...)
 	description, err := k8sh.Kubectl(args...)
 	if err != nil {
-		zap.S().Errorf("failed to describe pod. %v %+v", args, err)
+		// Completed CronJob pods may be cleaned up before we can describe them
+		zap.S().Warnf("failed to describe pod. %v %+v", args, err)
 		return ""
 	}
 	return description

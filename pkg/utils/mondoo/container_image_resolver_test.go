@@ -251,64 +251,64 @@ func TestContainerImageResolverSuite(t *testing.T) {
 
 func TestSplitImageParts(t *testing.T) {
 	tests := []struct {
-		name              string
-		image             string
-		expectedRegistry  string
-		expectedRepoTag   string
+		name             string
+		image            string
+		expectedRegistry string
+		expectedRepoTag  string
 	}{
 		{
-			name:              "ghcr.io image",
-			image:             "ghcr.io/mondoohq/mondoo-operator:v1.0.0",
-			expectedRegistry:  "ghcr.io",
-			expectedRepoTag:   "mondoohq/mondoo-operator:v1.0.0",
+			name:             "ghcr.io image",
+			image:            "ghcr.io/mondoohq/mondoo-operator:v1.0.0",
+			expectedRegistry: "ghcr.io",
+			expectedRepoTag:  "mondoohq/mondoo-operator:v1.0.0",
 		},
 		{
-			name:              "docker.io image",
-			image:             "docker.io/library/nginx:latest",
-			expectedRegistry:  "docker.io",
-			expectedRepoTag:   "library/nginx:latest",
+			name:             "docker.io image",
+			image:            "docker.io/library/nginx:latest",
+			expectedRegistry: "docker.io",
+			expectedRepoTag:  "library/nginx:latest",
 		},
 		{
-			name:              "quay.io image",
-			image:             "quay.io/prometheus/prometheus:v2.40.0",
-			expectedRegistry:  "quay.io",
-			expectedRepoTag:   "prometheus/prometheus:v2.40.0",
+			name:             "quay.io image",
+			image:            "quay.io/prometheus/prometheus:v2.40.0",
+			expectedRegistry: "quay.io",
+			expectedRepoTag:  "prometheus/prometheus:v2.40.0",
 		},
 		{
-			name:              "private registry with port",
-			image:             "registry.example.com:5000/myimage:tag",
-			expectedRegistry:  "registry.example.com:5000",
-			expectedRepoTag:   "myimage:tag",
+			name:             "private registry with port",
+			image:            "registry.example.com:5000/myimage:tag",
+			expectedRegistry: "registry.example.com:5000",
+			expectedRepoTag:  "myimage:tag",
 		},
 		{
-			name:              "localhost registry",
-			image:             "localhost/myimage:tag",
-			expectedRegistry:  "localhost",
-			expectedRepoTag:   "myimage:tag",
+			name:             "localhost registry",
+			image:            "localhost/myimage:tag",
+			expectedRegistry: "localhost",
+			expectedRepoTag:  "myimage:tag",
 		},
 		{
-			name:              "localhost with port",
-			image:             "localhost:5000/myimage:tag",
-			expectedRegistry:  "localhost:5000",
-			expectedRepoTag:   "myimage:tag",
+			name:             "localhost with port",
+			image:            "localhost:5000/myimage:tag",
+			expectedRegistry: "localhost:5000",
+			expectedRepoTag:  "myimage:tag",
 		},
 		{
-			name:              "image without registry (library image)",
-			image:             "nginx:latest",
-			expectedRegistry:  "",
-			expectedRepoTag:   "nginx:latest",
+			name:             "image without registry (library image)",
+			image:            "nginx:latest",
+			expectedRegistry: "",
+			expectedRepoTag:  "nginx:latest",
 		},
 		{
-			name:              "image without registry (org/repo)",
-			image:             "myorg/myimage:tag",
-			expectedRegistry:  "",
-			expectedRepoTag:   "myorg/myimage:tag",
+			name:             "image without registry (org/repo)",
+			image:            "myorg/myimage:tag",
+			expectedRegistry: "",
+			expectedRepoTag:  "myorg/myimage:tag",
 		},
 		{
-			name:              "image with digest",
-			image:             "ghcr.io/mondoohq/cnspec@sha256:abc123",
-			expectedRegistry:  "ghcr.io",
-			expectedRepoTag:   "mondoohq/cnspec@sha256:abc123",
+			name:             "image with digest",
+			image:            "ghcr.io/mondoohq/cnspec@sha256:abc123",
+			expectedRegistry: "ghcr.io",
+			expectedRepoTag:  "mondoohq/cnspec@sha256:abc123",
 		},
 	}
 
