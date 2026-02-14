@@ -63,7 +63,7 @@ var MondooClientBuilder = mondooclient.NewClient
 //+kubebuilder:rbac:groups=apps,resources=deployments;daemonsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments;replicasets;daemonsets;statefulsets,verbs=get;list;watch
 //+kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=deletecollection
+//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=delete;deletecollection
 //+kubebuilder:rbac:groups=batch,resources=cronjobs;jobs,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods;namespaces;nodes,verbs=get;list;watch
@@ -111,7 +111,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		if errors.IsNotFound(reconcileError) {
 			log.Info("MondooOperatorConfig not found, using defaults")
 		} else {
-			log.Error(reconcileError, "Failed to check for MondooOpertorConfig")
+			log.Error(reconcileError, "Failed to check for MondooOperatorConfig")
 			return ctrl.Result{}, reconcileError
 		}
 	}
@@ -129,6 +129,18 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if !config.DeletionTimestamp.IsZero() {
 		// Going to proceed as if there is no MondooOperatorConfig
 		config = &v1alpha2.MondooOperatorConfig{}
+	}
+
+	// Apply registry configuration to the container image resolver
+	imageResolver := r.ContainerImageResolver
+	if len(config.Spec.RegistryMirrors) > 0 {
+		imageResolver = imageResolver.WithRegistryMirrors(config.Spec.RegistryMirrors)
+	} else if config.Spec.ImageRegistry != nil && *config.Spec.ImageRegistry != "" {
+		imageResolver = imageResolver.WithImageRegistry(*config.Spec.ImageRegistry)
+	}
+	// Apply imagePullSecrets for authentication when resolving images
+	if len(config.Spec.ImagePullSecrets) > 0 {
+		imageResolver = imageResolver.WithImagePullSecrets(config.Spec.ImagePullSecrets)
 	}
 
 	if !mondooAuditConfig.DeletionTimestamp.IsZero() {
@@ -262,7 +274,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
-		ContainerImageResolver: r.ContainerImageResolver,
+		ContainerImageResolver: imageResolver,
 		IsOpenshift:            r.RunningOnOpenShift,
 	}
 
@@ -277,7 +289,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	containers := container_image.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
-		ContainerImageResolver: r.ContainerImageResolver,
+		ContainerImageResolver: imageResolver,
 		MondooOperatorConfig:   config,
 	}
 
@@ -293,7 +305,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
-		ContainerImageResolver: r.ContainerImageResolver,
+		ContainerImageResolver: imageResolver,
 		MondooClientBuilder:    r.MondooClientBuilder,
 	}
 
@@ -309,7 +321,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
-		ContainerImageResolver: r.ContainerImageResolver,
+		ContainerImageResolver: imageResolver,
 	}
 
 	result, reconcileError = resourceWatcher.Reconcile(ctx)
@@ -490,7 +502,26 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 		client.ObjectKeyFromObject(mondooCredsSecret),
 		tokenData,
 		cfg.Spec.HttpProxy,
+		cfg.Spec.HttpsProxy,
+		cfg.Spec.NoProxy,
 		log)
+}
+
+// operatorConfigRequestMapper maps MondooOperatorConfig changes to enqueue all MondooAuditConfigs
+// for reconciliation, so proxy/registry changes take effect without waiting for the next scheduled reconcile.
+func (r *MondooAuditConfigReconciler) operatorConfigRequestMapper(ctx context.Context, o client.Object) []reconcile.Request {
+	var requests []reconcile.Request
+	auditConfigs := &v1alpha2.MondooAuditConfigList{}
+	if err := r.List(ctx, auditConfigs); err != nil {
+		logger := ctrllog.Log.WithName("operator-config-watcher")
+		logger.Error(err, "Failed to list MondooAuditConfigs")
+		return requests
+	}
+
+	for _, a := range auditConfigs.Items {
+		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&a)})
+	}
+	return requests
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -507,6 +538,9 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.nodeEventsRequestMapper),
 			builder.WithPredicates(k8s.IgnoreGenericEventsPredicate{})).
+		Watches(
+			&v1alpha2.MondooOperatorConfig{},
+			handler.EnqueueRequestsFromMapFunc(r.operatorConfigRequestMapper)).
 		Complete(r)
 }
 

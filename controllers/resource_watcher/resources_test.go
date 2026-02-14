@@ -4,11 +4,15 @@
 package resource_watcher
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 )
@@ -361,4 +365,147 @@ func TestDeployment_EmptyClusterUIDAndIntegrationMRN(t *testing.T) {
 	// Should NOT contain flags when empty
 	assert.NotContains(t, cmdStr, "--cluster-uid")
 	assert.NotContains(t, cmdStr, "--integration-mrn")
+}
+
+func TestDeployment_HttpsProxyPreferred(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-config",
+			Namespace: "mondoo-operator",
+		},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable: true,
+				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
+					Enable: true,
+				},
+			},
+		},
+	}
+
+	operatorConfig := v1alpha2.MondooOperatorConfig{
+		Spec: v1alpha2.MondooOperatorConfigSpec{
+			HttpProxy:  ptr.To("http://proxy:8080"),
+			HttpsProxy: ptr.To("https://proxy:8443"),
+		},
+	}
+
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
+	container := deployment.Spec.Template.Spec.Containers[0]
+
+	cmdStr := strings.Join(container.Command, " ")
+	assert.Contains(t, cmdStr, "--api-proxy https://proxy:8443")
+	assert.NotContains(t, cmdStr, "http://proxy:8080")
+}
+
+func TestDeployment_SkipProxyForCnspec(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-config",
+			Namespace: "mondoo-operator",
+		},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable: true,
+				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
+					Enable: true,
+				},
+			},
+		},
+	}
+
+	operatorConfig := v1alpha2.MondooOperatorConfig{
+		Spec: v1alpha2.MondooOperatorConfigSpec{
+			HttpProxy:          ptr.To("http://proxy:8080"),
+			HttpsProxy:         ptr.To("https://proxy:8443"),
+			SkipProxyForCnspec: true,
+		},
+	}
+
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
+	container := deployment.Spec.Template.Spec.Containers[0]
+
+	cmdStr := strings.Join(container.Command, " ")
+	assert.NotContains(t, cmdStr, "--api-proxy")
+
+	envMap := envToMap(container.Env)
+	_, hasHTTPProxy := envMap["HTTP_PROXY"]
+	_, hasHTTPSProxy := envMap["HTTPS_PROXY"]
+	assert.False(t, hasHTTPProxy, "HTTP_PROXY should not be set when SkipProxyForCnspec is true")
+	assert.False(t, hasHTTPSProxy, "HTTPS_PROXY should not be set when SkipProxyForCnspec is true")
+}
+
+func TestDeployment_ProxyEnvVars(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-config",
+			Namespace: "mondoo-operator",
+		},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable: true,
+				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
+					Enable: true,
+				},
+			},
+		},
+	}
+
+	operatorConfig := v1alpha2.MondooOperatorConfig{
+		Spec: v1alpha2.MondooOperatorConfigSpec{
+			HttpProxy:  ptr.To("http://proxy:8080"),
+			HttpsProxy: ptr.To("https://proxy:8443"),
+			NoProxy:    ptr.To("localhost,10.0.0.0/8"),
+		},
+	}
+
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
+	container := deployment.Spec.Template.Spec.Containers[0]
+
+	envMap := envToMap(container.Env)
+	assert.Equal(t, "http://proxy:8080", envMap["HTTP_PROXY"])
+	assert.Equal(t, "http://proxy:8080", envMap["http_proxy"])
+	assert.Equal(t, "https://proxy:8443", envMap["HTTPS_PROXY"])
+	assert.Equal(t, "https://proxy:8443", envMap["https_proxy"])
+	assert.Equal(t, "localhost,10.0.0.0/8", envMap["NO_PROXY"])
+	assert.Equal(t, "localhost,10.0.0.0/8", envMap["no_proxy"])
+}
+
+func TestDeployment_WithImagePullSecrets(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-config",
+			Namespace: "mondoo-operator",
+		},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable: true,
+				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
+					Enable: true,
+				},
+			},
+		},
+	}
+
+	operatorConfig := v1alpha2.MondooOperatorConfig{
+		Spec: v1alpha2.MondooOperatorConfigSpec{
+			ImagePullSecrets: []corev1.LocalObjectReference{
+				{Name: "my-registry-secret"},
+			},
+		},
+	}
+
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
+	secrets := deployment.Spec.Template.Spec.ImagePullSecrets
+	require.Len(t, secrets, 1)
+	assert.Equal(t, "my-registry-secret", secrets[0].Name)
+}
+
+// envToMap converts a slice of EnvVar to a map for easy lookup.
+func envToMap(envVars []corev1.EnvVar) map[string]string {
+	m := make(map[string]string, len(envVars))
+	for _, e := range envVars {
+		m[e.Name] = e.Value
+	}
+	return m
 }

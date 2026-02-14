@@ -2,10 +2,9 @@
 # Copyright Mondoo, Inc. 2026
 # SPDX-License-Identifier: BUSL-1.1
 #
-# This script updates the CRD templates in the Helm chart from the generated CRDs.
-# It applies the necessary transformations to make them Helm-compatible:
-# - Adds Helm labels template
-# - Replaces webhook namespace with Helm template
+# This script updates the CRDs in the Helm chart from the generated CRDs.
+# CRDs are placed in charts/mondoo-operator/crds/ which Helm installs
+# automatically before other chart resources.
 #
 # Usage: ./hack/update-helm-crds.sh
 
@@ -13,58 +12,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-CHART_DIR="${ROOT_DIR}/charts/mondoo-operator/templates"
+CRD_BASES="${ROOT_DIR}/config/crd/bases"
+CHART_CRDS="${ROOT_DIR}/charts/mondoo-operator/crds"
 
-# Check for required tools
-if ! command -v yq &> /dev/null; then
-    echo "Error: yq is required but not installed."
-    echo "Install with: brew install yq (macOS) or go install github.com/mikefarah/yq/v4@latest"
-    exit 1
-fi
+echo "Copying CRDs from ${CRD_BASES} to ${CHART_CRDS}..."
+cp "${CRD_BASES}/k8s.mondoo.com_mondooauditconfigs.yaml" "${CHART_CRDS}/"
+cp "${CRD_BASES}/k8s.mondoo.com_mondoooperatorconfigs.yaml" "${CHART_CRDS}/"
 
-if ! command -v kustomize &> /dev/null && [ ! -f "${ROOT_DIR}/bin/kustomize" ]; then
-    echo "Error: kustomize is required. Run 'make kustomize' first."
-    exit 1
-fi
-
-KUSTOMIZE="${ROOT_DIR}/bin/kustomize"
-if [ ! -f "$KUSTOMIZE" ]; then
-    KUSTOMIZE="kustomize"
-fi
-
-echo "Building CRDs with kustomize..."
-CRD_OUTPUT=$("$KUSTOMIZE" build "${ROOT_DIR}/config/crd")
-
-# Process mondooauditconfigs CRD
-echo "Processing mondooauditconfigs CRD..."
-echo "$CRD_OUTPUT" | yq eval 'select(.metadata.name == "mondooauditconfigs.k8s.mondoo.com")' - | \
-    yq eval 'del(.metadata.labels)' - | \
-    yq eval '.spec.conversion.webhook.clientConfig.service.namespace = "HELM_NAMESPACE_PLACEHOLDER"' - | \
-    sed 's/name: mondooauditconfigs.k8s.mondoo.com/name: mondooauditconfigs.k8s.mondoo.com\n  labels:\n  {{- include "mondoo-operator.labels" . | nindent 4 }}/' | \
-    sed "s/HELM_NAMESPACE_PLACEHOLDER/'{{ .Release.Namespace }}'/" \
-    > "${CHART_DIR}/mondooauditconfig-crd.yaml"
-
-# Process mondoooperatorconfigs CRD
-echo "Processing mondoooperatorconfigs CRD..."
-echo "$CRD_OUTPUT" | yq eval 'select(.metadata.name == "mondoooperatorconfigs.k8s.mondoo.com")' - | \
-    yq eval 'del(.metadata.labels)' - | \
-    sed 's/name: mondoooperatorconfigs.k8s.mondoo.com/name: mondoooperatorconfigs.k8s.mondoo.com\n  labels:\n  {{- include "mondoo-operator.labels" . | nindent 4 }}/' \
-    > "${CHART_DIR}/mondoooperatorconfig-crd.yaml"
-
-# Validate that Helm template directives were injected correctly
-echo "Validating Helm template directives..."
-for crd_file in "${CHART_DIR}/mondooauditconfig-crd.yaml" "${CHART_DIR}/mondoooperatorconfig-crd.yaml"; do
-    if ! grep -q 'include "mondoo-operator.labels"' "$crd_file"; then
-        echo "Error: Helm labels template not found in $(basename "$crd_file")"
-        exit 1
-    fi
-done
-
-if ! grep -q '\.Release\.Namespace' "${CHART_DIR}/mondooauditconfig-crd.yaml"; then
-    echo "Error: Helm namespace template not found in mondooauditconfig-crd.yaml"
-    exit 1
-fi
-
-echo "CRDs updated successfully in ${CHART_DIR}"
+echo "CRDs updated successfully in ${CHART_CRDS}"
 echo ""
-echo "Please review the changes with: git diff charts/mondoo-operator/templates/*-crd.yaml"
+echo "Please review the changes with: git diff charts/mondoo-operator/crds/"

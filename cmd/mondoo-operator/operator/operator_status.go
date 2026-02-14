@@ -31,7 +31,7 @@ func checkForTerminatedState(ctx context.Context, nonCacheClient client.Client, 
 		if errors.IsNotFound(err) {
 			logger.Info("MondooOperatorConfig not found, using defaults")
 		} else {
-			logger.Error(err, "Failed to check for MondooOpertorConfig")
+			logger.Error(err, "Failed to check for MondooOperatorConfig")
 			return err
 		}
 	}

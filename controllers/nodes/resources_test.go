@@ -6,6 +6,7 @@ package nodes
 import (
 	"crypto/sha256"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,6 +21,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -261,6 +263,132 @@ func TestInventory_WithAnnotations(t *testing.T) {
 		assert.Equal(t, "prod", asset.Annotations["env"], "asset %s missing env annotation", asset.Name)
 		assert.Equal(t, "platform", asset.Annotations["team"], "asset %s missing team annotation", asset.Name)
 	}
+}
+
+func TestCronJob_WithProxy(t *testing.T) {
+	testNode := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-name"}}
+	mac := testMondooAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{
+		Spec: v1alpha2.MondooOperatorConfigSpec{
+			HttpProxy:  ptr.To("http://proxy:8080"),
+			HttpsProxy: ptr.To("https://proxy:8443"),
+		},
+	}
+
+	cj := CronJob("test123", testNode, mac, false, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	cmdStr := strings.Join(container.Command, " ")
+	assert.Contains(t, cmdStr, "--api-proxy")
+	assert.Contains(t, cmdStr, "https://proxy:8443")
+
+	envMap := envToMap(container.Env)
+	assert.Equal(t, "http://proxy:8080", envMap["HTTP_PROXY"])
+	assert.Equal(t, "https://proxy:8443", envMap["HTTPS_PROXY"])
+}
+
+func TestCronJob_SkipProxyForCnspec(t *testing.T) {
+	testNode := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-name"}}
+	mac := testMondooAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{
+		Spec: v1alpha2.MondooOperatorConfigSpec{
+			HttpProxy:          ptr.To("http://proxy:8080"),
+			SkipProxyForCnspec: true,
+		},
+	}
+
+	cj := CronJob("test123", testNode, mac, false, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	cmdStr := strings.Join(container.Command, " ")
+	assert.NotContains(t, cmdStr, "--api-proxy")
+
+	envMap := envToMap(container.Env)
+	_, hasHTTPProxy := envMap["HTTP_PROXY"]
+	assert.False(t, hasHTTPProxy, "HTTP_PROXY should not be set when SkipProxyForCnspec is true")
+}
+
+func TestCronJob_WithImagePullSecrets(t *testing.T) {
+	testNode := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-name"}}
+	mac := testMondooAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{
+		Spec: v1alpha2.MondooOperatorConfigSpec{
+			ImagePullSecrets: []corev1.LocalObjectReference{
+				{Name: "my-registry-secret"},
+			},
+		},
+	}
+
+	cj := CronJob("test123", testNode, mac, false, cfg)
+	secrets := cj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets
+	require.Len(t, secrets, 1)
+	assert.Equal(t, "my-registry-secret", secrets[0].Name)
+}
+
+func TestDaemonSet_WithProxy(t *testing.T) {
+	mac := *testMondooAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{
+		Spec: v1alpha2.MondooOperatorConfigSpec{
+			HttpProxy:  ptr.To("http://proxy:8080"),
+			HttpsProxy: ptr.To("https://proxy:8443"),
+		},
+	}
+
+	ds := DaemonSet(mac, false, "test123", cfg, nil)
+	container := ds.Spec.Template.Spec.Containers[0]
+
+	cmdStr := strings.Join(container.Command, " ")
+	assert.Contains(t, cmdStr, "--api-proxy")
+	assert.Contains(t, cmdStr, "https://proxy:8443")
+
+	envMap := envToMap(container.Env)
+	assert.Equal(t, "http://proxy:8080", envMap["HTTP_PROXY"])
+	assert.Equal(t, "https://proxy:8443", envMap["HTTPS_PROXY"])
+}
+
+func TestDaemonSet_SkipProxyForCnspec(t *testing.T) {
+	mac := *testMondooAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{
+		Spec: v1alpha2.MondooOperatorConfigSpec{
+			HttpProxy:          ptr.To("http://proxy:8080"),
+			SkipProxyForCnspec: true,
+		},
+	}
+
+	ds := DaemonSet(mac, false, "test123", cfg, nil)
+	container := ds.Spec.Template.Spec.Containers[0]
+
+	cmdStr := strings.Join(container.Command, " ")
+	assert.NotContains(t, cmdStr, "--api-proxy")
+
+	envMap := envToMap(container.Env)
+	_, hasHTTPProxy := envMap["HTTP_PROXY"]
+	assert.False(t, hasHTTPProxy, "HTTP_PROXY should not be set when SkipProxyForCnspec is true")
+}
+
+func TestDaemonSet_WithImagePullSecrets(t *testing.T) {
+	mac := *testMondooAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{
+		Spec: v1alpha2.MondooOperatorConfigSpec{
+			ImagePullSecrets: []corev1.LocalObjectReference{
+				{Name: "my-registry-secret"},
+			},
+		},
+	}
+
+	ds := DaemonSet(mac, false, "test123", cfg, nil)
+	secrets := ds.Spec.Template.Spec.ImagePullSecrets
+	require.Len(t, secrets, 1)
+	assert.Equal(t, "my-registry-secret", secrets[0].Name)
+}
+
+// envToMap converts a slice of EnvVar to a map for easy lookup.
+func envToMap(envVars []corev1.EnvVar) map[string]string {
+	m := make(map[string]string, len(envVars))
+	for _, e := range envVars {
+		m[e.Name] = e.Value
+	}
+	return m
 }
 
 func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {

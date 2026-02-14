@@ -38,12 +38,22 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 		"--inventory-file", "/etc/opt/mondoo/config/inventory.yml",
 	}
 
-	if cfg.Spec.HttpProxy != nil {
-		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
+	// Only add proxy settings if SkipProxyForCnspec is false
+	// cnspec-based components may not properly handle NO_PROXY for internal domains
+	if !cfg.Spec.SkipProxyForCnspec {
+		if apiProxy := k8s.APIProxyURL(cfg); apiProxy != nil {
+			cmd = append(cmd, "--api-proxy", *apiProxy)
+		}
 	}
 
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
+
+	// Add proxy environment variables from MondooOperatorConfig only if SkipProxyForCnspec is false
+	if !cfg.Spec.SkipProxyForCnspec {
+		envVars = append(envVars, k8s.ProxyEnvVars(cfg)...)
+	}
+
 	envVars = k8s.MergeEnv(envVars, m.Spec.Containers.Env)
 
 	cronjob := &batchv1.CronJob{
@@ -151,6 +161,13 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 
 	// Add private registry secret if specified
 	k8s.AddPrivateRegistryPullSecretToSpec(&cronjob.Spec.JobTemplate.Spec.Template.Spec, privateRegistrySecretName)
+
+	// Append imagePullSecrets from MondooOperatorConfig (don't overwrite existing secrets)
+	if len(cfg.Spec.ImagePullSecrets) > 0 {
+		cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = append(
+			cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets,
+			cfg.Spec.ImagePullSecrets...)
+	}
 
 	return cronjob
 }

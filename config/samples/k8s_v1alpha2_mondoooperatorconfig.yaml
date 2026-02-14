@@ -1,11 +1,83 @@
 # Copyright (c) Mondoo, Inc.
 # SPDX-License-Identifier: BUSL-1.1
 
+# MondooOperatorConfig defines cluster-wide settings for the Mondoo Operator.
+# This is a cluster-scoped resource - only one instance named "mondoo-operator-config" is allowed.
+# See docs/operator-config.md for detailed documentation.
+
 apiVersion: k8s.mondoo.com/v1alpha2
 kind: MondooOperatorConfig
 metadata:
   name: mondoo-operator-config
 spec:
+  # ============================================================================
+  # METRICS CONFIGURATION
+  # ============================================================================
+
   metrics:
+    # Enable Prometheus metrics and ServiceMonitor creation
     enable: false
+
+    # Extra labels to add to metrics-related resources (e.g., ServiceMonitor)
+    # Use this to match your Prometheus Operator's serviceMonitorSelector
+    # resourceLabels:
+    #   prometheus: main
+    #   team: security
+
+  # ============================================================================
+  # PROXY CONFIGURATION
+  # ============================================================================
+
+  # HTTP proxy for outbound HTTP connections to the Mondoo Platform
+  # httpProxy: "http://proxy.example.com:3128"
+
+  # HTTPS proxy for outbound HTTPS connections to the Mondoo Platform
+  # httpsProxy: "http://proxy.example.com:3128"
+
+  # Comma-separated list of hosts/CIDRs that should bypass the proxy
+  # Follows standard NO_PROXY conventions: IPs, CIDRs, domains, domain suffixes (.example.com)
+  # Recommended entries for Kubernetes:
+  # noProxy: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.cluster.local,.svc,localhost,127.0.0.1"
+
+  # Proxy specifically for container image operations (used in container image scanning)
+  # containerProxy: "http://proxy.example.com:3128"
+
+  # Disable proxy environment variables for cnspec-based components (K8s scanning, container scanning)
+  # Use this when the Mondoo API is accessible directly without proxy (e.g., internal mirror)
+  # but other components still need proxy for external access
+  skipProxyForCnspec: false
+
+  # ============================================================================
+  # REGISTRY CONFIGURATION (for air-gapped / private registry environments)
+  # ============================================================================
+
+  # Image pull secrets for pulling Mondoo container images from private registries
+  # The secrets must exist in the mondoo-operator namespace and be of type kubernetes.io/dockerconfigjson
+  # imagePullSecrets:
+  #   - name: ghcr-credentials
+  #   - name: artifactory-credentials
+
+  # Simple registry mirror: prefix for all Mondoo images
+  # Use this when all images are mirrored to the same registry location
+  # Example: "registry.example.com/ghcr.io.docker"
+  # This rewrites: ghcr.io/mondoohq/cnspec:v1.0.0 -> registry.example.com/ghcr.io.docker/mondoohq/cnspec:v1.0.0
+  # imageRegistry: ""
+
+  # Advanced registry mirrors: map different source registries to different mirrors
+  # Use this when you have separate mirrors for different upstream registries
+  # Note: If both imageRegistry and registryMirrors are set, registryMirrors takes precedence
+  # registryMirrors:
+  #   ghcr.io: "artifactory.example.com/ghcr-remote"
+  #   docker.io: "artifactory.example.com/docker-hub-remote"
+  #   quay.io: "artifactory.example.com/quay-remote"
+
+  # ============================================================================
+  # BEHAVIOR FLAGS
+  # ============================================================================
+
+  # Skip resolving container image digests from upstream registries
+  # Enable this for:
+  # - Air-gapped clusters without access to ghcr.io
+  # - GKE Autopilot or environments with restricted network policies
+  # - When you want to pin exact image versions without upstream resolution
   skipContainerResolution: false

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/stretchr/testify/suite"
@@ -16,6 +17,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"go.mondoo.com/mondoo-operator/pkg/imagecache"
 )
 
 type ContainerImageResolverSuite struct {
@@ -31,6 +34,10 @@ type fakeCacher struct {
 
 func (f *fakeCacher) GetImage(img string) (string, error) {
 	return f.fakeGetImage(img)
+}
+
+func (f *fakeCacher) WithAuth(keychain authn.Keychain) imagecache.ImageCacher {
+	return f // Return itself since we don't need auth in tests
 }
 
 func NewFakeCacher(f func(string) (string, error)) *fakeCacher {
@@ -240,4 +247,158 @@ func (s *ContainerImageResolverSuite) TestMondooOperatorImage_DigestWithTag() {
 
 func TestContainerImageResolverSuite(t *testing.T) {
 	suite.Run(t, new(ContainerImageResolverSuite))
+}
+
+func TestSplitImageParts(t *testing.T) {
+	tests := []struct {
+		name             string
+		image            string
+		expectedRegistry string
+		expectedRepoTag  string
+	}{
+		{
+			name:             "ghcr.io image",
+			image:            "ghcr.io/mondoohq/mondoo-operator:v1.0.0",
+			expectedRegistry: "ghcr.io",
+			expectedRepoTag:  "mondoohq/mondoo-operator:v1.0.0",
+		},
+		{
+			name:             "docker.io image",
+			image:            "docker.io/library/nginx:latest",
+			expectedRegistry: "docker.io",
+			expectedRepoTag:  "library/nginx:latest",
+		},
+		{
+			name:             "quay.io image",
+			image:            "quay.io/prometheus/prometheus:v2.40.0",
+			expectedRegistry: "quay.io",
+			expectedRepoTag:  "prometheus/prometheus:v2.40.0",
+		},
+		{
+			name:             "private registry with port",
+			image:            "registry.example.com:5000/myimage:tag",
+			expectedRegistry: "registry.example.com:5000",
+			expectedRepoTag:  "myimage:tag",
+		},
+		{
+			name:             "localhost registry",
+			image:            "localhost/myimage:tag",
+			expectedRegistry: "localhost",
+			expectedRepoTag:  "myimage:tag",
+		},
+		{
+			name:             "localhost with port",
+			image:            "localhost:5000/myimage:tag",
+			expectedRegistry: "localhost:5000",
+			expectedRepoTag:  "myimage:tag",
+		},
+		{
+			name:             "image without registry (library image)",
+			image:            "nginx:latest",
+			expectedRegistry: "",
+			expectedRepoTag:  "nginx:latest",
+		},
+		{
+			name:             "image without registry (org/repo)",
+			image:            "myorg/myimage:tag",
+			expectedRegistry: "",
+			expectedRepoTag:  "myorg/myimage:tag",
+		},
+		{
+			name:             "image with digest",
+			image:            "ghcr.io/mondoohq/cnspec@sha256:abc123",
+			expectedRegistry: "ghcr.io",
+			expectedRepoTag:  "mondoohq/cnspec@sha256:abc123",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parts := splitImageParts(tt.image)
+			if parts.registry != tt.expectedRegistry {
+				t.Errorf("registry: got %q, want %q", parts.registry, tt.expectedRegistry)
+			}
+			if parts.repositoryWithTag != tt.expectedRepoTag {
+				t.Errorf("repositoryWithTag: got %q, want %q", parts.repositoryWithTag, tt.expectedRepoTag)
+			}
+		})
+	}
+}
+
+func TestApplyImageRegistry(t *testing.T) {
+	tests := []struct {
+		name            string
+		image           string
+		imageRegistry   string
+		registryMirrors map[string]string
+		expected        string
+	}{
+		{
+			name:          "no registry configured",
+			image:         "ghcr.io/mondoohq/mondoo-operator:v1.0.0",
+			imageRegistry: "",
+			expected:      "ghcr.io/mondoohq/mondoo-operator:v1.0.0",
+		},
+		{
+			name:          "imageRegistry replaces registry",
+			image:         "ghcr.io/mondoohq/mondoo-operator:v1.0.0",
+			imageRegistry: "artifactory.example.com/ghcr.io.docker",
+			expected:      "artifactory.example.com/ghcr.io.docker/mondoohq/mondoo-operator:v1.0.0",
+		},
+		{
+			name:  "registryMirrors replaces specific registry",
+			image: "ghcr.io/mondoohq/mondoo-operator:v1.0.0",
+			registryMirrors: map[string]string{
+				"ghcr.io": "artifactory.example.com/ghcr.io.docker",
+			},
+			expected: "artifactory.example.com/ghcr.io.docker/mondoohq/mondoo-operator:v1.0.0",
+		},
+		{
+			name:  "registryMirrors takes precedence over imageRegistry",
+			image: "ghcr.io/mondoohq/mondoo-operator:v1.0.0",
+			registryMirrors: map[string]string{
+				"ghcr.io": "mirror.example.com/ghcr",
+			},
+			imageRegistry: "fallback.example.com",
+			expected:      "mirror.example.com/ghcr/mondoohq/mondoo-operator:v1.0.0",
+		},
+		{
+			name:  "registryMirrors does not match - falls back to imageRegistry",
+			image: "quay.io/prometheus/prometheus:v2.40.0",
+			registryMirrors: map[string]string{
+				"ghcr.io": "mirror.example.com/ghcr",
+			},
+			imageRegistry: "fallback.example.com",
+			expected:      "fallback.example.com/prometheus/prometheus:v2.40.0",
+		},
+		{
+			name:  "multiple registryMirrors",
+			image: "docker.io/library/nginx:latest",
+			registryMirrors: map[string]string{
+				"ghcr.io":   "mirror.example.com/ghcr",
+				"docker.io": "mirror.example.com/dockerhub",
+				"quay.io":   "mirror.example.com/quay",
+			},
+			expected: "mirror.example.com/dockerhub/library/nginx:latest",
+		},
+		{
+			name:          "imageRegistry with library image (no registry)",
+			image:         "nginx:latest",
+			imageRegistry: "mirror.example.com",
+			expected:      "mirror.example.com/nginx:latest",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolver := &containerImageResolver{
+				imageRegistry:   tt.imageRegistry,
+				registryMirrors: tt.registryMirrors,
+			}
+			result := resolver.applyImageRegistry(tt.image)
+			if result != tt.expected {
+				t.Errorf("got %q, want %q", result, tt.expected)
+			}
+		})
+	}
 }

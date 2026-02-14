@@ -120,7 +120,7 @@ func (s *AuditConfigBaseSuite) AfterTest(suiteName, testName string) {
 		_, err = s.testCluster.K8sHelper.Kubectl("delete", "deployments", "-n", "default", "--all", "--ignore-not-found", "--wait")
 		s.Require().NoError(err, "Failed to delete all deployments in default namespace")
 
-		_, err = s.testCluster.K8sHelper.Kubectl("delete", "pods", "-n", "default", "--all", "--wait")
+		_, err = s.testCluster.K8sHelper.Kubectl("delete", "pods", "-n", "default", "--all", "--ignore-not-found", "--wait")
 		s.Require().NoError(err, "Failed to delete all pods")
 	}
 }

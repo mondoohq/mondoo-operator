@@ -91,9 +91,11 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 		cmd = append(cmd, "--namespaces-exclude", strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","))
 	}
 
-	// Add API proxy if configured
-	if cfg.Spec.HttpProxy != nil {
-		cmd = append(cmd, "--api-proxy", *cfg.Spec.HttpProxy)
+	// Add API proxy if configured (respect SkipProxyForCnspec since resource watcher uses cnspec)
+	if !cfg.Spec.SkipProxyForCnspec {
+		if apiProxy := k8s.APIProxyURL(cfg); apiProxy != nil {
+			cmd = append(cmd, "--api-proxy", *apiProxy)
+		}
 	}
 
 	// Add annotations (sorted for deterministic ordering)
@@ -101,6 +103,11 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
+
+	// Add proxy environment variables if not skipped for cnspec components
+	if !cfg.Spec.SkipProxyForCnspec {
+		envVars = append(envVars, k8s.ProxyEnvVars(cfg)...)
+	}
 
 	// Add custom scanner env vars
 	envVars = append(envVars, m.Spec.Scanner.Env...)
@@ -186,6 +193,13 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 				},
 			},
 		},
+	}
+
+	// Add imagePullSecrets from MondooOperatorConfig
+	if len(cfg.Spec.ImagePullSecrets) > 0 {
+		deployment.Spec.Template.Spec.ImagePullSecrets = append(
+			deployment.Spec.Template.Spec.ImagePullSecrets,
+			cfg.Spec.ImagePullSecrets...)
 	}
 
 	return deployment
