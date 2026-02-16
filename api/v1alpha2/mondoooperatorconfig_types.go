@@ -14,22 +14,43 @@ const (
 	MondooOperatorConfigName = "mondoo-operator-config"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // MondooOperatorConfigSpec defines the desired state of MondooOperatorConfig
 type MondooOperatorConfigSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Metrics controls the enabling/disabling of metrics report of mondoo-operator
 	Metrics Metrics `json:"metrics,omitempty"`
 	// Allows skipping Image resolution from upstream repository
 	SkipContainerResolution bool `json:"skipContainerResolution,omitempty"`
 	// HttpProxy specifies a proxy to use for HTTP requests to the Mondoo Platform.
 	HttpProxy *string `json:"httpProxy,omitempty"`
+	// HttpsProxy specifies a proxy to use for HTTPS requests to the Mondoo Platform.
+	HttpsProxy *string `json:"httpsProxy,omitempty"`
+	// NoProxy specifies a comma-separated list of hosts that should not use the proxy.
+	NoProxy *string `json:"noProxy,omitempty"`
 	// ContainerProxy specifies a proxy to use for container images.
 	ContainerProxy *string `json:"containerProxy,omitempty"`
+	// ImagePullSecrets specifies the name of the Secret to use for pulling images for all Mondoo components.
+	// The secret must be of type kubernetes.io/dockerconfigjson.
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	// ImageRegistry specifies a custom container image registry prefix for all Mondoo images.
+	// Use this for simple registry mirrors where all images go to the same mirror.
+	// Example: "artifactory.example.com/ghcr.io.docker"
+	// For more complex setups with multiple source registries, use RegistryMirrors instead.
+	ImageRegistry *string `json:"imageRegistry,omitempty"`
+	// RegistryMirrors specifies a mapping of public registries to private mirrors.
+	// Use this when you need to map different source registries to different mirrors.
+	// The key is the public registry (e.g., "ghcr.io", "docker.io", "quay.io")
+	// and the value is the private mirror (e.g., "artifactory.example.com/ghcr.io.docker").
+	// Example:
+	//   registryMirrors:
+	//     ghcr.io: artifactory.example.com/ghcr.io.docker
+	//     docker.io: artifactory.example.com/hub.docker.com
+	// Note: If both ImageRegistry and RegistryMirrors are set, RegistryMirrors takes precedence.
+	RegistryMirrors map[string]string `json:"registryMirrors,omitempty"`
+	// SkipProxyForCnspec disables proxy environment variables for cnspec-based components
+	// (scan-api, container scanning). Use this when the Mondoo API is accessible directly
+	// without proxy (e.g., internal mirror) but other components need proxy for external access.
+	// Default: false (proxy settings are applied to all components)
+	SkipProxyForCnspec bool `json:"skipProxyForCnspec,omitempty"`
 }
 
 type Metrics struct {
@@ -41,9 +62,6 @@ type Metrics struct {
 
 // MondooOperatorConfigStatus defines the observed state of MondooOperatorConfig
 type MondooOperatorConfigStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Conditions includes more detailed status for the mondoo config
 	// +optional
 	Conditions []MondooOperatorConfigCondition `json:"conditions,omitempty"`

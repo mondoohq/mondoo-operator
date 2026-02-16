@@ -26,7 +26,7 @@ type MondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.Mo
 
 // CreateServiceAccountFromToken will take the provided Mondoo token and exchange it with the Mondoo API
 // for a long lived Mondoo ServiceAccount
-func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client, mondooClientBuilder MondooClientBuilder, withConsoleIntegration bool, serviceAccountSecret types.NamespacedName, tokenSecretData string, httpProxy *string, log logr.Logger) error {
+func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client, mondooClientBuilder MondooClientBuilder, withConsoleIntegration bool, serviceAccountSecret types.NamespacedName, tokenSecretData string, httpProxy *string, httpsProxy *string, noProxy *string, log logr.Logger) error {
 	jwtString := strings.TrimSpace(tokenSecretData)
 
 	parser := &jwt.Parser{}
@@ -48,6 +48,8 @@ func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client
 		ApiEndpoint: fmt.Sprintf("%v", apiEndpoint),
 		Token:       jwtString,
 		HttpProxy:   httpProxy,
+		HttpsProxy:  httpsProxy,
+		NoProxy:     noProxy,
 	}
 
 	mClient, err := mondooClientBuilder(opts)
@@ -98,7 +100,7 @@ func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client
 
 		// No easy way to retry this one-off CheckIn(). An error on initial CheckIn()
 		// means we'll just retry on the regularly scheduled interval via the integration controller
-		_ = performInitialCheckIn(ctx, mondooClientBuilder, integrationMrn, *resp.Creds, httpProxy, log)
+		_ = performInitialCheckIn(ctx, mondooClientBuilder, integrationMrn, *resp.Creds, httpProxy, httpsProxy, noProxy, log)
 	} else {
 		// Do a vanilla token-for-service-account exchange
 		resp, err := mClient.ExchangeRegistrationToken(ctx, &mondooclient.ExchangeRegistrationTokenInput{
@@ -125,8 +127,8 @@ func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client
 	return nil
 }
 
-func performInitialCheckIn(ctx context.Context, mondooClientBuilder MondooClientBuilder, integrationMrn string, sa mondooclient.ServiceAccountCredentials, httpProxy *string, logger logr.Logger) error {
-	if err := IntegrationCheckIn(ctx, integrationMrn, sa, mondooClientBuilder, httpProxy, logger); err != nil {
+func performInitialCheckIn(ctx context.Context, mondooClientBuilder MondooClientBuilder, integrationMrn string, sa mondooclient.ServiceAccountCredentials, httpProxy *string, httpsProxy *string, noProxy *string, logger logr.Logger) error {
+	if err := IntegrationCheckIn(ctx, integrationMrn, sa, mondooClientBuilder, httpProxy, httpsProxy, noProxy, logger); err != nil {
 		logger.Error(err, "initial CheckIn() failed, will CheckIn() periodically", "integrationMRN", integrationMrn)
 		return err
 	}

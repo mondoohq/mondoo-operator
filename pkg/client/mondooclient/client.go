@@ -26,6 +26,8 @@ type MondooClientOptions struct {
 	ApiEndpoint string
 	Token       string
 	HttpProxy   *string
+	HttpsProxy  *string
+	NoProxy     *string
 	HttpTimeout *time.Duration
 }
 
@@ -37,7 +39,7 @@ type mondooClient struct {
 
 func NewClient(opts MondooClientOptions) (MondooClient, error) {
 	opts.ApiEndpoint = strings.TrimRight(opts.ApiEndpoint, "/")
-	client, err := common.DefaultHttpClient(opts.HttpProxy, opts.HttpTimeout)
+	client, err := common.DefaultHttpClientWithProxy(opts.HttpProxy, opts.HttpsProxy, opts.NoProxy, opts.HttpTimeout)
 	if err != nil {
 		return nil, err
 	}

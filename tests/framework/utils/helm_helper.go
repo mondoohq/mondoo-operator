@@ -84,6 +84,7 @@ func (h *HelmHelper) Template(releaseName, chartPath, namespace string, values m
 		releaseName,
 		chartPath,
 		"--namespace", namespace,
+		"--include-crds",
 	}
 
 	for k, v := range values {

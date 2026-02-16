@@ -583,6 +583,8 @@ func (n *DeploymentHandler) performGarbageCollection(ctx context.Context, manage
 	}
 	if n.MondooOperatorConfig != nil {
 		opts.HttpProxy = n.MondooOperatorConfig.Spec.HttpProxy
+		opts.HttpsProxy = n.MondooOperatorConfig.Spec.HttpsProxy
+		opts.NoProxy = n.MondooOperatorConfig.Spec.NoProxy
 	}
 
 	mondooClient, err := n.MondooClientBuilder(opts)

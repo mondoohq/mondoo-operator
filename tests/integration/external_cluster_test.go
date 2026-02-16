@@ -159,6 +159,9 @@ func (s *ExternalClusterSuite) switchToManagementContext() error {
 }
 
 func (s *ExternalClusterSuite) createTargetCluster() error {
+	// Delete any stale target cluster from a previous run
+	s.cleanupTargetCluster()
+
 	cmd := exec.Command("k3d", "cluster", "create", targetClusterName, "--api-port", "6444")
 	output, err := cmd.CombinedOutput()
 	if err != nil {

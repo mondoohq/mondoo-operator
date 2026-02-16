@@ -59,11 +59,14 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 		"--score-threshold", "0",
 	}
 
-	if cfg.Spec.HttpProxy != nil {
-		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
+	// Only add proxy if configured and not skipped for cnspec
+	if !cfg.Spec.SkipProxyForCnspec {
+		if apiProxy := k8s.APIProxyURL(cfg); apiProxy != nil {
+			cmd = append(cmd, "--api-proxy", *apiProxy)
+		}
 	}
 
-	envVars := feature_flags.AllFeatureFlagsAsEnv()
+	envVars := buildEnvVars(cfg)
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 
 	cronjob := &batchv1.CronJob{
@@ -169,6 +172,13 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 		},
 	}
 
+	// Add imagePullSecrets from MondooOperatorConfig
+	if len(cfg.Spec.ImagePullSecrets) > 0 {
+		cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = append(
+			cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets,
+			cfg.Spec.ImagePullSecrets...)
+	}
+
 	return cronjob
 }
 
@@ -183,11 +193,14 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 		"--score-threshold", "0",
 	}
 
-	if cfg.Spec.HttpProxy != nil {
-		cmd = append(cmd, []string{"--api-proxy", *cfg.Spec.HttpProxy}...)
+	// Only add proxy if configured and not skipped for cnspec
+	if !cfg.Spec.SkipProxyForCnspec {
+		if apiProxy := k8s.APIProxyURL(cfg); apiProxy != nil {
+			cmd = append(cmd, "--api-proxy", *apiProxy)
+		}
 	}
 
-	envVars := feature_flags.AllFeatureFlagsAsEnv()
+	envVars := buildEnvVars(cfg)
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 	// Point KUBECONFIG to the mounted kubeconfig file
 	envVars = append(envVars, corev1.EnvVar{Name: "KUBECONFIG", Value: "/etc/opt/mondoo/kubeconfig/kubeconfig"})
@@ -445,6 +458,13 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
 			FailedJobsHistoryLimit:     ptr.To(int32(1)),
 		},
+	}
+
+	// Add imagePullSecrets from MondooOperatorConfig
+	if len(cfg.Spec.ImagePullSecrets) > 0 {
+		cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = append(
+			cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets,
+			cfg.Spec.ImagePullSecrets...)
 	}
 
 	// Add private registry pull secrets if configured
@@ -1020,4 +1040,15 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 	}
 
 	return string(invBytes), nil
+}
+
+func buildEnvVars(cfg v1alpha2.MondooOperatorConfig) []corev1.EnvVar {
+	envVars := feature_flags.AllFeatureFlagsAsEnv()
+
+	// Add proxy environment variables only if not skipped for cnspec components
+	if !cfg.Spec.SkipProxyForCnspec {
+		envVars = append(envVars, k8s.ProxyEnvVars(cfg)...)
+	}
+
+	return envVars
 }

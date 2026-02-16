@@ -3,6 +3,7 @@
 This user manual describes how to install and use the Mondoo Operator.
 
 - [User manual](#user-manual)
+  - [Configuring the Operator](#configuring-the-operator)
   - [Mondoo Operator Installation](#mondoo-operator-installation)
     - [Installing with kubectl](#installing-with-kubectl)
     - [Installing with Helm](#installing-with-helm)
@@ -50,6 +51,11 @@ When upgrading from operator versions prior to v12.x, the following changes appl
 - **New rate limiting**: A minimum scan interval of 2 minutes is now enforced by default to prevent excessive scanning.
 - **High-priority resources by default**: The watcher now only monitors Deployments, DaemonSets, StatefulSets, and ReplicaSets by default (previously watched all resources including Pods and Jobs). To restore the previous behavior, set `watchAllResources: true` in your configuration.
 
+
+## Configuring the Operator
+
+For cluster-wide settings like proxies, registry mirrors, and metrics, see the
+[MondooOperatorConfig Guide](operator-config.md).
 
 ## Mondoo Operator Installation
 
