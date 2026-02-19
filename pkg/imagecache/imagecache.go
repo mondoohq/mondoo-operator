@@ -148,7 +148,7 @@ type DockerConfigJSON struct {
 // DockerConfigEntry represents a single registry entry in Docker config
 type DockerConfigEntry struct {
 	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
+	Password string `json:"password,omitempty"` //nolint:gosec
 	Auth     string `json:"auth,omitempty"`
 }
 

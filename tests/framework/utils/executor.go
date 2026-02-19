@@ -138,7 +138,7 @@ func (*CommandExecutor) ExecuteCommandWithOutputFileTimeout(timeout time.Duratio
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	// #nosec G204 Rook controls the input to the exec arguments
+	//nolint:gosec // Rook controls the input to the exec arguments
 	cmd := exec.CommandContext(ctx, command, arg...)
 	cmdOut, err := cmd.CombinedOutput()
 
@@ -179,7 +179,7 @@ func (*CommandExecutor) ExecuteCommandWithOutputFile(command, outfileArg string,
 	arg = append(arg, outfileArg, outFile.Name())
 
 	logCommand(command, arg...)
-	// #nosec G204 Rook controls the input to the exec arguments
+	//nolint:gosec // Rook controls the input to the exec arguments
 	cmd := exec.Command(command, arg...)
 	cmdOut, err := cmd.CombinedOutput()
 	if err != nil {
