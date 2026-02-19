@@ -154,17 +154,17 @@ type ExternalCluster struct {
 
 	// KubeconfigSecretRef references a Secret containing kubeconfig for the remote cluster.
 	// The Secret must have a key "kubeconfig" with the kubeconfig content.
-	// Mutually exclusive with ServiceAccountAuth and WorkloadIdentity.
+	// Mutually exclusive with ServiceAccountAuth, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
 	// +optional
 	KubeconfigSecretRef *corev1.LocalObjectReference `json:"kubeconfigSecretRef,omitempty"`
 
 	// ServiceAccountAuth configures authentication using a service account token.
-	// Mutually exclusive with KubeconfigSecretRef and WorkloadIdentity.
+	// Mutually exclusive with KubeconfigSecretRef, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
 	// +optional
 	ServiceAccountAuth *ServiceAccountAuth `json:"serviceAccountAuth,omitempty"`
 
 	// WorkloadIdentity configures cloud-native Workload Identity Federation authentication.
-	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, and SPIFFEAuth.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, SPIFFEAuth, and VaultAuth.
 	// +optional
 	WorkloadIdentity *WorkloadIdentityConfig `json:"workloadIdentity,omitempty"`
 

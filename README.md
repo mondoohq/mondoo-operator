@@ -74,7 +74,7 @@ Install the operator in a central management cluster and scan remote clusters vi
 │  └──────────┬──────────────────┘    │
 └─────────────┼───────────────────────┘
               │
-              │ kubeconfig / WIF* / SPIFFE*
+              │ kubeconfig / WIF* / SPIFFE* / Vault
               │
     ┌─────────┴─────────┬─────────────────┐
     ▼                   ▼                 ▼
@@ -93,6 +93,7 @@ _*WIF and SPIFFE authentication are experimental features._
 - **Kubeconfig**: Use a kubeconfig file stored in a Secret
 - **Workload Identity (WIF)** _(Experimental)_: Native cloud provider authentication for GKE, EKS, AKS
 - **SPIFFE** _(Experimental)_: Use SPIFFE/SPIRE for cross-cluster authentication
+- **HashiCorp Vault**: Dynamic short-lived credentials via Vault's Kubernetes secrets engine
 
 ```yaml
 # External cluster scanning with kubeconfig
@@ -141,6 +142,7 @@ spec:
 | Kubeconfig Auth                  |      -       |           ✅            |
 | Workload Identity (GKE/EKS/AKS) |      -       | ✅ ⚠️ Experimental      |
 | SPIFFE Auth                      |      -       | ✅ ⚠️ Experimental      |
+| HashiCorp Vault Auth            |      -       |        ✅        |
 
 ### Self-Cluster Scanning Architecture
 
