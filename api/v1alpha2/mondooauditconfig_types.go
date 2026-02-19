@@ -169,9 +169,16 @@ type ExternalCluster struct {
 	WorkloadIdentity *WorkloadIdentityConfig `json:"workloadIdentity,omitempty"`
 
 	// SPIFFEAuth configures SPIFFE/SPIRE-based authentication using X.509 SVIDs.
-	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, and WorkloadIdentity.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, and VaultAuth.
 	// +optional
 	SPIFFEAuth *SPIFFEAuthConfig `json:"spiffeAuth,omitempty"`
+
+	// VaultAuth configures HashiCorp Vault Kubernetes secrets engine for dynamic credential generation.
+	// The operator authenticates to Vault during reconciliation using its own service account token,
+	// fetches short-lived credentials, and writes a kubeconfig Secret that the CronJob mounts.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, and SPIFFEAuth.
+	// +optional
+	VaultAuth *VaultAuthConfig `json:"vaultAuth,omitempty"`
 
 	// Schedule overrides the default schedule for this cluster (optional).
 	// If not specified, uses the schedule from KubernetesResources.Schedule.
@@ -327,6 +334,57 @@ type SPIFFEAuthConfig struct {
 	// Some SPIRE configurations require this for workload attestation.
 	// +optional
 	Audience string `json:"audience,omitempty"`
+}
+
+// VaultAuthConfig configures HashiCorp Vault's Kubernetes secrets engine
+// for dynamically generating short-lived service account tokens to scan external clusters.
+type VaultAuthConfig struct {
+	// Server is the URL of the target Kubernetes API server.
+	// Example: "https://target-cluster.example.com:6443"
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^https://.*`
+	Server string `json:"server"`
+
+	// VaultAddr is the address of the Vault server.
+	// Example: "https://vault.example.com:8200"
+	// +kubebuilder:validation:Required
+	VaultAddr string `json:"vaultAddr"`
+
+	// AuthPath is the Vault Kubernetes auth method mount path.
+	// +optional
+	// +kubebuilder:default="auth/kubernetes"
+	AuthPath string `json:"authPath,omitempty"`
+
+	// AuthRole is the Vault role for authenticating the pod's service account.
+	// +kubebuilder:validation:Required
+	AuthRole string `json:"authRole"`
+
+	// SecretsPath is the Vault Kubernetes secrets engine mount path.
+	// +optional
+	// +kubebuilder:default="kubernetes"
+	SecretsPath string `json:"secretsPath,omitempty"`
+
+	// CredsRole is the Vault role for generating target cluster credentials.
+	// +kubebuilder:validation:Required
+	CredsRole string `json:"credsRole"`
+
+	// KubernetesNamespace is the target namespace for the generated service account token.
+	// +optional
+	KubernetesNamespace string `json:"kubernetesNamespace,omitempty"`
+
+	// TTL is the requested TTL for the generated credentials (e.g. "1h", "30m").
+	// +optional
+	TTL string `json:"ttl,omitempty"`
+
+	// CACertSecretRef references a Secret containing Vault's CA certificate
+	// for TLS verification. The Secret must have a key "ca.crt".
+	// +optional
+	CACertSecretRef *corev1.LocalObjectReference `json:"caCertSecretRef,omitempty"`
+
+	// TargetCACertSecretRef references a Secret containing the target cluster's
+	// CA certificate for TLS verification. The Secret must have a key "ca.crt".
+	// +optional
+	TargetCACertSecretRef *corev1.LocalObjectReference `json:"targetCACertSecretRef,omitempty"`
 }
 
 // NodeScanStyle specifies the scan style for nodes

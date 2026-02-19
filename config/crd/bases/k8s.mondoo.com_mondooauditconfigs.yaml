@@ -473,7 +473,7 @@ spec:
                         spiffeAuth:
                           description: |-
                             SPIFFEAuth configures SPIFFE/SPIRE-based authentication using X.509 SVIDs.
-                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, and WorkloadIdentity.
+                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, and VaultAuth.
                           properties:
                             audience:
                               description: |-
@@ -511,6 +511,88 @@ spec:
                           required:
                           - server
                           - trustBundleSecretRef
+                          type: object
+                        vaultAuth:
+                          description: |-
+                            VaultAuth configures HashiCorp Vault Kubernetes secrets engine for dynamic credential generation.
+                            The operator authenticates to Vault during reconciliation using its own service account token,
+                            fetches short-lived credentials, and writes a kubeconfig Secret that the CronJob mounts.
+                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, and SPIFFEAuth.
+                          properties:
+                            authPath:
+                              default: auth/kubernetes
+                              description: AuthPath is the Vault Kubernetes auth method
+                                mount path.
+                              type: string
+                            authRole:
+                              description: AuthRole is the Vault role for authenticating
+                                the pod's service account.
+                              type: string
+                            caCertSecretRef:
+                              description: |-
+                                CACertSecretRef references a Secret containing Vault's CA certificate
+                                for TLS verification. The Secret must have a key "ca.crt".
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            credsRole:
+                              description: CredsRole is the Vault role for generating
+                                target cluster credentials.
+                              type: string
+                            kubernetesNamespace:
+                              description: KubernetesNamespace is the target namespace
+                                for the generated service account token.
+                              type: string
+                            secretsPath:
+                              default: kubernetes
+                              description: SecretsPath is the Vault Kubernetes secrets
+                                engine mount path.
+                              type: string
+                            server:
+                              description: |-
+                                Server is the URL of the target Kubernetes API server.
+                                Example: "https://target-cluster.example.com:6443"
+                              pattern: ^https://.*
+                              type: string
+                            targetCACertSecretRef:
+                              description: |-
+                                TargetCACertSecretRef references a Secret containing the target cluster's
+                                CA certificate for TLS verification. The Secret must have a key "ca.crt".
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            ttl:
+                              description: TTL is the requested TTL for the generated
+                                credentials (e.g. "1h", "30m").
+                              type: string
+                            vaultAddr:
+                              description: |-
+                                VaultAddr is the address of the Vault server.
+                                Example: "https://vault.example.com:8200"
+                              type: string
+                          required:
+                          - authRole
+                          - credsRole
+                          - server
+                          - vaultAddr
                           type: object
                         workloadIdentity:
                           description: |-

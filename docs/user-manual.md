@@ -312,7 +312,7 @@ externalClusters:
 
 ### Authentication methods
 
-The operator supports four authentication methods for external clusters. Choose the one that best fits your security requirements:
+The operator supports five authentication methods for external clusters. Choose the one that best fits your security requirements:
 
 #### 1. Kubeconfig (most flexible)
 
@@ -421,6 +421,39 @@ externalClusters:
 > **Note: Certificate TTL consideration**
 >
 > SPIFFE certificates are fetched once at the start of each scan job and are not rotated during the scan. SPIFFE SVIDs typically have a 1-hour TTL by default. For most K8s resource scans that complete within minutes, this is sufficient. If your scans consistently exceed the SVID TTL, consider increasing the TTL in your SPIRE server configuration or using a different authentication method.
+
+#### 5. HashiCorp Vault (dynamic credentials)
+
+Use HashiCorp Vault's [Kubernetes secrets engine](https://developer.hashicorp.com/vault/docs/secrets/kubernetes) to dynamically generate short-lived service account tokens for scanning external clusters. This avoids managing static credentials.
+
+**Prerequisites:**
+- Vault server with [Kubernetes auth method](https://developer.hashicorp.com/vault/docs/auth/kubernetes) configured for the operator's cluster
+- Vault [Kubernetes secrets engine](https://developer.hashicorp.com/vault/docs/secrets/kubernetes) configured for the target cluster
+- A Vault role that allows the operator's pod service account to authenticate
+- A Vault credentials role that generates service account tokens on the target cluster
+
+```yaml
+externalClusters:
+  - name: vault-cluster
+    vaultAuth:
+      server: "https://target-cluster.example.com:6443"
+      vaultAddr: "https://vault.example.com:8200"
+      authRole: mondoo-scanner        # Vault K8s auth role
+      credsRole: target-cluster-creds  # Vault K8s secrets engine role
+      # Optional fields:
+      # authPath: "auth/kubernetes"    # Vault K8s auth mount path (default)
+      # secretsPath: "kubernetes"      # Vault K8s secrets engine mount (default)
+      # kubernetesNamespace: scanning  # Target namespace for generated token
+      # ttl: "1h"                      # Requested token TTL
+      # caCertSecretRef:               # Secret with Vault CA cert (ca.crt key)
+      #   name: vault-ca-cert
+      # targetCACertSecretRef:         # Secret with target cluster CA cert (ca.crt key)
+      #   name: target-ca-cert
+```
+
+> **Note: Credential refresh timing**
+>
+> Vault credentials are refreshed each time the operator reconciles (typically every 7 days, or when configuration changes). Ensure the requested TTL is longer than the operator's reconcile interval. If you need more frequent credential rotation, consider adjusting the operator's reconcile schedule.
 
 ## Container Image Scanning
 
