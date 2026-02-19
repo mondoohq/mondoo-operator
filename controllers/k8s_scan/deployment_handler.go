@@ -684,7 +684,11 @@ func (n *DeploymentHandler) syncVaultKubeconfigSecret(ctx context.Context, clust
 		if err := n.KubeClient.Get(ctx, caKey, caSecret); err != nil {
 			return fmt.Errorf("failed to get Vault CA cert secret: %w", err)
 		}
-		vaultCACert = caSecret.Data["ca.crt"]
+		var ok bool
+		vaultCACert, ok = caSecret.Data["ca.crt"]
+		if !ok || len(vaultCACert) == 0 {
+			return fmt.Errorf("vault CA cert secret %q is missing the \"ca.crt\" key", cluster.VaultAuth.CACertSecretRef.Name)
+		}
 	}
 
 	// Read target cluster CA cert if configured
@@ -698,7 +702,11 @@ func (n *DeploymentHandler) syncVaultKubeconfigSecret(ctx context.Context, clust
 		if err := n.KubeClient.Get(ctx, targetCAKey, targetCASecret); err != nil {
 			return fmt.Errorf("failed to get target CA cert secret: %w", err)
 		}
-		targetCACert = targetCASecret.Data["ca.crt"]
+		var ok bool
+		targetCACert, ok = targetCASecret.Data["ca.crt"]
+		if !ok || len(targetCACert) == 0 {
+			return fmt.Errorf("target CA cert secret %q is missing the \"ca.crt\" key", cluster.VaultAuth.TargetCACertSecretRef.Name)
+		}
 	}
 
 	// Fetch token from Vault
