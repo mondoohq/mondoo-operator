@@ -6,11 +6,11 @@ package k8s_scan
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
-
-	"fmt"
 
 	"github.com/stretchr/testify/suite"
 
@@ -477,6 +477,162 @@ func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_SPIFFE() {
 	s.Contains(configMap.Data, "inventory")
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_VaultAuth() {
+	// Configure external cluster with VaultAuth
+	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
+		{
+			Name: "vault-cluster",
+			VaultAuth: &mondoov1alpha2.VaultAuthConfig{
+				Server:      "https://target-cluster.example.com:6443",
+				VaultAddr:   "https://vault.example.com:8200",
+				AuthRole:    "mondoo-scanner",
+				CredsRole:   "target-cluster-creds",
+				SecretsPath: "kubernetes",
+				AuthPath:    "auth/kubernetes",
+			},
+		},
+	}
+
+	d := s.createDeploymentHandlerWithVaultMock(func(ctx context.Context, saToken string, config mondoov1alpha2.VaultAuthConfig, vaultCACert []byte) (string, error) {
+		return "fake-vault-token", nil
+	})
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Verify kubeconfig Secret was created
+	kubeconfigSecret := &corev1.Secret{}
+	kubeconfigSecret.Name = VaultKubeconfigSecretName(s.auditConfig.Name, "vault-cluster")
+	kubeconfigSecret.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(kubeconfigSecret), kubeconfigSecret))
+	s.Contains(string(kubeconfigSecret.Data["kubeconfig"]), "fake-vault-token")
+	s.Contains(string(kubeconfigSecret.Data["kubeconfig"]), "https://target-cluster.example.com:6443")
+	s.Contains(string(kubeconfigSecret.Data["kubeconfig"]), "insecure-skip-tls-verify: true")
+
+	// Verify external cluster CronJob was created
+	externalCronJob := &batchv1.CronJob{}
+	externalCronJob.Name = ExternalClusterCronJobName(s.auditConfig.Name, "vault-cluster")
+	externalCronJob.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(externalCronJob), externalCronJob))
+
+	// Verify NO init containers
+	initContainers := externalCronJob.Spec.JobTemplate.Spec.Template.Spec.InitContainers
+	s.Empty(initContainers)
+
+	// Verify no special service account (should be empty)
+	s.Empty(externalCronJob.Spec.JobTemplate.Spec.Template.Spec.ServiceAccountName)
+
+	// Verify automount SA token is false
+	s.NotNil(externalCronJob.Spec.JobTemplate.Spec.Template.Spec.AutomountServiceAccountToken)
+	s.False(*externalCronJob.Spec.JobTemplate.Spec.Template.Spec.AutomountServiceAccountToken)
+
+	// Verify kubeconfig volume is a Secret (not emptyDir)
+	volumes := externalCronJob.Spec.JobTemplate.Spec.Template.Spec.Volumes
+	var kubeconfigVolume *corev1.Volume
+	for i := range volumes {
+		if volumes[i].Name == "kubeconfig" {
+			kubeconfigVolume = &volumes[i]
+			break
+		}
+	}
+	s.NotNil(kubeconfigVolume)
+	s.NotNil(kubeconfigVolume.Secret)
+	s.Equal(VaultKubeconfigSecretName(s.auditConfig.Name, "vault-cluster"), kubeconfigVolume.Secret.SecretName)
+
+	// Verify ConfigMap was created for external cluster
+	configMap := &corev1.ConfigMap{}
+	configMap.Name = ExternalClusterConfigMapName(s.auditConfig.Name, "vault-cluster")
+	configMap.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(configMap), configMap))
+	s.Contains(configMap.Data, "inventory")
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_VaultAuth_WithCACerts() {
+	// Create CA cert secrets
+	vaultCASecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vault-ca-cert",
+			Namespace: s.auditConfig.Namespace,
+		},
+		Data: map[string][]byte{
+			"ca.crt": []byte("-----BEGIN CERTIFICATE-----\nvault-ca\n-----END CERTIFICATE-----"),
+		},
+	}
+	targetCASecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "target-ca-cert",
+			Namespace: s.auditConfig.Namespace,
+		},
+		Data: map[string][]byte{
+			"ca.crt": []byte("-----BEGIN CERTIFICATE-----\ntarget-ca\n-----END CERTIFICATE-----"),
+		},
+	}
+	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(vaultCASecret, targetCASecret)
+
+	// Configure external cluster with VaultAuth and CA certs
+	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
+		{
+			Name: "vault-ca-cluster",
+			VaultAuth: &mondoov1alpha2.VaultAuthConfig{
+				Server:    "https://target-cluster.example.com:6443",
+				VaultAddr: "https://vault.example.com:8200",
+				AuthRole:  "mondoo-scanner",
+				CredsRole: "target-cluster-creds",
+				CACertSecretRef: &corev1.LocalObjectReference{
+					Name: "vault-ca-cert",
+				},
+				TargetCACertSecretRef: &corev1.LocalObjectReference{
+					Name: "target-ca-cert",
+				},
+			},
+		},
+	}
+
+	var receivedVaultCA []byte
+	d := s.createDeploymentHandlerWithVaultMock(func(ctx context.Context, saToken string, config mondoov1alpha2.VaultAuthConfig, vaultCACert []byte) (string, error) {
+		receivedVaultCA = vaultCACert
+		return "fake-vault-token-ca", nil
+	})
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Verify mock received the Vault CA cert bytes
+	s.Equal([]byte("-----BEGIN CERTIFICATE-----\nvault-ca\n-----END CERTIFICATE-----"), receivedVaultCA)
+
+	// Verify kubeconfig Secret was created with certificate-authority-data
+	kubeconfigSecret := &corev1.Secret{}
+	kubeconfigSecret.Name = VaultKubeconfigSecretName(s.auditConfig.Name, "vault-ca-cluster")
+	kubeconfigSecret.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(kubeconfigSecret), kubeconfigSecret))
+	s.Contains(string(kubeconfigSecret.Data["kubeconfig"]), "certificate-authority-data:")
+	s.NotContains(string(kubeconfigSecret.Data["kubeconfig"]), "insecure-skip-tls-verify")
+
+	// Verify CronJob has no init containers, no vault-ca/target-ca volumes
+	externalCronJob := &batchv1.CronJob{}
+	externalCronJob.Name = ExternalClusterCronJobName(s.auditConfig.Name, "vault-ca-cluster")
+	externalCronJob.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(externalCronJob), externalCronJob))
+
+	s.Empty(externalCronJob.Spec.JobTemplate.Spec.Template.Spec.InitContainers)
+
+	// Verify kubeconfig volume is a Secret
+	volumes := externalCronJob.Spec.JobTemplate.Spec.Template.Spec.Volumes
+	var kubeconfigVolume *corev1.Volume
+	for i := range volumes {
+		if volumes[i].Name == "kubeconfig" {
+			kubeconfigVolume = &volumes[i]
+			break
+		}
+	}
+	s.NotNil(kubeconfigVolume)
+	s.NotNil(kubeconfigVolume.Secret)
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_CustomSchedule() {
 	// Create kubeconfig secret
 	kubeconfigSecret := &corev1.Secret{
@@ -580,6 +736,28 @@ func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {
 		ContainerImageResolver: s.containerImageResolver,
 		MondooOperatorConfig:   &mondoov1alpha2.MondooOperatorConfig{},
 		MondooClientBuilder:    mondooclient.NewClient,
+	}
+}
+
+// createDeploymentHandlerWithVaultMock creates a DeploymentHandler with a mock VaultTokenFetcher
+// and a temporary SA token file for testing.
+func (s *DeploymentHandlerSuite) createDeploymentHandlerWithVaultMock(vaultFetcher VaultTokenFetcher) DeploymentHandler {
+	// Create a temporary SA token file
+	tmpFile, err := os.CreateTemp("", "sa-token-*")
+	s.Require().NoError(err)
+	_, err = tmpFile.WriteString("fake-sa-jwt-token")
+	s.Require().NoError(err)
+	s.Require().NoError(tmpFile.Close())
+	s.T().Cleanup(func() { _ = os.Remove(tmpFile.Name()) })
+
+	return DeploymentHandler{
+		KubeClient:             s.fakeClientBuilder.Build(),
+		Mondoo:                 &s.auditConfig,
+		ContainerImageResolver: s.containerImageResolver,
+		MondooOperatorConfig:   &mondoov1alpha2.MondooOperatorConfig{},
+		MondooClientBuilder:    mondooclient.NewClient,
+		VaultTokenFetcher:      vaultFetcher,
+		SATokenPath:            tmpFile.Name(),
 	}
 }
 
@@ -757,6 +935,103 @@ func TestValidateExternalClusterAuth(t *testing.T) {
 			},
 			expectError: true,
 			errorMsg:    "trustBundleSecretRef.name is required",
+		},
+		{
+			name: "valid vault auth",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				VaultAuth: &mondoov1alpha2.VaultAuthConfig{
+					Server:    "https://target.example.com:6443",
+					VaultAddr: "https://vault.example.com:8200",
+					AuthRole:  "mondoo-scanner",
+					CredsRole: "target-creds",
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "vault auth without server",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				VaultAuth: &mondoov1alpha2.VaultAuthConfig{
+					VaultAddr: "https://vault.example.com:8200",
+					AuthRole:  "mondoo-scanner",
+					CredsRole: "target-creds",
+				},
+			},
+			expectError: true,
+			errorMsg:    "server is required for vaultAuth",
+		},
+		{
+			name: "vault auth without vaultAddr",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				VaultAuth: &mondoov1alpha2.VaultAuthConfig{
+					Server:    "https://target.example.com:6443",
+					AuthRole:  "mondoo-scanner",
+					CredsRole: "target-creds",
+				},
+			},
+			expectError: true,
+			errorMsg:    "vaultAddr is required for vaultAuth",
+		},
+		{
+			name: "vault auth without authRole",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				VaultAuth: &mondoov1alpha2.VaultAuthConfig{
+					Server:    "https://target.example.com:6443",
+					VaultAddr: "https://vault.example.com:8200",
+					CredsRole: "target-creds",
+				},
+			},
+			expectError: true,
+			errorMsg:    "authRole is required for vaultAuth",
+		},
+		{
+			name: "vault auth without credsRole",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				VaultAuth: &mondoov1alpha2.VaultAuthConfig{
+					Server:    "https://target.example.com:6443",
+					VaultAddr: "https://vault.example.com:8200",
+					AuthRole:  "mondoo-scanner",
+				},
+			},
+			expectError: true,
+			errorMsg:    "credsRole is required for vaultAuth",
+		},
+		{
+			name: "vault auth with empty caCertSecretRef name",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				VaultAuth: &mondoov1alpha2.VaultAuthConfig{
+					Server:          "https://target.example.com:6443",
+					VaultAddr:       "https://vault.example.com:8200",
+					AuthRole:        "mondoo-scanner",
+					CredsRole:       "target-creds",
+					CACertSecretRef: &corev1.LocalObjectReference{},
+				},
+			},
+			expectError: true,
+			errorMsg:    "caCertSecretRef.name is required",
+		},
+		{
+			name: "vault auth mutually exclusive with kubeconfig",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				KubeconfigSecretRef: &corev1.LocalObjectReference{
+					Name: "my-kubeconfig",
+				},
+				VaultAuth: &mondoov1alpha2.VaultAuthConfig{
+					Server:    "https://target.example.com:6443",
+					VaultAddr: "https://vault.example.com:8200",
+					AuthRole:  "mondoo-scanner",
+					CredsRole: "target-creds",
+				},
+			},
+			expectError: true,
+			errorMsg:    "mutually exclusive",
 		},
 	}
 
@@ -1236,6 +1511,15 @@ func TestExternalClusterNaming(t *testing.T) {
 			}
 			if !strings.HasSuffix(wifSAName, tt.clusterName) {
 				t.Errorf("WIF SA name should end with cluster name %q, got %q", tt.clusterName, wifSAName)
+			}
+
+			// Test Vault kubeconfig Secret name
+			vaultKubeconfigName := VaultKubeconfigSecretName(tt.prefix, tt.clusterName)
+			if !strings.HasPrefix(vaultKubeconfigName, tt.prefix) {
+				t.Errorf("Vault kubeconfig name should start with prefix %q, got %q", tt.prefix, vaultKubeconfigName)
+			}
+			if !strings.HasSuffix(vaultKubeconfigName, tt.clusterName) {
+				t.Errorf("Vault kubeconfig name should end with cluster name %q, got %q", tt.clusterName, vaultKubeconfigName)
 			}
 		})
 	}

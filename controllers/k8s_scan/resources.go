@@ -402,6 +402,19 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 		}
 
 		initContainers = append(initContainers, spiffeInitContainer(cluster))
+
+	case cluster.VaultAuth != nil:
+		// Vault auth: operator fetches credentials and writes a kubeconfig Secret
+		volumes = append(volumes, corev1.Volume{
+			Name: "kubeconfig",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  VaultKubeconfigSecretName(m.Name, cluster.Name),
+					DefaultMode: ptr.To(int32(0o440)),
+					Items:       []corev1.KeyToPath{{Key: "kubeconfig", Path: "kubeconfig"}},
+				},
+			},
+		})
 	}
 
 	cronjob := &batchv1.CronJob{
