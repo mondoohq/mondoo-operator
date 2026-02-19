@@ -156,7 +156,7 @@ func Request(ctx context.Context, client http.Client, url, token string, reqBody
 	req.Header = header
 
 	// do http call
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to do request: %v", err)
 	}

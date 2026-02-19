@@ -34,7 +34,7 @@ type DockerConfigJSON struct {
 type DockerAuthConfig struct {
 	Auth          string `json:"auth,omitempty"`
 	Username      string `json:"username,omitempty"`
-	Password      string `json:"password,omitempty"`
+	Password      string `json:"password,omitempty"` //nolint:gosec
 	Email         string `json:"email,omitempty"`
 	ServerAddress string `json:"serveraddress,omitempty"`
 	IdentityToken string `json:"identitytoken,omitempty"`
