@@ -22,6 +22,7 @@ require (
 )
 
 require (
+	github.com/hashicorp/vault-client-go v0.4.3
 	go.mondoo.com/cnquery/v12 v12.23.1
 	go.mondoo.com/cnquery/v12/providers/k8s v0.0.0-00010101000000-000000000000
 )

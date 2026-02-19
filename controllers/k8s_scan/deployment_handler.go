@@ -6,6 +6,7 @@ package k8s_scan
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -46,12 +47,15 @@ func validateExternalClusterAuth(cluster v1alpha2.ExternalCluster) error {
 	if cluster.SPIFFEAuth != nil {
 		authMethods++
 	}
+	if cluster.VaultAuth != nil {
+		authMethods++
+	}
 
 	if authMethods == 0 {
-		return fmt.Errorf("externalCluster %q: must specify one of kubeconfigSecretRef, serviceAccountAuth, workloadIdentity, or spiffeAuth", cluster.Name)
+		return fmt.Errorf("externalCluster %q: must specify one of kubeconfigSecretRef, serviceAccountAuth, workloadIdentity, spiffeAuth, or vaultAuth", cluster.Name)
 	}
 	if authMethods > 1 {
-		return fmt.Errorf("externalCluster %q: kubeconfigSecretRef, serviceAccountAuth, workloadIdentity, and spiffeAuth are mutually exclusive", cluster.Name)
+		return fmt.Errorf("externalCluster %q: kubeconfigSecretRef, serviceAccountAuth, workloadIdentity, spiffeAuth, and vaultAuth are mutually exclusive", cluster.Name)
 	}
 
 	// Provider-specific validation for WorkloadIdentity
@@ -98,8 +102,32 @@ func validateExternalClusterAuth(cluster v1alpha2.ExternalCluster) error {
 			return fmt.Errorf("externalCluster %q: trustBundleSecretRef.name is required for spiffeAuth", cluster.Name)
 		}
 	}
+
+	// Validation for VaultAuth
+	if cluster.VaultAuth != nil {
+		if cluster.VaultAuth.Server == "" {
+			return fmt.Errorf("externalCluster %q: server is required for vaultAuth", cluster.Name)
+		}
+		if cluster.VaultAuth.VaultAddr == "" {
+			return fmt.Errorf("externalCluster %q: vaultAddr is required for vaultAuth", cluster.Name)
+		}
+		if cluster.VaultAuth.AuthRole == "" {
+			return fmt.Errorf("externalCluster %q: authRole is required for vaultAuth", cluster.Name)
+		}
+		if cluster.VaultAuth.CredsRole == "" {
+			return fmt.Errorf("externalCluster %q: credsRole is required for vaultAuth", cluster.Name)
+		}
+		if cluster.VaultAuth.CACertSecretRef != nil && cluster.VaultAuth.CACertSecretRef.Name == "" {
+			return fmt.Errorf("externalCluster %q: caCertSecretRef.name is required when caCertSecretRef is specified for vaultAuth", cluster.Name)
+		}
+		if cluster.VaultAuth.TargetCACertSecretRef != nil && cluster.VaultAuth.TargetCACertSecretRef.Name == "" {
+			return fmt.Errorf("externalCluster %q: targetCACertSecretRef.name is required when targetCACertSecretRef is specified for vaultAuth", cluster.Name)
+		}
+	}
 	return nil
 }
+
+const defaultSATokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token" //nolint:gosec
 
 type DeploymentHandler struct {
 	KubeClient             client.Client
@@ -107,6 +135,10 @@ type DeploymentHandler struct {
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
 	MondooClientBuilder    func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
+	VaultTokenFetcher      VaultTokenFetcher
+	// SATokenPath is the path to the operator pod's service account token.
+	// Defaults to /var/run/secrets/kubernetes.io/serviceaccount/token.
+	SATokenPath string
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
@@ -281,6 +313,13 @@ func (n *DeploymentHandler) reconcileExternalClusters(ctx context.Context) error
 			}
 		}
 
+		// Sync Vault kubeconfig Secret if using VaultAuth
+		if cluster.VaultAuth != nil {
+			if err := n.syncVaultKubeconfigSecret(ctx, cluster); err != nil {
+				return err
+			}
+		}
+
 		// Sync ConfigMap for this external cluster
 		if err := n.syncExternalClusterConfigMap(ctx, integrationMrn, clusterUid, cluster); err != nil {
 			return err
@@ -403,6 +442,18 @@ func (n *DeploymentHandler) cleanupOrphanedExternalClusterResources(ctx context.
 			}
 			if err := k8s.DeleteIfExists(ctx, n.KubeClient, wifSA); err != nil {
 				logger.Error(err, "failed to delete orphaned WIF ServiceAccount for external cluster", "cluster", clusterName)
+				return err
+			}
+
+			// Delete Vault kubeconfig Secret (if exists)
+			vaultKubeconfigSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      VaultKubeconfigSecretName(n.Mondoo.Name, clusterName),
+					Namespace: n.Mondoo.Namespace,
+				},
+			}
+			if err := k8s.DeleteIfExists(ctx, n.KubeClient, vaultKubeconfigSecret); err != nil {
+				logger.Error(err, "failed to delete orphaned Vault kubeconfig Secret for external cluster", "cluster", clusterName)
 				return err
 			}
 
@@ -603,6 +654,81 @@ func (n *DeploymentHandler) performGarbageCollection(ctx context.Context, manage
 	}
 
 	logger.Info("Successfully performed garbage collection of K8s resource scan assets")
+	return nil
+}
+
+// syncVaultKubeconfigSecret fetches credentials from Vault and writes a kubeconfig Secret.
+func (n *DeploymentHandler) syncVaultKubeconfigSecret(ctx context.Context, cluster v1alpha2.ExternalCluster) error {
+	if n.VaultTokenFetcher == nil {
+		return fmt.Errorf("VaultTokenFetcher not configured")
+	}
+
+	// Read the operator pod's service account token
+	tokenPath := n.SATokenPath
+	if tokenPath == "" {
+		tokenPath = defaultSATokenPath
+	}
+	saToken, err := os.ReadFile(tokenPath) //nolint:gosec
+	if err != nil {
+		return fmt.Errorf("failed to read service account token: %w", err)
+	}
+
+	// Read Vault CA cert if configured
+	var vaultCACert []byte
+	if cluster.VaultAuth.CACertSecretRef != nil {
+		caSecret := &corev1.Secret{}
+		caKey := client.ObjectKey{
+			Namespace: n.Mondoo.Namespace,
+			Name:      cluster.VaultAuth.CACertSecretRef.Name,
+		}
+		if err := n.KubeClient.Get(ctx, caKey, caSecret); err != nil {
+			return fmt.Errorf("failed to get Vault CA cert secret: %w", err)
+		}
+		var ok bool
+		vaultCACert, ok = caSecret.Data["ca.crt"]
+		if !ok || len(vaultCACert) == 0 {
+			return fmt.Errorf("vault CA cert secret %q is missing the \"ca.crt\" key", cluster.VaultAuth.CACertSecretRef.Name)
+		}
+	}
+
+	// Read target cluster CA cert if configured
+	var targetCACert []byte
+	if cluster.VaultAuth.TargetCACertSecretRef != nil {
+		targetCASecret := &corev1.Secret{}
+		targetCAKey := client.ObjectKey{
+			Namespace: n.Mondoo.Namespace,
+			Name:      cluster.VaultAuth.TargetCACertSecretRef.Name,
+		}
+		if err := n.KubeClient.Get(ctx, targetCAKey, targetCASecret); err != nil {
+			return fmt.Errorf("failed to get target CA cert secret: %w", err)
+		}
+		var ok bool
+		targetCACert, ok = targetCASecret.Data["ca.crt"]
+		if !ok || len(targetCACert) == 0 {
+			return fmt.Errorf("target CA cert secret %q is missing the \"ca.crt\" key", cluster.VaultAuth.TargetCACertSecretRef.Name)
+		}
+	}
+
+	// Fetch token from Vault
+	token, err := n.VaultTokenFetcher(ctx, string(saToken), *cluster.VaultAuth, vaultCACert)
+	if err != nil {
+		return fmt.Errorf("failed to fetch Vault token for cluster %s: %w", cluster.Name, err)
+	}
+
+	// Build kubeconfig
+	kubeconfig := buildVaultKubeconfig(cluster.VaultAuth.Server, token, targetCACert)
+
+	// Create/update kubeconfig Secret
+	desired := VaultKubeconfigSecret(n.Mondoo, cluster.Name, kubeconfig)
+	obj := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+	if _, err := k8s.CreateOrUpdate(ctx, n.KubeClient, obj, n.Mondoo, logger, func() error {
+		obj.Labels = desired.Labels
+		obj.Data = desired.Data
+		return nil
+	}); err != nil {
+		return err
+	}
+
 	return nil
 }
 

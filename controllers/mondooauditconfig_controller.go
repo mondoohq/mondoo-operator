@@ -68,8 +68,8 @@ var MondooClientBuilder = mondooclient.NewClient
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods;namespaces;nodes,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
-// Need to be able to create/delete Secrets for Mondoo service account credentials
-//+kubebuilder:rbac:groups=core,resources=secrets,verbs=create;delete
+// Need to be able to create/update/delete Secrets for Mondoo service account credentials and Vault kubeconfig
+//+kubebuilder:rbac:groups=core,resources=secrets,verbs=create;update;delete
 // Need to be able to check for the existence of Secrets with tokens, Mondoo service accounts, and private image pull secrets without asking for permission to read all Secrets
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get
 // Need to be able to manage ServiceAccounts for external cluster workload identity federation
@@ -307,6 +307,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: imageResolver,
 		MondooClientBuilder:    r.MondooClientBuilder,
+		VaultTokenFetcher:      k8s_scan.DefaultVaultTokenFetcher,
 	}
 
 	result, reconcileError = workloads.Reconcile(ctx)
