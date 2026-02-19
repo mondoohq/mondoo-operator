@@ -748,7 +748,8 @@ func (s *DeploymentHandlerSuite) createDeploymentHandlerWithVaultMock(vaultFetch
 	_, err = tmpFile.WriteString("fake-sa-jwt-token")
 	s.Require().NoError(err)
 	s.Require().NoError(tmpFile.Close())
-	s.T().Cleanup(func() { _ = os.Remove(tmpFile.Name()) })
+	tmpName := tmpFile.Name()
+	s.T().Cleanup(func() { _ = os.Remove(tmpName) }) //nolint:gosec
 
 	return DeploymentHandler{
 		KubeClient:             s.fakeClientBuilder.Build(),
