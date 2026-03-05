@@ -36,15 +36,21 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		return ctrl.Result{}, n.down(ctx)
 	}
 
+	var syncErr error
 	switch n.Mondoo.Spec.Nodes.Style {
 	case v1alpha2.NodeScanStyle_CronJob:
-		if err := n.syncCronJob(ctx); err != nil {
-			return ctrl.Result{}, err
-		}
+		syncErr = n.syncCronJob(ctx)
 	case v1alpha2.NodeScanStyle_Deployment, v1alpha2.NodeScanStyle_DaemonSet:
-		if err := n.syncDaemonSet(ctx); err != nil {
-			return ctrl.Result{}, err
-		}
+		syncErr = n.syncDaemonSet(ctx)
+	}
+
+	if syncErr != nil {
+		n.Mondoo.Status.Conditions = mondoo.SetMondooAuditCondition(
+			n.Mondoo.Status.Conditions, v1alpha2.NodeScanningDegraded, corev1.ConditionTrue,
+			"NodeScanningUnavailable", "Node scanning setup failed: "+syncErr.Error(),
+			mondoo.UpdateConditionIfReasonOrMessageChange, nil, "",
+		)
+		return ctrl.Result{}, syncErr
 	}
 	return ctrl.Result{}, nil
 }

@@ -278,12 +278,12 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		IsOpenshift:            r.RunningOnOpenShift,
 	}
 
+	var firstError error
 	result, reconcileError := nodes.Reconcile(ctx)
 	if reconcileError != nil {
-		log.Error(reconcileError, "Failed to set up nodes scanning")
-	}
-	if reconcileError != nil || result.RequeueAfter > 0 {
-		return result, reconcileError
+		log.Error(reconcileError, "Failed to set up nodes scanning, continuing with other scan types")
+		firstError = reconcileError
+		reconcileError = nil
 	}
 
 	containers := container_image.DeploymentHandler{
@@ -335,6 +335,13 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// Update status.ReconciledByOperatorVersion to the running operator version
 	// This should only happen, after all objects have been reconciled
 	mondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
+
+	// If a non-critical scan type (e.g. nodes) failed but we continued, return the
+	// error so the controller requeues and retries, while still having reconciled the
+	// remaining scan types.
+	if firstError != nil {
+		return ctrl.Result{}, firstError
+	}
 
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
 }
