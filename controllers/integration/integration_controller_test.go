@@ -84,7 +84,7 @@ func (s *IntegrationCheckInSuite) SetupSuite() {
 
 	testMondooServiceAccount.PrivateKey = credentials.MondooServiceAccount(s.T())
 
-	testMondooServiceAccountDataBytes, err = json.Marshal(testMondooServiceAccount)
+	testMondooServiceAccountDataBytes, err = json.Marshal(testMondooServiceAccount) //nolint:gosec
 	s.Require().NoError(err, "error converting sample service account data")
 }
 

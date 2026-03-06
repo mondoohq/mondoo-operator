@@ -79,7 +79,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateConfigMapWithIntegrationMRN
 
 	s.seedNodes()
 
-	sa, err := json.Marshal(mondooclient.ServiceAccountCredentials{Mrn: "test-mrn"})
+	sa, err := json.Marshal(mondooclient.ServiceAccountCredentials{Mrn: "test-mrn"}) //nolint:gosec
 	s.NoError(err)
 
 	s.auditConfig.Spec.ConsoleIntegration.Enable = true

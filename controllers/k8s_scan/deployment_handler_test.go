@@ -6,11 +6,10 @@ package k8s_scan
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
-
-	"fmt"
 
 	"github.com/stretchr/testify/suite"
 
@@ -85,7 +84,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create_ConsoleIntegration() {
 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
 	integrationMrn := utils.RandString(20)
-	sa, err := json.Marshal(mondooclient.ServiceAccountCredentials{Mrn: "test-mrn"})
+	sa, err := json.Marshal(mondooclient.ServiceAccountCredentials{Mrn: "test-mrn"}) //nolint:gosec
 	s.NoError(err)
 	clientSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1348,7 +1347,7 @@ func (s *DeploymentHandlerSuite) createDeploymentHandlerWithGCMock(gcFunc func(c
 		PrivateKey:  key,
 		ApiEndpoint: "https://us.api.mondoo.com",
 	}
-	saData, err := json.Marshal(mockSA)
+	saData, err := json.Marshal(mockSA) //nolint:gosec
 	s.Require().NoError(err)
 	credsSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

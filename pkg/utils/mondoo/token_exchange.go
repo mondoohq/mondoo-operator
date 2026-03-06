@@ -83,7 +83,7 @@ func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client
 		}
 
 		integrationMrn := resp.Mrn
-		credsBytes, err := json.Marshal(*resp.Creds)
+		credsBytes, err := json.Marshal(*resp.Creds) //nolint:gosec
 		if err != nil {
 			log.Error(err, "failed to marshal service account creds from IntegrationRegister()")
 			return err

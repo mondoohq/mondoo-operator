@@ -59,7 +59,7 @@ func (d *Debouncer) Add(key string, resource K8sResourceIdentifier) {
 // Start begins the debouncer's background processing. It should be called once
 // and will run until the context is cancelled.
 func (d *Debouncer) Start(ctx context.Context) error {
-	d.ctx, d.cancel = context.WithCancel(ctx)
+	d.ctx, d.cancel = context.WithCancel(ctx) //nolint:gosec
 	debouncerLogger.Info("Debouncer started", "interval", d.interval, "minInterval", d.minInterval)
 	<-d.ctx.Done()
 	d.stop()

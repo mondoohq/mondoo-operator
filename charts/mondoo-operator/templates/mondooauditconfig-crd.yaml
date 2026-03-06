@@ -1,3 +1,8 @@
 # Copyright (c) Mondoo, Inc.
 # SPDX-License-Identifier: BUSL-1.1
+#
+# On fresh install, Helm installs CRDs from the crds/ directory (before templates).
+# On upgrade, crds/ is skipped, so we render CRDs here to keep them current.
+{{- if .Release.IsUpgrade }}
 {{ .Files.Get "files/crds/k8s.mondoo.com_mondooauditconfigs.yaml" }}
+{{- end }}
