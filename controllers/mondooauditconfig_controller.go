@@ -6,6 +6,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -60,6 +61,7 @@ var MondooClientBuilder = mondooclient.NewClient
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooauditconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondooauditconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=k8s.mondoo.com,resources=mondoooperatorconfigs,verbs=get;watch;list
+//+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments;daemonsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments;replicasets;daemonsets;statefulsets,verbs=get;list;watch
 //+kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
@@ -108,7 +110,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	config := &v1alpha2.MondooOperatorConfig{}
 	if reconcileError = r.Get(ctx, types.NamespacedName{Name: v1alpha2.MondooOperatorConfigName}, config); reconcileError != nil {
-		if errors.IsNotFound(reconcileError) {
+		if errors.IsNotFound(reconcileError) || strings.Contains(reconcileError.Error(), "no matches for kind") {
 			log.Info("MondooOperatorConfig not found, using defaults")
 		} else {
 			log.Error(reconcileError, "Failed to check for MondooOperatorConfig")
@@ -532,8 +534,8 @@ func (r *MondooAuditConfigReconciler) operatorConfigRequestMapper(ctx context.Co
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager, mondooOperatorConfigCRDExists bool) error {
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha2.MondooAuditConfig{}).
 		Owns(&batchv1.CronJob{}).
 		Owns(&appsv1.Deployment{}).
@@ -544,11 +546,13 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.nodeEventsRequestMapper),
-			builder.WithPredicates(k8s.IgnoreGenericEventsPredicate{})).
-		Watches(
+			builder.WithPredicates(k8s.IgnoreGenericEventsPredicate{}))
+	if mondooOperatorConfigCRDExists {
+		b = b.Watches(
 			&v1alpha2.MondooOperatorConfig{},
-			handler.EnqueueRequestsFromMapFunc(r.operatorConfigRequestMapper)).
-		Complete(r)
+			handler.EnqueueRequestsFromMapFunc(r.operatorConfigRequestMapper))
+	}
+	return b.Complete(r)
 }
 
 // labelsForMondoo returns the labels for selecting the resources

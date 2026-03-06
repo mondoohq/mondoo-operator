@@ -14,13 +14,6 @@ source "${SCRIPT_DIR}/common.sh"
 
 info "Deploying operator from local chart (image: ${IMAGE_REPO}:${IMAGE_TAG})..."
 
-# Adopt any existing Mondoo CRDs so Helm can manage them
-for crd in $(kubectl get crds -o name 2>/dev/null | grep mondoo || true); do
-  info "Adopting existing CRD for Helm: ${crd}"
-  kubectl label "${crd}" app.kubernetes.io/managed-by=Helm --overwrite
-  kubectl annotate "${crd}" meta.helm.sh/release-name=mondoo-operator meta.helm.sh/release-namespace="${NAMESPACE}" --overwrite
-done
-
 helm upgrade --install mondoo-operator "${REPO_ROOT}/charts/mondoo-operator" \
   --namespace "${NAMESPACE}" --create-namespace \
   --set controllerManager.manager.image.repository="${IMAGE_REPO}" \

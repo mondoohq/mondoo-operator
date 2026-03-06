@@ -1,0 +1,129 @@
+# Copyright (c) Mondoo, Inc.
+# SPDX-License-Identifier: BUSL-1.1
+#
+# Pre-upgrade hook to ensure CRDs are up-to-date before upgrading the operator.
+# Helm only installs CRDs from the crds/ directory on initial install, not on upgrade.
+# This hook applies CRDs as templates during pre-upgrade to ensure they are current.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "mondoo-operator.fullname" . }}-crd-upgrade
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mondoo-operator.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+spec:
+  ttlSecondsAfterFinished: 60
+  template:
+    metadata:
+      labels:
+        {{- include "mondoo-operator.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "mondoo-operator.fullname" . }}-crd-upgrade
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: crd-upgrade
+        image: "bitnami/kubectl:latest"
+        command:
+        - sh
+        - -c
+        - |
+          kubectl apply --server-side --force-conflicts -f /crds/
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        resources:
+          limits:
+            cpu: 100m
+            memory: 64Mi
+          requests:
+            cpu: 50m
+            memory: 32Mi
+        volumeMounts:
+        - name: crds
+          mountPath: /crds
+          readOnly: true
+      volumes:
+      - name: crds
+        configMap:
+          name: {{ include "mondoo-operator.fullname" . }}-crds
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "mondoo-operator.fullname" . }}-crd-upgrade
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mondoo-operator.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "mondoo-operator.fullname" . }}-crd-upgrade
+  labels:
+    {{- include "mondoo-operator.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+rules:
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "mondoo-operator.fullname" . }}-crd-upgrade
+  labels:
+    {{- include "mondoo-operator.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "mondoo-operator.fullname" . }}-crd-upgrade
+subjects:
+- kind: ServiceAccount
+  name: {{ include "mondoo-operator.fullname" . }}-crd-upgrade
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mondoo-operator.fullname" . }}-crds
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mondoo-operator.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+data:
+  mondooauditconfigs.yaml: |
+    {{- .Files.Get "files/crds/k8s.mondoo.com_mondooauditconfigs.yaml" | nindent 4 }}
+  mondoooperatorconfigs.yaml: |
+    {{- .Files.Get "files/crds/k8s.mondoo.com_mondoooperatorconfigs.yaml" | nindent 4 }}
