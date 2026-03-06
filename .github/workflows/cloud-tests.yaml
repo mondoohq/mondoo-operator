@@ -50,7 +50,7 @@ jobs:
         run: cat ".github/env" >> $GITHUB_ENV
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4.0.0
 
       - name: Terraform init
         run: terraform init
@@ -133,7 +133,7 @@ jobs:
         run: cat ".github/env" >> $GITHUB_ENV
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4.0.0
 
       - run: terraform init
         working-directory: .github/terraform/aws
@@ -213,7 +213,7 @@ jobs:
         run: echo ${{ secrets.GCP_SERVICE_ACCOUNT }} | base64 -d > gcp_sa.json
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4.0.0
 
       - run: terraform init
         working-directory: .github/terraform/gke
