@@ -233,6 +233,8 @@ jobs:
   run-release-manifests:
     if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/release-manifests.yaml
+    permissions:
+      contents: write
     needs:
       - push-virtual-tag
       # this should ensure the manifest is tagged latest, which is required for the install automation
