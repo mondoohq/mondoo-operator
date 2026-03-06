@@ -5,6 +5,7 @@ package operator
 
 import (
 	"context"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +29,7 @@ func checkForTerminatedState(ctx context.Context, nonCacheClient client.Client, 
 	var err error
 	config := &k8sv1alpha2.MondooOperatorConfig{}
 	if err = nonCacheClient.Get(ctx, types.NamespacedName{Name: k8sv1alpha2.MondooOperatorConfigName}, config); err != nil {
-		if errors.IsNotFound(err) {
+		if errors.IsNotFound(err) || strings.Contains(err.Error(), "no matches for kind") {
 			logger.Info("MondooOperatorConfig not found, using defaults")
 		} else {
 			logger.Error(err, "Failed to check for MondooOperatorConfig")

@@ -53,3 +53,16 @@ tests/integration/_output
 
 package.json
 .env
+
+# Terraform
+.terraform
+*.tfstate
+.terraform.lock.hcl
+terraform.tfvars
+.terraform.tfstate.lock.info
+terraform.tfstate.backup
+
+# tests artifacts
+tests/e2e/terraform/kubeconfig
+tests/e2e/terraform/gke_gcloud_auth_plugin_cache
+tests/e2e/terraform/mondoo.json

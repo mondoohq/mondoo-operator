@@ -51,7 +51,7 @@ func (s *StatusReporterSuite) BeforeTest(suiteName, testName string) {
 	s.auditConfig.Spec.ConsoleIntegration.Enable = true
 
 	key := credentials.MondooServiceAccount(s.T())
-	sa, err := json.Marshal(mondooclient.ServiceAccountCredentials{Mrn: "mrn", PrivateKey: key})
+	sa, err := json.Marshal(mondooclient.ServiceAccountCredentials{Mrn: "mrn", PrivateKey: key}) //nolint:gosec
 	s.Require().NoError(err)
 
 	secret := &v1.Secret{

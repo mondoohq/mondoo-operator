@@ -13,6 +13,7 @@ irsa
 kustomization
 mcr
 mondoooperatorconfig
+nginx
 oidc
 openssl
 psat
@@ -24,4 +25,5 @@ SResources
 spiffe
 SVIDs
 tekton
+tpl
 wif

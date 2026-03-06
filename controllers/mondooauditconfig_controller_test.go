@@ -81,7 +81,7 @@ func TestTokenRegistration(t *testing.T) {
 	testMondooServiceAccount.PrivateKey = credentials.MondooServiceAccount(t)
 
 	var err error
-	testMondooServiceAccountDataBytes, err = json.Marshal(testMondooServiceAccount)
+	testMondooServiceAccountDataBytes, err = json.Marshal(testMondooServiceAccount) //nolint:gosec
 	require.NoError(t, err, "error converting sample service account data")
 
 	tests := []struct {

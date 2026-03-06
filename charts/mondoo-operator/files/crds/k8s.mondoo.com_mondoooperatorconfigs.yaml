@@ -1,0 +1,169 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.0
+  name: mondoooperatorconfigs.k8s.mondoo.com
+spec:
+  group: k8s.mondoo.com
+  names:
+    kind: MondooOperatorConfig
+    listKind: MondooOperatorConfigList
+    plural: mondoooperatorconfigs
+    singular: mondoooperatorconfig
+  scope: Cluster
+  versions:
+  - name: v1alpha2
+    schema:
+      openAPIV3Schema:
+        description: MondooOperatorConfig is the Schema for the mondoooperatorconfigs
+          API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: MondooOperatorConfigSpec defines the desired state of MondooOperatorConfig
+            properties:
+              containerProxy:
+                description: ContainerProxy specifies a proxy to use for container
+                  images.
+                type: string
+              httpProxy:
+                description: HttpProxy specifies a proxy to use for HTTP requests
+                  to the Mondoo Platform.
+                type: string
+              httpsProxy:
+                description: HttpsProxy specifies a proxy to use for HTTPS requests
+                  to the Mondoo Platform.
+                type: string
+              imagePullSecrets:
+                description: |-
+                  ImagePullSecrets specifies the name of the Secret to use for pulling images for all Mondoo components.
+                  The secret must be of type kubernetes.io/dockerconfigjson.
+                items:
+                  description: |-
+                    LocalObjectReference contains enough information to let you locate the
+                    referenced object inside the same namespace.
+                  properties:
+                    name:
+                      default: ""
+                      description: |-
+                        Name of the referent.
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
+                  type: object
+                  x-kubernetes-map-type: atomic
+                type: array
+              imageRegistry:
+                description: |-
+                  ImageRegistry specifies a custom container image registry to use for all Mondoo images.
+                  This allows using a private registry mirror (e.g., artifactory.example.com/ghcr.io.docker).
+                  If set, all image references will be prefixed with this registry.
+                  Deprecated: Use RegistryMirrors for more flexible registry mapping.
+                type: string
+              metrics:
+                description: Metrics controls the enabling/disabling of metrics report
+                  of mondoo-operator
+                properties:
+                  enable:
+                    type: boolean
+                  resourceLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      ResourceLabels allows providing a list of extra labels to apply to the metrics-related
+                      resources (eg. ServiceMonitor)
+                    type: object
+                type: object
+              noProxy:
+                description: NoProxy specifies a comma-separated list of hosts that
+                  should not use the proxy.
+                type: string
+              registryMirrors:
+                additionalProperties:
+                  type: string
+                description: |-
+                  RegistryMirrors specifies a mapping of public registries to private mirrors.
+                  The key is the public registry (e.g., "ghcr.io", "docker.io", "quay.io")
+                  and the value is the private mirror (e.g., "artifactory.example.com/ghcr.io.docker").
+                  Example:
+                    registryMirrors:
+                      ghcr.io: artifactory.example.com/ghcr.io.docker
+                      docker.io: artifactory.example.com/hub.docker.com
+                type: object
+              skipContainerResolution:
+                description: Allows skipping Image resolution from upstream repository
+                type: boolean
+              skipProxyForCnspec:
+                description: |-
+                  SkipProxyForCnspec disables proxy environment variables for cnspec-based components
+                  (scan-api, container scanning). Use this when the Mondoo API is accessible directly
+                  without proxy (e.g., internal mirror) but other components need proxy for external access.
+                  Default: false (proxy settings are applied to all components)
+                type: boolean
+            type: object
+          status:
+            description: MondooOperatorConfigStatus defines the observed state of
+              MondooOperatorConfig
+            properties:
+              conditions:
+                description: Conditions includes more detailed status for the mondoo
+                  config
+                items:
+                  description: Condition contains details for the current condition
+                    of a MondooOperatorConfig
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    lastUpdateTime:
+                      description: LastUpdateTime is the last time the condition was
+                        updated.
+                      format: date-time
+                      type: string
+                    message:
+                      description: Message is a human-readable message indicating
+                        details about last transition.
+                      type: string
+                    reason:
+                      description: Reason is a unique, one-word, CamelCase reason
+                        for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status is the status of the condition.
+                      type: string
+                    type:
+                      description: Type is the type of the condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

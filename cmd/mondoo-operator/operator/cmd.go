@@ -115,6 +115,11 @@ func init() {
 
 		ctx := ctrl.SetupSignalHandler()
 
+		mondooOperatorConfigExists, err := k8s.VerifyResourceExists("k8s.mondoo.com", "v1alpha2", "mondoooperatorconfigs", setupLog)
+		if err != nil {
+			setupLog.Error(err, "error checking for MondooOperatorConfig CRD")
+			return err
+		}
 		containerImageResolver := mondoo.NewContainerImageResolver(mgr.GetClient(), isOpenShift)
 		if err = (&controllers.MondooAuditConfigReconciler{
 			Client:                 mgr.GetClient(),
@@ -122,16 +127,20 @@ func init() {
 			ContainerImageResolver: containerImageResolver,
 			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder, v, containerImageResolver),
 			RunningOnOpenShift:     isOpenShift,
-		}).SetupWithManager(mgr); err != nil {
+		}).SetupWithManager(mgr, mondooOperatorConfigExists); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "MondooAuditConfig")
 			return err
 		}
-		if err = (&controllers.MondooOperatorConfigReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "MondooOperatorConfig")
-			return err
+		if mondooOperatorConfigExists {
+			if err = (&controllers.MondooOperatorConfigReconciler{
+				Client: mgr.GetClient(),
+				Scheme: mgr.GetScheme(),
+			}).SetupWithManager(mgr); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "MondooOperatorConfig")
+				return err
+			}
+		} else {
+			setupLog.Info("MondooOperatorConfig CRD not found, skipping controller registration")
 		}
 
 		// Check whether the mondoo-operator crashed because of OOMKilled
