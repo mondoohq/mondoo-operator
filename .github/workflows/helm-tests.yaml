@@ -79,6 +79,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
+          version: v3.17.0
           token: ${{ secrets.GITHUB_TOKEN }}
         id: install
 
@@ -101,9 +102,9 @@ jobs:
 
       - name: Install Mondoo Operator Helm chart
         run: |
-          HELM_ARGS=""
+          HELM_ARGS="--set operator.createConfig=false"
           if [ "${{ inputs.build-operator }}" = "true" ]; then
-            HELM_ARGS="--set controllerManager.manager.image.tag=$(make print-version) --set controllerManager.manager.imagePullPolicy=Never"
+            HELM_ARGS="$HELM_ARGS --set controllerManager.manager.image.tag=$(make print-version) --set controllerManager.manager.imagePullPolicy=Never"
           fi
           helm install mondoo-operator charts/mondoo-operator -n mondoo-operator --create-namespace --wait $HELM_ARGS
 
