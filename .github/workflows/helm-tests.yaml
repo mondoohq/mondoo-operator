@@ -102,9 +102,11 @@ jobs:
         run: for i in 1 2 3 4 5; do kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=180s && break || sleep 10; done
 
       - name: Install Mondoo Operator Helm chart
+        env:
+          BUILD_OPERATOR: ${{ inputs.build-operator }}
         run: |
           HELM_ARGS="--set operator.createConfig=false"
-          if [ "${{ inputs.build-operator }}" = "true" ]; then
+          if [ "$BUILD_OPERATOR" = "true" ]; then
             HELM_ARGS="$HELM_ARGS --set controllerManager.manager.image.tag=$(make print-version) --set controllerManager.manager.imagePullPolicy=Never"
           fi
           helm install mondoo-operator charts/mondoo-operator -n mondoo-operator --create-namespace --wait $HELM_ARGS
@@ -112,7 +114,17 @@ jobs:
       - name: Run integration tests
         env:
           MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
-        run: EXTERNAL_INSTALLATION=1 make test/integration/ci
+          BUILD_OPERATOR: ${{ inputs.build-operator }}
+          GIT_REF_NAME: ${{ github.ref_name }}
+        run: |
+          # When using a pre-built image (build-operator=false), skip the minikube image
+          # load step (K8S_DISTRO=gke) and pass the git tag as VERSION so the version
+          # check matches the published operator binary.
+          if [ "$BUILD_OPERATOR" = "true" ]; then
+            EXTERNAL_INSTALLATION=1 make test/integration/ci
+          else
+            EXTERNAL_INSTALLATION=1 K8S_DISTRO=gke VERSION="$GIT_REF_NAME" make test/integration/ci
+          fi
 
       - run: mv integration-tests.xml integration-tests-helm-${{ matrix.k8s-version }}.xml
         if: success() || failure()
