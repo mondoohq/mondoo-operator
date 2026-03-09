@@ -71,7 +71,7 @@ jobs:
           go-version: "${{ env.golang-version }}"
 
       - name: Start minikube
-        uses: medyagh/setup-minikube@master
+        uses: medyagh/setup-minikube@aba8d5ff1666d19b9549133e3b92e70d4fc52cb7 # master
         with:
           memory: 4000m
           kubernetes-version: ${{ matrix.k8s-version }}
@@ -93,7 +93,8 @@ jobs:
         if: inputs.build-operator
         run: minikube image load operator.tar
 
-      - run: sleep 10
+      - name: Wait for minikube to stabilize
+        run: sleep 10
 
       # Wait for the cluster to stabilize before installing anything.
       # Matches the pattern from integration-tests.yaml.
@@ -133,7 +134,7 @@ jobs:
     name: Report helm test results
     runs-on: ubuntu-latest
     needs: [helm-tests]
-    if: always()
+    if: always() && !cancelled()
     permissions:
       actions: read
       contents: read
