@@ -58,7 +58,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
 
       - name: Import environment variables from file
         run: cat ".github/env" >> $GITHUB_ENV
@@ -97,27 +99,18 @@ jobs:
       - name: Wait for cluster to be ready
         run: for i in 1 2 3 4 5; do kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=180s && break || sleep 10; done
 
-      - name: Determine operator image tag
-        id: image-tag
-        run: |
-          if [ "${{ inputs.build-operator }}" = "true" ]; then
-            echo "tag=sha256-$(git rev-parse HEAD).sig" >> $GITHUB_OUTPUT
-          else
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          fi
-
       - name: Install Mondoo Operator Helm chart
         run: |
           HELM_ARGS=""
           if [ "${{ inputs.build-operator }}" = "true" ]; then
-            HELM_ARGS="--set controllerManager.manager.image.tag=${{ steps.image-tag.outputs.tag }} --set controllerManager.manager.imagePullPolicy=Never"
+            HELM_ARGS="--set controllerManager.manager.image.tag=$(make print-version) --set controllerManager.manager.imagePullPolicy=Never"
           fi
           helm install mondoo-operator charts/mondoo-operator -n mondoo-operator --create-namespace --wait $HELM_ARGS
 
       - name: Run integration tests
         env:
           MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
-        run: EXTERNAL_INSTALLATION=1 VERSION=${{ steps.image-tag.outputs.tag }} make test/integration/ci
+        run: EXTERNAL_INSTALLATION=1 make test/integration/ci
 
       - run: mv integration-tests.xml integration-tests-helm-${{ matrix.k8s-version }}.xml
         if: success() || failure()
