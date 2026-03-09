@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	"go.mondoo.com/mondoo-operator/tests/framework/installer"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 )
 
@@ -93,6 +94,10 @@ func (s *HelmChartSuite) TestHelmTemplate() {
 }
 
 func (s *HelmChartSuite) TestHelmInstallAndUninstall() {
+	if _, ok := os.LookupEnv(installer.ExternalInstallationEnvVar); ok {
+		s.T().Skip("Skipping helm install test when operator is installed externally (cluster-scoped resources conflict)")
+	}
+
 	chartPath := filepath.Join(s.rootFolder, helmChartPath)
 
 	imageRepo := os.Getenv("MONDOO_OPERATOR_IMAGE_REPO")

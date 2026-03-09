@@ -42,3 +42,16 @@ jobs:
     with:
       cnspecImageTag: ""
     secrets: inherit
+  helm-tests:
+    name: Helm tests
+    needs: [unit-tests]
+    if: needs.unit-tests.result == 'success'
+    uses: ./.github/workflows/helm-tests.yaml
+    permissions:
+      contents: read
+      actions: read
+      checks: write
+      statuses: write
+      pull-requests: write
+    secrets:
+      MONDOO_TEST_ORG_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}

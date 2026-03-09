@@ -86,6 +86,10 @@ LDFLAGS="-s -w -X go.mondoo.com/mondoo-operator/pkg/version.Version=$(VERSION) -
 
 all: build
 
+.PHONY: print-version
+print-version: ## Print the current VERSION
+	@echo $(VERSION)
+
 ##@ General
 
 # The help target prints out all targets with their descriptions organized

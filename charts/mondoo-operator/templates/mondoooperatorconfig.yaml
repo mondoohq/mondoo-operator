@@ -6,33 +6,33 @@ metadata:
   labels:
   {{- include "mondoo-operator.labels" . | nindent 4 }}
 spec:
+  {{- $spec := dict }}
   {{- if .Values.operator.httpProxy }}
-  httpProxy: {{ .Values.operator.httpProxy | quote }}
+  {{- $_ := set $spec "httpProxy" .Values.operator.httpProxy }}
   {{- end }}
   {{- if .Values.operator.httpsProxy }}
-  httpsProxy: {{ .Values.operator.httpsProxy | quote }}
+  {{- $_ := set $spec "httpsProxy" .Values.operator.httpsProxy }}
   {{- end }}
   {{- if .Values.operator.noProxy }}
-  noProxy: {{ .Values.operator.noProxy | quote }}
+  {{- $_ := set $spec "noProxy" .Values.operator.noProxy }}
   {{- end }}
   {{- if .Values.operator.containerProxy }}
-  containerProxy: {{ .Values.operator.containerProxy | quote }}
+  {{- $_ := set $spec "containerProxy" .Values.operator.containerProxy }}
   {{- end }}
   {{- if .Values.operator.imagePullSecrets }}
-  imagePullSecrets:
-  {{- toYaml .Values.operator.imagePullSecrets | nindent 4 }}
+  {{- $_ := set $spec "imagePullSecrets" .Values.operator.imagePullSecrets }}
   {{- end }}
   {{- if .Values.operator.imageRegistry }}
-  imageRegistry: {{ .Values.operator.imageRegistry | quote }}
+  {{- $_ := set $spec "imageRegistry" .Values.operator.imageRegistry }}
   {{- end }}
   {{- if .Values.operator.registryMirrors }}
-  registryMirrors:
-  {{- toYaml .Values.operator.registryMirrors | nindent 4 }}
+  {{- $_ := set $spec "registryMirrors" .Values.operator.registryMirrors }}
   {{- end }}
   {{- if .Values.operator.skipContainerResolution }}
-  skipContainerResolution: {{ .Values.operator.skipContainerResolution }}
+  {{- $_ := set $spec "skipContainerResolution" .Values.operator.skipContainerResolution }}
   {{- end }}
   {{- if .Values.operator.skipProxyForCnspec }}
-  skipProxyForCnspec: {{ .Values.operator.skipProxyForCnspec }}
+  {{- $_ := set $spec "skipProxyForCnspec" .Values.operator.skipProxyForCnspec }}
   {{- end }}
+  {{- $spec | toYaml | nindent 2 }}
 {{- end }}
