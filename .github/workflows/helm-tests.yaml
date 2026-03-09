@@ -104,18 +104,26 @@ jobs:
       - name: Install Mondoo Operator Helm chart
         env:
           BUILD_OPERATOR: ${{ inputs.build-operator }}
+          GIT_REF_NAME: ${{ github.ref_name }}
         run: |
           HELM_ARGS="--set operator.createConfig=false"
           if [ "$BUILD_OPERATOR" = "true" ]; then
             HELM_ARGS="$HELM_ARGS --set controllerManager.manager.image.tag=$(make print-version) --set controllerManager.manager.imagePullPolicy=Never"
+          else
+            # Use the published image matching the git tag instead of the chart default
+            if [ -z "$GIT_REF_NAME" ]; then
+              echo "::error::GIT_REF_NAME is empty; cannot determine which published image to use"
+              exit 1
+            fi
+            HELM_ARGS="$HELM_ARGS --set controllerManager.manager.image.tag=${GIT_REF_NAME}"
           fi
           helm install mondoo-operator charts/mondoo-operator -n mondoo-operator --create-namespace --wait $HELM_ARGS
 
       - name: Run integration tests
         env:
           MONDOO_API_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
-          BUILD_OPERATOR: ${{ inputs.build-operator }}
           GIT_REF_NAME: ${{ github.ref_name }}
+          BUILD_OPERATOR: ${{ inputs.build-operator }}
         run: |
           # When using a pre-built image (build-operator=false), skip the minikube image
           # load step (K8S_DISTRO=gke) and pass the git tag as VERSION so the version
@@ -123,7 +131,11 @@ jobs:
           if [ "$BUILD_OPERATOR" = "true" ]; then
             EXTERNAL_INSTALLATION=1 make test/integration/ci
           else
-            EXTERNAL_INSTALLATION=1 K8S_DISTRO=gke VERSION="$GIT_REF_NAME" make test/integration/ci
+            if [ -z "$GIT_REF_NAME" ]; then
+              echo "::error::GIT_REF_NAME is empty; cannot determine published operator version"
+              exit 1
+            fi
+            EXTERNAL_INSTALLATION=1 K8S_DISTRO=gke VERSION="${GIT_REF_NAME}" make test/integration/ci
           fi
 
       - run: mv integration-tests.xml integration-tests-helm-${{ matrix.k8s-version }}.xml
