@@ -90,6 +90,13 @@ jobs:
         if: inputs.build-operator
         run: minikube image load operator.tar
 
+      - run: sleep 10
+
+      # Wait for the cluster to stabilize before installing anything.
+      # Matches the pattern from integration-tests.yaml.
+      - name: Wait for cluster to be ready
+        run: for i in 1 2 3 4 5; do kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=180s && break || sleep 10; done
+
       - name: Determine operator image tag
         id: image-tag
         run: |
@@ -106,12 +113,6 @@ jobs:
             HELM_ARGS="--set controllerManager.manager.image.tag=${{ steps.image-tag.outputs.tag }} --set controllerManager.manager.imagePullPolicy=Never"
           fi
           helm install mondoo-operator charts/mondoo-operator -n mondoo-operator --create-namespace --wait $HELM_ARGS
-
-      # Now that dependencies are cached the tests start almost immediately after minikube has started
-      # this makes tests fail occasionally. This sleep gives the runner some time to become more stable
-      # before the test execution starts.
-      - name: Wait a bit for the runner to become more stable
-        run: kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=60s
 
       - name: Run integration tests
         env:
