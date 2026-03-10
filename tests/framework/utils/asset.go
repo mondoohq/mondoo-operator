@@ -6,11 +6,11 @@ package utils
 import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"go.mondoo.com/cnquery/v12/providers/os/id/containerid"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils"
 	"go.mondoo.com/mondoo-operator/tests/framework/nexus/assets"
 	nexusK8s "go.mondoo.com/mondoo-operator/tests/framework/nexus/k8s"
+	"go.mondoo.com/mql/v13/providers/os/id/containerid"
 	v1 "k8s.io/api/core/v1"
 )
 
