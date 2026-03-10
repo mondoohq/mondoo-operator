@@ -29,7 +29,7 @@ jobs:
         run: cat ".github/env" >> $GITHUB_ENV
       - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
-          go-version: "${{ env.golang-version }}"
+          go-version-file: "go.mod"
       - name: Build operator container image
         run: make docker-save
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -68,7 +68,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
-          go-version: "${{ env.golang-version }}"
+          go-version-file: "go.mod"
 
       - name: Start minikube
         uses: medyagh/setup-minikube@aba8d5ff1666d19b9549133e3b92e70d4fc52cb7 # master

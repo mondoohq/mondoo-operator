@@ -30,7 +30,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
-          go-version: "${{ env.golang-version }}"
+          go-version-file: "go.mod"
           cache: false
       - name: Scan AWS terraform with Mondoo
         uses: mondoohq/actions/terraform-hcl@main
