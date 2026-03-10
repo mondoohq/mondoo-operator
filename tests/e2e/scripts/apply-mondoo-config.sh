@@ -23,7 +23,13 @@ rm -f /tmp/mondoo-creds.json
 
 info "Applying MondooAuditConfig..."
 export NAMESPACE
-if [[ "${AUTOPILOT}" == "true" ]]; then
+if [[ "${ENABLE_TARGET_CLUSTER:-false}" == "true" ]]; then
+  if [[ "${AUTOPILOT}" == "true" ]]; then
+    MANIFEST="${E2E_DIR}/manifests/mondoo-audit-config-external-autopilot.yaml.tpl"
+  else
+    MANIFEST="${E2E_DIR}/manifests/mondoo-audit-config-external.yaml.tpl"
+  fi
+elif [[ "${AUTOPILOT}" == "true" ]]; then
   MANIFEST="${E2E_DIR}/manifests/mondoo-audit-config-autopilot.yaml.tpl"
 else
   MANIFEST="${E2E_DIR}/manifests/mondoo-audit-config.yaml.tpl"

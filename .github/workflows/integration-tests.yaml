@@ -37,7 +37,7 @@ jobs:
         run: cat ".github/env" >> $GITHUB_ENV
       - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
-          go-version: "${{ env.golang-version }}"
+          go-version-file: "go.mod"
       - name: Build operator container image
         run: make docker-save
       - name: Generate manifests
@@ -85,7 +85,7 @@ jobs:
 
       - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
-          go-version: "${{ env.golang-version }}"
+          go-version-file: "go.mod"
 
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         name: Download operator build artifact
@@ -147,7 +147,7 @@ jobs:
 
       - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
-          go-version: "${{ env.golang-version }}"
+          go-version-file: "go.mod"
 
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         name: Download operator build artifact

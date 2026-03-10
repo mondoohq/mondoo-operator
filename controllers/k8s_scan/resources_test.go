@@ -14,8 +14,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
-	"go.mondoo.com/cnquery/v12/providers-sdk/v1/inventory"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mql/v13/providers-sdk/v1/inventory"
 )
 
 const testClusterUID = "abcdefg"

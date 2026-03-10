@@ -36,6 +36,13 @@ load_tf_outputs() {
   export GIT_SHA="$(git -C "${REPO_ROOT}" rev-parse --short HEAD)"
   export NAMESPACE="mondoo-operator"
 
+  export ENABLE_TARGET_CLUSTER="$(terraform output -raw enable_target_cluster 2>/dev/null || echo "false")"
+  if [[ "${ENABLE_TARGET_CLUSTER}" == "true" ]]; then
+    export TARGET_CLUSTER_NAME="$(terraform output -raw target_cluster_name)"
+    # Resolve to absolute path since we're currently in TF_DIR
+    export TARGET_KUBECONFIG_PATH="$(cd "${TF_DIR}" && realpath "$(terraform output -raw target_kubeconfig_path)")"
+  fi
+
   cd ->/dev/null
 
   # Use gcloud to get cluster credentials (auto-refreshing auth)
@@ -44,6 +51,9 @@ load_tf_outputs() {
     --region "${REGION}" --project "${PROJECT_ID}" --quiet
 
   info "Loaded outputs: cluster=${CLUSTER_NAME}, repo=${AR_REPO}"
+  if [[ "${ENABLE_TARGET_CLUSTER}" == "true" ]]; then
+    info "Target cluster enabled: ${TARGET_CLUSTER_NAME}"
+  fi
 }
 
 # Wait for a deployment to be rolled out

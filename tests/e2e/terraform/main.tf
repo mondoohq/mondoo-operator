@@ -58,6 +58,44 @@ resource "google_artifact_registry_repository" "e2e" {
 }
 
 ################################################################################
+# Target Cluster (optional, for external cluster scanning tests)
+################################################################################
+
+resource "google_container_cluster" "target" {
+  count = var.enable_target_cluster ? 1 : 0
+
+  name     = "${local.name_prefix}-target"
+  project  = var.project_id
+  location = var.region
+
+  enable_autopilot    = var.autopilot ? true : null
+  deletion_protection = false
+
+  # Standard clusters: remove the default node pool, we manage our own below
+  remove_default_node_pool = var.autopilot ? null : true
+  initial_node_count       = var.autopilot ? null : 1
+}
+
+resource "google_container_node_pool" "target" {
+  count = var.enable_target_cluster && !var.autopilot ? 1 : 0
+
+  name     = "default"
+  project  = var.project_id
+  location = var.region
+  cluster  = google_container_cluster.target[0].name
+
+  node_count = 1
+
+  node_config {
+    spot         = true
+    machine_type = "e2-standard-2"
+    oauth_scopes = [
+      "https://www.googleapis.com/auth/cloud-platform",
+    ]
+  }
+}
+
+################################################################################
 # Kubeconfig
 ################################################################################
 
@@ -74,4 +112,23 @@ module "gke_auth" {
 resource "local_file" "kubeconfig" {
   content  = module.gke_auth.kubeconfig_raw
   filename = "${path.module}/kubeconfig"
+}
+
+################################################################################
+# Kubeconfig for Target Cluster
+################################################################################
+
+module "gke_auth_target" {
+  count  = var.enable_target_cluster ? 1 : 0
+  source = "terraform-google-modules/kubernetes-engine/google//modules/auth"
+
+  project_id   = var.project_id
+  cluster_name = google_container_cluster.target[0].name
+  location     = var.region
+}
+
+resource "local_file" "kubeconfig_target" {
+  count    = var.enable_target_cluster ? 1 : 0
+  content  = module.gke_auth_target[0].kubeconfig_raw
+  filename = "${path.module}/kubeconfig-target"
 }

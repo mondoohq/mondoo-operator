@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
-	cnquery_k8s "go.mondoo.com/cnquery/v12/providers/k8s/resources"
 	api "go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	cnquery_k8s "go.mondoo.com/mql/v13/providers/k8s/resources"
 	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"

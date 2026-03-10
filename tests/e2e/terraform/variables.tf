@@ -22,3 +22,9 @@ variable "autopilot" {
   type        = bool
   default     = true
 }
+
+variable "enable_target_cluster" {
+  description = "Create a second GKE cluster as a scan target for external cluster testing"
+  type        = bool
+  default     = false
+}
