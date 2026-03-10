@@ -37,3 +37,15 @@ output "name_prefix" {
 output "autopilot" {
   value = var.autopilot
 }
+
+output "enable_target_cluster" {
+  value = var.enable_target_cluster
+}
+
+output "target_cluster_name" {
+  value = var.enable_target_cluster ? google_container_cluster.target[0].name : ""
+}
+
+output "target_kubeconfig_path" {
+  value = var.enable_target_cluster ? local_file.kubeconfig_target[0].filename : ""
+}

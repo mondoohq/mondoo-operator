@@ -26,6 +26,10 @@ kubectl delete mondooauditconfigs.k8s.mondoo.com --all -n "${NAMESPACE}" --ignor
 info "Deleting mondoo-client secret..."
 kubectl delete secret mondoo-client -n "${NAMESPACE}" --ignore-not-found
 
+# Target cluster kubeconfig secret
+info "Deleting target-kubeconfig secret..."
+kubectl delete secret target-kubeconfig -n "${NAMESPACE}" --ignore-not-found
+
 # Helm release
 info "Uninstalling mondoo-operator Helm release..."
 helm uninstall mondoo-operator -n "${NAMESPACE}" --wait --timeout 2m 2>/dev/null || true
@@ -50,6 +54,13 @@ kubectl delete crds mondooauditconfigs.k8s.mondoo.com mondoooperatorconfigs.k8s.
 # Test workload
 info "Deleting nginx test workload..."
 kubectl delete deployment nginx-test-workload -n default --ignore-not-found
+
+# Target cluster test workload
+if [[ -n "${TARGET_KUBECONFIG_PATH:-}" && -f "${TARGET_KUBECONFIG_PATH}" ]]; then
+  info "Deleting nginx test workload on target cluster..."
+  kubectl --kubeconfig "${TARGET_KUBECONFIG_PATH}" delete deployment nginx-test-workload \
+    -n default --ignore-not-found || true
+fi
 
 # Helm repo
 info "Removing mondoo Helm repo..."
