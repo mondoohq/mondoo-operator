@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Copyright Mondoo, Inc. 2026
+# SPDX-License-Identifier: BUSL-1.1
+
+# Export all pages from architecture.drawio to individual SVGs
+# Note: -p is 1-based (page 1 = Self-Cluster, page 2 = External Cluster)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$SCRIPT_DIR/../.."
+cd "$REPO_ROOT"
+
+docker run --rm -w /data -v "$(pwd):/data" rlespinasse/drawio-desktop-headless \
+  -x -f svg -p 1 --svg-theme light --embed-svg-fonts true \
+  -o docs/img/architecture-self-cluster.svg docs/img/architecture.drawio
+
+docker run --rm -w /data -v "$(pwd):/data" rlespinasse/drawio-desktop-headless \
+  -x -f svg -p 2 --svg-theme light --embed-svg-fonts true \
+  -o docs/img/architecture-external-cluster.svg docs/img/architecture.drawio
