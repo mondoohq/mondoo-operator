@@ -22,7 +22,7 @@ require (
 )
 
 require (
-	go.mondoo.com/mql/v13 v13.0.0-rc7
+	go.mondoo.com/mql/v13 v13.0.0
 	go.mondoo.com/mql/v13/providers/k8s v0.0.0-00010101000000-000000000000
 )
 
