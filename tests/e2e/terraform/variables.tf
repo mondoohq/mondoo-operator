@@ -28,3 +28,15 @@ variable "enable_target_cluster" {
   type        = bool
   default     = false
 }
+
+variable "enable_mirror_test" {
+  description = "Create a mirror Artifact Registry repo for registry mirroring and imagePullSecrets testing"
+  type        = bool
+  default     = false
+}
+
+variable "enable_proxy_test" {
+  description = "Create a Squid proxy VM for proxy testing (requires enable_mirror_test=true)"
+  type        = bool
+  default     = false
+}

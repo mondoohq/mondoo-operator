@@ -66,4 +66,8 @@ fi
 info "Removing mondoo Helm repo..."
 helm repo remove mondoo 2>/dev/null || true
 
+# Mirror registry resources (from registry mirroring tests)
+info "Deleting mirror-registry-creds secret..."
+kubectl delete secret mirror-registry-creds -n "${NAMESPACE}" --ignore-not-found
+
 info "=== Cleanup complete ==="
