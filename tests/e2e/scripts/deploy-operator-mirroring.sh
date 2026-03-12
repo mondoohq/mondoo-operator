@@ -45,7 +45,7 @@ fi
 # Generate values override file
 # Using a file avoids Helm --set escaping issues with dots in registry mirror keys
 VALUES_FILE=$(mktemp /tmp/mondoo-mirror-values-XXXXXX.yaml)
-trap "rm -f ${VALUES_FILE}" EXIT
+trap 'rm -f "${VALUES_FILE}"' EXIT
 
 cat > "${VALUES_FILE}" <<EOF
 operator:

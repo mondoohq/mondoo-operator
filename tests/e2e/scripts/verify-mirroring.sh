@@ -90,11 +90,11 @@ if [[ "${ENABLE_PROXY_TEST}" == "true" && -n "${SQUID_PROXY_IP}" ]]; then
   SQUID_INSTANCE="${NAME_PREFIX:-mondoo-e2e}-squid-proxy"
 
   check_warn "Squid proxy shows access log traffic" \
-    bash -c "gcloud compute ssh '${SQUID_INSTANCE}' --zone='${SQUID_ZONE}' --project='${PROJECT_ID}' --command='sudo tail -20 /var/log/squid/access.log' 2>/dev/null | grep -q ."
+    bash -c "gcloud compute ssh '${SQUID_INSTANCE}' --zone='${SQUID_ZONE}' --project='${PROJECT_ID}' --tunnel-through-iap --command='sudo tail -20 /var/log/squid/access.log' 2>/dev/null | grep -q ."
 
   info "Squid access log (last 20 lines):"
   gcloud compute ssh "${SQUID_INSTANCE}" --zone="${SQUID_ZONE}" --project="${PROJECT_ID}" \
-    --command="sudo tail -20 /var/log/squid/access.log" 2>/dev/null || warn "Could not retrieve Squid logs"
+    --tunnel-through-iap --command="sudo tail -20 /var/log/squid/access.log" 2>/dev/null || warn "Could not retrieve Squid logs"
 else
   info ""
   info "--- Proxy checks skipped (enable_proxy_test != true) ---"

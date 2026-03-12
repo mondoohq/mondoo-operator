@@ -8,6 +8,13 @@
 resource "google_compute_instance" "squid_proxy" {
   count = var.enable_proxy_test ? 1 : 0
 
+  lifecycle {
+    precondition {
+      condition     = var.enable_mirror_test
+      error_message = "enable_proxy_test requires enable_mirror_test to also be true."
+    }
+  }
+
   name         = "${local.name_prefix}-squid-proxy"
   project      = var.project_id
   zone         = "${var.region}-a"
@@ -21,7 +28,7 @@ resource "google_compute_instance" "squid_proxy" {
 
   network_interface {
     network = "default"
-    access_config {} # Ephemeral public IP for SSH access
+    # No access_config — use IAP tunneling for SSH instead of a public IP
   }
 
   metadata_startup_script = <<-SCRIPT
@@ -74,10 +81,10 @@ resource "google_compute_firewall" "allow_squid" {
   target_tags   = ["squid-proxy"]
 }
 
-resource "google_compute_firewall" "allow_squid_ssh" {
+resource "google_compute_firewall" "allow_squid_iap_ssh" {
   count = var.enable_proxy_test ? 1 : 0
 
-  name    = "${local.name_prefix}-allow-squid-ssh"
+  name    = "${local.name_prefix}-allow-squid-iap-ssh"
   project = var.project_id
   network = "default"
 
@@ -86,6 +93,7 @@ resource "google_compute_firewall" "allow_squid_ssh" {
     ports    = ["22"]
   }
 
-  source_ranges = ["0.0.0.0/0"]
+  # IAP's IP range for TCP forwarding
+  source_ranges = ["35.235.240.0/20"]
   target_tags   = ["squid-proxy"]
 }

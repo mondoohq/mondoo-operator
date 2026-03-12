@@ -8,4 +8,4 @@ autopilot     = true
 # Set to true to provision a mirror AR repo for registry mirroring/imagePullSecrets tests
 enable_mirror_test = false
 # Set to true to also provision a Squid proxy VM for proxy tests (requires enable_mirror_test)
-enable_proxy_test = false
+enable_proxy_test  = false
