@@ -37,6 +37,7 @@ func UpdateCronJobFields(obj, desired *batchv1.CronJob) {
 	ps.InitContainers = dps.InitContainers
 	ps.Containers = dps.Containers
 	ps.Volumes = dps.Volumes
+	ps.ImagePullSecrets = dps.ImagePullSecrets
 }
 
 // UpdateDeploymentFields copies managed fields from desired to obj,
@@ -54,6 +55,7 @@ func UpdateDeploymentFields(obj, desired *appsv1.Deployment) {
 	ps.ServiceAccountName = dps.ServiceAccountName
 	ps.Containers = dps.Containers
 	ps.Volumes = dps.Volumes
+	ps.ImagePullSecrets = dps.ImagePullSecrets
 }
 
 // UpdateDaemonSetFields copies managed fields from desired to obj,
@@ -73,4 +75,5 @@ func UpdateDaemonSetFields(obj, desired *appsv1.DaemonSet) {
 	ps.Tolerations = dps.Tolerations
 	ps.Containers = dps.Containers
 	ps.Volumes = dps.Volumes
+	ps.ImagePullSecrets = dps.ImagePullSecrets
 }
