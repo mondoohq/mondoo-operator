@@ -58,6 +58,46 @@ resource "google_artifact_registry_repository" "e2e" {
 }
 
 ################################################################################
+# Mirror Registry (optional, for registry mirroring tests)
+# A second Artifact Registry repo used as the mirror target.
+################################################################################
+
+resource "google_artifact_registry_repository" "mirror" {
+  count = var.enable_mirror_test ? 1 : 0
+
+  location      = var.region
+  repository_id = "${local.name_prefix}-mirror"
+  format        = "DOCKER"
+  project       = var.project_id
+}
+
+# Service account with read-only access to the mirror repo.
+# Used to create an imagePullSecret, testing the full imagePullSecrets path.
+resource "google_service_account" "mirror_reader" {
+  count = var.enable_mirror_test ? 1 : 0
+
+  account_id   = "${local.name_prefix}-mirror-sa"
+  display_name = "Mirror registry reader for e2e tests"
+  project      = var.project_id
+}
+
+resource "google_artifact_registry_repository_iam_member" "mirror_reader" {
+  count = var.enable_mirror_test ? 1 : 0
+
+  project    = var.project_id
+  location   = var.region
+  repository = google_artifact_registry_repository.mirror[0].repository_id
+  role       = "roles/artifactregistry.reader"
+  member     = "serviceAccount:${google_service_account.mirror_reader[0].email}"
+}
+
+resource "google_service_account_key" "mirror_reader" {
+  count = var.enable_mirror_test ? 1 : 0
+
+  service_account_id = google_service_account.mirror_reader[0].name
+}
+
+################################################################################
 # Target Cluster (optional, for external cluster scanning tests)
 ################################################################################
 

@@ -2,6 +2,7 @@ AADSTS
 artifactory
 bak
 bitnami
+containerregistry
 curlimages
 deepcopy
 deletecollection
@@ -21,8 +22,8 @@ rolearn
 selfsigned
 servicemonitor
 servicemonitors
-SResources
 spiffe
+SResources
 SVIDs
 tekton
 tpl

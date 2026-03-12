@@ -43,6 +43,17 @@ load_tf_outputs() {
     export TARGET_KUBECONFIG_PATH="$(cd "${TF_DIR}" && realpath "$(terraform output -raw target_kubeconfig_path)")"
   fi
 
+  export ENABLE_MIRROR_TEST="$(terraform output -raw enable_mirror_test 2>/dev/null || echo "false")"
+  if [[ "${ENABLE_MIRROR_TEST}" == "true" ]]; then
+    export MIRROR_REGISTRY="$(terraform output -raw mirror_registry_repo)"
+    export MIRROR_SA_KEY_B64="$(terraform output -raw mirror_sa_key_b64)"
+  fi
+
+  export ENABLE_PROXY_TEST="$(terraform output -raw enable_proxy_test 2>/dev/null || echo "false")"
+  if [[ "${ENABLE_PROXY_TEST}" == "true" ]]; then
+    export SQUID_PROXY_IP="$(terraform output -raw squid_proxy_ip)"
+  fi
+
   cd ->/dev/null
 
   # Use gcloud to get cluster credentials (auto-refreshing auth)

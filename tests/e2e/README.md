@@ -6,8 +6,9 @@ End-to-end tests that deploy the Mondoo operator to a real GKE cluster and verif
 
 - **Fresh Deploy** (`run-fresh-deploy.sh`): Builds the operator from the current branch, deploys to a GKE cluster, configures scanning, and verifies everything works.
 - **Upgrade** (`run-upgrade.sh`): Installs a released baseline version first, verifies it, then upgrades to the current branch and verifies again.
+- **Registry Mirroring & Proxy** (`run-registry-mirroring.sh`): Deploys with an Artifact Registry mirror repo and optional Squid proxy. Verifies image references are rewritten, `imagePullSecrets` are propagated, and proxy env vars are set.
 
-Both tests pause for manual verification at each verify step (check Mondoo console for assets/scan results). Press Enter to continue or Ctrl+C to abort.
+All tests pause for manual verification at each verify step (check Mondoo console for assets/scan results). Press Enter to continue or Ctrl+C to abort.
 
 ## Prerequisites
 
@@ -17,6 +18,8 @@ Both tests pause for manual verification at each verify step (check Mondoo conso
 - `docker`
 - `kubectl`
 - Go toolchain (for building the operator)
+- `jq` (for registry mirroring test verification)
+- `crane` CLI (for registry mirroring test): `go install github.com/google/go-containerregistry/cmd/crane@latest`
 
 ### Mondoo credentials
 
@@ -57,6 +60,8 @@ terraform apply \
 | `mondoo_org_id` | yes | - | Mondoo organization ID |
 | `region` | no | `europe-west3` | GCP region |
 | `autopilot` | no | `true` | `true` for Autopilot, `false` for Standard cluster |
+| `enable_mirror_test` | no | `false` | Create a mirror AR repo for registry mirroring/imagePullSecrets tests |
+| `enable_proxy_test` | no | `false` | Provision a Squid proxy VM for proxy tests (requires `enable_mirror_test`) |
 
 You can also set these in a `terraform.tfvars` file.
 
@@ -94,6 +99,32 @@ What it does:
 6. Upgrades to the current branch image via local Helm chart
 7. Waits, verifies again, pauses for manual check
 
+### Registry Mirroring & Proxy
+
+```bash
+# Provision infrastructure with mirror AR repo (and optional proxy VM)
+cd tests/e2e/terraform
+terraform apply -var="project_id=MY_PROJECT" -var="mondoo_org_id=MY_ORG" \
+  -var="enable_mirror_test=true" -var="enable_proxy_test=true"
+
+# Run the test
+cd tests/e2e
+./run-registry-mirroring.sh
+```
+
+What it does:
+1. Loads Terraform outputs (including mirror AR repo and proxy IP if enabled)
+2. Builds the operator image and pushes to Artifact Registry
+3. Creates `imagePullSecret` from the mirror repo's GCP service account key
+4. Uses `crane` to copy cnspec image from ghcr.io into the mirror AR repo
+5. Deploys an nginx test workload
+6. Helm installs the operator with `registryMirrors`, `imagePullSecrets`, and proxy `--values`
+7. Applies MondooAuditConfig, waits 90s for reconciliation
+8. Runs standard verification checks
+9. Runs mirroring-specific checks: image refs rewritten, pull secrets propagated, proxy env vars set
+10. Checks Squid proxy access logs (if proxy enabled)
+11. Pauses for manual verification in the Mondoo console
+
 ## Cleanup
 
 Remove all test resources from the cluster (everything except Terraform infra):
@@ -115,23 +146,29 @@ terraform destroy -var="project_id=MY_PROJECT" -var="mondoo_org_id=MY_ORG"
 ```
 tests/e2e/
 ├── README.md
-├── run-fresh-deploy.sh          # Fresh deploy test orchestrator
-├── run-upgrade.sh               # Upgrade test orchestrator
+├── run-fresh-deploy.sh              # Fresh deploy test orchestrator
+├── run-upgrade.sh                   # Upgrade test orchestrator
+├── run-registry-mirroring.sh        # Registry mirroring & proxy test orchestrator
 ├── terraform/
-│   ├── versions.tf              # Provider requirements
-│   ├── variables.tf             # Input variables
-│   ├── main.tf                  # GKE cluster + Artifact Registry
-│   ├── mondoo.tf                # Mondoo space + service account
-│   └── outputs.tf               # Outputs consumed by scripts
+│   ├── versions.tf                  # Provider requirements
+│   ├── variables.tf                 # Input variables
+│   ├── main.tf                      # GKE cluster + Artifact Registry
+│   ├── mondoo.tf                    # Mondoo space + service account
+│   ├── proxy.tf                     # Squid proxy VM (optional)
+│   └── outputs.tf                   # Outputs consumed by scripts
 ├── scripts/
-│   ├── common.sh                # Logging, TF output loading, wait helpers
-│   ├── build-and-push.sh        # Build operator image, push to AR
-│   ├── deploy-operator.sh       # Helm install from local chart
-│   ├── deploy-baseline.sh       # Helm install released version
-│   ├── deploy-test-workload.sh  # Deploy nginx for scanning
-│   ├── apply-mondoo-config.sh   # Create secret + apply MondooAuditConfig
-│   ├── verify.sh                # Automated checks + manual verification pause
-│   └── cleanup.sh               # Remove all test resources from cluster
+│   ├── common.sh                    # Logging, TF output loading, wait helpers
+│   ├── build-and-push.sh            # Build operator image, push to AR
+│   ├── deploy-operator.sh           # Helm install from local chart
+│   ├── deploy-operator-mirroring.sh # Helm install with mirror/proxy values
+│   ├── deploy-baseline.sh           # Helm install released version
+│   ├── deploy-test-workload.sh      # Deploy nginx for scanning
+│   ├── apply-mondoo-config.sh       # Create secret + apply MondooAuditConfig
+│   ├── setup-mirror-registry.sh     # Create imagePullSecret for mirror AR repo
+│   ├── populate-mirror-registry.sh  # Copy cnspec image into mirror AR repo via crane
+│   ├── verify.sh                    # Automated checks + manual verification pause
+│   ├── verify-mirroring.sh          # Mirroring/proxy-specific verification
+│   └── cleanup.sh                   # Remove all test resources from cluster
 └── manifests/
     ├── mondoo-audit-config.yaml.tpl            # Standard cluster config (nodes enabled)
     ├── mondoo-audit-config-autopilot.yaml.tpl  # Autopilot config (nodes disabled)

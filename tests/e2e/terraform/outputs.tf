@@ -49,3 +49,24 @@ output "target_cluster_name" {
 output "target_kubeconfig_path" {
   value = var.enable_target_cluster ? local_file.kubeconfig_target[0].filename : ""
 }
+
+output "enable_mirror_test" {
+  value = var.enable_mirror_test
+}
+
+output "mirror_registry_repo" {
+  value = var.enable_mirror_test ? "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.mirror[0].repository_id}" : ""
+}
+
+output "mirror_sa_key_b64" {
+  value     = var.enable_mirror_test ? google_service_account_key.mirror_reader[0].private_key : ""
+  sensitive = true
+}
+
+output "enable_proxy_test" {
+  value = var.enable_proxy_test
+}
+
+output "squid_proxy_ip" {
+  value = var.enable_proxy_test ? google_compute_instance.squid_proxy[0].network_interface[0].network_ip : ""
+}
