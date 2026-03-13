@@ -58,7 +58,7 @@ jobs:
       - name: Generate manifests and Helm chart
         run: |
           make manifests
-          CHART_NAME=charts/mondoo-operator make helm
+          CHART_NAME=charts/mondoo-operator make helm/crds
 
       - name: Configure Git
         run: |
