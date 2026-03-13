@@ -1,6 +1,7 @@
 # Architecture
 
-![Architecture](img/architecture.svg)
+![Self-Cluster Scanning](img/architecture-self-cluster.svg)
+![External Cluster Scanning](img/architecture-external-cluster.svg)
 
 ## Overview
 
