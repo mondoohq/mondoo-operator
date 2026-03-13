@@ -74,7 +74,7 @@ Install the operator in a central management cluster and scan remote clusters vi
 │  └──────────┬──────────────────┘    │
 └─────────────┼───────────────────────┘
               │
-              │ kubeconfig / WIF / SPIFFE
+              │ kubeconfig / WIF* / SPIFFE*
               │
     ┌─────────┴─────────┬─────────────────┐
     ▼                   ▼                 ▼
@@ -84,13 +84,15 @@ Install the operator in a central management cluster and scan remote clusters vi
 └─────────┘       └─────────┘       └─────────┘
 ```
 
+_*WIF and SPIFFE authentication are experimental features._
+
 **Use when:** You want centralized scanning, cannot install operators in target clusters, or want to reduce operational overhead.
 
 **Authentication methods:**
 
 - **Kubeconfig**: Use a kubeconfig file stored in a Secret
-- **Workload Identity (WIF)**: Native cloud provider authentication for GKE, EKS, AKS
-- **SPIFFE**: Use SPIFFE/SPIRE for cross-cluster authentication
+- **Workload Identity (WIF)** _(Experimental)_: Native cloud provider authentication for GKE, EKS, AKS
+- **SPIFFE** _(Experimental)_: Use SPIFFE/SPIRE for cross-cluster authentication
 
 ```yaml
 # External cluster scanning with kubeconfig
@@ -130,17 +132,23 @@ spec:
 
 ## Features
 
-| Feature                         | Self-Cluster | External Cluster |
-| ------------------------------- | :----------: | :--------------: |
-| Kubernetes Resources Scanning   |      ✅      |        ✅        |
-| Node Scanning                   |      ✅      |        ❌        |
-| Container Image Scanning        |      ✅      |        ✅        |
-| Namespace Filtering             |      ✅      |        ✅        |
-| Kubeconfig Auth                 |      -       |        ✅        |
-| Workload Identity (GKE/EKS/AKS) |      -       |        ✅        |
-| SPIFFE Auth                     |      -       |        ✅        |
+| Feature                          | Self-Cluster | External Cluster        |
+| -------------------------------- | :----------: | :---------------------: |
+| Kubernetes Resources Scanning    |      ✅      |           ✅            |
+| Node Scanning                    |      ✅      |           ❌            |
+| Container Image Scanning         |      ✅      |           ✅            |
+| Namespace Filtering              |      ✅      |           ✅            |
+| Kubeconfig Auth                  |      -       |           ✅            |
+| Workload Identity (GKE/EKS/AKS) |      -       | ✅ ⚠️ Experimental      |
+| SPIFFE Auth                      |      -       | ✅ ⚠️ Experimental      |
 
-![Architecture](docs/img/architecture.svg)
+### Self-Cluster Scanning Architecture
+
+![Self-Cluster Scanning](docs/img/architecture-self-cluster.svg)
+
+### External Cluster Scanning Architecture
+
+![External Cluster Scanning](docs/img/architecture-external-cluster.svg)
 
 ## Getting Started
 
