@@ -25,4 +25,4 @@ yq -i ".images[0].newTag=\"v${VERSION}\"" config/manager/kustomization.yaml
 
 yq -i ".appVersion = \"${VERSION}\"" charts/mondoo-operator/Chart.yaml
 yq -i ".version = \"${VERSION}\"" charts/mondoo-operator/Chart.yaml
-CHART_NAME=charts/mondoo-operator make helm
+CHART_NAME=charts/mondoo-operator make helm/crds
