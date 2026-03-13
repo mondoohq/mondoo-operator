@@ -500,7 +500,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_VaultAuth() {
 
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
-	s.True(result.IsZero())
+	s.Equal(30*time.Minute, result.RequeueAfter, "should requeue at default interval when no TTL is set")
 
 	// Verify kubeconfig Secret was created
 	kubeconfigSecret := &corev1.Secret{}
@@ -599,7 +599,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_VaultAuth_WithCAC
 
 	result, err := d.Reconcile(s.ctx)
 	s.NoError(err)
-	s.True(result.IsZero())
+	s.Equal(30*time.Minute, result.RequeueAfter, "should requeue at default interval when no TTL is set")
 
 	// Verify mock received the Vault CA cert bytes
 	s.Equal([]byte("-----BEGIN CERTIFICATE-----\nvault-ca\n-----END CERTIFICATE-----"), receivedVaultCA)
@@ -758,7 +758,7 @@ func (s *DeploymentHandlerSuite) createDeploymentHandlerWithVaultMock(vaultFetch
 		MondooOperatorConfig:   &mondoov1alpha2.MondooOperatorConfig{},
 		MondooClientBuilder:    mondooclient.NewClient,
 		VaultTokenFetcher:      vaultFetcher,
-		SATokenPath:            tmpFile.Name(),
+		SATokenPath:            tmpName,
 	}
 }
 

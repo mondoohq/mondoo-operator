@@ -178,7 +178,21 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		}
 	}
 
-	return ctrl.Result{}, nil
+	// If any external cluster uses VaultAuth, request an earlier requeue so the
+	// operator refreshes Vault credentials before they expire. Default to half
+	// the requested TTL, with a floor of 10 minutes and a ceiling of 1 hour.
+	result := ctrl.Result{}
+	for i := range n.Mondoo.Spec.KubernetesResources.ExternalClusters {
+		cluster := &n.Mondoo.Spec.KubernetesResources.ExternalClusters[i]
+		if cluster.VaultAuth != nil {
+			requeue := vaultRequeueInterval(cluster.VaultAuth.TTL)
+			if result.RequeueAfter == 0 || requeue < result.RequeueAfter {
+				result.RequeueAfter = requeue
+			}
+		}
+	}
+
+	return result, nil
 }
 
 func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {

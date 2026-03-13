@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"time"
 
 	vault "github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
@@ -93,6 +94,35 @@ func DefaultVaultTokenFetcher(ctx context.Context, saToken string, config v1alph
 	return token, nil
 }
 
+// vaultRequeueInterval calculates a reconcile requeue interval based on the Vault TTL.
+// It targets half the TTL so credentials are refreshed well before expiry, with a
+// floor of 10 minutes and a ceiling of 1 hour.
+func vaultRequeueInterval(ttl string) time.Duration {
+	const (
+		minInterval     = 10 * time.Minute
+		maxInterval     = 1 * time.Hour
+		defaultInterval = 30 * time.Minute
+	)
+
+	if ttl == "" {
+		return defaultInterval
+	}
+
+	d, err := time.ParseDuration(ttl)
+	if err != nil {
+		return defaultInterval
+	}
+
+	half := d / 2
+	if half < minInterval {
+		return minInterval
+	}
+	if half > maxInterval {
+		return maxInterval
+	}
+	return half
+}
+
 // VaultKubeconfigSecretName returns the name for the Vault kubeconfig Secret.
 func VaultKubeconfigSecretName(prefix, clusterName string) string {
 	return fmt.Sprintf("%s-vault-kubeconfig-%s", prefix, clusterName)
@@ -126,7 +156,7 @@ current-context: default
 users:
 - name: vault
   user:
-    token: %s
+    token: "%s"
 `, clusterConfig, token)
 }
 
