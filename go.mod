@@ -5,7 +5,7 @@ go 1.25.6
 replace go.mondoo.com/mql/v13/providers/k8s => github.com/mondoohq/mql/providers/k8s v0.0.0-20260309210947-abb4667b6efb
 
 require (
-	github.com/cert-manager/cert-manager v1.19.4
+	github.com/cert-manager/cert-manager v1.20.0
 	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang/mock v1.6.0
@@ -18,25 +18,25 @@ require (
 	k8s.io/apiextensions-apiserver v0.35.2 // indirect
 	k8s.io/apimachinery v0.35.2
 	k8s.io/client-go v0.35.2
-	sigs.k8s.io/controller-runtime v0.22.3
+	sigs.k8s.io/controller-runtime v0.23.1
 )
 
 require (
 	github.com/hashicorp/vault-client-go v0.4.3
-	go.mondoo.com/mql/v13 v13.0.0-rc7
+	go.mondoo.com/mql/v13 v13.0.1
 	go.mondoo.com/mql/v13/providers/k8s v0.0.0-00010101000000-000000000000
 )
 
 require (
 	cel.dev/expr v0.25.1 // indirect
-	cloud.google.com/go v0.121.6 // indirect
-	cloud.google.com/go/auth v0.16.5 // indirect
+	cloud.google.com/go v0.123.0 // indirect
+	cloud.google.com/go/auth v0.18.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
-	cloud.google.com/go/iam v1.5.2 // indirect
-	cloud.google.com/go/kms v1.22.0 // indirect
-	cloud.google.com/go/longrunning v0.6.7 // indirect
-	cloud.google.com/go/monitoring v1.24.2 // indirect
+	cloud.google.com/go/iam v1.5.3 // indirect
+	cloud.google.com/go/kms v1.25.0 // indirect
+	cloud.google.com/go/longrunning v0.8.0 // indirect
+	cloud.google.com/go/monitoring v1.24.3 // indirect
 	cloud.google.com/go/secretmanager v1.16.0 // indirect
 	cloud.google.com/go/storage v1.56.1 // indirect
 	dario.cat/mergo v1.0.2 // indirect
@@ -122,7 +122,7 @@ require (
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.14 // indirect
-	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
+	github.com/googleapis/gax-go/v2 v2.17.0 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -198,8 +198,8 @@ require (
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/tools v0.42.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
-	google.golang.org/api v0.251.0 // indirect
-	google.golang.org/genproto v0.0.0-20250826171959-ef028d996bc1 // indirect
+	google.golang.org/api v0.269.0 // indirect
+	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
 	google.golang.org/grpc v1.79.2 // indirect
@@ -207,7 +207,7 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
 	moul.io/http2curl v1.0.0 // indirect
-	sigs.k8s.io/gateway-api v1.4.0 // indirect
+	sigs.k8s.io/gateway-api v1.5.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect
