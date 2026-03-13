@@ -6,6 +6,8 @@ End-to-end tests that deploy the Mondoo operator to a real GKE cluster and verif
 
 - **Fresh Deploy** (`run-fresh-deploy.sh`): Builds the operator from the current branch, deploys to a GKE cluster, configures scanning, and verifies everything works.
 - **Upgrade** (`run-upgrade.sh`): Installs a released baseline version first, verifies it, then upgrades to the current branch and verifies again.
+- **External Cluster** (`run-external-cluster.sh`): Deploys the operator and configures external cluster scanning against a target GKE cluster using a static kubeconfig Secret.
+- **Vault External Cluster** (`run-vault-external-cluster.sh`): Like External Cluster, but uses HashiCorp Vault's Kubernetes secrets engine to dynamically generate short-lived service account tokens instead of a static kubeconfig.
 - **Registry Mirroring & Proxy** (`run-registry-mirroring.sh`): Deploys with an Artifact Registry mirror repo and optional Squid proxy. Verifies image references are rewritten, `imagePullSecrets` are propagated, and proxy env vars are set.
 
 All tests pause for manual verification at each verify step (check Mondoo console for assets/scan results). Press Enter to continue or Ctrl+C to abort.
@@ -61,6 +63,7 @@ terraform apply \
 | `region` | no | `europe-west3` | GCP region |
 | `autopilot` | no | `true` | `true` for Autopilot, `false` for Standard cluster |
 | `enable_mirror_test` | no | `false` | Create a mirror AR repo for registry mirroring/imagePullSecrets tests |
+| `enable_target_cluster` | no | `false` | Create a second GKE cluster for external cluster / Vault scanning tests |
 | `enable_proxy_test` | no | `false` | Provision a Squid proxy VM for proxy tests (requires `enable_mirror_test`) |
 
 You can also set these in a `terraform.tfvars` file.
@@ -98,6 +101,45 @@ What it does:
 5. Applies MondooAuditConfig, waits, verifies, pauses for manual check
 6. Upgrades to the current branch image via local Helm chart
 7. Waits, verifies again, pauses for manual check
+
+### External Cluster (Static Kubeconfig)
+
+```bash
+# Provision infrastructure with a target cluster
+cd tests/e2e/terraform
+terraform apply -var="project_id=MY_PROJECT" -var="mondoo_org_id=MY_ORG" \
+  -var="enable_target_cluster=true"
+
+# Run the test
+cd tests/e2e
+./run-external-cluster.sh
+```
+
+### Vault External Cluster
+
+```bash
+# Provision infrastructure with a target cluster
+cd tests/e2e/terraform
+terraform apply -var="project_id=MY_PROJECT" -var="mondoo_org_id=MY_ORG" \
+  -var="enable_target_cluster=true"
+
+# Run the test
+cd tests/e2e
+./run-vault-external-cluster.sh
+```
+
+What it does:
+1. Loads Terraform outputs (requires `enable_target_cluster=true`)
+2. Builds the operator image and pushes to Artifact Registry
+3. Deploys nginx test workloads to both clusters
+4. Installs the operator via local Helm chart
+5. Deploys HashiCorp Vault in dev mode to the scanner cluster
+6. Configures Vault: Kubernetes auth (scanner cluster) + Kubernetes secrets engine (target cluster)
+7. Creates target cluster CA cert Secret for TLS verification
+8. Applies MondooAuditConfig with `vaultAuth` external cluster config
+9. Waits 90s for operator to reconcile and fetch Vault credentials
+10. Verifies: vault-kubeconfig Secret created, CronJob has no init containers, correct volume mounts
+11. Pauses for manual verification in the Mondoo console
 
 ### Registry Mirroring & Proxy
 
@@ -148,6 +190,8 @@ tests/e2e/
 ├── README.md
 ├── run-fresh-deploy.sh              # Fresh deploy test orchestrator
 ├── run-upgrade.sh                   # Upgrade test orchestrator
+├── run-external-cluster.sh          # External cluster scanning test orchestrator
+├── run-vault-external-cluster.sh    # Vault external cluster test orchestrator
 ├── run-registry-mirroring.sh        # Registry mirroring & proxy test orchestrator
 ├── terraform/
 │   ├── versions.tf                  # Provider requirements
@@ -163,16 +207,25 @@ tests/e2e/
 │   ├── deploy-operator-mirroring.sh # Helm install with mirror/proxy values
 │   ├── deploy-baseline.sh           # Helm install released version
 │   ├── deploy-test-workload.sh      # Deploy nginx for scanning
+│   ├── deploy-target-workload.sh    # Deploy nginx + kubeconfig Secret for external cluster
+│   ├── deploy-target-workload-only.sh # Deploy nginx to target (no kubeconfig Secret)
+│   ├── deploy-vault.sh              # Deploy + configure Vault for external cluster auth
 │   ├── apply-mondoo-config.sh       # Create secret + apply MondooAuditConfig
 │   ├── setup-mirror-registry.sh     # Create imagePullSecret for mirror AR repo
 │   ├── populate-mirror-registry.sh  # Copy cnspec image into mirror AR repo via crane
 │   ├── verify.sh                    # Automated checks + manual verification pause
+│   ├── verify-external.sh           # External cluster verification
+│   ├── verify-vault-external.sh     # Vault external cluster verification
 │   ├── verify-mirroring.sh          # Mirroring/proxy-specific verification
 │   └── cleanup.sh                   # Remove all test resources from cluster
 └── manifests/
-    ├── mondoo-audit-config.yaml.tpl            # Standard cluster config (nodes enabled)
-    ├── mondoo-audit-config-autopilot.yaml.tpl  # Autopilot config (nodes disabled)
-    └── nginx-workload.yaml                     # Test workload
+    ├── mondoo-audit-config.yaml.tpl                       # Standard config (nodes enabled)
+    ├── mondoo-audit-config-autopilot.yaml.tpl             # Autopilot config (nodes disabled)
+    ├── mondoo-audit-config-external.yaml.tpl              # External cluster (static kubeconfig)
+    ├── mondoo-audit-config-external-autopilot.yaml.tpl    # External cluster + Autopilot
+    ├── mondoo-audit-config-vault-external.yaml.tpl        # Vault external cluster
+    ├── mondoo-audit-config-vault-external-autopilot.yaml.tpl # Vault external + Autopilot
+    └── nginx-workload.yaml                                # Test workload
 ```
 
 ## Notes
