@@ -453,7 +453,7 @@ externalClusters:
 
 > **Note: Credential refresh timing**
 >
-> Vault credentials are refreshed each time the operator reconciles (typically every 7 days, or when configuration changes). Ensure the requested TTL is longer than the operator's reconcile interval. If you need more frequent credential rotation, consider adjusting the operator's reconcile schedule.
+> When VaultAuth is configured, the operator automatically reconciles at half the requested TTL (clamped between 10 minutes and 1 hour) to refresh credentials before they expire. For example, a `ttl: "1h"` results in a 30-minute refresh interval. If no TTL is specified, the operator defaults to refreshing every 30 minutes.
 
 ## Container Image Scanning
 
