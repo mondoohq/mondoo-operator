@@ -238,6 +238,23 @@ func TestExternalClusterCronJob_ImagePullSecrets(t *testing.T) {
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
 }
 
+func TestExternalClusterCronJob_HasMondooTmpDir(t *testing.T) {
+	m := testAuditConfig()
+	cluster := v1alpha2.ExternalCluster{
+		Name: "remote",
+		KubeconfigSecretRef: &corev1.LocalObjectReference{
+			Name: "kubeconfig-secret",
+		},
+	}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := ExternalClusterCronJob("test-image:latest", cluster, m, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	envMap := envToMap(container.Env)
+	assert.Equal(t, "/tmp", envMap["MONDOO_TMP_DIR"])
+}
+
 func TestInventory_WithContainerProxy(t *testing.T) {
 	auditConfig := v1alpha2.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
