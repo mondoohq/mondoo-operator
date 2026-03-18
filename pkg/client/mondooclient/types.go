@@ -19,7 +19,7 @@ type MondooClient interface {
 	IntegrationCheckIn(context.Context, *IntegrationCheckInInput) (*IntegrationCheckInOutput, error)
 	IntegrationReportStatus(context.Context, *ReportStatusRequest) error
 
-	GarbageCollectAssets(context.Context, *GarbageCollectOptions) error
+	DeleteAssets(context.Context, *DeleteAssetsRequest) (*DeleteAssetsConfirmation, error)
 }
 
 // ExchangeRegistrationTokenInput is used for converting a JWT to a Mondoo serivce account
@@ -116,10 +116,38 @@ const (
 	MessageStatus_MESSAGE_INFO    MessageStatus = 3
 )
 
-// GarbageCollectOptions contains filters for garbage collection of assets
-type GarbageCollectOptions struct {
-	ManagedBy       string            `json:"managed_by,omitempty"`
-	PlatformRuntime string            `json:"platform_runtime,omitempty"`
-	OlderThan       string            `json:"older_than,omitempty"` // RFC3339 timestamp
-	Labels          map[string]string `json:"labels,omitempty"`
+// DeleteAssetsRequest matches the server-side DeleteAssetsRequest proto.
+type DeleteAssetsRequest struct {
+	SpaceMrn        string      `json:"spaceMrn,omitempty"`
+	AssetMrns       []string    `json:"asset_mrns,omitempty"`
+	DeleteAll       bool        `json:"delete_all,omitempty"`
+	DateFilter      *DateFilter `json:"date_filter,omitempty"`
+	ManagedBy       string      `json:"managed_by,omitempty"`
+	PlatformRuntime string      `json:"platform_runtime,omitempty"`
+}
+
+type DateFilter struct {
+	Timestamp  string          `json:"timestamp,omitempty"` // RFC3339
+	Comparison Comparison      `json:"comparison"`
+	Field      DateFilterField `json:"field"`
+}
+
+type Comparison int32
+
+const (
+	Comparison_GREATER_THAN Comparison = 0
+	Comparison_LESS_THAN    Comparison = 1
+)
+
+type DateFilterField int32
+
+const (
+	DateFilterField_FILTER_LAST_UPDATED DateFilterField = 0
+	DateFilterField_FILTER_CREATED      DateFilterField = 1
+)
+
+// DeleteAssetsConfirmation is the response from the DeleteAssets API.
+type DeleteAssetsConfirmation struct {
+	AssetMrns []string          `json:"asset_mrns,omitempty"`
+	Errors    map[string]string `json:"errors,omitempty"`
 }

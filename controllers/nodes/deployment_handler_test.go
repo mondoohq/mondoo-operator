@@ -5,7 +5,12 @@ package nodes
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"testing"
 	"time"
@@ -764,6 +769,120 @@ func (s *DeploymentHandlerSuite) TestReconcile_Deployment_CustomInterval() {
 	s.Contains(ds.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("%d", s.auditConfig.Spec.Nodes.IntervalTimer))
 }
 
+func (s *DeploymentHandlerSuite) TestGarbageCollection_RunsAfterSuccessfulScan() {
+	s.seedNodes()
+	gcCalled := false
+	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, req *mondooclient.DeleteAssetsRequest) error {
+		gcCalled = true
+		s.Contains(req.ManagedBy, "mondoo-operator-")
+		s.NotNil(req.DateFilter)
+		s.NotEmpty(req.DateFilter.Timestamp)
+		s.Equal(mondooclient.Comparison_LESS_THAN, req.DateFilter.Comparison)
+		s.Equal(mondooclient.DateFilterField_FILTER_LAST_UPDATED, req.DateFilter.Field)
+		return nil
+	})
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	// First reconcile - creates resources
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Set lastSuccessfulTime on a CronJob
+	cronJobs := &batchv1.CronJobList{}
+	listOpts := &client.ListOptions{
+		Namespace:     s.auditConfig.Namespace,
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
+	}
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
+	s.Require().NotEmpty(cronJobs.Items)
+
+	now := metav1.Now()
+	cronJobs.Items[0].Status.LastSuccessfulTime = &now
+	s.NoError(d.KubeClient.Status().Update(s.ctx, &cronJobs.Items[0]))
+
+	// Second reconcile - should trigger GC
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	s.True(gcCalled, "DeleteAssets should have been called")
+	s.NotNil(d.Mondoo.Status.LastNodeScanGarbageCollectionTime, "GC timestamp should be set in status")
+}
+
+func (s *DeploymentHandlerSuite) TestGarbageCollection_SkipsWhenAlreadyRun() {
+	s.seedNodes()
+	gcCalled := false
+	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.DeleteAssetsRequest) error {
+		gcCalled = true
+		return nil
+	})
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	// First reconcile
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Set lastSuccessfulTime on a CronJob
+	cronJobs := &batchv1.CronJobList{}
+	listOpts := &client.ListOptions{
+		Namespace:     s.auditConfig.Namespace,
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
+	}
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
+	s.Require().NotEmpty(cronJobs.Items)
+
+	successTime := metav1.NewTime(time.Now().Add(-1 * time.Hour))
+	cronJobs.Items[0].Status.LastSuccessfulTime = &successTime
+	s.NoError(d.KubeClient.Status().Update(s.ctx, &cronJobs.Items[0]))
+
+	// Set status to indicate GC was already done at a newer time
+	gcTime := metav1.Now()
+	d.Mondoo.Status.LastNodeScanGarbageCollectionTime = &gcTime
+
+	// Reconcile - should NOT trigger GC
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	s.False(gcCalled, "DeleteAssets should NOT have been called")
+}
+
+func (s *DeploymentHandlerSuite) TestGarbageCollection_FailureStillUpdatesTimestamp() {
+	s.seedNodes()
+	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.DeleteAssetsRequest) error {
+		return fmt.Errorf("API error")
+	})
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	// First reconcile
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Set lastSuccessfulTime on a CronJob
+	cronJobs := &batchv1.CronJobList{}
+	listOpts := &client.ListOptions{
+		Namespace:     s.auditConfig.Namespace,
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
+	}
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
+	s.Require().NotEmpty(cronJobs.Items)
+
+	now := metav1.Now()
+	cronJobs.Items[0].Status.LastSuccessfulTime = &now
+	s.NoError(d.KubeClient.Status().Update(s.ctx, &cronJobs.Items[0]))
+
+	// Reconcile - GC fails but reconcile should still succeed
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Timestamp should still be updated so we don't retry until the next new successful scan
+	s.NotNil(d.Mondoo.Status.LastNodeScanGarbageCollectionTime, "GC timestamp should be set even when GC fails")
+}
+
 func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {
 	return DeploymentHandler{
 		KubeClient:             s.fakeClientBuilder.Build(),
@@ -771,6 +890,66 @@ func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {
 		ContainerImageResolver: s.containerImageResolver,
 		MondooOperatorConfig:   &v1alpha2.MondooOperatorConfig{},
 	}
+}
+
+// createDeploymentHandlerWithGCMock creates a DeploymentHandler with a mock MondooClientBuilder
+// that captures calls to DeleteAssets.
+func (s *DeploymentHandlerSuite) createDeploymentHandlerWithGCMock(gcFunc func(context.Context, *mondooclient.DeleteAssetsRequest) error) DeploymentHandler {
+	// Create a mock credentials secret so GC can read it
+	key := generateTestPrivateKey(s.T())
+	mockSA := mondooclient.ServiceAccountCredentials{
+		Mrn:         "//agents.api.mondoo.app/spaces/test/serviceaccounts/test",
+		PrivateKey:  key,
+		ApiEndpoint: "https://us.api.mondoo.com",
+	}
+	saData, err := json.Marshal(mockSA) //nolint:gosec
+	s.Require().NoError(err)
+	credsSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      s.auditConfig.Spec.MondooCredsSecretRef.Name,
+			Namespace: s.auditConfig.Namespace,
+		},
+		Data: map[string][]byte{
+			constants.MondooCredsSecretServiceAccountKey: saData,
+		},
+	}
+	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(credsSecret)
+
+	return DeploymentHandler{
+		KubeClient:             s.fakeClientBuilder.Build(),
+		Mondoo:                 &s.auditConfig,
+		ContainerImageResolver: s.containerImageResolver,
+		MondooOperatorConfig:   &v1alpha2.MondooOperatorConfig{},
+		MondooClientBuilder: func(opts mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+			return &fakeMondooClient{gcFunc: gcFunc}, nil
+		},
+	}
+}
+
+// fakeMondooClient implements just enough of MondooClient to test GC
+type fakeMondooClient struct {
+	mondooclient.MondooClient
+	gcFunc func(context.Context, *mondooclient.DeleteAssetsRequest) error
+}
+
+func (f *fakeMondooClient) DeleteAssets(ctx context.Context, req *mondooclient.DeleteAssetsRequest) (*mondooclient.DeleteAssetsConfirmation, error) {
+	if f.gcFunc != nil {
+		return &mondooclient.DeleteAssetsConfirmation{}, f.gcFunc(ctx, req)
+	}
+	return &mondooclient.DeleteAssetsConfirmation{}, nil
+}
+
+// generateTestPrivateKey generates an ECDSA private key and returns its PEM-encoded string.
+func generateTestPrivateKey(t *testing.T) string {
+	key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate private key: %v", err)
+	}
+	x509Encoded, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatalf("failed to marshal private key: %v", err)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509Encoded}))
 }
 
 func (s *DeploymentHandlerSuite) seedNodes() {

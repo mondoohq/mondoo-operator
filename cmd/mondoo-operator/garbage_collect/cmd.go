@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -31,7 +30,6 @@ func init() {
 	filterPlatformRuntime := Cmd.Flags().String("filter-platform-runtime", "", "Cleanup assets by an asset's PlatformRuntime (k8s-cluster or docker-image).")
 	filterManagedBy := Cmd.Flags().String("filter-managed-by", "", "Cleanup assets with matching ManagedBy field.")
 	filterOlderThan := Cmd.Flags().String("filter-older-than", "", "Cleanup assets which have not been updated in over the time provided (eg 12m or 48h or anything time.ParseDuration() accepts).")
-	labelsInput := Cmd.Flags().StringSlice("labels", []string{}, "Cleanup assets with matching labels (eg --labels key1=value1,key2=value2).")
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(logger.NewLogger())
 		logger := log.Log.WithName("garbage-collect")
@@ -41,15 +39,6 @@ func init() {
 		}
 		if *timeout <= 0 {
 			return fmt.Errorf("--timeout must be greater than 0")
-		}
-
-		labels := make(map[string]string)
-		for _, l := range *labelsInput {
-			split := strings.Split(l, "=")
-			if len(split) != 2 {
-				return fmt.Errorf("invalid label provided %s. Labels should be in the form of key=value", l)
-			}
-			labels[split[0]] = split[1]
 		}
 
 		// Read the service account credentials from the config file
@@ -88,14 +77,18 @@ func init() {
 			return fmt.Errorf("no filters provided to garbage collect by")
 		}
 
-		return GarbageCollectCmd(ctx, client, *filterPlatformRuntime, *filterOlderThan, *filterManagedBy, labels, logger)
+		spaceMrn := serviceAccount.SpaceMrn
+		if spaceMrn == "" {
+			spaceMrn = mondoo.SpaceMrnFromServiceAccountMrn(serviceAccount.Mrn)
+		}
+		return GarbageCollectCmd(ctx, client, spaceMrn, *filterPlatformRuntime, *filterOlderThan, *filterManagedBy, logger)
 	}
 }
 
-func GarbageCollectCmd(ctx context.Context, client mondooclient.MondooClient, platformRuntime, olderThan, managedBy string, labels map[string]string, logger logr.Logger) error {
-	gcOpts := &mondooclient.GarbageCollectOptions{
+func GarbageCollectCmd(ctx context.Context, client mondooclient.MondooClient, spaceMrn, platformRuntime, olderThan, managedBy string, logger logr.Logger) error {
+	req := &mondooclient.DeleteAssetsRequest{
+		SpaceMrn:  spaceMrn,
 		ManagedBy: managedBy,
-		Labels:    labels,
 	}
 
 	if olderThan != "" {
@@ -105,19 +98,23 @@ func GarbageCollectCmd(ctx context.Context, client mondooclient.MondooClient, pl
 			return err
 		}
 
-		gcOpts.OlderThan = timestamp
+		req.DateFilter = &mondooclient.DateFilter{
+			Timestamp:  timestamp,
+			Comparison: mondooclient.Comparison_LESS_THAN,
+			Field:      mondooclient.DateFilterField_FILTER_LAST_UPDATED,
+		}
 	}
 
 	if platformRuntime != "" {
 		switch platformRuntime {
 		case "k8s-cluster", "docker-image":
-			gcOpts.PlatformRuntime = platformRuntime
+			req.PlatformRuntime = platformRuntime
 		default:
 			return fmt.Errorf("no matching platform runtime found for (%s)", platformRuntime)
 		}
 	}
 
-	err := client.GarbageCollectAssets(ctx, gcOpts)
+	resp, err := client.DeleteAssets(ctx, req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			logger.Error(err, "failed to receive a response before timeout was exceeded")
@@ -125,6 +122,13 @@ func GarbageCollectCmd(ctx context.Context, client mondooclient.MondooClient, pl
 			logger.Error(err, "error while performing garbage collection")
 		}
 		return err
+	}
+
+	if len(resp.AssetMrns) > 0 {
+		logger.Info("Deleted assets", "count", len(resp.AssetMrns))
+	}
+	if len(resp.Errors) > 0 {
+		logger.Info("DeleteAssets completed with errors", "errors", resp.Errors)
 	}
 
 	return nil

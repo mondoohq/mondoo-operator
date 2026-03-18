@@ -7,8 +7,10 @@ import (
 	"context"
 	"maps"
 	"slices"
+	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	appsv1 "k8s.io/api/apps/v1"
@@ -28,6 +30,7 @@ type DeploymentHandler struct {
 	Mondoo                 *v1alpha2.MondooAuditConfig
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
+	MondooClientBuilder    func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
 	IsOpenshift            bool
 }
 
@@ -52,6 +55,16 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		)
 		return ctrl.Result{}, syncErr
 	}
+
+	// Perform garbage collection of stale node scan assets if a new successful scan has completed.
+	// GC is only applicable in CronJob mode; for DaemonSet style this is a no-op since no CronJobs exist.
+	clusterUid, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
+	if err != nil {
+		logger.Error(err, "Failed to get cluster's UID for node scan garbage collection")
+	} else {
+		n.garbageCollectIfNeeded(ctx, clusterUid)
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -377,5 +390,67 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 	// Update any remnant conditions
 	updateNodeConditions(n.Mondoo, false, &corev1.PodList{})
 
+	return nil
+}
+
+// garbageCollectIfNeeded checks whether a new successful node scan has completed since the last GC run,
+// and if so, performs garbage collection of stale node assets via the Mondoo API.
+func (n *DeploymentHandler) garbageCollectIfNeeded(ctx context.Context, clusterUid string) {
+	cronJobs, err := n.getCronJobsForAuditConfig(ctx)
+	if err != nil {
+		logger.Error(err, "Failed to list CronJobs for node scan garbage collection")
+		return
+	}
+
+	// Find the latest lastSuccessfulTime across all node scan CronJobs
+	var latestSuccess *metav1.Time
+	for i := range cronJobs {
+		t := cronJobs[i].Status.LastSuccessfulTime
+		if t != nil && (latestSuccess == nil || t.After(latestSuccess.Time)) {
+			latestSuccess = t
+		}
+	}
+
+	if latestSuccess == nil {
+		// No successful scans yet
+		return
+	}
+
+	// Skip if we already ran GC for this (or a newer) successful scan
+	if n.Mondoo.Status.LastNodeScanGarbageCollectionTime != nil &&
+		!latestSuccess.After(n.Mondoo.Status.LastNodeScanGarbageCollectionTime.Time) {
+		return
+	}
+
+	managedBy := "mondoo-operator-" + clusterUid
+	if err := n.performGarbageCollection(ctx, managedBy); err != nil {
+		logger.Error(err, "Failed to perform garbage collection of node scan assets")
+	}
+
+	// Always update the timestamp so we don't retry until the next new successful scan.
+	// GC failure is non-critical — stale assets will be cleaned up on the next attempt.
+	now := metav1.Now()
+	n.Mondoo.Status.LastNodeScanGarbageCollectionTime = &now
+}
+
+// performGarbageCollection calls the Mondoo API to delete stale node scan assets.
+func (n *DeploymentHandler) performGarbageCollection(ctx context.Context, managedBy string) error {
+	// Node assets are scanned via the filesystem/OS provider and have no PlatformRuntime set
+	// (unlike k8s resource assets which have PlatformRuntime "k8s-cluster").
+	// Omitting PlatformRuntime so the filter matches node assets.
+	req := &mondooclient.DeleteAssetsRequest{
+		ManagedBy: managedBy,
+		DateFilter: &mondooclient.DateFilter{
+			Timestamp:  time.Now().Add(-mondoo.GCOlderThan()).Format(time.RFC3339),
+			Comparison: mondooclient.Comparison_LESS_THAN,
+			Field:      mondooclient.DateFilterField_FILTER_LAST_UPDATED,
+		},
+	}
+
+	if err := mondoo.DeleteStaleAssets(ctx, n.KubeClient, n.Mondoo, n.MondooOperatorConfig, n.MondooClientBuilder, req, logger); err != nil {
+		return err
+	}
+
+	logger.Info("Successfully performed garbage collection of node scan assets")
 	return nil
 }

@@ -277,6 +277,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		KubeClient:             r.Client,
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: imageResolver,
+		MondooClientBuilder:    r.MondooClientBuilder,
 		IsOpenshift:            r.RunningOnOpenShift,
 	}
 

@@ -20,7 +20,6 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
-	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
@@ -610,61 +609,20 @@ func (n *DeploymentHandler) garbageCollectIfNeeded(ctx context.Context, clusterU
 	n.Mondoo.Status.LastK8sResourceGarbageCollectionTime = &now
 }
 
-// performGarbageCollection calls the Mondoo API to garbage collect stale K8s resource scan assets.
+// performGarbageCollection calls the Mondoo API to delete stale K8s resource scan assets.
 func (n *DeploymentHandler) performGarbageCollection(ctx context.Context, managedBy string) error {
-	if n.MondooClientBuilder == nil {
-		logger.Info("MondooClientBuilder not configured, skipping garbage collection")
-		return nil
-	}
-
-	// Read service account credentials from the creds secret
-	credsSecret := &corev1.Secret{}
-	credsSecretKey := client.ObjectKey{
-		Namespace: n.Mondoo.Namespace,
-		Name:      n.Mondoo.Spec.MondooCredsSecretRef.Name,
-	}
-	if err := n.KubeClient.Get(ctx, credsSecretKey, credsSecret); err != nil {
-		return fmt.Errorf("failed to get credentials secret: %w", err)
-	}
-
-	saData, ok := credsSecret.Data[constants.MondooCredsSecretServiceAccountKey]
-	if !ok {
-		return fmt.Errorf("credentials secret missing key %q", constants.MondooCredsSecretServiceAccountKey)
-	}
-
-	sa, err := mondoo.LoadServiceAccountFromFile(saData)
-	if err != nil {
-		return fmt.Errorf("failed to load service account: %w", err)
-	}
-
-	token, err := mondoo.GenerateTokenFromServiceAccount(*sa, logger)
-	if err != nil {
-		return fmt.Errorf("failed to generate token: %w", err)
-	}
-
-	opts := mondooclient.MondooClientOptions{
-		ApiEndpoint: sa.ApiEndpoint,
-		Token:       token,
-	}
-	if n.MondooOperatorConfig != nil {
-		opts.HttpProxy = n.MondooOperatorConfig.Spec.HttpProxy
-		opts.HttpsProxy = n.MondooOperatorConfig.Spec.HttpsProxy
-		opts.NoProxy = n.MondooOperatorConfig.Spec.NoProxy
-	}
-
-	mondooClient, err := n.MondooClientBuilder(opts)
-	if err != nil {
-		return fmt.Errorf("failed to create mondoo client: %w", err)
-	}
-
-	gcOpts := &mondooclient.GarbageCollectOptions{
+	req := &mondooclient.DeleteAssetsRequest{
 		ManagedBy:       managedBy,
 		PlatformRuntime: "k8s-cluster",
-		OlderThan:       time.Now().Add(-2 * time.Hour).Format(time.RFC3339),
+		DateFilter: &mondooclient.DateFilter{
+			Timestamp:  time.Now().Add(-mondoo.GCOlderThan()).Format(time.RFC3339),
+			Comparison: mondooclient.Comparison_LESS_THAN,
+			Field:      mondooclient.DateFilterField_FILTER_LAST_UPDATED,
+		},
 	}
 
-	if err := mondooClient.GarbageCollectAssets(ctx, gcOpts); err != nil {
-		return fmt.Errorf("garbage collection API call failed: %w", err)
+	if err := mondoo.DeleteStaleAssets(ctx, n.KubeClient, n.Mondoo, n.MondooOperatorConfig, n.MondooClientBuilder, req, logger); err != nil {
+		return err
 	}
 
 	logger.Info("Successfully performed garbage collection of K8s resource scan assets")

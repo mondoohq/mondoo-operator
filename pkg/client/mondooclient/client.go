@@ -19,7 +19,7 @@ const (
 	IntegrationRegisterEndpoint       = "/IntegrationsManager/Register"
 	IntegrationCheckInEndpoint        = "/IntegrationsManager/CheckIn"
 	IntegrationReportStatusEndpoint   = "/IntegrationsManager/ReportStatus"
-	GarbageCollectAssetsEndpoint      = "/Scan/GarbageCollectAssets"
+	DeleteAssetsEndpoint              = "/AssetStore/DeleteAssets"
 )
 
 type MondooClientOptions struct {
@@ -150,18 +150,23 @@ func (s *mondooClient) IntegrationReportStatus(ctx context.Context, in *ReportSt
 	return nil
 }
 
-func (s *mondooClient) GarbageCollectAssets(ctx context.Context, opts *GarbageCollectOptions) error {
-	url := s.ApiEndpoint + GarbageCollectAssetsEndpoint
+func (s *mondooClient) DeleteAssets(ctx context.Context, req *DeleteAssetsRequest) (*DeleteAssetsConfirmation, error) {
+	url := s.ApiEndpoint + DeleteAssetsEndpoint
 
-	reqBodyBytes, err := json.Marshal(opts)
+	reqBodyBytes, err := json.Marshal(req)
 	if err != nil {
-		return fmt.Errorf("failed to marshal request: %v", err)
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	_, err = common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
+	respBodyBytes, err := common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
 	if err != nil {
-		return fmt.Errorf("failed to make garbage collect request: %v", err)
+		return nil, fmt.Errorf("failed to make delete assets request: %v", err)
 	}
 
-	return nil
+	out := &DeleteAssetsConfirmation{}
+	if err = json.Unmarshal(respBodyBytes, out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %v", err)
+	}
+
+	return out, nil
 }
