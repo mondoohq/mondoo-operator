@@ -48,6 +48,7 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
+	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_TMP_DIR", Value: "/tmp"})
 
 	// Add proxy environment variables from MondooOperatorConfig only if SkipProxyForCnspec is false
 	if !cfg.Spec.SkipProxyForCnspec {
@@ -222,6 +223,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 							Options: map[string]string{
 								"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
 								"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
+								"disable-cache":      "false",
 							},
 							Discover: &inventory.Discovery{
 								Targets: []string{"container-images"},

@@ -202,6 +202,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 
 	envVars := buildEnvVars(cfg)
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
+	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_TMP_DIR", Value: "/tmp"})
 	// Point KUBECONFIG to the mounted kubeconfig file
 	envVars = append(envVars, corev1.EnvVar{Name: "KUBECONFIG", Value: "/etc/opt/mondoo/kubeconfig/kubeconfig"})
 
@@ -1011,6 +1012,7 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 							Options: map[string]string{
 								"namespaces":         strings.Join(filtering.Namespaces.Include, ","),
 								"namespaces-exclude": strings.Join(filtering.Namespaces.Exclude, ","),
+								"disable-cache":      "false",
 							},
 							Discover: &inventory.Discovery{
 								Targets: targets,

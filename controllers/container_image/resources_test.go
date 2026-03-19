@@ -158,6 +158,17 @@ func TestCronJob_PrivateRegistrySecretMountsDockerConfig(t *testing.T) {
 	assert.True(t, found, "pull-secrets volume mount should be present")
 }
 
+func TestCronJob_HasMondooTmpDir(t *testing.T) {
+	m := testAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", "", testClusterUID, "", m, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	envMap := envToMap(container.Env)
+	assert.Equal(t, "/tmp", envMap["MONDOO_TMP_DIR"])
+}
+
 func TestInventory_WithContainerProxy(t *testing.T) {
 	auditConfig := v1alpha2.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
