@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"go.mondoo.com/mondoo-operator/pkg/annotations"
+	mondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
 var scannerLogger = ctrl.Log.WithName("resource-watcher-scanner")
@@ -162,10 +163,7 @@ func (s *Scanner) generateInventory(resources []K8sResourceIdentifier) ([]byte, 
 		opts["namespaces-exclude"] = strings.Join(s.config.NamespacesExclude, ",")
 	}
 
-	managedBy := "mondoo-operator"
-	if s.config.ClusterUID != "" {
-		managedBy = "mondoo-operator-" + s.config.ClusterUID
-	}
+	managedBy := mondoo.ManagedByLabel(s.config.ClusterUID)
 
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{

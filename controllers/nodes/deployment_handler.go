@@ -422,7 +422,7 @@ func (n *DeploymentHandler) garbageCollectIfNeeded(ctx context.Context, clusterU
 		return
 	}
 
-	managedBy := "mondoo-operator-" + clusterUid
+	managedBy := mondoo.ManagedByLabel(clusterUid)
 	if err := n.performGarbageCollection(ctx, managedBy); err != nil {
 		logger.Error(err, "Failed to perform garbage collection of node scan assets")
 	}

@@ -14,6 +14,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	mondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mql/v13/providers-sdk/v1/inventory"
 	"gopkg.in/yaml.v2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -954,7 +955,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 					Labels: map[string]string{
 						"k8s.mondoo.com/kind": "cluster",
 					},
-					ManagedBy: "mondoo-operator-" + clusterUID,
+					ManagedBy: mondoo.ManagedByLabel(clusterUID),
 				},
 			},
 		},
@@ -1024,7 +1025,7 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 						"mondoo.com/cluster-name":  cluster.Name,
 						"mondoo.com/external-scan": "true",
 					},
-					ManagedBy: "mondoo-operator-" + operatorClusterUID,
+					ManagedBy: mondoo.ManagedByLabel(operatorClusterUID),
 				},
 			},
 		},

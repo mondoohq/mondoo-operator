@@ -21,6 +21,15 @@ import (
 
 const defaultGCOlderThan = 2 * time.Hour
 
+// ManagedByLabel returns the ManagedBy value for assets owned by this operator instance.
+// The cluster UID uniquely identifies which operator instance manages the assets.
+func ManagedByLabel(clusterUID string) string {
+	if clusterUID == "" {
+		return "mondoo-operator"
+	}
+	return "mondoo-operator-" + clusterUID
+}
+
 // GCOlderThan returns the duration threshold for garbage collection.
 // It defaults to 2h but can be overridden via the MONDOO_GC_OLDER_THAN env var
 // (accepts any value parseable by time.ParseDuration, e.g. "5m", "30s").
