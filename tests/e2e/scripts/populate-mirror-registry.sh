@@ -18,7 +18,7 @@ source "${SCRIPT_DIR}/common.sh"
 
 # cnspec image constants (must match pkg/utils/mondoo/container_image_resolver.go)
 CNSPEC_IMAGE="ghcr.io/mondoohq/mondoo-operator/cnspec"
-CNSPEC_TAG="12-rootless"
+CNSPEC_TAG="13-rootless"
 
 CNSPEC_SRC="${CNSPEC_IMAGE}:${CNSPEC_TAG}"
 # Mirror path preserves the ghcr.io path structure so registryMirrors mapping works:
