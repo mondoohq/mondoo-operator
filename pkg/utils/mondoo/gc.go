@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/robfig/cron/v3"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -19,7 +20,10 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 )
 
-const defaultGCOlderThan = 2 * time.Hour
+const (
+	defaultGCOlderThan = 2 * time.Hour
+	gcMultiplier       = 2
+)
 
 // ManagedByLabel returns the ManagedBy value for assets owned by this operator instance.
 // The cluster UID uniquely identifies which operator instance manages the assets.
@@ -30,19 +34,41 @@ func ManagedByLabel(clusterUID string) string {
 	return "mondoo-operator-" + clusterUID
 }
 
-// GCOlderThan returns the duration threshold for garbage collection.
-// It defaults to 2h but can be overridden via the MONDOO_GC_OLDER_THAN env var
-// (accepts any value parseable by time.ParseDuration, e.g. "5m", "30s").
-func GCOlderThan() time.Duration {
+// GCOlderThan returns the duration threshold for garbage collection based on
+// the scan schedule. It computes 2x the interval between consecutive cron runs
+// so that assets are only GC'd after missing at least one full scan cycle.
+// The MONDOO_GC_OLDER_THAN env var overrides the computed value.
+func GCOlderThan(schedule string) time.Duration {
 	if v := os.Getenv("MONDOO_GC_OLDER_THAN"); v != "" {
 		d, err := time.ParseDuration(v)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "WARNING: invalid MONDOO_GC_OLDER_THAN=%q, using default %s: %v\n", v, defaultGCOlderThan, err)
+			fmt.Fprintf(os.Stderr, "WARNING: invalid MONDOO_GC_OLDER_THAN=%q, falling back to schedule-based computation: %v\n", v, err)
 		} else {
 			return d
 		}
 	}
-	return defaultGCOlderThan
+	return gcOlderThanFromSchedule(schedule)
+}
+
+// gcOlderThanFromSchedule parses a cron schedule and returns 2x the interval
+// between consecutive runs. Falls back to defaultGCOlderThan if parsing fails.
+func gcOlderThanFromSchedule(schedule string) time.Duration {
+	if schedule == "" {
+		return defaultGCOlderThan
+	}
+
+	sched, err := cron.ParseStandard(schedule)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: failed to parse cron schedule %q, using default %s: %v\n", schedule, defaultGCOlderThan, err)
+		return defaultGCOlderThan
+	}
+
+	now := time.Now()
+	next1 := sched.Next(now)
+	next2 := sched.Next(next1)
+	interval := next2.Sub(next1)
+
+	return time.Duration(gcMultiplier) * interval
 }
 
 // DeleteStaleAssets builds a Mondoo API client from the operator's credentials and

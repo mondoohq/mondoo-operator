@@ -614,7 +614,7 @@ func (n *DeploymentHandler) performGarbageCollection(ctx context.Context, manage
 		ManagedBy:       managedBy,
 		PlatformRuntime: "k8s-cluster",
 		DateFilter: &mondooclient.DateFilter{
-			Timestamp:  time.Now().Add(-mondoo.GCOlderThan()).Format(time.RFC3339),
+			Timestamp:  time.Now().Add(-mondoo.GCOlderThan(n.Mondoo.Spec.KubernetesResources.Schedule)).Format(time.RFC3339),
 			Comparison: mondooclient.Comparison_LESS_THAN,
 			Field:      mondooclient.DateFilterField_FILTER_LAST_UPDATED,
 		},
