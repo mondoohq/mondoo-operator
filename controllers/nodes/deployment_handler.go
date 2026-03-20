@@ -441,7 +441,7 @@ func (n *DeploymentHandler) performGarbageCollection(ctx context.Context, manage
 	req := &mondooclient.DeleteAssetsRequest{
 		ManagedBy: managedBy,
 		DateFilter: &mondooclient.DateFilter{
-			Timestamp:  time.Now().Add(-mondoo.GCOlderThan()).Format(time.RFC3339),
+			Timestamp:  time.Now().Add(-mondoo.GCOlderThan(n.Mondoo.Spec.Nodes.Schedule)).Format(time.RFC3339),
 			Comparison: mondooclient.Comparison_LESS_THAN,
 			Field:      mondooclient.DateFilterField_FILTER_LAST_UPDATED,
 		},
