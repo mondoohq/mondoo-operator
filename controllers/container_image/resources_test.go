@@ -9,10 +9,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/yaml"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mql/v13/providers-sdk/v1/inventory"

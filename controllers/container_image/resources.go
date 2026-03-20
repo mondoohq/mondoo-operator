@@ -15,11 +15,11 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	mondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mql/v13/providers-sdk/v1/inventory"
-	"gopkg.in/yaml.v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/yaml"
 )
 
 const (
