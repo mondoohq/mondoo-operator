@@ -1528,11 +1528,14 @@ func TestExternalClusterNaming(t *testing.T) {
 
 func (s *DeploymentHandlerSuite) TestGarbageCollection_RunsAfterSuccessfulScan() {
 	gcCalled := false
-	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.GarbageCollectOptions) error {
+	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, req *mondooclient.DeleteAssetsRequest) error {
 		gcCalled = true
-		s.Equal("k8s-cluster", opts.PlatformRuntime)
-		s.Contains(opts.ManagedBy, "mondoo-operator-")
-		s.NotEmpty(opts.OlderThan)
+		s.Equal("k8s-cluster", req.PlatformRuntime)
+		s.Contains(req.ManagedBy, "mondoo-operator-")
+		s.NotNil(req.DateFilter)
+		s.NotEmpty(req.DateFilter.Timestamp)
+		s.Equal(mondooclient.Comparison_LESS_THAN, req.DateFilter.Comparison)
+		s.Equal(mondooclient.DateFilterField_FILTER_LAST_UPDATED, req.DateFilter.Field)
 		return nil
 	})
 	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
@@ -1556,13 +1559,13 @@ func (s *DeploymentHandlerSuite) TestGarbageCollection_RunsAfterSuccessfulScan()
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	s.True(gcCalled, "GarbageCollectAssets should have been called")
+	s.True(gcCalled, "DeleteAssets should have been called")
 	s.NotNil(d.Mondoo.Status.LastK8sResourceGarbageCollectionTime, "GC timestamp should be set in status")
 }
 
 func (s *DeploymentHandlerSuite) TestGarbageCollection_SkipsWhenAlreadyRun() {
 	gcCalled := false
-	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.GarbageCollectOptions) error {
+	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.DeleteAssetsRequest) error {
 		gcCalled = true
 		return nil
 	})
@@ -1591,11 +1594,11 @@ func (s *DeploymentHandlerSuite) TestGarbageCollection_SkipsWhenAlreadyRun() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	s.False(gcCalled, "GarbageCollectAssets should NOT have been called")
+	s.False(gcCalled, "DeleteAssets should NOT have been called")
 }
 
 func (s *DeploymentHandlerSuite) TestGarbageCollection_FailureStillUpdatesTimestamp() {
-	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.GarbageCollectOptions) error {
+	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.DeleteAssetsRequest) error {
 		return fmt.Errorf("API error")
 	})
 	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
@@ -1624,8 +1627,8 @@ func (s *DeploymentHandlerSuite) TestGarbageCollection_FailureStillUpdatesTimest
 }
 
 // createDeploymentHandlerWithGCMock creates a DeploymentHandler with a mock MondooClientBuilder
-// that captures calls to GarbageCollectAssets.
-func (s *DeploymentHandlerSuite) createDeploymentHandlerWithGCMock(gcFunc func(context.Context, *mondooclient.GarbageCollectOptions) error) DeploymentHandler {
+// that captures calls to DeleteAssets.
+func (s *DeploymentHandlerSuite) createDeploymentHandlerWithGCMock(gcFunc func(context.Context, *mondooclient.DeleteAssetsRequest) error) DeploymentHandler {
 	// Create a mock credentials secret so GC can read it
 	key := credentials.MondooServiceAccount(s.T())
 	mockSA := mondooclient.ServiceAccountCredentials{
@@ -1660,14 +1663,14 @@ func (s *DeploymentHandlerSuite) createDeploymentHandlerWithGCMock(gcFunc func(c
 // fakeMondooClient implements just enough of MondooClient to test GC
 type fakeMondooClient struct {
 	mondooclient.MondooClient
-	gcFunc func(context.Context, *mondooclient.GarbageCollectOptions) error
+	gcFunc func(context.Context, *mondooclient.DeleteAssetsRequest) error
 }
 
-func (f *fakeMondooClient) GarbageCollectAssets(ctx context.Context, opts *mondooclient.GarbageCollectOptions) error {
+func (f *fakeMondooClient) DeleteAssets(ctx context.Context, req *mondooclient.DeleteAssetsRequest) (*mondooclient.DeleteAssetsConfirmation, error) {
 	if f.gcFunc != nil {
-		return f.gcFunc(ctx, opts)
+		return &mondooclient.DeleteAssetsConfirmation{}, f.gcFunc(ctx, req)
 	}
-	return nil
+	return &mondooclient.DeleteAssetsConfirmation{}, nil
 }
 
 func TestDeploymentHandlerSuite(t *testing.T) {
