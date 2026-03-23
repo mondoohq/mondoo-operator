@@ -54,6 +54,11 @@ load_tf_outputs() {
     export SQUID_PROXY_IP="$(terraform output -raw squid_proxy_ip)"
   fi
 
+  export ENABLE_WIF_TEST="$(terraform output -raw enable_wif_test 2>/dev/null || echo "false")"
+  if [[ "${ENABLE_WIF_TEST}" == "true" ]]; then
+    export WIF_GSA_EMAIL="$(terraform output -raw wif_gsa_email)"
+  fi
+
   cd ->/dev/null
 
   # Use gcloud to get cluster credentials (auto-refreshing auth)

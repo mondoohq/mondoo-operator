@@ -70,3 +70,11 @@ output "enable_proxy_test" {
 output "squid_proxy_ip" {
   value = var.enable_proxy_test ? google_compute_instance.squid_proxy[0].network_interface[0].network_ip : ""
 }
+
+output "enable_wif_test" {
+  value = var.enable_wif_test
+}
+
+output "wif_gsa_email" {
+  value = var.enable_wif_test ? google_service_account.wif_scanner[0].email : ""
+}

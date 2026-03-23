@@ -40,3 +40,9 @@ variable "enable_proxy_test" {
   type        = bool
   default     = false
 }
+
+variable "enable_wif_test" {
+  description = "Enable GKE Workload Identity Federation for external cluster scanning"
+  type        = bool
+  default     = false
+}
