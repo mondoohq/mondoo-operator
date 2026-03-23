@@ -6,6 +6,13 @@
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+E2E_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# CLOUD_DIR can be set by caller, or derived from first argument
+if [[ -z "${CLOUD_DIR:-}" ]]; then
+  CLOUD="${1:?Usage: $0 <cloud> (gke|eks) — or set CLOUD_DIR}"
+  export CLOUD_DIR="${E2E_DIR}/${CLOUD}"
+fi
 source "${SCRIPT_DIR}/common.sh"
 
 NAMESPACE="${NAMESPACE:-mondoo-operator}"

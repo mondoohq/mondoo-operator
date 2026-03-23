@@ -2,7 +2,7 @@
 # Copyright Mondoo, Inc. 2026
 # SPDX-License-Identifier: BUSL-1.1
 
-# Common utilities for e2e test scripts
+# Common utilities for e2e test scripts (cloud-agnostic)
 
 set -euo pipefail
 
@@ -16,57 +16,45 @@ die()   { err "$@"; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 E2E_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${E2E_DIR}/../.." && pwd)"
-TF_DIR="${E2E_DIR}/terraform"
 
-export SCRIPT_DIR E2E_DIR REPO_ROOT TF_DIR
+# CLOUD_DIR must be set by the runner script (e.g., tests/e2e/gke or tests/e2e/eks)
+: "${CLOUD_DIR:?CLOUD_DIR must be set before sourcing common.sh}"
 
-# Load Terraform outputs into environment variables
+TF_DIR="${CLOUD_DIR}/terraform"
+MANIFESTS_DIR="${CLOUD_DIR}/manifests"
+SHARED_MANIFESTS_DIR="${E2E_DIR}/manifests"
+
+export SCRIPT_DIR E2E_DIR REPO_ROOT TF_DIR CLOUD_DIR MANIFESTS_DIR SHARED_MANIFESTS_DIR
+
+# Load Terraform outputs into environment variables.
+# Delegates to cloud-specific loader (common-gke.sh or common-eks.sh).
 load_tf_outputs() {
   info "Loading Terraform outputs..."
   cd "${TF_DIR}"
 
-  export PROJECT_ID="$(terraform output -raw project_id)"
+  # Common outputs (all clouds)
   export REGION="$(terraform output -raw region)"
   export CLUSTER_NAME="$(terraform output -raw cluster_name)"
-  export AR_REPO="$(terraform output -raw artifact_registry_repo)"
   export MONDOO_CREDS_B64="$(terraform output -raw mondoo_credentials_b64)"
   export MONDOO_SPACE_MRN="$(terraform output -raw mondoo_space_mrn)"
   export NAME_PREFIX="$(terraform output -raw name_prefix)"
-  export AUTOPILOT="$(terraform output -raw autopilot)"
   export GIT_SHA="$(git -C "${REPO_ROOT}" rev-parse --short HEAD)"
   export NAMESPACE="mondoo-operator"
 
   export ENABLE_TARGET_CLUSTER="$(terraform output -raw enable_target_cluster 2>/dev/null || echo "false")"
   if [[ "${ENABLE_TARGET_CLUSTER}" == "true" ]]; then
     export TARGET_CLUSTER_NAME="$(terraform output -raw target_cluster_name)"
-    # Resolve to absolute path since we're currently in TF_DIR
     export TARGET_KUBECONFIG_PATH="$(cd "${TF_DIR}" && realpath "$(terraform output -raw target_kubeconfig_path)")"
   fi
 
-  export ENABLE_MIRROR_TEST="$(terraform output -raw enable_mirror_test 2>/dev/null || echo "false")"
-  if [[ "${ENABLE_MIRROR_TEST}" == "true" ]]; then
-    export MIRROR_REGISTRY="$(terraform output -raw mirror_registry_repo)"
-    export MIRROR_SA_KEY_B64="$(terraform output -raw mirror_sa_key_b64)"
-  fi
-
-  export ENABLE_PROXY_TEST="$(terraform output -raw enable_proxy_test 2>/dev/null || echo "false")"
-  if [[ "${ENABLE_PROXY_TEST}" == "true" ]]; then
-    export SQUID_PROXY_IP="$(terraform output -raw squid_proxy_ip)"
-  fi
-
   export ENABLE_WIF_TEST="$(terraform output -raw enable_wif_test 2>/dev/null || echo "false")"
-  if [[ "${ENABLE_WIF_TEST}" == "true" ]]; then
-    export WIF_GSA_EMAIL="$(terraform output -raw wif_gsa_email)"
-  fi
 
   cd ->/dev/null
 
-  # Use gcloud to get cluster credentials (auto-refreshing auth)
-  info "Fetching GKE credentials..."
-  gcloud container clusters get-credentials "${CLUSTER_NAME}" \
-    --region "${REGION}" --project "${PROJECT_ID}" --quiet
+  # Delegate to cloud-specific loader for remaining outputs and credential setup
+  _load_cloud_outputs
 
-  info "Loaded outputs: cluster=${CLUSTER_NAME}, repo=${AR_REPO}"
+  info "Loaded outputs: cluster=${CLUSTER_NAME}, repo=${REGISTRY_REPO}"
   if [[ "${ENABLE_TARGET_CLUSTER}" == "true" ]]; then
     info "Target cluster enabled: ${TARGET_CLUSTER_NAME}"
   fi
@@ -87,3 +75,7 @@ wait_for_pods_ready() {
   info "Waiting for pods with selector '${selector}' in ${ns} (timeout: ${timeout})..."
   kubectl wait --for=condition=Ready pods -l "${selector}" -n "${ns}" --timeout="${timeout}"
 }
+
+# Source the cloud-specific common script
+CLOUD_PROVIDER="$(basename "${CLOUD_DIR}")"
+source "${SCRIPT_DIR}/common-${CLOUD_PROVIDER}.sh"

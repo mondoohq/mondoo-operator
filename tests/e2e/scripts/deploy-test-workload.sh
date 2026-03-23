@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
 info "Deploying nginx test workload..."
-kubectl apply -f "${E2E_DIR}/manifests/nginx-workload.yaml"
+kubectl apply -f "${SHARED_MANIFESTS_DIR}/nginx-workload.yaml"
 
 wait_for_deployment "default" "nginx-test-workload"
 

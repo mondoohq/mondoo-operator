@@ -8,18 +8,19 @@
 #
 # Prerequisites:
 #   - Terraform infrastructure provisioned with enable_target_cluster=true
-#   - gcloud authenticated, docker, helm, kubectl available
+#   - Cloud CLI authenticated, docker, helm, kubectl available
 #
 # Usage:
-#   ./run-vault-external-cluster.sh
+#   ./run-vault-external-cluster.sh <cloud>    (gke|eks)
 
 set -euo pipefail
 
-E2E_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${E2E_ROOT}/scripts/common.sh"
+CLOUD="${1:?Usage: $0 <cloud> (gke|eks)}"
+export CLOUD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/${CLOUD}" && pwd)"
+source "${CLOUD_DIR}/../scripts/common.sh"
 
 info "=========================================="
-info "  Test: Vault External Cluster Scanning"
+info "  Test: Vault External Cluster Scanning (${CLOUD})"
 info "=========================================="
 
 # Step 1: Load Terraform outputs
@@ -31,15 +32,15 @@ fi
 
 # Step 2: Build and push operator image
 info "--- Step: Build and Push ---"
-source "${E2E_ROOT}/scripts/build-and-push.sh"
+source "${E2E_DIR}/scripts/build-and-push.sh"
 
 # Step 3: Deploy test workload to scanner cluster
 info "--- Step: Deploy Test Workload (scanner cluster) ---"
-source "${E2E_ROOT}/scripts/deploy-test-workload.sh"
+source "${E2E_DIR}/scripts/deploy-test-workload.sh"
 
 # Step 4: Deploy operator from local chart
 info "--- Step: Deploy Operator ---"
-source "${E2E_ROOT}/scripts/deploy-operator.sh"
+source "${E2E_DIR}/scripts/deploy-operator.sh"
 
 # Step 5: Ensure CRDs include vaultAuth field (Helm doesn't upgrade CRDs)
 info "--- Step: Update CRDs ---"
@@ -47,16 +48,16 @@ kubectl apply --server-side --force-conflicts -f "${REPO_ROOT}/config/crd/bases/
 
 # Step 6: Deploy test workload to target cluster (no kubeconfig Secret — Vault handles auth)
 info "--- Step: Deploy Target Workload ---"
-source "${E2E_ROOT}/scripts/deploy-target-workload-only.sh"
+source "${E2E_DIR}/scripts/deploy-target-workload-only.sh"
 
 # Step 7: Deploy and configure Vault
 info "--- Step: Deploy and Configure Vault ---"
-source "${E2E_ROOT}/scripts/deploy-vault.sh"
+source "${E2E_DIR}/scripts/deploy-vault.sh"
 
 # Step 8: Apply MondooAuditConfig with Vault auth
 info "--- Step: Apply Mondoo Config (with Vault auth) ---"
 export ENABLE_VAULT_TEST="true"
-source "${E2E_ROOT}/scripts/apply-mondoo-config.sh"
+source "${E2E_DIR}/scripts/apply-mondoo-config.sh"
 
 # Step 9: Wait for operator to reconcile
 info "Waiting 90s for operator to reconcile and Vault token fetch..."
@@ -64,13 +65,13 @@ sleep 90
 
 # Step 10: Verify local scanning
 info "--- Step: Verify (local) ---"
-source "${E2E_ROOT}/scripts/verify.sh"
+source "${E2E_DIR}/scripts/verify.sh"
 
 # Step 11: Verify Vault-based external cluster scanning
 info "--- Step: Verify (Vault external cluster) ---"
-source "${E2E_ROOT}/scripts/verify-vault-external.sh"
+source "${E2E_DIR}/scripts/verify-vault-external.sh"
 
 info ""
 info "=========================================="
-info "  Test: Vault External Cluster Scanning - COMPLETE"
+info "  Test: Vault External Cluster Scanning (${CLOUD}) - COMPLETE"
 info "=========================================="

@@ -2,14 +2,15 @@
 # Copyright Mondoo, Inc. 2026
 # SPDX-License-Identifier: BUSL-1.1
 
-# Verify WIF external cluster scanning resources are created
+# Verify WIF external cluster scanning resources (cloud-agnostic)
+# Uses WIF_ANNOTATION_KEY, wif_annotation_value(), WIF_INIT_IMAGE_PATTERN,
+# and WIF_AUTH_DESCRIPTION from common-{provider}.sh.
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
 : "${NAMESPACE:?NAMESPACE must be set}"
-: "${WIF_GSA_EMAIL:?WIF_GSA_EMAIL must be set}"
 
 PASS=0
 FAIL=0
@@ -28,16 +29,18 @@ check() {
 
 info "=== WIF External Cluster Verification ==="
 
+EXPECTED_WIF_VALUE="$(wif_annotation_value)"
+
 # Check WIF ServiceAccount exists
 check "WIF ServiceAccount exists" \
   kubectl get serviceaccount mondoo-client-wif-target-cluster -n "${NAMESPACE}"
 
 # Check WIF SA has correct annotation
-check "WIF SA has iam.gke.io/gcp-service-account annotation" \
+check "WIF SA has ${WIF_ANNOTATION_KEY} annotation" \
   bash -c "
     ANNOTATION=\$(kubectl get serviceaccount mondoo-client-wif-target-cluster -n '${NAMESPACE}' \
-      -o jsonpath='{.metadata.annotations.iam\\.gke\\.io/gcp-service-account}')
-    [[ \"\${ANNOTATION}\" == '${WIF_GSA_EMAIL}' ]]
+      -o jsonpath='{.metadata.annotations.${WIF_ANNOTATION_KEY//./\\.}}')
+    [[ \"\${ANNOTATION}\" == '${EXPECTED_WIF_VALUE}' ]]
   "
 
 # Check CronJob for external cluster exists
@@ -52,12 +55,12 @@ check "CronJob has generate-kubeconfig init container" \
       | grep -q generate-kubeconfig
   "
 
-# Check init container uses gcloud image
-check "Init container uses gcloud image" \
+# Check init container uses the correct cloud CLI image
+check "Init container uses ${WIF_INIT_IMAGE_PATTERN} image" \
   bash -c "
     kubectl get cronjobs -n '${NAMESPACE}' -l cluster_name=target-cluster \
       -o jsonpath='{.items[0].spec.jobTemplate.spec.template.spec.initContainers[0].image}' \
-      | grep -q 'google-cloud-cli'
+      | grep -q '${WIF_INIT_IMAGE_PATTERN}'
   "
 
 # Check CronJob uses the WIF ServiceAccount
@@ -108,5 +111,5 @@ info "Check the Mondoo console for WIF-authenticated external cluster assets"
 info "  Space MRN: ${MONDOO_SPACE_MRN:-unknown}"
 info "  - Target cluster K8s resources should appear as assets"
 info "  - nginx-test-workload from the target cluster should be visible"
-info "  - Auth was via GKE Workload Identity (no static kubeconfig Secret)"
+info "  - Auth was via ${WIF_AUTH_DESCRIPTION} (no static kubeconfig Secret)"
 read -rp "Press Enter once verified (or Ctrl+C to abort)... "

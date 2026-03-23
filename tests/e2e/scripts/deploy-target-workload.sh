@@ -11,12 +11,12 @@ source "${SCRIPT_DIR}/common.sh"
 
 : "${TARGET_KUBECONFIG_PATH:?TARGET_KUBECONFIG_PATH must be set}"
 : "${NAMESPACE:?NAMESPACE must be set}"
-: "${CLUSTER_NAME:?CLUSTER_NAME must be set}"
-: "${REGION:?REGION must be set}"
-: "${PROJECT_ID:?PROJECT_ID must be set}"
+
+# Refresh target cluster credentials (cloud-specific)
+refresh_target_credentials
 
 info "Deploying nginx test workload to target cluster..."
-kubectl --kubeconfig "${TARGET_KUBECONFIG_PATH}" apply -f "${E2E_DIR}/manifests/nginx-workload.yaml"
+kubectl --kubeconfig "${TARGET_KUBECONFIG_PATH}" apply -f "${SHARED_MANIFESTS_DIR}/nginx-workload.yaml"
 
 info "Waiting for nginx deployment on target cluster..."
 kubectl --kubeconfig "${TARGET_KUBECONFIG_PATH}" rollout status deployment/nginx-test-workload \

@@ -63,7 +63,7 @@ terraform.tfvars
 terraform.tfstate.backup
 
 # tests artifacts
-tests/e2e/terraform/kubeconfig
-tests/e2e/terraform/kubeconfig-target
-tests/e2e/terraform/gke_gcloud_auth_plugin_cache
-tests/e2e/terraform/mondoo.json
+tests/e2e/**/kubeconfig
+tests/e2e/**/kubeconfig-target
+tests/e2e/**/gke_gcloud_auth_plugin_cache
+tests/e2e/**/mondoo.json
