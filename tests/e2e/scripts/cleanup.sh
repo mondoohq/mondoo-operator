@@ -15,6 +15,9 @@ if [[ -z "${CLOUD_DIR:-}" ]]; then
 fi
 source "${SCRIPT_DIR}/common.sh"
 
+# Load terraform outputs to set KUBECONFIG and other vars
+load_tf_outputs
+
 NAMESPACE="${NAMESPACE:-mondoo-operator}"
 
 info "=== E2E Cleanup ==="
