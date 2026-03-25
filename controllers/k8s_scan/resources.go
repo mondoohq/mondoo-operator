@@ -733,6 +733,13 @@ echo "=== END DEBUG ==="
 	case v1alpha2.CloudProviderAKS:
 		image = AzureCLIImage
 		script = retryWrapper + `
+# Azure CLI requires explicit login with the federated token injected by the
+# AKS Workload Identity webhook (AZURE_CLIENT_ID, AZURE_TENANT_ID,
+# AZURE_FEDERATED_TOKEN_FILE are set as env vars by the webhook).
+retry az login --federated-token "$(cat "$AZURE_FEDERATED_TOKEN_FILE")" \
+  --service-principal \
+  -u "$AZURE_CLIENT_ID" \
+  -t "$AZURE_TENANT_ID"
 retry az aks get-credentials \
   --resource-group "$RESOURCE_GROUP" \
   --name "$CLUSTER_NAME" \
