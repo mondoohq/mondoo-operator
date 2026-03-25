@@ -13,11 +13,11 @@
 #   - For proxy testing: also set enable_proxy_test=true in terraform
 #
 # Usage:
-#   ./run-registry-mirroring.sh <cloud>    (gke|eks)
+#   ./run-registry-mirroring.sh <cloud>    (gke|eks|aks)
 
 set -euo pipefail
 
-CLOUD="${1:?Usage: $0 <cloud> (gke|eks)}"
+CLOUD="${1:?Usage: $0 <cloud> (gke|eks|aks)}"
 export CLOUD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/${CLOUD}" && pwd)"
 source "${CLOUD_DIR}/../scripts/common.sh"
 

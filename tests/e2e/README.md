@@ -1,6 +1,6 @@
 # E2E Test Suite for Mondoo Operator
 
-End-to-end tests that deploy the Mondoo operator to real Kubernetes clusters (GKE and EKS) and verify scanning works.
+End-to-end tests that deploy the Mondoo operator to real Kubernetes clusters (GKE, EKS, and AKS) and verify scanning works.
 
 ## Architecture
 
@@ -11,6 +11,7 @@ The e2e test suite is structured for multi-cloud support:
 - **`run-*.sh`** — Shared test runners that accept a cloud argument (e.g., `./run-fresh-deploy.sh gke`)
 - **`gke/`** — GKE-specific terraform and manifests
 - **`eks/`** — EKS-specific terraform and manifests
+- **`aks/`** — AKS-specific terraform and manifests
 
 Each cloud directory contains:
 - `terraform/` — Infrastructure provisioning (cluster, registry, Mondoo space, optional WIF/target cluster)
@@ -18,7 +19,7 @@ Each cloud directory contains:
 
 ## Test Cases
 
-All runners accept a cloud argument: `./run-<test>.sh <cloud>` where `<cloud>` is `gke` or `eks`.
+All runners accept a cloud argument: `./run-<test>.sh <cloud>` where `<cloud>` is `gke`, `eks`, or `aks`.
 
 | Test | Runner | Description |
 |------|--------|-------------|
@@ -32,15 +33,15 @@ All runners accept a cloud argument: `./run-<test>.sh <cloud>` where `<cloud>` i
 
 Not all tests have manifests/terraform for every cloud yet. Currently supported:
 
-| Test | GKE | EKS |
-|------|-----|-----|
-| Fresh Deploy | yes | yes |
-| Upgrade | yes | yes |
-| External Cluster | yes | yes |
-| Vault External | yes | - |
-| WIF External | yes | yes |
-| Registry Mirroring | yes | - |
-| Operator Only | yes | yes |
+| Test | GKE | EKS | AKS |
+|------|-----|-----|-----|
+| Fresh Deploy | yes | yes | yes |
+| Upgrade | yes | yes | yes |
+| External Cluster | yes | yes | yes |
+| Vault External | yes | - | - |
+| WIF External | yes | yes | yes |
+| Registry Mirroring | yes | - | - |
+| Operator Only | yes | yes | yes |
 
 All tests pause for manual verification at each verify step (check Mondoo console for assets/scan results). Press Enter to continue or Ctrl+C to abort.
 
@@ -63,6 +64,12 @@ All tests pause for manual verification at each verify step (check Mondoo consol
 ### EKS
 
 - `aws` CLI, authenticated to your AWS account
+- `envsubst` (usually part of `gettext`)
+
+### AKS
+
+- `az` CLI, authenticated to your Azure subscription
+- `kubelogin` (Azure Kubernetes Service AAD plugin): `az aks install-cli`
 - `envsubst` (usually part of `gettext`)
 
 ### Mondoo credentials
@@ -126,6 +133,25 @@ terraform apply -var="mondoo_org_id=MY_ORG"
 | `k8s_version` | no | `1.30` | Kubernetes version |
 | `enable_target_cluster` | no | `false` | Create a second EKS cluster for external cluster tests |
 | `enable_wif_test` | no | `false` | Enable IRSA resources (IAM role, OIDC trust, Access Entries) |
+
+### AKS
+
+```bash
+cd tests/e2e/aks/terraform
+terraform init
+terraform apply -var="subscription_id=MY_SUB" -var="mondoo_org_id=MY_ORG"
+```
+
+#### AKS Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `subscription_id` | yes | - | Azure subscription ID |
+| `mondoo_org_id` | yes | - | Mondoo organization ID |
+| `location` | no | `westeurope` | Azure region |
+| `k8s_version` | no | `null` (latest) | Kubernetes version |
+| `enable_target_cluster` | no | `false` | Create a second AKS cluster for external cluster tests |
+| `enable_wif_test` | no | `false` | Enable Azure Workload Identity resources (managed identity, federated credential, role assignments) |
 
 ## Running Tests
 
@@ -194,6 +220,36 @@ terraform apply -var="mondoo_org_id=MY_ORG" \
 ./tests/e2e/run-wif-external-cluster.sh eks
 ```
 
+### AKS Fresh Deploy
+
+```bash
+cd tests/e2e/aks/terraform
+terraform init
+terraform apply -var="subscription_id=MY_SUB" -var="mondoo_org_id=MY_ORG"
+
+./tests/e2e/run-fresh-deploy.sh aks
+```
+
+### AKS WIF External Cluster (Azure Workload Identity)
+
+```bash
+cd tests/e2e/aks/terraform
+terraform apply -var="subscription_id=MY_SUB" -var="mondoo_org_id=MY_ORG" \
+  -var="enable_target_cluster=true" -var="enable_wif_test=true"
+
+./tests/e2e/run-wif-external-cluster.sh aks
+```
+
+### AKS External Cluster (Static Kubeconfig)
+
+```bash
+cd tests/e2e/aks/terraform
+terraform apply -var="subscription_id=MY_SUB" -var="mondoo_org_id=MY_ORG" \
+  -var="enable_target_cluster=true"
+
+./tests/e2e/run-external-cluster.sh aks
+```
+
 ## Cleanup
 
 Remove all test resources from the cluster:
@@ -212,6 +268,10 @@ terraform destroy -var="project_id=MY_PROJECT" -var="mondoo_org_id=MY_ORG"
 # EKS
 cd tests/e2e/eks/terraform
 terraform destroy -var="mondoo_org_id=MY_ORG"
+
+# AKS
+cd tests/e2e/aks/terraform
+terraform destroy -var="subscription_id=MY_SUB" -var="mondoo_org_id=MY_ORG"
 ```
 
 ## Directory Structure
@@ -232,6 +292,7 @@ tests/e2e/
 │   ├── common.sh                                     # Logging, TF output loading, wait helpers
 │   ├── common-gke.sh                                 # GKE-specific: AR auth, gcloud credentials, WIF vars
 │   ├── common-eks.sh                                 # EKS-specific: ECR auth, aws credentials, IRSA vars
+│   ├── common-aks.sh                                 # AKS-specific: ACR auth, az credentials, WIF vars
 │   ├── build-and-push.sh                             # Build operator image, push to registry
 │   ├── deploy-operator.sh                            # Helm install from local chart
 │   ├── deploy-operator-mirroring.sh                  # Helm install with mirror/proxy values
@@ -267,13 +328,25 @@ tests/e2e/
 │       ├── mondoo-audit-config-vault-external-autopilot.yaml.tpl
 │       ├── mondoo-audit-config-wif-external.yaml.tpl
 │       └── mondoo-audit-config-wif-external-autopilot.yaml.tpl
-└── eks/                                              # EKS-specific
+├── eks/                                              # EKS-specific
+│   ├── terraform/
+│   │   ├── versions.tf
+│   │   ├── variables.tf
+│   │   ├── main.tf                                   # VPC + EKS cluster + ECR + IRSA
+│   │   ├── mondoo.tf                                 # Mondoo space + service account
+│   │   ├── kubeconfig.tpl                            # Kubeconfig template (aws eks get-token)
+│   │   └── outputs.tf
+│   └── manifests/
+│       ├── mondoo-audit-config.yaml.tpl
+│       ├── mondoo-audit-config-external.yaml.tpl
+│       └── mondoo-audit-config-wif-external.yaml.tpl
+└── aks/                                              # AKS-specific
     ├── terraform/
     │   ├── versions.tf
     │   ├── variables.tf
-    │   ├── main.tf                                   # VPC + EKS cluster + ECR + IRSA
+    │   ├── main.tf                                   # VNet + AKS cluster + ACR + Azure WIF
     │   ├── mondoo.tf                                 # Mondoo space + service account
-    │   ├── kubeconfig.tpl                            # Kubeconfig template (aws eks get-token)
+    │   ├── kubeconfig.tpl                            # Kubeconfig template (kubelogin)
     │   └── outputs.tf
     └── manifests/
         ├── mondoo-audit-config.yaml.tpl
@@ -286,6 +359,7 @@ tests/e2e/
 - **GKE Autopilot** restricts `hostPath` volumes to `/var/log/`, so node scanning is disabled in Autopilot mode. Use `autopilot=false` to test node scanning.
 - **GKE internal images** (in `kube-system`, `gke-managed-*` namespaces) are hosted in private registries and can't be scanned. These namespaces are excluded in the GKE MondooAuditConfig.
 - **EKS IRSA** (IAM Roles for Service Accounts) is the AWS equivalent of GKE Workload Identity. The IAM role trust policy and EKS Access Entries are configured in Terraform; no manual RBAC setup is needed.
+- **AKS Workload Identity** uses Azure AD federated credentials. An AAD application with a federated identity credential is created in Terraform, trusting the scanner cluster's OIDC issuer for the WIF KSA. Azure RBAC role assignments (`AKS Cluster User Role` + `AKS RBAC Reader`) grant access to the target cluster. Both clusters share the same VNet with an NSG rule allowing scanner-to-target API traffic on port 443.
 - The operator code has been updated so that node scanning failures no longer block other scan types (containers, k8s resources). The `NodeScanningDegraded` condition is set and reconciliation continues.
 - Scan intervals are set to every 5 minutes in the test configs for faster feedback.
-- **WIF external cluster scanning** uses an init container (gcloud CLI for GKE, aws-cli for EKS) to generate a kubeconfig at runtime using the federated identity. The scan container then uses this kubeconfig to access the target cluster.
+- **WIF external cluster scanning** uses an init container (gcloud CLI for GKE, aws-cli for EKS, azure-cli for AKS) to generate a kubeconfig at runtime using the federated identity. The scan container then uses this kubeconfig to access the target cluster.
