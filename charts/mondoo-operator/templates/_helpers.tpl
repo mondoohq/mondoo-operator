@@ -60,3 +60,10 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Manager container image with tag. Defaults to AppVersion with 'v' prefix.
+*/}}
+{{- define "mondoo-operator.managerImage" -}}
+{{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag | default (printf "v%s" (.Chart.AppVersion | trimPrefix "v")) }}
+{{- end }}
