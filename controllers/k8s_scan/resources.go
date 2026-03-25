@@ -340,6 +340,13 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 
 		initContainers = append(initContainers, wifInitContainer(cluster))
 
+		// AKS Workload Identity webhook uses a pod-level objectSelector matching
+		// the label "azure.workload.identity/use: true" to inject federated token
+		// env vars and projected volume. Add it to the pod template labels.
+		if cluster.WorkloadIdentity.Provider == v1alpha2.CloudProviderAKS {
+			ls["azure.workload.identity/use"] = "true"
+		}
+
 	case cluster.SPIFFEAuth != nil:
 		// SPIFFE auth: use sidecar to fetch certificates, generate kubeconfig
 		serviceAccountName = m.Spec.Scanner.ServiceAccountName
