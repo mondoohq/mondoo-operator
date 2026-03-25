@@ -20,8 +20,8 @@ controllerManager:
     image:
       ## @param controllerManager.manager.image.repository Container image repository for the operator
       repository: ghcr.io/mondoohq/mondoo-operator
-      ## @param controllerManager.manager.image.tag Container image tag for the operator
-      tag: v12.0.1
+      ## @param controllerManager.manager.image.tag Container image tag for the operator (defaults to .Chart.AppVersion)
+      tag: ""
     ## @param controllerManager.manager.imagePullPolicy Image pull policy for the operator container
     imagePullPolicy: IfNotPresent
     ## @param controllerManager.manager.resources [object] Resource requests and limits for the manager container

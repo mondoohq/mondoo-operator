@@ -1,19 +1,22 @@
 # Copyright (c) Mondoo, Inc.
 # SPDX-License-Identifier: BUSL-1.1
 
-name: Release
+name: Prepare Release
 
 on:
-  release:
-    types: [created]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g., 13.0.2) — without the 'v' prefix"
+        required: true
+        type: string
 
 jobs:
   prepare-release:
     runs-on: ubuntu-latest
-    # Only run for stable version tags (skip pre-releases like v1.0.0-alpha.1)
-    if: startsWith(github.event.release.tag_name, 'v') && !contains(github.event.release.tag_name, '-')
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout main branch
@@ -36,13 +39,14 @@ jobs:
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
-      - name: Extract version from tag
+      - name: Set version
         id: version
         run: |
-          TAG="${{ github.event.release.tag_name }}"
-          VERSION="${TAG#v}"
+          VERSION="${{ inputs.version }}"
+          # Strip leading 'v' if accidentally included
+          VERSION="${VERSION#v}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Update version files
         run: |
@@ -65,30 +69,40 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Commit version updates
-        id: commit
+      - name: Create release branch and PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          BRANCH="release/${TAG}"
 
+          git checkout -b "${BRANCH}"
           git add -A
           if git diff --staged --quiet; then
-            echo "No changes to commit"
-            echo "changed=false" >> $GITHUB_OUTPUT
-          else
-            git commit -m "🚀 Release v${VERSION}"
-            git push origin main
-            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "No changes to commit — version files are already up to date"
+            exit 0
           fi
 
-      - name: Move tag to include version updates
-        if: steps.commit.outputs.changed == 'true'
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
+          git commit -m "🚀 Release ${TAG}"
+          git push origin "${BRANCH}"
 
-          # Delete the old tag (local and remote)
-          git tag -d "${TAG}" || true
-          git push origin ":refs/tags/${TAG}" || true
+          gh pr create \
+            --title "🚀 Release ${TAG}" \
+            --body "$(cat <<EOF
+          ## Release ${TAG}
 
-          # Create new tag at current HEAD (which includes version updates)
-          git tag "${TAG}"
-          git push origin "${TAG}"
+          This PR updates version files for the ${TAG} release.
+
+          ### Changed files
+          - \`charts/mondoo-operator/Chart.yaml\` — version and appVersion → ${VERSION}
+          - \`config/manager/kustomization.yaml\` — image tag → ${TAG}
+          - Generated manifests and Helm CRDs
+
+          ### After merging
+          [Create a new GitHub Release](https://github.com/${{ github.repository }}/releases/new?tag=${TAG}&target=main&title=${TAG}) with tag \`${TAG}\` targeting \`main\`.
+          The **Publish** workflow will then build and push container images and the Helm chart.
+          EOF
+          )" \
+            --base main \
+            --head "${BRANCH}"
