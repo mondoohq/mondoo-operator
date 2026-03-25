@@ -49,8 +49,7 @@ spec:
         - name: no_proxy
           value: {{ .Values.operator.noProxy | quote }}
         {{- end }}
-        image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
-          | default .Chart.AppVersion }}
+        image: {{ include "mondoo-operator.managerImage" . }}
         imagePullPolicy: {{ .Values.controllerManager.manager.imagePullPolicy }}
         livenessProbe:
           httpGet:
