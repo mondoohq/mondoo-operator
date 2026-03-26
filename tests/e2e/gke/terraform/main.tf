@@ -23,6 +23,14 @@ resource "google_container_cluster" "e2e" {
   enable_autopilot    = var.autopilot ? true : null
   deletion_protection = false
 
+  # Workload Identity is required for WIF external cluster scanning
+  dynamic "workload_identity_config" {
+    for_each = var.enable_wif_test ? [1] : []
+    content {
+      workload_pool = "${var.project_id}.svc.id.goog"
+    }
+  }
+
   # Standard clusters: remove the default node pool, we manage our own below
   remove_default_node_pool = var.autopilot ? null : true
   initial_node_count       = var.autopilot ? null : 1
@@ -43,6 +51,14 @@ resource "google_container_node_pool" "e2e" {
     oauth_scopes = [
       "https://www.googleapis.com/auth/cloud-platform",
     ]
+
+    # Required for Workload Identity on nodes
+    dynamic "workload_metadata_config" {
+      for_each = var.enable_wif_test ? [1] : []
+      content {
+        mode = "GKE_METADATA"
+      }
+    }
   }
 }
 
@@ -171,4 +187,38 @@ resource "local_file" "kubeconfig_target" {
   count    = var.enable_target_cluster ? 1 : 0
   content  = module.gke_auth_target[0].kubeconfig_raw
   filename = "${path.module}/kubeconfig-target"
+}
+
+################################################################################
+# WIF: Google Service Account + IAM (optional, for WIF external cluster tests)
+################################################################################
+
+resource "google_service_account" "wif_scanner" {
+  count = var.enable_wif_test ? 1 : 0
+
+  account_id   = "${local.name_prefix}-wif-scanner"
+  display_name = "WIF scanner for e2e tests"
+  project      = var.project_id
+}
+
+# Allow the management cluster KSA to impersonate this GSA.
+# KSA name: mondoo-client-wif-target-cluster (from WIFServiceAccountName("mondoo-client", "target-cluster"))
+resource "google_service_account_iam_binding" "wif_identity" {
+  count = var.enable_wif_test ? 1 : 0
+
+  service_account_id = google_service_account.wif_scanner[0].name
+  role               = "roles/iam.workloadIdentityUser"
+
+  members = [
+    "serviceAccount:${var.project_id}.svc.id.goog[mondoo-operator/mondoo-client-wif-target-cluster]",
+  ]
+}
+
+# Grant the GSA permission to view/access the target cluster
+resource "google_project_iam_member" "wif_cluster_viewer" {
+  count = var.enable_wif_test ? 1 : 0
+
+  project = var.project_id
+  role    = "roles/container.clusterViewer"
+  member  = "serviceAccount:${google_service_account.wif_scanner[0].email}"
 }

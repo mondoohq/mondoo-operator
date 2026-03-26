@@ -340,6 +340,13 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 
 		initContainers = append(initContainers, wifInitContainer(cluster))
 
+		// AKS Workload Identity webhook uses a pod-level objectSelector matching
+		// the label "azure.workload.identity/use: true" to inject federated token
+		// env vars and projected volume. Add it to the pod template labels.
+		if cluster.WorkloadIdentity.Provider == v1alpha2.CloudProviderAKS {
+			ls["azure.workload.identity/use"] = "true"
+		}
+
 	case cluster.SPIFFEAuth != nil:
 		// SPIFFE auth: use sidecar to fetch certificates, generate kubeconfig
 		serviceAccountName = m.Spec.Scanner.ServiceAccountName
@@ -695,6 +702,9 @@ retry gcloud container clusters get-credentials "$CLUSTER_NAME" \
   --project "$PROJECT_ID" \
   --location "$CLUSTER_LOCATION"
 cp ~/.kube/config /etc/opt/mondoo/kubeconfig/kubeconfig
+echo "=== DEBUG: generated kubeconfig ==="
+cat /etc/opt/mondoo/kubeconfig/kubeconfig
+echo "=== END DEBUG ==="
 `
 		env = []corev1.EnvVar{
 			{Name: "HOME", Value: "/tmp"},
@@ -710,6 +720,9 @@ retry aws eks update-kubeconfig \
   --name "$CLUSTER_NAME" \
   --region "$AWS_REGION" \
   --kubeconfig /etc/opt/mondoo/kubeconfig/kubeconfig
+echo "=== DEBUG: generated kubeconfig ==="
+cat /etc/opt/mondoo/kubeconfig/kubeconfig
+echo "=== END DEBUG ==="
 `
 		env = []corev1.EnvVar{
 			{Name: "HOME", Value: "/tmp"},
@@ -720,6 +733,13 @@ retry aws eks update-kubeconfig \
 	case v1alpha2.CloudProviderAKS:
 		image = AzureCLIImage
 		script = retryWrapper + `
+# Azure CLI requires explicit login with the federated token injected by the
+# AKS Workload Identity webhook (AZURE_CLIENT_ID, AZURE_TENANT_ID,
+# AZURE_FEDERATED_TOKEN_FILE are set as env vars by the webhook).
+retry az login --federated-token "$(cat "$AZURE_FEDERATED_TOKEN_FILE")" \
+  --service-principal \
+  -u "$AZURE_CLIENT_ID" \
+  -t "$AZURE_TENANT_ID"
 retry az aks get-credentials \
   --resource-group "$RESOURCE_GROUP" \
   --name "$CLUSTER_NAME" \
@@ -741,10 +761,11 @@ retry az aks get-credentials \
 	}
 
 	return corev1.Container{
-		Name:    "generate-kubeconfig",
-		Image:   image,
-		Command: []string{"/bin/sh", "-c", script},
-		Env:     env,
+		Name:            "generate-kubeconfig",
+		Image:           image,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command:         []string{"/bin/sh", "-c", script},
+		Env:             env,
 		VolumeMounts: []corev1.VolumeMount{
 			{Name: "kubeconfig", MountPath: "/etc/opt/mondoo/kubeconfig"},
 			{Name: "temp", MountPath: "/tmp"},
@@ -863,9 +884,10 @@ kill $HELPER_PID 2>/dev/null || true
 `
 
 	return corev1.Container{
-		Name:    "fetch-spiffe-certs",
-		Image:   SPIFFEHelperImage,
-		Command: []string{"/bin/sh", "-c", script},
+		Name:            "fetch-spiffe-certs",
+		Image:           SPIFFEHelperImage,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command:         []string{"/bin/sh", "-c", script},
 		Env: []corev1.EnvVar{
 			{Name: "SOCKET_FILE", Value: socketFile},
 			{Name: "K8S_SERVER", Value: cluster.SPIFFEAuth.Server},

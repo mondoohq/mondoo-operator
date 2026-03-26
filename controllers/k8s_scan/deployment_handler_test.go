@@ -401,6 +401,56 @@ func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_WorkloadIdentity_
 	s.Contains(initContainers[0].Image, "google-cloud-cli")
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_WorkloadIdentity_AKS() {
+	// Configure external cluster with AKS Workload Identity
+	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
+		{
+			Name: "aks-prod",
+			WorkloadIdentity: &mondoov1alpha2.WorkloadIdentityConfig{
+				Provider: mondoov1alpha2.CloudProviderAKS,
+				AKS: &mondoov1alpha2.AKSWorkloadIdentity{
+					SubscriptionID: "sub-123",
+					ResourceGroup:  "my-rg",
+					ClusterName:    "prod-cluster",
+					ClientID:       "client-123",
+					TenantID:       "tenant-456",
+				},
+			},
+		},
+	}
+
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Verify WIF ServiceAccount was created with correct annotation and label
+	wifSA := &corev1.ServiceAccount{}
+	wifSA.Name = WIFServiceAccountName(s.auditConfig.Name, "aks-prod")
+	wifSA.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(wifSA), wifSA))
+	s.Equal("client-123", wifSA.Annotations["azure.workload.identity/client-id"])
+	s.Equal("true", wifSA.Labels["azure.workload.identity/use"])
+
+	// Verify external cluster CronJob was created with init container
+	externalCronJob := &batchv1.CronJob{}
+	externalCronJob.Name = ExternalClusterCronJobName(s.auditConfig.Name, "aks-prod")
+	externalCronJob.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(externalCronJob), externalCronJob))
+
+	// Verify init container exists and uses azure-cli
+	initContainers := externalCronJob.Spec.JobTemplate.Spec.Template.Spec.InitContainers
+	s.Len(initContainers, 1)
+	s.Equal("generate-kubeconfig", initContainers[0].Name)
+	s.Contains(initContainers[0].Image, "azure-cli")
+
+	// Verify pod template has the AKS WI label for webhook injection
+	podLabels := externalCronJob.Spec.JobTemplate.Spec.Template.Labels
+	s.Equal("true", podLabels["azure.workload.identity/use"])
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_SPIFFE() {
 	// Create trust bundle secret for remote cluster CA
 	trustBundleSecret := &corev1.Secret{

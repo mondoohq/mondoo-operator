@@ -1,4 +1,6 @@
+AAD
 AADSTS
+ACR
 artifactory
 bak
 bitnami
@@ -8,13 +10,16 @@ deepcopy
 deletecollection
 dockerconfigjson
 eksctl
+envsubst
 fullname
+gettext
 iamidentitymapping
 irsa
 kustomization
 mcr
 mondoooperatorconfig
 nginx
+NSG
 oidc
 openssl
 psat
@@ -27,4 +32,5 @@ SResources
 SVIDs
 tekton
 tpl
+westeurope
 wif

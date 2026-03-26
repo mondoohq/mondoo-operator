@@ -23,22 +23,31 @@ rm -f /tmp/mondoo-creds.json
 
 info "Applying MondooAuditConfig..."
 export NAMESPACE
-if [[ "${ENABLE_VAULT_TEST:-false}" == "true" ]]; then
-  if [[ "${AUTOPILOT}" == "true" ]]; then
-    MANIFEST="${E2E_DIR}/manifests/mondoo-audit-config-vault-external-autopilot.yaml.tpl"
+
+# Select manifest based on test type and cluster mode.
+# Autopilot variants are GKE-specific; other clouds just use the base manifest.
+if [[ "${ENABLE_WIF_TEST:-false}" == "true" ]]; then
+  if [[ "${AUTOPILOT:-false}" == "true" ]]; then
+    MANIFEST="${MANIFESTS_DIR}/mondoo-audit-config-wif-external-autopilot.yaml.tpl"
   else
-    MANIFEST="${E2E_DIR}/manifests/mondoo-audit-config-vault-external.yaml.tpl"
+    MANIFEST="${MANIFESTS_DIR}/mondoo-audit-config-wif-external.yaml.tpl"
+  fi
+elif [[ "${ENABLE_VAULT_TEST:-false}" == "true" ]]; then
+  if [[ "${AUTOPILOT:-false}" == "true" ]]; then
+    MANIFEST="${MANIFESTS_DIR}/mondoo-audit-config-vault-external-autopilot.yaml.tpl"
+  else
+    MANIFEST="${MANIFESTS_DIR}/mondoo-audit-config-vault-external.yaml.tpl"
   fi
 elif [[ "${ENABLE_TARGET_CLUSTER:-false}" == "true" ]]; then
-  if [[ "${AUTOPILOT}" == "true" ]]; then
-    MANIFEST="${E2E_DIR}/manifests/mondoo-audit-config-external-autopilot.yaml.tpl"
+  if [[ "${AUTOPILOT:-false}" == "true" ]]; then
+    MANIFEST="${MANIFESTS_DIR}/mondoo-audit-config-external-autopilot.yaml.tpl"
   else
-    MANIFEST="${E2E_DIR}/manifests/mondoo-audit-config-external.yaml.tpl"
+    MANIFEST="${MANIFESTS_DIR}/mondoo-audit-config-external.yaml.tpl"
   fi
-elif [[ "${AUTOPILOT}" == "true" ]]; then
-  MANIFEST="${E2E_DIR}/manifests/mondoo-audit-config-autopilot.yaml.tpl"
+elif [[ "${AUTOPILOT:-false}" == "true" ]]; then
+  MANIFEST="${MANIFESTS_DIR}/mondoo-audit-config-autopilot.yaml.tpl"
 else
-  MANIFEST="${E2E_DIR}/manifests/mondoo-audit-config.yaml.tpl"
+  MANIFEST="${MANIFESTS_DIR}/mondoo-audit-config.yaml.tpl"
 fi
 info "Using manifest: $(basename "${MANIFEST}")"
 envsubst < "${MANIFEST}" | kubectl apply -f -

@@ -8,18 +8,19 @@
 #
 # Prerequisites:
 #   - Terraform infrastructure provisioned with enable_target_cluster=true
-#   - gcloud authenticated, docker, helm, kubectl available
+#   - Cloud CLI authenticated, docker, helm, kubectl available
 #
 # Usage:
-#   ./run-external-cluster.sh
+#   ./run-external-cluster.sh <cloud>    (gke|eks|aks)
 
 set -euo pipefail
 
-E2E_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${E2E_ROOT}/scripts/common.sh"
+CLOUD="${1:?Usage: $0 <cloud> (gke|eks|aks)}"
+export CLOUD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/${CLOUD}" && pwd)"
+source "${CLOUD_DIR}/../scripts/common.sh"
 
 info "=========================================="
-info "  Test: External Cluster Scanning"
+info "  Test: External Cluster Scanning (${CLOUD})"
 info "=========================================="
 
 # Step 1: Load Terraform outputs
@@ -31,23 +32,23 @@ fi
 
 # Step 2: Build and push operator image
 info "--- Step: Build and Push ---"
-source "${E2E_ROOT}/scripts/build-and-push.sh"
+source "${E2E_DIR}/scripts/build-and-push.sh"
 
 # Step 3: Deploy test workload to scanner cluster
 info "--- Step: Deploy Test Workload (scanner cluster) ---"
-source "${E2E_ROOT}/scripts/deploy-test-workload.sh"
+source "${E2E_DIR}/scripts/deploy-test-workload.sh"
 
 # Step 4: Deploy operator from local chart
 info "--- Step: Deploy Operator ---"
-source "${E2E_ROOT}/scripts/deploy-operator.sh"
+source "${E2E_DIR}/scripts/deploy-operator.sh"
 
 # Step 5: Deploy workload to target cluster and create kubeconfig Secret
 info "--- Step: Deploy Target Workload + Kubeconfig Secret ---"
-source "${E2E_ROOT}/scripts/deploy-target-workload.sh"
+source "${E2E_DIR}/scripts/deploy-target-workload.sh"
 
 # Step 6: Apply MondooAuditConfig with external clusters
 info "--- Step: Apply Mondoo Config (with external clusters) ---"
-source "${E2E_ROOT}/scripts/apply-mondoo-config.sh"
+source "${E2E_DIR}/scripts/apply-mondoo-config.sh"
 
 # Step 7: Wait for operator to reconcile
 info "Waiting 60s for operator to reconcile..."
@@ -55,13 +56,13 @@ sleep 60
 
 # Step 8: Verify local scanning
 info "--- Step: Verify (local) ---"
-source "${E2E_ROOT}/scripts/verify.sh"
+source "${E2E_DIR}/scripts/verify.sh"
 
 # Step 9: Verify external cluster scanning
 info "--- Step: Verify (external cluster) ---"
-source "${E2E_ROOT}/scripts/verify-external.sh"
+source "${E2E_DIR}/scripts/verify-external.sh"
 
 info ""
 info "=========================================="
-info "  Test: External Cluster Scanning - COMPLETE"
+info "  Test: External Cluster Scanning (${CLOUD}) - COMPLETE"
 info "=========================================="
