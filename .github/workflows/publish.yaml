@@ -146,7 +146,7 @@ jobs:
 
       - name: Scan Image
         if: matrix.arch == 'amd64'
-        uses: mondoohq/actions/docker-image@main
+        uses: mondoohq/actions/docker-image@20caefcb2d1258d051149913cde321a698b1fdb9 # v13.1.0
         env:
           MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
         with:
@@ -296,7 +296,7 @@ jobs:
       - name: Run chart-releaser
         # switch back to helm/chart-releaser-action when #60 is fixed
         # https://github.com/helm/chart-releaser-action/issues/60
-        uses: luisico/chart-releaser-action@on-tags
+        uses: luisico/chart-releaser-action@c25b74a986eb925b398320414b576227f375f946 # v1.2.1
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
