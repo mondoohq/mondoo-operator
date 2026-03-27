@@ -70,7 +70,7 @@ jobs:
         run: cat ".github/env" >> $GITHUB_ENV
 
       - name: Start minikube
-        uses: medyagh/setup-minikube@aba8d5ff1666d19b9549133e3b92e70d4fc52cb7 # master
+        uses: medyagh/setup-minikube@e9e035a86bbc3caea26a450bd4dbf9d0c453682e # v0.0.21
         if: matrix.k8s-distro == 'minikube'
         with:
           memory: 4000m
