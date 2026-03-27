@@ -33,13 +33,13 @@ jobs:
           go-version-file: "go.mod"
           cache: false
       - name: Scan AWS terraform with Mondoo
-        uses: mondoohq/actions/terraform-hcl@main
+        uses: mondoohq/actions/terraform-hcl@20caefcb2d1258d051149913cde321a698b1fdb9 # main
         env:
           MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
         with:
           path: ".github/terraform/aws/main.tf"
       - name: Scan Azure terraform with Mondoo
-        uses: mondoohq/actions/terraform-hcl@main
+        uses: mondoohq/actions/terraform-hcl@20caefcb2d1258d051149913cde321a698b1fdb9 # main
         env:
           MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
         with:
@@ -47,7 +47,7 @@ jobs:
       - name: Generate manifests
         run: make generate-manifests IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE }}'
       - name: Scan Kubernetes Manifest with Mondoo
-        uses: mondoohq/actions/k8s-manifest@main
+        uses: mondoohq/actions/k8s-manifest@20caefcb2d1258d051149913cde321a698b1fdb9 # main
         env:
           MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
         with:
