@@ -5,12 +5,12 @@ go 1.25.7
 replace go.mondoo.com/mql/v13/providers/k8s => github.com/mondoohq/mql/providers/k8s v0.0.0-20260309210947-abb4667b6efb
 
 require (
-	github.com/cert-manager/cert-manager v1.20.0
+	github.com/cert-manager/cert-manager v1.20.1
 	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang/mock v1.6.0
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.90.0
-	github.com/rs/zerolog v1.34.0
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.90.1
+	github.com/rs/zerolog v1.35.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	go.mondoo.com/mondoo-go v0.0.0-20260321001232-0b2c5fb2b6da
