@@ -18,17 +18,17 @@ spec:
     spec:
       containers:
       - args:
+        - operator
+        - --health-probe-bind-address=:8081
+        - --leader-elect
         {{- if .Values.controllerManager.manager.secureMetrics }}
-        {{- range .Values.controllerManager.manager.args }}
-        {{- if hasPrefix "--metrics-bind-address" . }}
         - --metrics-bind-address=:8443
-        {{- else }}
-        - {{ . }}
-        {{- end }}
-        {{- end }}
         - --secure-metrics
         {{- else }}
-        {{- toYaml .Values.controllerManager.manager.args | nindent 8 }}
+        - --metrics-bind-address=:8080
+        {{- end }}
+        {{- with .Values.controllerManager.manager.extraArgs }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}
         command:
         - /mondoo-operator

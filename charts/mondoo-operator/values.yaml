@@ -3,12 +3,8 @@
 
 controllerManager:
   manager:
-    ## @param controllerManager.manager.args Command-line arguments passed to the operator manager container
-    args:
-    - operator
-    - --health-probe-bind-address=:8081
-    - --metrics-bind-address=:8080
-    - --leader-elect
+    ## @param controllerManager.manager.extraArgs Additional command-line arguments passed to the operator manager container
+    extraArgs: []
     ## @param controllerManager.manager.containerSecurityContext [object] Security context for the manager container
     containerSecurityContext:
       allowPrivilegeEscalation: false
