@@ -34,5 +34,9 @@ spec:
   {{- if .Values.operator.skipProxyForCnspec }}
   {{- $_ := set $spec "skipProxyForCnspec" .Values.operator.skipProxyForCnspec }}
   {{- end }}
+  {{- if .Values.controllerManager.manager.secureMetrics }}
+  {{- $metrics := dict "enable" true "secureMetrics" true }}
+  {{- $_ := set $spec "metrics" $metrics }}
+  {{- end }}
   {{- $spec | toYaml | nindent 2 }}
 {{- end }}

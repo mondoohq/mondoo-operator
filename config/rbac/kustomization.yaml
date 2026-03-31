@@ -18,6 +18,7 @@ resources:
 #- auth_proxy_role.yaml
 #- auth_proxy_role_binding.yaml
 #- auth_proxy_client_clusterrole.yaml
+#- auth_proxy_client_clusterrolebinding.yaml
 # Comment the following lines to self manage roles for the workload
 - k8s_resources_scanning_service_account.yaml
 - k8s_resources_scanning_clusterrole.yaml

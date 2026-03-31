@@ -112,6 +112,9 @@ func (s *ServiceMonitor) metricsEndpoint() monitoringv1.Endpoint {
 			Scheme: ptr.To(monitoringv1.SchemeHTTPS),
 		}
 		ep.BearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token" //nolint:staticcheck // SA1019: no credentialsFile alternative available in SafeAuthorization
+		// InsecureSkipVerify is safe here because controller-runtime's SecureServing
+		// uses a self-signed certificate for the metrics endpoint. The connection is
+		// still encrypted (HTTPS); we just skip CA verification since there is no CA.
 		ep.TLSConfig = &monitoringv1.TLSConfig{
 			SafeTLSConfig: monitoringv1.SafeTLSConfig{
 				InsecureSkipVerify: ptr.To(true),

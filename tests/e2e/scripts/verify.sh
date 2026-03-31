@@ -42,8 +42,8 @@ check "CronJobs created for mondoo-client" \
 
 # Check secure metrics endpoint is serving on HTTPS (port 8443)
 check "Metrics endpoint responds on port 8443 (HTTPS)" \
-  kubectl get svc -n "${NAMESPACE}" -l app.kubernetes.io/name=mondoo-operator \
-    -o jsonpath='{.items[0].spec.ports[0].port}' | grep -q 8443
+  bash -c "kubectl get svc -n '${NAMESPACE}' -l app.kubernetes.io/name=mondoo-operator \
+    -o jsonpath='{.items[0].spec.ports[0].port}' | grep -q 8443"
 
 # TODO: Add automated verification against Mondoo API:
 #   - Query the space for discovered assets (cluster, nodes, container images)
