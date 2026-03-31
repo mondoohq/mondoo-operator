@@ -26,6 +26,7 @@ helm upgrade --install mondoo-operator "${REPO_ROOT}/charts/mondoo-operator" \
   --set controllerManager.manager.image.repository="${IMAGE_REPO}" \
   --set controllerManager.manager.image.tag="${IMAGE_TAG}" \
   --set controllerManager.manager.imagePullPolicy=Always \
+  --set controllerManager.manager.secureMetrics=true \
   --wait --timeout 5m
 
 wait_for_deployment "${NAMESPACE}" "mondoo-operator-controller-manager"

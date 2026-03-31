@@ -4,12 +4,14 @@
 package operator
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -52,6 +54,8 @@ func init() {
 	probeAddr := Cmd.Flags().String("health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	enableLeaderElection := Cmd.Flags().Bool("leader-elect", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+	secureMetrics := Cmd.Flags().Bool("secure-metrics", false,
+		"Enable authentication and authorization on the metrics endpoint via HTTPS and RBAC.")
 
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		// TODO: opts.BindFlags(flag.CommandLine) is not supported with cobra. If we want to support that we should manually
@@ -67,9 +71,18 @@ func init() {
 		utilruntime.Must(certmanagerv1.AddToScheme(scheme))
 		utilruntime.Must(monitoringv1.AddToScheme(scheme))
 
+		metricsOpts := metricsserver.Options{BindAddress: *metricsAddr}
+		if *secureMetrics {
+			metricsOpts.SecureServing = true
+			metricsOpts.FilterProvider = filters.WithAuthenticationAndAuthorization
+			metricsOpts.TLSOpts = []func(*tls.Config){
+				func(c *tls.Config) { c.MinVersion = tls.VersionTLS12 },
+			}
+		}
+
 		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 			Scheme:                 scheme,
-			Metrics:                metricsserver.Options{BindAddress: *metricsAddr},
+			Metrics:                metricsOpts,
 			HealthProbeBindAddress: *probeAddr,
 			LeaderElection:         *enableLeaderElection,
 			LeaderElectionID:       "60679458.mondoo.com",

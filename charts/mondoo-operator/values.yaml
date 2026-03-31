@@ -22,6 +22,8 @@ controllerManager:
       repository: ghcr.io/mondoohq/mondoo-operator
       ## @param controllerManager.manager.image.tag Container image tag for the operator (defaults to .Chart.AppVersion)
       tag: ""
+    ## @param controllerManager.manager.secureMetrics Enable RBAC-authenticated HTTPS metrics (port 8443)
+    secureMetrics: false
     ## @param controllerManager.manager.imagePullPolicy Image pull policy for the operator container
     imagePullPolicy: IfNotPresent
     ## @param controllerManager.manager.resources [object] Resource requests and limits for the manager container

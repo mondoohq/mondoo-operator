@@ -88,12 +88,7 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *mondoov1alpha2.MondooOperato
 		},
 		Spec: monitoringv1.ServiceMonitorSpec{
 			Endpoints: []monitoringv1.Endpoint{
-				{
-					Path: "/metrics",
-					// The named port exposing metrics from the mondoo-operator Deployment
-					Port:   "metrics",
-					Scheme: ptr.To(monitoringv1.SchemeHTTP),
-				},
+				s.metricsEndpoint(),
 			},
 			Selector: metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -107,6 +102,28 @@ func (s *ServiceMonitor) serviceMonitorForMondoo(m *mondoov1alpha2.MondooOperato
 		},
 	}
 	return dep
+}
+
+func (s *ServiceMonitor) metricsEndpoint() monitoringv1.Endpoint {
+	if s.Config.Spec.Metrics.SecureMetrics {
+		ep := monitoringv1.Endpoint{
+			Path:   "/metrics",
+			Port:   "https",
+			Scheme: ptr.To(monitoringv1.SchemeHTTPS),
+		}
+		ep.BearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token" //nolint:staticcheck // SA1019: no credentialsFile alternative available in SafeAuthorization
+		ep.TLSConfig = &monitoringv1.TLSConfig{
+			SafeTLSConfig: monitoringv1.SafeTLSConfig{
+				InsecureSkipVerify: ptr.To(true),
+			},
+		}
+		return ep
+	}
+	return monitoringv1.Endpoint{
+		Path:   "/metrics",
+		Port:   "metrics",
+		Scheme: ptr.To(monitoringv1.SchemeHTTP),
+	}
 }
 
 func (s *ServiceMonitor) Reconcile(ctx context.Context, clt client.Client, scheme *runtime.Scheme, req ctrl.Request) (ctrl.Result, error) {

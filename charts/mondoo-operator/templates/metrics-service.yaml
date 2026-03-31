@@ -9,4 +9,11 @@ spec:
   selector:
     {{- include "mondoo-operator.selectorLabels" . | nindent 4 }}
   ports:
+  {{- if .Values.controllerManager.manager.secureMetrics }}
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: https
+  {{- else }}
   {{- .Values.metricsService.ports | toYaml | nindent 2 }}
+  {{- end }}

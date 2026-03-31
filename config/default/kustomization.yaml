@@ -30,9 +30,6 @@ bases:
 #- ../prometheus
 
 patchesStrategicMerge:
-# Uncomment the following line to protect the /metrics endpoint with kube-rbac-proxy.
-# - manager_auth_proxy_patch.yaml
-
 - manager_public_metrics_patch.yaml
 
 # Mount the controller config file for loading manager configurations
