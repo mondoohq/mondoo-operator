@@ -55,6 +55,11 @@ type MondooOperatorConfigSpec struct {
 
 type Metrics struct {
 	Enable bool `json:"enable,omitempty"`
+	// SecureMetrics enables authentication and authorization on the metrics endpoint
+	// using controller-runtime's built-in TLS and RBAC-based auth.
+	// When enabled, metrics are served over HTTPS on port 8443 with token-based auth.
+	// When disabled, metrics are served over HTTP on port 8080 without auth.
+	SecureMetrics bool `json:"secureMetrics,omitempty"`
 	// ResourceLabels allows providing a list of extra labels to apply to the metrics-related
 	// resources (eg. ServiceMonitor)
 	ResourceLabels map[string]string `json:"resourceLabels,omitempty"`

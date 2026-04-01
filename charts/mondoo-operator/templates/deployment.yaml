@@ -17,7 +17,19 @@ spec:
         kubectl.kubernetes.io/default-container: manager
     spec:
       containers:
-      - args: {{- toYaml .Values.controllerManager.manager.args | nindent 8 }}
+      - args:
+        - operator
+        - --health-probe-bind-address=:8081
+        - --leader-elect
+        {{- if .Values.controllerManager.manager.secureMetrics }}
+        - --metrics-bind-address=:8443
+        - --secure-metrics
+        {{- else }}
+        - --metrics-bind-address=:8080
+        {{- end }}
+        {{- with .Values.controllerManager.manager.extraArgs }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         command:
         - /mondoo-operator
         env:
@@ -59,9 +71,15 @@ spec:
           periodSeconds: 20
         name: manager
         ports:
+        {{- if .Values.controllerManager.manager.secureMetrics }}
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        {{- else }}
         - containerPort: 8080
           name: metrics
           protocol: TCP
+        {{- end }}
         readinessProbe:
           httpGet:
             path: /readyz

@@ -93,6 +93,13 @@ spec:
                       ResourceLabels allows providing a list of extra labels to apply to the metrics-related
                       resources (eg. ServiceMonitor)
                     type: object
+                  secureMetrics:
+                    description: |-
+                      SecureMetrics enables authentication and authorization on the metrics endpoint
+                      using controller-runtime's built-in TLS and RBAC-based auth.
+                      When enabled, metrics are served over HTTPS on port 8443 with token-based auth.
+                      When disabled, metrics are served over HTTP on port 8080 without auth.
+                    type: boolean
                 type: object
               noProxy:
                 description: NoProxy specifies a comma-separated list of hosts that
