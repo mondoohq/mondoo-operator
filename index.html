@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mondoo Operator — Helm Charts</title>
+  <meta name="description" content="Official Helm chart repository for the Mondoo Operator — security scanning for Kubernetes.">
+  <link rel="icon" href="https://raw.githubusercontent.com/mondoohq/mondoo-operator/main/charts/mondoo-operator/icon.svg" type="image/svg+xml">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Mona+Sans:wght@600;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- highlight.js (core + bash only, ~10KB) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/styles/atom-one-light.min.css" media="(prefers-color-scheme: light)">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/styles/atom-one-dark.min.css" media="(prefers-color-scheme: dark)">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/bash.min.js"></script>
+
+  <style>
+    :root {
+      /* Light mode (Mondoo design tokens) */
+      --bg-canvas: #f5f3f0;
+      --bg-surface: #fcfbfa;
+      --text-primary: #120f09;
+      --text-secondary: rgba(18, 15, 9, 0.72);
+      --border: rgba(18, 15, 9, 0.12);
+      --action: #542c84;          /* ultraviolet */
+      --action-hover: #793bc4;
+      --accent: #4c35e8;          /* purple secondary */
+      --code-bg: #fcfbfa;
+      --code-border: #d8d5d0;
+      --code-text: #120f09;
+      --logo-src: url("mondoo_logo_wide.png");
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-canvas: #2e2f32;
+        --bg-surface: #1b1c20;
+        --text-primary: #fcfbfa;
+        --text-secondary: rgba(245, 243, 240, 0.72);
+        --border: rgba(245, 243, 240, 0.12);
+        --action: #793bc4;
+        --action-hover: #8797ff;
+        --accent: #8797ff;
+        --code-bg: #0c0d15;
+        --code-border: #535558;
+        --code-text: #fcfbfa;
+        --logo-src: url("mondoo_logo_wide_light.png");
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    html { font-size: 16px; }
+
+    body {
+      margin: 0;
+      font-family: "Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      background: var(--bg-canvas);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.55;
+    }
+
+    .wrap {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 64px 32px 96px;
+    }
+
+    header { margin-bottom: 56px; }
+
+    .logo {
+      display: block;
+      width: 220px;
+      height: 56px;
+      background-image: var(--logo-src);
+      background-repeat: no-repeat;
+      background-size: contain;
+      background-position: left center;
+      margin-bottom: 32px;
+    }
+
+    h1 {
+      font-family: "Mona Sans", -apple-system, sans-serif;
+      font-weight: 800;
+      font-size: clamp(2rem, 4vw, 3rem);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin: 0 0 16px;
+    }
+
+    h1 .accent { color: var(--action); }
+
+    .lede {
+      font-size: 1.125rem;
+      color: var(--text-secondary);
+      max-width: 60ch;
+      margin: 0;
+    }
+
+    section {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+    }
+
+    h2 {
+      font-family: "Atkinson Hyperlegible", sans-serif;
+      font-weight: 700;
+      font-size: 1.125rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      margin: 0 0 16px;
+    }
+
+    p { margin: 0 0 12px; color: var(--text-secondary); }
+    p:last-child { margin-bottom: 0; }
+
+    .code-block {
+      position: relative;
+      margin: 12px 0 0;
+    }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      overflow-x: auto;
+      margin: 0;
+    }
+
+    /* hljs override: keep our background/border, let theme color the tokens */
+    pre code.hljs {
+      background: transparent;
+      padding: 0;
+    }
+
+    pre, code {
+      font-family: "IBM Plex Mono", "Fira Code", "Cascadia Mono", monospace;
+      font-size: 0.875rem;
+      color: var(--code-text);
+    }
+
+    code { background: transparent; }
+
+    .copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 6px 12px;
+      font-family: "Atkinson Hyperlegible", sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 120ms ease, color 120ms ease, border-color 120ms ease;
+    }
+    .code-block:hover .copy-btn,
+    .copy-btn:focus-visible { opacity: 1; }
+    .copy-btn:hover {
+      color: var(--action);
+      border-color: var(--action);
+    }
+    .copy-btn.copied {
+      color: var(--action);
+      border-color: var(--action);
+      opacity: 1;
+    }
+
+    a {
+      color: var(--action);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: border-color 120ms ease, color 120ms ease;
+    }
+    a:hover {
+      color: var(--action-hover);
+      border-bottom-color: currentColor;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .links a {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 18px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-canvas);
+      color: var(--text-primary);
+    }
+    .links a:hover {
+      border-color: var(--action);
+      color: var(--action);
+    }
+    .links a.primary {
+      background: var(--action);
+      color: #fcfbfa;
+      border-color: var(--action);
+    }
+    .links a.primary:hover {
+      background: var(--action-hover);
+      border-color: var(--action-hover);
+      color: #fcfbfa;
+    }
+
+    footer {
+      margin-top: 64px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a href="https://mondoo.com" class="logo" aria-label="Mondoo"></a>
+      <h1>Mondoo Operator <span class="accent">Helm Charts</span></h1>
+      <p class="lede">The official Helm chart repository for the Mondoo Operator — bring continuous security and compliance scanning to your Kubernetes clusters.</p>
+    </header>
+
+    <section>
+      <h2>Add the repository</h2>
+      <div class="code-block"><pre><code class="language-bash">helm repo add mondoo https://mondoohq.github.io/mondoo-operator
+helm repo update</code></pre></div>
+    </section>
+
+    <section>
+      <h2>Install the operator</h2>
+      <div class="code-block"><pre><code class="language-bash">helm install mondoo-operator mondoo/mondoo-operator \
+  --namespace mondoo-operator \
+  --create-namespace</code></pre></div>
+    </section>
+
+    <section>
+      <h2>Browse versions</h2>
+      <p>The full chart index is available at <a href="index.yaml"><code>index.yaml</code></a>. Tagged releases are published to <a href="https://github.com/mondoohq/mondoo-operator/releases">GitHub Releases</a> and mirrored as OCI artifacts at <code>oci://ghcr.io/mondoohq/mondoo-operator/charts</code>.</p>
+    </section>
+
+    <section>
+      <h2>Learn more</h2>
+      <div class="links">
+        <a class="primary" href="https://github.com/mondoohq/mondoo-operator">GitHub repository</a>
+        <a href="https://mondoo.com/docs/platform/infra/cloud/kubernetes/overview">Documentation</a>
+        <a href="https://mondoo.com">mondoo.com</a>
+      </div>
+    </section>
+
+    <footer>
+      Built with care by <a href="https://mondoo.com">Mondoo</a> · <a href="https://github.com/mondoohq/mondoo-operator/blob/main/LICENSE">BUSL-1.1</a> licensed
+    </footer>
+  </div>
+
+  <script>
+    // Highlight code blocks
+    if (window.hljs) {
+      document.querySelectorAll('pre code').forEach((el) => hljs.highlightElement(el));
+    }
+
+    // Add copy buttons
+    document.querySelectorAll('.code-block').forEach((block) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'copy-btn';
+      btn.textContent = 'Copy';
+      btn.setAttribute('aria-label', 'Copy code to clipboard');
+      btn.addEventListener('click', async () => {
+        const code = block.querySelector('code').innerText;
+        try {
+          await navigator.clipboard.writeText(code);
+          btn.textContent = 'Copied!';
+          btn.classList.add('copied');
+          setTimeout(() => {
+            btn.textContent = 'Copy';
+            btn.classList.remove('copied');
+          }, 1500);
+        } catch (e) {
+          btn.textContent = 'Failed';
+          setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+        }
+      });
+      block.appendChild(btn);
+    });
+  </script>
+</body>
+</html>
