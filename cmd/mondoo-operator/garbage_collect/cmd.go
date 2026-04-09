@@ -30,6 +30,7 @@ func init() {
 	filterPlatformRuntime := Cmd.Flags().String("filter-platform-runtime", "", "Cleanup assets by an asset's PlatformRuntime (k8s-cluster or docker-image).")
 	filterManagedBy := Cmd.Flags().String("filter-managed-by", "", "Cleanup assets with matching ManagedBy field.")
 	filterOlderThan := Cmd.Flags().String("filter-older-than", "", "Cleanup assets which have not been updated in over the time provided (eg 12m or 48h or anything time.ParseDuration() accepts).")
+	spaceMrnOverride := Cmd.Flags().String("space-mrn", "", "Override the space MRN for garbage collection (used when spaceId is set in MondooAuditConfig).")
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(logger.NewLogger())
 		logger := log.Log.WithName("garbage-collect")
@@ -77,9 +78,12 @@ func init() {
 			return fmt.Errorf("no filters provided to garbage collect by")
 		}
 
-		spaceMrn := serviceAccount.SpaceMrn
+		spaceMrn := *spaceMrnOverride
 		if spaceMrn == "" {
-			spaceMrn = mondoo.SpaceMrnFromServiceAccountMrn(serviceAccount.Mrn)
+			spaceMrn = serviceAccount.SpaceMrn
+			if spaceMrn == "" {
+				spaceMrn = mondoo.SpaceMrnFromServiceAccountMrn(serviceAccount.Mrn)
+			}
 		}
 		return GarbageCollectCmd(ctx, client, spaceMrn, *filterPlatformRuntime, *filterOlderThan, *filterManagedBy, logger)
 	}

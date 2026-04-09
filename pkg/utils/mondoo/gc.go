@@ -18,6 +18,7 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
 const (
@@ -112,12 +113,21 @@ func DeleteStaleAssets(
 		return fmt.Errorf("failed to generate token: %w", err)
 	}
 
-	// Set the SpaceMrn from the service account credentials.
+	// Use spaceId override from MondooAuditConfig if set, otherwise derive from SA credentials.
 	// Some SA credentials (e.g. terraform-created) omit space_mrn, so derive it from the SA MRN.
 	// SA MRN format: //agents.api.mondoo.app/spaces/<id>/serviceaccounts/<id>
-	req.SpaceMrn = sa.SpaceMrn
-	if req.SpaceMrn == "" {
-		req.SpaceMrn = SpaceMrnFromServiceAccountMrn(sa.Mrn)
+	if spaceMrn := k8s.SpaceMrnForAuditConfig(*mondoo); spaceMrn != "" {
+		req.SpaceMrn = spaceMrn
+		// Warn if SA appears to be space-scoped (not org-level) and targets a different space
+		if saSpaceMrn := sa.SpaceMrn; saSpaceMrn != "" && saSpaceMrn != spaceMrn {
+			logger.Info("WARNING: spaceId targets a different space than the service account; ensure the SA has org-level access",
+				"saSpaceMrn", saSpaceMrn, "targetSpaceMrn", spaceMrn)
+		}
+	} else {
+		req.SpaceMrn = sa.SpaceMrn
+		if req.SpaceMrn == "" {
+			req.SpaceMrn = SpaceMrnFromServiceAccountMrn(sa.Mrn)
+		}
 	}
 	logger.Info("Preparing DeleteAssets request", "spaceMrn", req.SpaceMrn, "managedBy", req.ManagedBy)
 

@@ -8,9 +8,17 @@ metadata:
   name: mondoo-client
   namespace: mondoo-operator
 spec:
-  # Required: Reference to secret containing Mondoo service account credentials
+  # Required: Reference to secret containing Mondoo service account credentials.
+  # Can be a space-level or org-level service account.
   mondooCredsSecretRef:
     name: mondoo-client
+
+  # Optional: Route scanned assets to a specific Mondoo space.
+  # When set, the operator injects the target space into the scanner config,
+  # overriding the space derived from the service account credentials.
+  # This enables using a single org-level service account across multiple
+  # MondooAuditConfigs, each targeting a different space.
+  # spaceId: "your-space-1234"
 
   # Optional: Reference to secret containing a Mondoo registration token
   # If provided and mondooCredsSecretRef secret doesn't exist, the operator

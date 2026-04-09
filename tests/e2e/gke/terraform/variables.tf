@@ -46,3 +46,9 @@ variable "enable_wif_test" {
   type        = bool
   default     = false
 }
+
+variable "enable_space_splitting_test" {
+  description = "Create a second Mondoo space to test org-level SA with spaceId routing"
+  type        = bool
+  default     = false
+}

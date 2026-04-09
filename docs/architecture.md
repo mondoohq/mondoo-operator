@@ -137,6 +137,9 @@ spec:
   mondooCredsSecretRef:
     name: mondoo-client
 
+  # Optional: route assets to a specific space (for org-level Service Accounts)
+  # spaceId: "your-space-1234"
+
   # Scan Kubernetes resources
   kubernetesResources:
     enable: true
