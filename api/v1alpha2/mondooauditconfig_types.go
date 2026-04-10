@@ -29,6 +29,13 @@ type MondooAuditConfigSpec struct {
 	Filtering           Filtering           `json:"filtering,omitempty"`
 	Containers          Containers          `json:"containers,omitempty"`
 
+	// SpaceID optionally specifies the target Mondoo space for asset routing.
+	// When set, scanned assets are sent to this space instead of the space
+	// associated with the service account credentials. This allows using an
+	// org-level service account across multiple spaces.
+	// +optional
+	SpaceID string `json:"spaceId,omitempty"`
+
 	// Annotations allows adding custom annotations to all scanned assets. These key-value pairs
 	// will be attached to every asset discovered by the operator, making them searchable
 	// and filterable in the Mondoo Console.

@@ -152,7 +152,7 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 												},
 												{
 													Secret: &corev1.SecretProjection{
-														LocalObjectReference: m.Spec.MondooCredsSecretRef,
+														LocalObjectReference: k8s.ConfigSecretRef(*m),
 														Items: []corev1.KeyToPath{{
 															Key:  "config",
 															Path: "mondoo.yml",
@@ -237,7 +237,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 						},
 						{
 							Secret: &corev1.SecretProjection{
-								LocalObjectReference: m.Spec.MondooCredsSecretRef,
+								LocalObjectReference: k8s.ConfigSecretRef(*m),
 								Items: []corev1.KeyToPath{{
 									Key:  "config",
 									Path: "mondoo.yml",

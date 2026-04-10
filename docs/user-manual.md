@@ -180,6 +180,8 @@ Once the Secret is configured, configure the operator to define the scan targets
    spec:
      mondooCredsSecretRef:
        name: mondoo-client
+     # Optional: route assets to a specific space (useful with org-level Service Accounts)
+     # spaceId: "your-space-1234"
      kubernetesResources:
        enable: true
      nodes:
@@ -543,6 +545,60 @@ If no secret reference is specified, the operator looks for a secret named `mond
 The operator's default RBAC only allows reading secrets with specific names. If you use a custom secret name, extend RBAC so that the `ServiceAccount` `mondoo-operator-k8s-resources-scanning` has permission to read the secret.
 
 You can find examples of creating Docker registry secrets [here](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
+
+## Routing assets to a specific space with `spaceId`
+
+By default, scanned assets are sent to the space associated with the service account credentials. The `spaceId` field lets you override this, routing assets to any space the service account has access to. This is especially useful with **org-level service accounts**, which have access to all spaces in the organization.
+
+### Use cases
+
+- **Multi-space scanning**: A single operator with multiple `MondooAuditConfig` resources, each routing to a different space.
+- **External cluster scanning**: Scan remote clusters and route each cluster's assets to its own space.
+- **Simplified credential management**: Use one org-level service account instead of managing per-space service accounts.
+
+### Example: Two MondooAuditConfigs routing to different spaces
+
+Create an org-level service account in the [Mondoo Console](https://mondoo.com/docs/platform/maintain/access/service_accounts/) and store it as a Secret:
+
+```bash
+kubectl create secret generic mondoo-client --namespace mondoo-operator --from-file=config=org-creds.json
+```
+
+Then create two `MondooAuditConfig` resources, each targeting a different space:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-scanner
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  spaceId: "space-for-local-cluster"
+  kubernetesResources:
+    enable: true
+  nodes:
+    enable: true
+---
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-target
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  spaceId: "space-for-remote-cluster"
+  kubernetesResources:
+    enable: true
+    externalClusters:
+      - name: remote-cluster
+        kubeconfigSecretRef:
+          name: remote-kubeconfig
+```
+
+Both configs share the same org-level service account but route assets to different spaces. The operator creates a derived config Secret for each `MondooAuditConfig` that has `spaceId` set, injecting the target space into the scanner configuration.
 
 ## Installing Mondoo into multiple namespaces
 

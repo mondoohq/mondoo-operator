@@ -178,7 +178,7 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 									Sources: []corev1.VolumeProjection{
 										{
 											Secret: &corev1.SecretProjection{
-												LocalObjectReference: m.Spec.MondooCredsSecretRef,
+												LocalObjectReference: k8s.ConfigSecretRef(*m),
 												Items: []corev1.KeyToPath{{
 													Key:  constants.MondooCredsSecretServiceAccountKey,
 													Path: "mondoo.yml",

@@ -1312,6 +1312,13 @@ spec:
                     default: mondoo-operator-k8s-resources-scanning
                     type: string
                 type: object
+              spaceId:
+                description: |-
+                  SpaceID optionally specifies the target Mondoo space for asset routing.
+                  When set, scanned assets are sent to this space instead of the space
+                  associated with the service account credentials. This allows using an
+                  org-level service account across multiple spaces.
+                type: string
             required:
             - mondooCredsSecretRef
             type: object

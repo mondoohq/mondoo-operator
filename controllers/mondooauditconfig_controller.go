@@ -272,6 +272,13 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, reconcileError
 	}
 
+	// When spaceId is set, create a derived Secret with scope_mrn injected so cnspec
+	// routes assets to the specified space instead of the SA's default space.
+	if reconcileError = k8s.SyncConfigOverrideSecret(ctx, r.Client, mondooAuditConfig); reconcileError != nil {
+		log.Error(reconcileError, "failed to sync config override secret for space routing")
+		return ctrl.Result{}, reconcileError
+	}
+
 	nodes := nodes.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,

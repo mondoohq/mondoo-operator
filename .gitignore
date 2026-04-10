@@ -67,3 +67,6 @@ tests/e2e/**/kubeconfig
 tests/e2e/**/kubeconfig-target
 tests/e2e/**/gke_gcloud_auth_plugin_cache
 tests/e2e/**/mondoo.json
+
+# macOS
+.DS_Store

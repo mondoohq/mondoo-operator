@@ -78,3 +78,24 @@ output "enable_wif_test" {
 output "wif_gsa_email" {
   value = var.enable_wif_test ? google_service_account.wif_scanner[0].email : ""
 }
+
+output "enable_space_splitting_test" {
+  value = var.enable_space_splitting_test
+}
+
+output "scanner_space_id" {
+  value = var.enable_space_splitting_test ? mondoo_space.e2e.id : ""
+}
+
+output "target_space_id" {
+  value = var.enable_space_splitting_test ? mondoo_space.target[0].id : ""
+}
+
+output "target_space_mrn" {
+  value = var.enable_space_splitting_test ? mondoo_space.target[0].mrn : ""
+}
+
+output "org_credentials_b64" {
+  value     = var.enable_space_splitting_test ? mondoo_service_account.org[0].credential : ""
+  sensitive = true
+}

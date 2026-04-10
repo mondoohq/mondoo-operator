@@ -140,7 +140,7 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 												},
 												{
 													Secret: &corev1.SecretProjection{
-														LocalObjectReference: m.Spec.MondooCredsSecretRef,
+														LocalObjectReference: k8s.ConfigSecretRef(*m),
 														Items: []corev1.KeyToPath{{
 															Key:  "config",
 															Path: "mondoo.yml",

@@ -49,6 +49,14 @@ load_tf_outputs() {
 
   export ENABLE_WIF_TEST="$(terraform output -raw enable_wif_test 2>/dev/null || echo "false")"
 
+  export ENABLE_SPACE_SPLITTING_TEST="$(terraform output -raw enable_space_splitting_test 2>/dev/null || echo "false")"
+  if [[ "${ENABLE_SPACE_SPLITTING_TEST}" == "true" ]]; then
+    export SCANNER_SPACE_ID="$(terraform output -raw scanner_space_id)"
+    export TARGET_SPACE_ID="$(terraform output -raw target_space_id)"
+    export TARGET_SPACE_MRN="$(terraform output -raw target_space_mrn)"
+    export ORG_CREDS_B64="$(terraform output -raw org_credentials_b64)"
+  fi
+
   cd ->/dev/null
 
   # Delegate to cloud-specific loader for remaining outputs and credential setup
