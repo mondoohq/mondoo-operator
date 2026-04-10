@@ -77,7 +77,7 @@ jobs:
           kubernetes-version: ${{ matrix.k8s-version }}
 
       - name: Start k3d
-        uses: nolar/setup-k3d-k3s@293b8e5822a20bc0d5bcdd4826f1a665e72aba96 # v1.0.9
+        uses: nolar/setup-k3d-k3s@8bf8d22160e8b1d184dcb780e390d6952a7eec65 # v1.0.10
         if: matrix.k8s-distro == 'k3d'
         with:
           version: ${{ matrix.k8s-version }}
@@ -140,7 +140,7 @@ jobs:
         run: cat ".github/env" >> $GITHUB_ENV
 
       - name: Start k3d
-        uses: nolar/setup-k3d-k3s@293b8e5822a20bc0d5bcdd4826f1a665e72aba96 # v1.0.9
+        uses: nolar/setup-k3d-k3s@8bf8d22160e8b1d184dcb780e390d6952a7eec65 # v1.0.10
         with:
           version: v1.32.0
           k3d-args: --k3s-arg=--disable=traefik@server:*
