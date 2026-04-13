@@ -772,7 +772,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_Deployment_CustomInterval() {
 func (s *DeploymentHandlerSuite) TestGarbageCollection_RunsAfterSuccessfulScan() {
 	s.seedNodes()
 	gcCalled := false
-	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, req *mondooclient.DeleteAssetsRequest) error {
+	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, req *mondooclient.GarbageCollectAssetsRequest) error {
 		gcCalled = true
 		s.Contains(req.ManagedBy, "mondoo-operator-")
 		s.NotNil(req.DateFilter)
@@ -806,14 +806,14 @@ func (s *DeploymentHandlerSuite) TestGarbageCollection_RunsAfterSuccessfulScan()
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	s.True(gcCalled, "DeleteAssets should have been called")
+	s.True(gcCalled, "GarbageCollectAssets should have been called")
 	s.NotNil(d.Mondoo.Status.LastNodeScanGarbageCollectionTime, "GC timestamp should be set in status")
 }
 
 func (s *DeploymentHandlerSuite) TestGarbageCollection_SkipsWhenAlreadyRun() {
 	s.seedNodes()
 	gcCalled := false
-	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.DeleteAssetsRequest) error {
+	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.GarbageCollectAssetsRequest) error {
 		gcCalled = true
 		return nil
 	})
@@ -846,12 +846,12 @@ func (s *DeploymentHandlerSuite) TestGarbageCollection_SkipsWhenAlreadyRun() {
 	s.NoError(err)
 	s.True(result.IsZero())
 
-	s.False(gcCalled, "DeleteAssets should NOT have been called")
+	s.False(gcCalled, "GarbageCollectAssets should NOT have been called")
 }
 
 func (s *DeploymentHandlerSuite) TestGarbageCollection_FailureStillUpdatesTimestamp() {
 	s.seedNodes()
-	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.DeleteAssetsRequest) error {
+	d := s.createDeploymentHandlerWithGCMock(func(ctx context.Context, opts *mondooclient.GarbageCollectAssetsRequest) error {
 		return fmt.Errorf("API error")
 	})
 	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
@@ -893,8 +893,8 @@ func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {
 }
 
 // createDeploymentHandlerWithGCMock creates a DeploymentHandler with a mock MondooClientBuilder
-// that captures calls to DeleteAssets.
-func (s *DeploymentHandlerSuite) createDeploymentHandlerWithGCMock(gcFunc func(context.Context, *mondooclient.DeleteAssetsRequest) error) DeploymentHandler {
+// that captures calls to GarbageCollectAssets.
+func (s *DeploymentHandlerSuite) createDeploymentHandlerWithGCMock(gcFunc func(context.Context, *mondooclient.GarbageCollectAssetsRequest) error) DeploymentHandler {
 	// Create a mock credentials secret so GC can read it
 	key := generateTestPrivateKey(s.T())
 	mockSA := mondooclient.ServiceAccountCredentials{
@@ -929,14 +929,14 @@ func (s *DeploymentHandlerSuite) createDeploymentHandlerWithGCMock(gcFunc func(c
 // fakeMondooClient implements just enough of MondooClient to test GC
 type fakeMondooClient struct {
 	mondooclient.MondooClient
-	gcFunc func(context.Context, *mondooclient.DeleteAssetsRequest) error
+	gcFunc func(context.Context, *mondooclient.GarbageCollectAssetsRequest) error
 }
 
-func (f *fakeMondooClient) DeleteAssets(ctx context.Context, req *mondooclient.DeleteAssetsRequest) (*mondooclient.DeleteAssetsConfirmation, error) {
+func (f *fakeMondooClient) GarbageCollectAssets(ctx context.Context, req *mondooclient.GarbageCollectAssetsRequest) error {
 	if f.gcFunc != nil {
-		return &mondooclient.DeleteAssetsConfirmation{}, f.gcFunc(ctx, req)
+		return f.gcFunc(ctx, req)
 	}
-	return &mondooclient.DeleteAssetsConfirmation{}, nil
+	return nil
 }
 
 // generateTestPrivateKey generates an ECDSA private key and returns its PEM-encoded string.

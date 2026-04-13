@@ -36,21 +36,6 @@ func (m *MockMondooClient) EXPECT() *MockMondooClientMockRecorder {
 	return m.recorder
 }
 
-// DeleteAssets mocks base method.
-func (m *MockMondooClient) DeleteAssets(arg0 context.Context, arg1 *mondooclient.DeleteAssetsRequest) (*mondooclient.DeleteAssetsConfirmation, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteAssets", arg0, arg1)
-	ret0, _ := ret[0].(*mondooclient.DeleteAssetsConfirmation)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// DeleteAssets indicates an expected call of DeleteAssets.
-func (mr *MockMondooClientMockRecorder) DeleteAssets(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAssets", reflect.TypeOf((*MockMondooClient)(nil).DeleteAssets), arg0, arg1)
-}
-
 // ExchangeRegistrationToken mocks base method.
 func (m *MockMondooClient) ExchangeRegistrationToken(arg0 context.Context, arg1 *mondooclient.ExchangeRegistrationTokenInput) (*mondooclient.ExchangeRegistrationTokenOutput, error) {
 	m.ctrl.T.Helper()
@@ -64,6 +49,20 @@ func (m *MockMondooClient) ExchangeRegistrationToken(arg0 context.Context, arg1 
 func (mr *MockMondooClientMockRecorder) ExchangeRegistrationToken(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExchangeRegistrationToken", reflect.TypeOf((*MockMondooClient)(nil).ExchangeRegistrationToken), arg0, arg1)
+}
+
+// GarbageCollectAssets mocks base method.
+func (m *MockMondooClient) GarbageCollectAssets(arg0 context.Context, arg1 *mondooclient.GarbageCollectAssetsRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GarbageCollectAssets", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// GarbageCollectAssets indicates an expected call of GarbageCollectAssets.
+func (mr *MockMondooClientMockRecorder) GarbageCollectAssets(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GarbageCollectAssets", reflect.TypeOf((*MockMondooClient)(nil).GarbageCollectAssets), arg0, arg1)
 }
 
 // HealthCheck mocks base method.

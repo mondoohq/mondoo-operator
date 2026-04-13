@@ -90,7 +90,7 @@ func init() {
 }
 
 func GarbageCollectCmd(ctx context.Context, client mondooclient.MondooClient, spaceMrn, platformRuntime, olderThan, managedBy string, logger logr.Logger) error {
-	req := &mondooclient.DeleteAssetsRequest{
+	req := &mondooclient.GarbageCollectAssetsRequest{
 		SpaceMrn:  spaceMrn,
 		ManagedBy: managedBy,
 	}
@@ -118,8 +118,7 @@ func GarbageCollectCmd(ctx context.Context, client mondooclient.MondooClient, sp
 		}
 	}
 
-	resp, err := client.DeleteAssets(ctx, req)
-	if err != nil {
+	if err := client.GarbageCollectAssets(ctx, req); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			logger.Error(err, "failed to receive a response before timeout was exceeded")
 		} else {
@@ -128,13 +127,7 @@ func GarbageCollectCmd(ctx context.Context, client mondooclient.MondooClient, sp
 		return err
 	}
 
-	if len(resp.AssetMrns) > 0 {
-		logger.Info("Deleted assets", "count", len(resp.AssetMrns))
-	}
-	if len(resp.Errors) > 0 {
-		logger.Info("DeleteAssets completed with errors", "errors", resp.Errors)
-	}
-
+	logger.Info("Garbage collection complete")
 	return nil
 }
 
