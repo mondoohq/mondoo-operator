@@ -5,6 +5,7 @@ package container_image
 
 import (
 	"context"
+	"fmt"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -42,6 +43,24 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 	// TODO: KubernetesResources.ContainerImageScanning is a deprecated setting
 	if !n.Mondoo.Spec.KubernetesResources.ContainerImageScanning && !n.Mondoo.Spec.Containers.Enable {
 		return ctrl.Result{}, n.down(ctx)
+	}
+
+	// Validate container registry WIF configuration
+	if err := validateContainerRegistryWIF(n.Mondoo.Spec.Containers.WorkloadIdentity); err != nil {
+		logger.Error(err, "invalid container registry WIF configuration")
+		return ctrl.Result{}, err
+	}
+
+	// Sync WIF ServiceAccount if using WorkloadIdentity
+	if n.Mondoo.Spec.Containers.WorkloadIdentity != nil {
+		if err := n.syncWIFServiceAccount(ctx); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		// Clean up WIF ServiceAccount if WIF was removed
+		if err := n.cleanupWIFServiceAccount(ctx); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	if err := n.syncCronJob(ctx); err != nil {
@@ -175,8 +194,44 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		return err
 	}
 
+	// Clean up WIF ServiceAccount if it exists
+	if err := n.cleanupWIFServiceAccount(ctx); err != nil {
+		return err
+	}
+
 	// Clear any remnant status
 	updateImageScanningConditions(n.Mondoo, false, &corev1.PodList{})
 
+	return nil
+}
+
+// syncWIFServiceAccount creates or updates a ServiceAccount with cloud-specific annotations for container registry WIF
+func (n *DeploymentHandler) syncWIFServiceAccount(ctx context.Context) error {
+	desired := WIFServiceAccount(n.Mondoo)
+
+	obj := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+	if _, err := k8s.CreateOrUpdate(ctx, n.KubeClient, obj, n.Mondoo, logger, func() error {
+		obj.Labels = desired.Labels
+		obj.Annotations = desired.Annotations
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to sync WIF ServiceAccount for container registry: %w", err)
+	}
+
+	return nil
+}
+
+// cleanupWIFServiceAccount removes the WIF ServiceAccount if it exists
+func (n *DeploymentHandler) cleanupWIFServiceAccount(ctx context.Context) error {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      WIFServiceAccountName(n.Mondoo.Name),
+			Namespace: n.Mondoo.Namespace,
+		},
+	}
+	if err := k8s.DeleteIfExists(ctx, n.KubeClient, sa); err != nil {
+		logger.Error(err, "failed to clean up WIF ServiceAccount for container registry")
+		return err
+	}
 	return nil
 }

@@ -49,3 +49,7 @@ output "scanner_role_arn" {
 output "profile" {
   value = var.profile != null ? var.profile : ""
 }
+
+output "private_test_ecr_repo" {
+  value = var.enable_wif_test ? aws_ecr_repository.private_test[0].repository_url : ""
+}

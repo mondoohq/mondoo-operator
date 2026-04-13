@@ -112,6 +112,15 @@ resource "azurerm_role_assignment" "scanner_acr_pull" {
   skip_service_principal_aad_check = true
 }
 
+# Grant target cluster AcrPull access (for pulling private test images)
+resource "azurerm_role_assignment" "target_acr_pull" {
+  count                            = var.enable_target_cluster ? 1 : 0
+  principal_id                     = azurerm_kubernetes_cluster.target[0].kubelet_identity[0].object_id
+  role_definition_name             = "AcrPull"
+  scope                            = azurerm_container_registry.e2e.id
+  skip_service_principal_aad_check = true
+}
+
 ################################################################################
 # Target Cluster (optional, for external cluster scanning tests)
 ################################################################################
@@ -238,4 +247,23 @@ resource "azurerm_role_assignment" "scanner_target_rbac_reader" {
   scope                = azurerm_kubernetes_cluster.target[0].id
   role_definition_name = "Azure Kubernetes Service RBAC Reader"
   principal_id         = azurerm_user_assigned_identity.scanner[0].principal_id
+}
+
+# Grant the managed identity AcrPull on the ACR (for container registry WIF scanning)
+resource "azurerm_role_assignment" "scanner_acr_pull_wif" {
+  count                = var.enable_wif_test && var.enable_target_cluster ? 1 : 0
+  scope                = azurerm_container_registry.e2e.id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_user_assigned_identity.scanner[0].principal_id
+}
+
+# Federated credential for the container registry WIF KSA (mondoo-client-cr-wif)
+resource "azurerm_federated_identity_credential" "cr_wif" {
+  count                         = var.enable_wif_test && var.enable_target_cluster ? 1 : 0
+  name                          = "${local.name_prefix}-cr-wif-fed-cred"
+  resource_group_name           = azurerm_resource_group.e2e.name
+  user_assigned_identity_id     = azurerm_user_assigned_identity.scanner[0].id
+  audience                      = ["api://AzureADTokenExchange"]
+  issuer                        = azurerm_kubernetes_cluster.scanner.oidc_issuer_url
+  subject                       = "system:serviceaccount:mondoo-operator:mondoo-client-cr-wif"
 }

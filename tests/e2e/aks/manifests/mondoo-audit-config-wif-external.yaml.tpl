@@ -30,6 +30,15 @@ spec:
   containers:
     enable: true
     schedule: "*/5 * * * *"
+    workloadIdentity:
+      provider: aks
+      aks:
+        subscriptionId: ${AZURE_SUBSCRIPTION_ID}
+        resourceGroup: ${AZURE_RESOURCE_GROUP}
+        clusterName: ${CLUSTER_NAME}
+        clientId: ${WIF_CLIENT_ID}
+        tenantId: ${WIF_TENANT_ID}
+        loginServer: ${ACR_LOGIN_SERVER}
   nodes:
     enable: true
     style: cronjob

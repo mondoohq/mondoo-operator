@@ -87,6 +87,16 @@ resource "aws_ecr_repository" "e2e" {
   tags = local.default_tags
 }
 
+# Separate ECR repo for private WIF test image (ECR repos are flat, no nesting)
+resource "aws_ecr_repository" "private_test" {
+  count                = var.enable_wif_test ? 1 : 0
+  name                 = "${local.name_prefix}-private-test"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+
+  tags = local.default_tags
+}
+
 ################################################################################
 # Target Cluster (optional, for external cluster scanning tests)
 ################################################################################
@@ -199,8 +209,11 @@ resource "aws_iam_role" "scanner" {
         Condition = {
           StringEquals = {
             "${module.eks.oidc_provider}:aud" = "sts.amazonaws.com"
-            # KSA name: mondoo-client-wif-target-cluster (from WIFServiceAccountName)
-            "${module.eks.oidc_provider}:sub" = "system:serviceaccount:mondoo-operator:mondoo-client-wif-target-cluster"
+          }
+          StringLike = {
+            # Allow both external cluster (mondoo-client-wif-target-cluster) and
+            # container registry WIF (mondoo-client-cr-wif) KSAs
+            "${module.eks.oidc_provider}:sub" = "system:serviceaccount:mondoo-operator:mondoo-client-*"
           }
         }
       },
@@ -225,6 +238,38 @@ resource "aws_iam_role_policy" "eks_access" {
           "eks:ListClusters",
         ]
         Resource = "*"
+      },
+    ]
+  })
+}
+
+# Grant the scanner role read access to ECR (for container registry WIF scanning)
+resource "aws_iam_role_policy" "ecr_read" {
+  count = var.enable_wif_test && var.enable_target_cluster ? 1 : 0
+  name  = "ecr-read"
+  role  = aws_iam_role.scanner[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken",
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+        ]
+        Resource = [
+          aws_ecr_repository.e2e.arn,
+          var.enable_wif_test ? aws_ecr_repository.private_test[0].arn : aws_ecr_repository.e2e.arn,
+        ]
       },
     ]
   })

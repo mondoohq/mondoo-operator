@@ -316,6 +316,11 @@ type AKSWorkloadIdentity struct {
 	// TenantID is the Azure AD tenant ID.
 	// +kubebuilder:validation:Required
 	TenantID string `json:"tenantId"`
+
+	// LoginServer is the ACR login server URL (e.g., "myregistry.azurecr.io").
+	// Only used for container registry WIF authentication (containers.workloadIdentity).
+	// +optional
+	LoginServer string `json:"loginServer,omitempty"`
 }
 
 // SPIFFEAuthConfig configures SPIFFE/SPIRE authentication using X.509 SVIDs
@@ -432,6 +437,14 @@ type Containers struct {
 	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// WorkloadIdentity configures Workload Identity Federation for authenticating to cloud
+	// container registries (GCR/Artifact Registry, ECR, ACR) without static imagePullSecrets.
+	// When configured, an init container uses the pod's cloud identity to generate short-lived
+	// registry credentials at runtime. Reuses the same WorkloadIdentityConfig as external cluster
+	// scanning — cluster-specific fields (ClusterName, etc.) are ignored for registry auth.
+	// +optional
+	WorkloadIdentity *WorkloadIdentityConfig `json:"workloadIdentity,omitempty"`
 }
 
 // DeprecatedAdmission exists for backward compatibility during upgrades.

@@ -21,12 +21,23 @@ for crd in $(kubectl get crds -o name 2>/dev/null | grep mondoo || true); do
   kubectl annotate "${crd}" meta.helm.sh/release-name=mondoo-operator meta.helm.sh/release-namespace="${NAMESPACE}" --overwrite
 done
 
+HELM_EXTRA_ARGS=()
+
+# If WIF container registry scanning is enabled, bind the WIF SA to the scanning ClusterRole
+if [[ "${ENABLE_WIF_TEST:-}" == "true" ]]; then
+  HELM_EXTRA_ARGS+=(
+    --set "k8SResourcesScanning.extraClusterRoleBindingSubjects[0].name=mondoo-client-cr-wif"
+    --set "k8SResourcesScanning.extraClusterRoleBindingSubjects[0].namespace=${NAMESPACE}"
+  )
+fi
+
 helm upgrade --install mondoo-operator "${REPO_ROOT}/charts/mondoo-operator" \
   --namespace "${NAMESPACE}" --create-namespace \
   --set controllerManager.manager.image.repository="${IMAGE_REPO}" \
   --set controllerManager.manager.image.tag="${IMAGE_TAG}" \
   --set controllerManager.manager.imagePullPolicy=Always \
   --set controllerManager.manager.secureMetrics=true \
+  "${HELM_EXTRA_ARGS[@]}" \
   --wait --timeout 5m
 
 wait_for_deployment "${NAMESPACE}" "mondoo-operator-controller-manager"

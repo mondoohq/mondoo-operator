@@ -31,6 +31,13 @@ spec:
   containers:
     enable: true
     schedule: "*/5 * * * *"
+    workloadIdentity:
+      provider: gke
+      gke:
+        projectId: ${PROJECT_ID}
+        clusterName: ${CLUSTER_NAME}
+        clusterLocation: ${REGION}
+        googleServiceAccount: ${WIF_GSA_EMAIL}
   nodes:
     enable: true
     style: cronjob

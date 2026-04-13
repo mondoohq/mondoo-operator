@@ -105,3 +105,8 @@ WIF_INIT_IMAGE_PATTERN="google-cloud-cli"
 
 # WIF description for manual verification messages
 WIF_AUTH_DESCRIPTION="GKE Workload Identity"
+
+# Container registry WIF verification values
+CR_WIF_ANNOTATION_KEY="iam.gke.io/gcp-service-account"
+cr_wif_annotation_value() { echo "${WIF_GSA_EMAIL}"; }
+CR_WIF_INIT_IMAGE_PATTERN="google-cloud-cli"

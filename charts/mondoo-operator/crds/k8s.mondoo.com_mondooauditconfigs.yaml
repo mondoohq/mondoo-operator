@@ -322,6 +322,103 @@ spec:
                       image scanning job. If not specified, the default schedule is
                       used.
                     type: string
+                  workloadIdentity:
+                    description: |-
+                      WorkloadIdentity configures Workload Identity Federation for authenticating to cloud
+                      container registries (GCR/Artifact Registry, ECR, ACR) without static imagePullSecrets.
+                      When configured, an init container uses the pod's cloud identity to generate short-lived
+                      registry credentials at runtime. Reuses the same WorkloadIdentityConfig as external cluster
+                      scanning — cluster-specific fields (ClusterName, etc.) are ignored for registry auth.
+                    properties:
+                      aks:
+                        description: |-
+                          AKS contains AKS-specific Azure Workload Identity configuration.
+                          Required when provider is "aks".
+                        properties:
+                          clientId:
+                            description: ClientID is the Azure AD app client ID.
+                            type: string
+                          clusterName:
+                            description: ClusterName is the AKS cluster name.
+                            type: string
+                          loginServer:
+                            description: |-
+                              LoginServer is the ACR login server URL (e.g., "myregistry.azurecr.io").
+                              Only used for container registry WIF authentication (containers.workloadIdentity).
+                            type: string
+                          resourceGroup:
+                            description: ResourceGroup containing the AKS cluster.
+                            type: string
+                          subscriptionId:
+                            description: SubscriptionID is the Azure subscription.
+                            type: string
+                          tenantId:
+                            description: TenantID is the Azure AD tenant ID.
+                            type: string
+                        required:
+                        - clientId
+                        - clusterName
+                        - resourceGroup
+                        - subscriptionId
+                        - tenantId
+                        type: object
+                      eks:
+                        description: |-
+                          EKS contains EKS-specific IRSA configuration.
+                          Required when provider is "eks".
+                        properties:
+                          clusterName:
+                            description: ClusterName is the EKS cluster name.
+                            type: string
+                          region:
+                            description: Region is the AWS region.
+                            type: string
+                          roleArn:
+                            description: |-
+                              RoleARN is the IAM role to assume.
+                              Format: arn:aws:iam::<account>:role/<name>
+                            type: string
+                        required:
+                        - clusterName
+                        - region
+                        - roleArn
+                        type: object
+                      gke:
+                        description: |-
+                          GKE contains GKE-specific Workload Identity configuration.
+                          Required when provider is "gke".
+                        properties:
+                          clusterLocation:
+                            description: ClusterLocation is the region or zone (e.g.,
+                              "us-central1" or "us-central1-a").
+                            type: string
+                          clusterName:
+                            description: ClusterName is the GKE cluster name.
+                            type: string
+                          googleServiceAccount:
+                            description: |-
+                              GoogleServiceAccount is the Google service account to impersonate.
+                              Format: <name>@<project>.iam.gserviceaccount.com
+                            type: string
+                          projectId:
+                            description: ProjectID is the GCP project ID.
+                            type: string
+                        required:
+                        - clusterLocation
+                        - clusterName
+                        - googleServiceAccount
+                        - projectId
+                        type: object
+                      provider:
+                        description: Provider specifies the cloud provider for WIF.
+                        enum:
+                        - gke
+                        - eks
+                        - aks
+                        type: string
+                    required:
+                    - provider
+                    type: object
                 type: object
               filtering:
                 properties:
@@ -610,6 +707,11 @@ spec:
                                   type: string
                                 clusterName:
                                   description: ClusterName is the AKS cluster name.
+                                  type: string
+                                loginServer:
+                                  description: |-
+                                    LoginServer is the ACR login server URL (e.g., "myregistry.azurecr.io").
+                                    Only used for container registry WIF authentication (containers.workloadIdentity).
                                   type: string
                                 resourceGroup:
                                   description: ResourceGroup containing the AKS cluster.

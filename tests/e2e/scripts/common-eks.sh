@@ -35,6 +35,7 @@ _load_cloud_outputs() {
 
   if [[ "${ENABLE_WIF_TEST}" == "true" ]]; then
     export SCANNER_ROLE_ARN="$(terraform output -raw scanner_role_arn)"
+    export PRIVATE_TEST_ECR_REPO="$(terraform output -raw private_test_ecr_repo)"
   fi
 
   cd ->/dev/null
@@ -89,3 +90,8 @@ WIF_INIT_IMAGE_PATTERN="aws-cli"
 
 # WIF description for manual verification messages
 WIF_AUTH_DESCRIPTION="EKS IRSA"
+
+# Container registry WIF verification values
+CR_WIF_ANNOTATION_KEY="eks.amazonaws.com/role-arn"
+cr_wif_annotation_value() { echo "${SCANNER_ROLE_ARN}"; }
+CR_WIF_INIT_IMAGE_PATTERN="aws-cli"
