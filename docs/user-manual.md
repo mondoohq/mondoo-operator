@@ -477,6 +477,19 @@ spec:
     schedule: "0 0 * * *"  # Daily at midnight
 ```
 
+> [!WARNING]
+> **GKE Autopilot ephemeral storage limit**: GKE Autopilot's Default compute class caps ephemeral storage at 2Gi per pod. Container image scanning pulls and analyzes images locally, which can exceed this limit when scanning large or numerous images. If scan jobs are evicted with `Pod ephemeral local storage usage exceeds the total limit`, switch to the `Scale-Out` or `Balanced` [compute class](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/balanced-scale-out-autopilot) by adding the `cloud.google.com/compute-class` annotation to the pod template, or use a GKE Standard cluster instead.
+>
+> ```yaml
+> spec:
+>   containers:
+>     resources:
+>       requests:
+>         ephemeral-storage: "10Gi"
+>       limits:
+>         ephemeral-storage: "10Gi"
+> ```
+
 ### Creating a secret for private image scanning
 
 To allow the Mondoo operator to scan private images, it needs access to image pull secrets for these private registries.
