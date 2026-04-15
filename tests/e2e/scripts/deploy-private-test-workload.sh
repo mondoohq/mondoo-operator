@@ -51,6 +51,7 @@ info "Private-image workload deployed on scanner cluster."
 # Deploy on target cluster (if available) so external cluster scanning can
 # discover a private image too.
 if [[ "${ENABLE_TARGET_CLUSTER:-false}" == "true" ]] && [[ -n "${TARGET_KUBECONFIG_PATH:-}" ]]; then
+  refresh_target_credentials
   info "Deploying private-image workload on target cluster..."
   envsubst < "${SHARED_MANIFESTS_DIR}/nginx-private-workload.yaml.tpl" \
     | kubectl --kubeconfig "${TARGET_KUBECONFIG_PATH}" apply -f -
