@@ -1,7 +1,8 @@
 AAD
 AADSTS
-ACR
+acr
 artifactory
+artifactregistry
 bak
 bitnami
 containerregistry
@@ -18,6 +19,7 @@ irsa
 kustomization
 mcr
 mondoooperatorconfig
+myregistry
 nginx
 NSG
 oidc
