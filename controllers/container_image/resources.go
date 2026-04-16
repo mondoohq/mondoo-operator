@@ -202,7 +202,7 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 				podLabels[k] = v
 			}
 			podLabels["azure.workload.identity/use"] = "true"
-			cronjob.Spec.JobTemplate.Spec.Template.ObjectMeta.Labels = podLabels
+			cronjob.Spec.JobTemplate.Spec.Template.Labels = podLabels
 		}
 	} else {
 		// Add private registry secret if specified (static credentials path)
