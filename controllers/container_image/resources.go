@@ -194,9 +194,15 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 		// Add init container for registry credential generation
 		podSpec.InitContainers = append(podSpec.InitContainers, registryWIFInitContainer(wif))
 
-		// AKS Workload Identity webhook requires pod label
+		// AKS Workload Identity webhook requires this label on the pod template only.
+		// Copy labels so we don't mutate the CronJob/Job metadata.
 		if wif.Provider == v1alpha2.CloudProviderAKS {
-			ls["azure.workload.identity/use"] = "true"
+			podLabels := make(map[string]string, len(ls)+1)
+			for k, v := range ls {
+				podLabels[k] = v
+			}
+			podLabels["azure.workload.identity/use"] = "true"
+			cronjob.Spec.JobTemplate.Spec.Template.ObjectMeta.Labels = podLabels
 		}
 	} else {
 		// Add private registry secret if specified (static credentials path)
@@ -350,13 +356,22 @@ func validateContainerRegistryWIF(wif *v1alpha2.WorkloadIdentityConfig) error {
 		if wif.GKE == nil {
 			return fmt.Errorf("containers.workloadIdentity: gke config required when provider is gke")
 		}
+		if wif.GKE.GoogleServiceAccount == "" {
+			return fmt.Errorf("containers.workloadIdentity: gke.googleServiceAccount is required for container registry WIF")
+		}
 	case v1alpha2.CloudProviderEKS:
 		if wif.EKS == nil {
 			return fmt.Errorf("containers.workloadIdentity: eks config required when provider is eks")
 		}
+		if wif.EKS.Region == "" {
+			return fmt.Errorf("containers.workloadIdentity: eks.region is required for container registry WIF")
+		}
 	case v1alpha2.CloudProviderAKS:
 		if wif.AKS == nil {
 			return fmt.Errorf("containers.workloadIdentity: aks config required when provider is aks")
+		}
+		if wif.AKS.LoginServer == "" {
+			return fmt.Errorf("containers.workloadIdentity: aks.loginServer is required for container registry WIF")
 		}
 	}
 

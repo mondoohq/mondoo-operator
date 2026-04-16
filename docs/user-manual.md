@@ -576,6 +576,8 @@ spec:
       provider: gke
       gke:
         projectId: my-gcp-project
+        clusterName: my-cluster          # required by schema
+        clusterLocation: us-central1     # required by schema
         googleServiceAccount: scanner@my-gcp-project.iam.gserviceaccount.com
 ```
 
@@ -594,6 +596,7 @@ spec:
       provider: eks
       eks:
         region: us-west-2
+        clusterName: my-cluster          # required by schema
         roleArn: arn:aws:iam::123456789012:role/MondooRegistryReader
 ```
 
@@ -611,6 +614,9 @@ spec:
     workloadIdentity:
       provider: aks
       aks:
+        subscriptionId: 12345678-1234-1234-1234-123456789012  # required by schema
+        resourceGroup: my-resource-group                       # required by schema
+        clusterName: my-cluster                                # required by schema
         clientId: abcdef12-3456-7890-abcd-ef1234567890
         tenantId: fedcba98-7654-3210-fedc-ba9876543210
         loginServer: myregistry.azurecr.io

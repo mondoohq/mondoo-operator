@@ -293,8 +293,10 @@ func TestCronJob_WIF_AKS(t *testing.T) {
 	initEnv := envToMap(podSpec.InitContainers[0].Env)
 	assert.Equal(t, "myregistry.azurecr.io", initEnv["ACR_LOGIN_SERVER"])
 
-	// AKS should add WIF pod label
+	// AKS should add WIF pod label only on pod template, not on CronJob metadata
 	assert.Equal(t, "true", cj.Spec.JobTemplate.Spec.Template.Labels["azure.workload.identity/use"])
+	assert.Empty(t, cj.Labels["azure.workload.identity/use"])
+	assert.Empty(t, cj.Spec.JobTemplate.Labels["azure.workload.identity/use"])
 }
 
 func TestCronJob_WIF_IgnoresPrivateRegistrySecret(t *testing.T) {
