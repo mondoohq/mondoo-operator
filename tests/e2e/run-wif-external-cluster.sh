@@ -38,9 +38,10 @@ fi
 info "--- Step: Build and Push ---"
 source "${E2E_DIR}/scripts/build-and-push.sh"
 
-# Step 3: Deploy test workload to scanner cluster
-info "--- Step: Deploy Test Workload (scanner cluster) ---"
+# Step 3: Deploy test workloads to scanner cluster (public + private-registry)
+info "--- Step: Deploy Test Workloads (scanner cluster) ---"
 source "${E2E_DIR}/scripts/deploy-test-workload.sh"
+source "${E2E_DIR}/scripts/deploy-private-test-workload.sh"
 
 # Step 4: Deploy operator from local chart
 info "--- Step: Deploy Operator ---"
@@ -70,6 +71,10 @@ source "${E2E_DIR}/scripts/verify.sh"
 # Step 10: Verify WIF external cluster scanning
 info "--- Step: Verify (WIF external cluster) ---"
 source "${E2E_DIR}/scripts/verify-wif-external.sh"
+
+# Step 11: Verify WIF container registry scanning
+info "--- Step: Verify (WIF container registry) ---"
+source "${E2E_DIR}/scripts/verify-wif-container-registry.sh"
 
 info ""
 info "=========================================="

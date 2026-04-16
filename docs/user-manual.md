@@ -19,6 +19,7 @@ This user manual describes how to install and use the Mondoo Operator.
     - [Authentication methods](#authentication-methods)
   - [Container Image Scanning](#container-image-scanning)
     - [Creating a secret for private image scanning](#creating-a-secret-for-private-image-scanning)
+    - [Private image scanning with Workload Identity Federation](#private-image-scanning-with-workload-identity-federation)
   - [Installing Mondoo into multiple namespaces](#installing-mondoo-into-multiple-namespaces)
   - [Adjust the scan interval](#adjust-the-scan-interval)
   - [Real-time Resource Watcher (Opt-in)](#real-time-resource-watcher-opt-in)
@@ -477,6 +478,19 @@ spec:
     schedule: "0 0 * * *"  # Daily at midnight
 ```
 
+> [!WARNING]
+> **GKE Autopilot ephemeral storage limit**: GKE Autopilot's Default compute class caps ephemeral storage at 2Gi per pod. Container image scanning pulls and analyzes images locally, which can exceed this limit when scanning large or numerous images. If scan jobs are evicted with `Pod ephemeral local storage usage exceeds the total limit`, switch to the `Scale-Out` or `Balanced` [compute class](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/balanced-scale-out-autopilot) by adding the `cloud.google.com/compute-class` annotation to the pod template, or use a GKE Standard cluster instead.
+>
+> ```yaml
+> spec:
+>   containers:
+>     resources:
+>       requests:
+>         ephemeral-storage: "10Gi"
+>       limits:
+>         ephemeral-storage: "10Gi"
+> ```
+
 ### Creating a secret for private image scanning
 
 To allow the Mondoo operator to scan private images, it needs access to image pull secrets for these private registries.
@@ -545,6 +559,92 @@ If no secret reference is specified, the operator looks for a secret named `mond
 The operator's default RBAC only allows reading secrets with specific names. If you use a custom secret name, extend RBAC so that the `ServiceAccount` `mondoo-operator-k8s-resources-scanning` has permission to read the secret.
 
 You can find examples of creating Docker registry secrets [here](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
+
+### Private image scanning with Workload Identity Federation
+
+Instead of managing static image pull secrets, you can use Workload Identity Federation (WIF) to authenticate to cloud container registries using the pod's cloud identity. The operator creates a dedicated Kubernetes ServiceAccount with the appropriate cloud annotations and adds an init container that obtains short-lived registry credentials at runtime.
+
+This approach supports GCR, Artifact Registry, ECR, and ACR.
+
+**GKE (Artifact Registry / GCR):**
+
+```yaml
+spec:
+  containers:
+    enable: true
+    workloadIdentity:
+      provider: gke
+      gke:
+        projectId: my-gcp-project
+        clusterName: my-cluster          # required by schema
+        clusterLocation: us-central1     # required by schema
+        googleServiceAccount: scanner@my-gcp-project.iam.gserviceaccount.com
+```
+
+Prerequisites:
+- GKE cluster with Workload Identity enabled
+- Google Service Account with `roles/artifactregistry.reader` (or `roles/storage.objectViewer` for GCR)
+- IAM policy binding the GSA to the Kubernetes ServiceAccount `mondoo-client-cr-wif` in the operator namespace
+
+**EKS (ECR):**
+
+```yaml
+spec:
+  containers:
+    enable: true
+    workloadIdentity:
+      provider: eks
+      eks:
+        region: us-west-2
+        clusterName: my-cluster          # required by schema
+        roleArn: arn:aws:iam::123456789012:role/MondooRegistryReader
+```
+
+Prerequisites:
+- EKS cluster with IRSA (IAM Roles for Service Accounts) enabled
+- IAM role with `ecr:GetAuthorizationToken`, `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer`, and `ecr:BatchCheckLayerAvailability` permissions
+- IRSA trust policy allowing the Kubernetes ServiceAccount `mondoo-client-cr-wif` in the operator namespace
+
+**AKS (ACR):**
+
+```yaml
+spec:
+  containers:
+    enable: true
+    workloadIdentity:
+      provider: aks
+      aks:
+        subscriptionId: 12345678-1234-1234-1234-123456789012  # required by schema
+        resourceGroup: my-resource-group                       # required by schema
+        clusterName: my-cluster                                # required by schema
+        clientId: abcdef12-3456-7890-abcd-ef1234567890
+        tenantId: fedcba98-7654-3210-fedc-ba9876543210
+        loginServer: myregistry.azurecr.io
+```
+
+Prerequisites:
+- AKS cluster with Workload Identity enabled
+- User-assigned managed identity with `AcrPull` role on the ACR
+- Federated identity credential trusting the Kubernetes ServiceAccount `mondoo-client-cr-wif` in the operator namespace
+
+#### RBAC for the WIF ServiceAccount
+
+The WIF ServiceAccount (`mondoo-client-cr-wif`) needs the same cluster read permissions as the default scanner ServiceAccount to discover container images running in the cluster. Add it to the scanning ClusterRoleBinding via the Helm chart:
+
+```bash
+helm upgrade mondoo-operator mondoo/mondoo-operator \
+  --set "k8SResourcesScanning.extraClusterRoleBindingSubjects[0].name=mondoo-client-cr-wif" \
+  --set "k8SResourcesScanning.extraClusterRoleBindingSubjects[0].namespace=mondoo-operator"
+```
+
+Or in `values.yaml`:
+
+```yaml
+k8SResourcesScanning:
+  extraClusterRoleBindingSubjects:
+    - name: mondoo-client-cr-wif
+      namespace: mondoo-operator
+```
 
 ## Routing assets to a specific space with `spaceId`
 

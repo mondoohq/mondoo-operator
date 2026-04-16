@@ -45,6 +45,10 @@ k8SResourcesScanning:
   serviceAccount:
     ## @param k8SResourcesScanning.serviceAccount.annotations [object] Annotations to add to the Kubernetes resources scanning service account
     annotations: {}
+  ## @param k8SResourcesScanning.extraClusterRoleBindingSubjects [array] Additional ServiceAccount subjects to bind to the k8s-resources-scanning ClusterRole (e.g., WIF ServiceAccounts for container registry scanning)
+  extraClusterRoleBindingSubjects: []
+  # - name: mondoo-client-cr-wif
+  #   namespace: mondoo-operator
 
 ## @section General Configuration
 

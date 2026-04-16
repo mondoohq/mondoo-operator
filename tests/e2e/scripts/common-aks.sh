@@ -89,3 +89,8 @@ WIF_INIT_IMAGE_PATTERN="azure-cli"
 
 # WIF description for manual verification messages
 WIF_AUTH_DESCRIPTION="AKS Workload Identity"
+
+# Container registry WIF verification values
+CR_WIF_ANNOTATION_KEY="azure.workload.identity/client-id"
+cr_wif_annotation_value() { echo "${WIF_CLIENT_ID}"; }
+CR_WIF_INIT_IMAGE_PATTERN="azure-cli"

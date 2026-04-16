@@ -401,6 +401,114 @@ func (s *DeploymentHandlerSuite) TestReconcile_DisableContainerImageScanning() {
 	s.Equal(0, len(cronJobs.Items))
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_WIF_GKE_CreatesServiceAccount() {
+	s.auditConfig.Spec.Containers.WorkloadIdentity = &mondoov1alpha2.WorkloadIdentityConfig{
+		Provider: mondoov1alpha2.CloudProviderGKE,
+		GKE: &mondoov1alpha2.GKEWorkloadIdentity{
+			ProjectID:            "my-project",
+			GoogleServiceAccount: "scanner@my-project.iam.gserviceaccount.com",
+		},
+	}
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Verify WIF ServiceAccount was created
+	sa := &corev1.ServiceAccount{}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKey{
+		Namespace: s.auditConfig.Namespace,
+		Name:      WIFServiceAccountName(s.auditConfig.Name),
+	}, sa))
+	s.Equal("scanner@my-project.iam.gserviceaccount.com", sa.Annotations["iam.gke.io/gcp-service-account"])
+
+	// Verify CronJob uses WIF ServiceAccount and has init container
+	cj := &batchv1.CronJob{}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKey{
+		Namespace: s.auditConfig.Namespace,
+		Name:      CronJobName(s.auditConfig.Name),
+	}, cj))
+	s.Equal(WIFServiceAccountName(s.auditConfig.Name), cj.Spec.JobTemplate.Spec.Template.Spec.ServiceAccountName)
+	s.Require().Len(cj.Spec.JobTemplate.Spec.Template.Spec.InitContainers, 1)
+	s.Equal("generate-registry-creds", cj.Spec.JobTemplate.Spec.Template.Spec.InitContainers[0].Name)
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_WIF_AKS_CreatesServiceAccount() {
+	s.auditConfig.Spec.Containers.WorkloadIdentity = &mondoov1alpha2.WorkloadIdentityConfig{
+		Provider: mondoov1alpha2.CloudProviderAKS,
+		AKS: &mondoov1alpha2.AKSWorkloadIdentity{
+			ClientID:    "client-id-123",
+			TenantID:    "tenant-id-456",
+			LoginServer: "myregistry.azurecr.io",
+		},
+	}
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Verify WIF ServiceAccount
+	sa := &corev1.ServiceAccount{}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKey{
+		Namespace: s.auditConfig.Namespace,
+		Name:      WIFServiceAccountName(s.auditConfig.Name),
+	}, sa))
+	s.Equal("client-id-123", sa.Annotations["azure.workload.identity/client-id"])
+	s.Equal("true", sa.Labels["azure.workload.identity/use"])
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_WIF_CleansUpOnDisable() {
+	// First, enable WIF and reconcile
+	s.auditConfig.Spec.Containers.WorkloadIdentity = &mondoov1alpha2.WorkloadIdentityConfig{
+		Provider: mondoov1alpha2.CloudProviderGKE,
+		GKE: &mondoov1alpha2.GKEWorkloadIdentity{
+			ProjectID:            "my-project",
+			GoogleServiceAccount: "scanner@my-project.iam.gserviceaccount.com",
+		},
+	}
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	_, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+
+	// Verify SA exists
+	sa := &corev1.ServiceAccount{}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKey{
+		Namespace: s.auditConfig.Namespace,
+		Name:      WIFServiceAccountName(s.auditConfig.Name),
+	}, sa))
+
+	// Now disable WIF and reconcile
+	d.Mondoo.Spec.Containers.WorkloadIdentity = nil
+	_, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+
+	// Verify SA is cleaned up
+	err = d.KubeClient.Get(s.ctx, client.ObjectKey{
+		Namespace: s.auditConfig.Namespace,
+		Name:      WIFServiceAccountName(s.auditConfig.Name),
+	}, sa)
+	s.Error(err, "WIF ServiceAccount should be deleted after disabling WIF")
+
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_WIF_InvalidConfig() {
+	s.auditConfig.Spec.Containers.WorkloadIdentity = &mondoov1alpha2.WorkloadIdentityConfig{
+		Provider: mondoov1alpha2.CloudProviderGKE,
+		// Missing GKE config
+	}
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	_, err := d.Reconcile(s.ctx)
+	s.Error(err, "should fail validation when provider-specific config is missing")
+}
+
 func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {
 	return DeploymentHandler{
 		KubeClient:             s.fakeClientBuilder.Build(),

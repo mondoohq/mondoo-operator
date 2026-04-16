@@ -201,8 +201,9 @@ resource "google_service_account" "wif_scanner" {
   project      = var.project_id
 }
 
-# Allow the management cluster KSA to impersonate this GSA.
-# KSA name: mondoo-client-wif-target-cluster (from WIFServiceAccountName("mondoo-client", "target-cluster"))
+# Allow the management cluster KSAs to impersonate this GSA.
+# - mondoo-client-wif-target-cluster: external cluster scanning
+# - mondoo-client-cr-wif: container registry WIF scanning
 resource "google_service_account_iam_binding" "wif_identity" {
   count = var.enable_wif_test ? 1 : 0
 
@@ -211,6 +212,7 @@ resource "google_service_account_iam_binding" "wif_identity" {
 
   members = [
     "serviceAccount:${var.project_id}.svc.id.goog[mondoo-operator/mondoo-client-wif-target-cluster]",
+    "serviceAccount:${var.project_id}.svc.id.goog[mondoo-operator/mondoo-client-cr-wif]",
   ]
 }
 
@@ -222,3 +224,15 @@ resource "google_project_iam_member" "wif_cluster_viewer" {
   role    = "roles/container.clusterViewer"
   member  = "serviceAccount:${google_service_account.wif_scanner[0].email}"
 }
+
+# Grant the GSA read access to the Artifact Registry repo (for container registry WIF scanning)
+resource "google_artifact_registry_repository_iam_member" "wif_ar_reader" {
+  count = var.enable_wif_test ? 1 : 0
+
+  project    = var.project_id
+  location   = var.region
+  repository = google_artifact_registry_repository.e2e.repository_id
+  role       = "roles/artifactregistry.reader"
+  member     = "serviceAccount:${google_service_account.wif_scanner[0].email}"
+}
+

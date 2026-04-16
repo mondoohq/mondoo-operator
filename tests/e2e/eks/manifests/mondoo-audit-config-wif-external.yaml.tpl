@@ -28,6 +28,12 @@ spec:
   containers:
     enable: true
     schedule: "*/5 * * * *"
+    workloadIdentity:
+      provider: eks
+      eks:
+        region: ${AWS_REGION}
+        clusterName: ${CLUSTER_NAME}
+        roleArn: ${SCANNER_ROLE_ARN}
   nodes:
     enable: true
     style: cronjob

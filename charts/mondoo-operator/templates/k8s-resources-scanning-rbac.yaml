@@ -28,3 +28,8 @@ subjects:
 - kind: ServiceAccount
   name: '{{ include "mondoo-operator.fullname" . }}-k8s-resources-scanning'
   namespace: '{{ .Release.Namespace }}'
+{{- range .Values.k8SResourcesScanning.extraClusterRoleBindingSubjects }}
+- kind: ServiceAccount
+  name: '{{ .name }}'
+  namespace: '{{ .namespace | default $.Release.Namespace }}'
+{{- end }}
