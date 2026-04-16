@@ -5,6 +5,7 @@ package container_image
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	// That's the mod k8s relies on https://github.com/kubernetes/kubernetes/blob/master/go.mod#L63
@@ -198,9 +199,7 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 		// Copy labels so we don't mutate the CronJob/Job metadata.
 		if wif.Provider == v1alpha2.CloudProviderAKS {
 			podLabels := make(map[string]string, len(ls)+1)
-			for k, v := range ls {
-				podLabels[k] = v
-			}
+			maps.Copy(podLabels, ls)
 			podLabels["azure.workload.identity/use"] = "true"
 			cronjob.Spec.JobTemplate.Spec.Template.Labels = podLabels
 		}
@@ -385,7 +384,7 @@ func registryWIFInitContainer(wif *v1alpha2.WorkloadIdentityConfig) corev1.Conta
 	var env []corev1.EnvVar
 
 	// Common retry wrapper for transient failures
-	retryWrapper := `
+	retryWrapper := `set -euo pipefail
 # Retry wrapper for transient failures
 retry() {
   local max_attempts=3
