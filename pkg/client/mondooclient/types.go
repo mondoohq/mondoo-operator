@@ -19,7 +19,7 @@ type MondooClient interface {
 	IntegrationCheckIn(context.Context, *IntegrationCheckInInput) (*IntegrationCheckInOutput, error)
 	IntegrationReportStatus(context.Context, *ReportStatusRequest) error
 
-	DeleteAssets(context.Context, *DeleteAssetsRequest) (*DeleteAssetsConfirmation, error)
+	GarbageCollectAssets(context.Context, *GarbageCollectAssetsRequest) error
 }
 
 // ExchangeRegistrationTokenInput is used for converting a JWT to a Mondoo serivce account
@@ -116,14 +116,14 @@ const (
 	MessageStatus_MESSAGE_INFO    MessageStatus = 3
 )
 
-// DeleteAssetsRequest matches the server-side DeleteAssetsRequest proto.
-type DeleteAssetsRequest struct {
-	SpaceMrn        string      `json:"spaceMrn,omitempty"`
-	AssetMrns       []string    `json:"asset_mrns,omitempty"`
-	DeleteAll       bool        `json:"delete_all,omitempty"`
-	DateFilter      *DateFilter `json:"date_filter,omitempty"`
-	ManagedBy       string      `json:"managed_by,omitempty"`
-	PlatformRuntime string      `json:"platform_runtime,omitempty"`
+// GarbageCollectAssetsRequest matches the server-side PurgeAssetsRequest proto
+// on the PolicyResolver service (/PolicyResolver/PurgeAssets).
+type GarbageCollectAssetsRequest struct {
+	SpaceMrn        string            `json:"spaceMrn,omitempty"`
+	DateFilter      *DateFilter       `json:"date_filter,omitempty"`
+	ManagedBy       string            `json:"managed_by,omitempty"`
+	PlatformRuntime string            `json:"platform_runtime,omitempty"` // optional filter (k8s-cluster, docker-image, etc.)
+	Labels          map[string]string `json:"labels,omitempty"`
 }
 
 type DateFilter struct {
@@ -145,9 +145,3 @@ const (
 	DateFilterField_FILTER_LAST_UPDATED DateFilterField = 0
 	DateFilterField_FILTER_CREATED      DateFilterField = 1
 )
-
-// DeleteAssetsConfirmation is the response from the DeleteAssets API.
-type DeleteAssetsConfirmation struct {
-	AssetMrns []string          `json:"asset_mrns,omitempty"`
-	Errors    map[string]string `json:"errors,omitempty"`
-}

@@ -438,7 +438,7 @@ func (n *DeploymentHandler) performGarbageCollection(ctx context.Context, manage
 	// Node assets are scanned via the filesystem/OS provider and have no PlatformRuntime set
 	// (unlike k8s resource assets which have PlatformRuntime "k8s-cluster").
 	// Omitting PlatformRuntime so the filter matches node assets.
-	req := &mondooclient.DeleteAssetsRequest{
+	req := &mondooclient.GarbageCollectAssetsRequest{
 		ManagedBy: managedBy,
 		DateFilter: &mondooclient.DateFilter{
 			Timestamp:  time.Now().Add(-mondoo.GCOlderThan(n.Mondoo.Spec.Nodes.Schedule)).Format(time.RFC3339),
@@ -447,7 +447,7 @@ func (n *DeploymentHandler) performGarbageCollection(ctx context.Context, manage
 		},
 	}
 
-	if err := mondoo.DeleteStaleAssets(ctx, n.KubeClient, n.Mondoo, n.MondooOperatorConfig, n.MondooClientBuilder, req, logger); err != nil {
+	if err := mondoo.GarbageCollectAssets(ctx, n.KubeClient, n.Mondoo, n.MondooOperatorConfig, n.MondooClientBuilder, req, logger); err != nil {
 		return err
 	}
 

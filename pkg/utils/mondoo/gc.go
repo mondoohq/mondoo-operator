@@ -72,16 +72,16 @@ func gcOlderThanFromSchedule(schedule string) time.Duration {
 	return time.Duration(gcMultiplier) * interval
 }
 
-// DeleteStaleAssets builds a Mondoo API client from the operator's credentials and
-// calls DeleteAssets with the provided request. This is shared between node scan
-// and k8s resource scan garbage collection.
-func DeleteStaleAssets(
+// GarbageCollectAssets builds a Mondoo API client from the operator's credentials and
+// calls GarbageCollectAssets with the provided request. The server automatically
+// scopes deletion to assets created by the calling service account.
+func GarbageCollectAssets(
 	ctx context.Context,
 	kubeClient client.Client,
 	mondoo *v1alpha2.MondooAuditConfig,
 	operatorConfig *v1alpha2.MondooOperatorConfig,
 	clientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error),
-	req *mondooclient.DeleteAssetsRequest,
+	req *mondooclient.GarbageCollectAssetsRequest,
 	logger logr.Logger,
 ) error {
 	if clientBuilder == nil {
@@ -114,13 +114,10 @@ func DeleteStaleAssets(
 	}
 
 	// Use spaceId override from MondooAuditConfig if set, otherwise derive from SA credentials.
-	// Some SA credentials (e.g. terraform-created) omit space_mrn, so derive it from the SA MRN.
-	// SA MRN format: //agents.api.mondoo.app/spaces/<id>/serviceaccounts/<id>
 	if spaceMrn := k8s.SpaceMrnForAuditConfig(*mondoo); spaceMrn != "" {
 		req.SpaceMrn = spaceMrn
-		// Warn if SA appears to be space-scoped (not org-level) and targets a different space
 		if saSpaceMrn := sa.SpaceMrn; saSpaceMrn != "" && saSpaceMrn != spaceMrn {
-			logger.Info("WARNING: spaceId targets a different space than the service account; ensure the SA has org-level access",
+			logger.V(1).Info("spaceId override targets a different space than the service account",
 				"saSpaceMrn", saSpaceMrn, "targetSpaceMrn", spaceMrn)
 		}
 	} else {
@@ -129,7 +126,7 @@ func DeleteStaleAssets(
 			req.SpaceMrn = SpaceMrnFromServiceAccountMrn(sa.Mrn)
 		}
 	}
-	logger.Info("Preparing DeleteAssets request", "spaceMrn", req.SpaceMrn, "managedBy", req.ManagedBy)
+	logger.Info("Preparing GarbageCollectAssets request", "spaceMrn", req.SpaceMrn, "managedBy", req.ManagedBy)
 
 	opts := mondooclient.MondooClientOptions{
 		ApiEndpoint: sa.ApiEndpoint,
@@ -146,19 +143,11 @@ func DeleteStaleAssets(
 		return fmt.Errorf("failed to create mondoo client: %w", err)
 	}
 
-	resp, err := mc.DeleteAssets(ctx, req)
-	if err != nil {
-		return fmt.Errorf("delete assets API call failed: %w", err)
+	if err := mc.GarbageCollectAssets(ctx, req); err != nil {
+		return fmt.Errorf("garbage collect assets API call failed: %w", err)
 	}
 
-	logger.Info("DeleteAssets response", "deletedCount", len(resp.AssetMrns), "errorCount", len(resp.Errors))
-	if len(resp.Errors) > 0 {
-		logger.Info("DeleteAssets completed with errors", "errors", resp.Errors)
-	}
-	if len(resp.AssetMrns) > 0 {
-		logger.Info("Deleted stale assets", "mrns", resp.AssetMrns)
-	}
-
+	logger.Info("GarbageCollectAssets completed successfully")
 	return nil
 }
 

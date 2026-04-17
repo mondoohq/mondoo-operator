@@ -610,7 +610,7 @@ func (n *DeploymentHandler) garbageCollectIfNeeded(ctx context.Context, clusterU
 
 // performGarbageCollection calls the Mondoo API to delete stale K8s resource scan assets.
 func (n *DeploymentHandler) performGarbageCollection(ctx context.Context, managedBy string) error {
-	req := &mondooclient.DeleteAssetsRequest{
+	req := &mondooclient.GarbageCollectAssetsRequest{
 		ManagedBy:       managedBy,
 		PlatformRuntime: "k8s-cluster",
 		DateFilter: &mondooclient.DateFilter{
@@ -620,7 +620,7 @@ func (n *DeploymentHandler) performGarbageCollection(ctx context.Context, manage
 		},
 	}
 
-	if err := mondoo.DeleteStaleAssets(ctx, n.KubeClient, n.Mondoo, n.MondooOperatorConfig, n.MondooClientBuilder, req, logger); err != nil {
+	if err := mondoo.GarbageCollectAssets(ctx, n.KubeClient, n.Mondoo, n.MondooOperatorConfig, n.MondooClientBuilder, req, logger); err != nil {
 		return err
 	}
 
