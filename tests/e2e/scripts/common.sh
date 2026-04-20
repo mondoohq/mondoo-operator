@@ -57,6 +57,14 @@ load_tf_outputs() {
     export ORG_CREDS_B64="$(terraform output -raw org_credentials_b64)"
   fi
 
+  export ENABLE_ASSET_ROUTING_TEST="$(terraform output -raw enable_asset_routing_test 2>/dev/null || echo "false")"
+  if [[ "${ENABLE_ASSET_ROUTING_TEST}" == "true" ]]; then
+    export DEVELOPERS_SPACE_ID="$(terraform output -raw developers_space_id)"
+    # Reuse org creds and target space outputs (shared with space splitting)
+    export ORG_CREDS_B64="${ORG_CREDS_B64:-$(terraform output -raw org_credentials_b64)}"
+    export TARGET_SPACE_ID="${TARGET_SPACE_ID:-$(terraform output -raw target_space_id)}"
+  fi
+
   cd ->/dev/null
 
   # Delegate to cloud-specific loader for remaining outputs and credential setup

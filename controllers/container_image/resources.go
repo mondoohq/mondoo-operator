@@ -296,11 +296,15 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 		}
 	}
 
-	// Add user-defined annotations to all assets
+	// Add user-defined annotations first, then operator-managed annotations.
+	// Operator annotations go last so they cannot be overwritten by user values.
 	if len(m.Spec.Annotations) > 0 {
 		for i := range inv.Spec.Assets {
 			inv.Spec.Assets[i].AddAnnotations(m.Spec.Annotations)
 		}
+	}
+	for i := range inv.Spec.Assets {
+		inv.Spec.Assets[i].AddAnnotations(constants.AuditConfigAnnotations(m.Name, m.Namespace))
 	}
 
 	invBytes, err := yaml.Marshal(inv)
