@@ -88,14 +88,22 @@ output "scanner_space_id" {
 }
 
 output "target_space_id" {
-  value = var.enable_space_splitting_test ? mondoo_space.target[0].id : ""
+  value = (var.enable_space_splitting_test || var.enable_asset_routing_test) ? mondoo_space.target[0].id : ""
 }
 
 output "target_space_mrn" {
-  value = var.enable_space_splitting_test ? mondoo_space.target[0].mrn : ""
+  value = (var.enable_space_splitting_test || var.enable_asset_routing_test) ? mondoo_space.target[0].mrn : ""
 }
 
 output "org_credentials_b64" {
-  value     = var.enable_space_splitting_test ? mondoo_service_account.org[0].credential : ""
+  value     = (var.enable_space_splitting_test || var.enable_asset_routing_test) ? mondoo_service_account.org[0].credential : ""
   sensitive = true
+}
+
+output "enable_asset_routing_test" {
+  value = var.enable_asset_routing_test
+}
+
+output "developers_space_id" {
+  value = var.enable_asset_routing_test ? mondoo_space.developers[0].id : ""
 }

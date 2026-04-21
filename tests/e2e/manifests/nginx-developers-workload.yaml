@@ -1,0 +1,25 @@
+# Copyright Mondoo, Inc. 2026
+# SPDX-License-Identifier: BUSL-1.1
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-developers
+  namespace: developers
+  labels:
+    app: nginx-developers
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-developers
+  template:
+    metadata:
+      labels:
+        app: nginx-developers
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:stable
+        ports:
+        - containerPort: 80

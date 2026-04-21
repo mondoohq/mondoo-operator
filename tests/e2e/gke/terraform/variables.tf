@@ -52,3 +52,9 @@ variable "enable_space_splitting_test" {
   type        = bool
   default     = false
 }
+
+variable "enable_asset_routing_test" {
+  description = "Create spaces and routing rules for server-side asset routing tests"
+  type        = bool
+  default     = false
+}

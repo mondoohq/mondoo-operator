@@ -126,6 +126,14 @@ func GarbageCollectAssets(
 			req.SpaceMrn = SpaceMrnFromServiceAccountMrn(sa.Mrn)
 		}
 	}
+
+	// Org-level service accounts without spaceId have no determinable space for GC.
+	// This happens when asset routing is used (server-side routing, no operator-side space).
+	if req.SpaceMrn == "" {
+		logger.Info("Skipping garbage collection: no space MRN determinable (org-level SA without spaceId)")
+		return nil
+	}
+
 	logger.Info("Preparing GarbageCollectAssets request", "spaceMrn", req.SpaceMrn, "managedBy", req.ManagedBy)
 
 	opts := mondooclient.MondooClientOptions{
