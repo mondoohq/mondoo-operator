@@ -16,6 +16,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
+	mondooutils "go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
 )
@@ -194,6 +195,72 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 		{Identifier: MondooOperatorIdentifier, Status: mondooclient.MessageStatus_MESSAGE_ERROR, Message: m.Status.Conditions[3].Message},
 	}
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
+}
+
+type mockContainerImageResolver struct {
+	cnspecSkipValues   []bool
+	operatorSkipValues []bool
+}
+
+func (m *mockContainerImageResolver) CnspecImage(_, _, _ string, skipImageResolution bool) (string, error) {
+	m.cnspecSkipValues = append(m.cnspecSkipValues, skipImageResolution)
+	if skipImageResolution {
+		return "ghcr.io/mondoohq/mondoo-operator/cnspec:11-rootless", nil
+	}
+	return "ghcr.io/mondoohq/mondoo-operator/cnspec@sha256:abc123", nil
+}
+
+func (m *mockContainerImageResolver) MondooOperatorImage(_ context.Context, _, _, _ string, skipImageResolution bool) (string, error) {
+	m.operatorSkipValues = append(m.operatorSkipValues, skipImageResolution)
+	if skipImageResolution {
+		return "ghcr.io/mondoohq/mondoo-operator:latest", nil
+	}
+	return "ghcr.io/mondoohq/mondoo-operator@sha256:def456", nil
+}
+
+func (m *mockContainerImageResolver) WithImageRegistry(_ string) mondooutils.ContainerImageResolver {
+	return m
+}
+
+func (m *mockContainerImageResolver) WithRegistryMirrors(_ map[string]string) mondooutils.ContainerImageResolver {
+	return m
+}
+
+func (m *mockContainerImageResolver) WithImagePullSecrets(_ []v1.LocalObjectReference) mondooutils.ContainerImageResolver {
+	return m
+}
+
+func TestReportStatusRequestFromAuditConfig_SkipContainerResolution(t *testing.T) {
+	logger := logr.Logger{}
+	integrationMrn := utils.RandString(10)
+	nodes := []v1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node1"}}}
+	v := &k8sversion.Info{GitVersion: "v1.24.0"}
+	m := testMondooAuditConfig()
+
+	t.Run("skipContainerResolution=false resolves digests", func(t *testing.T) {
+		resolver := &mockContainerImageResolver{}
+		reportStatus := ReportStatusRequestFromAuditConfig(context.Background(), integrationMrn, m, nodes, v, resolver, false, logger)
+
+		state := reportStatus.LastState.(OperatorCustomState)
+		assert.Equal(t, "sha256:abc123", state.CnspecImageDigest)
+		assert.Equal(t, "sha256:def456", state.OperatorImageDigest)
+		// CnspecImage called twice: once for digest, once for tag (always skip=true)
+		assert.Equal(t, []bool{false, true}, resolver.cnspecSkipValues)
+		assert.Equal(t, []bool{false}, resolver.operatorSkipValues)
+	})
+
+	t.Run("skipContainerResolution=true skips digest resolution", func(t *testing.T) {
+		resolver := &mockContainerImageResolver{}
+		reportStatus := ReportStatusRequestFromAuditConfig(context.Background(), integrationMrn, m, nodes, v, resolver, true, logger)
+
+		state := reportStatus.LastState.(OperatorCustomState)
+		assert.Empty(t, state.CnspecImageDigest)
+		assert.Empty(t, state.OperatorImageDigest)
+		assert.Equal(t, "11-rootless", state.CnspecVersion)
+		// Both calls should pass skipImageResolution=true
+		assert.Equal(t, []bool{true, true}, resolver.cnspecSkipValues)
+		assert.Equal(t, []bool{true}, resolver.operatorSkipValues)
+	})
 }
 
 func testMondooAuditConfig() v1alpha2.MondooAuditConfig {
