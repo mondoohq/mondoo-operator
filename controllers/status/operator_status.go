@@ -46,7 +46,9 @@ type MondooAuditConfig struct {
 }
 
 func ReportStatusRequestFromAuditConfig(
-	ctx context.Context, integrationMrn string, m v1alpha2.MondooAuditConfig, nodes []v1.Node, k8sVersion *k8sversion.Info, containerImageResolver mondoo.ContainerImageResolver, log logr.Logger,
+	ctx context.Context, integrationMrn string, m v1alpha2.MondooAuditConfig,
+	nodes []v1.Node, k8sVersion *k8sversion.Info, containerImageResolver mondoo.ContainerImageResolver,
+	skipContainerResolution bool, log logr.Logger,
 ) mondooclient.ReportStatusRequest {
 	nodeNames := make([]string, len(nodes))
 	for i := range nodes {
@@ -169,7 +171,7 @@ func ReportStatusRequestFromAuditConfig(
 	// Resolve cnspec and operator images to get version and digest
 	var cnspecVersion, cnspecImageDigest, operatorImageDigest string
 	if containerImageResolver != nil {
-		resolvedImage, err := containerImageResolver.CnspecImage(m.Spec.Scanner.Image.Name, m.Spec.Scanner.Image.Tag, m.Spec.Scanner.Image.Digest, false)
+		resolvedImage, err := containerImageResolver.CnspecImage(m.Spec.Scanner.Image.Name, m.Spec.Scanner.Image.Tag, m.Spec.Scanner.Image.Digest, skipContainerResolution)
 		if err != nil {
 			log.Error(err, "Failed to resolve cnspec image for status reporting")
 		} else {
@@ -185,7 +187,7 @@ func ReportStatusRequestFromAuditConfig(
 		}
 
 		// Resolve operator image digest
-		resolvedOperator, err := containerImageResolver.MondooOperatorImage(ctx, "", "", "", false)
+		resolvedOperator, err := containerImageResolver.MondooOperatorImage(ctx, "", "", "", skipContainerResolution)
 		if err != nil {
 			log.Error(err, "Failed to resolve operator image for status reporting")
 		} else {
