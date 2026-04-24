@@ -30,7 +30,9 @@ func init() {
 	filterPlatformRuntime := Cmd.Flags().String("filter-platform-runtime", "", "Cleanup assets by an asset's PlatformRuntime (k8s-cluster or docker-image).")
 	filterManagedBy := Cmd.Flags().String("filter-managed-by", "", "Cleanup assets with matching ManagedBy field.")
 	filterOlderThan := Cmd.Flags().String("filter-older-than", "", "Cleanup assets which have not been updated in over the time provided (eg 12m or 48h or anything time.ParseDuration() accepts).")
-	spaceMrnOverride := Cmd.Flags().String("space-mrn", "", "Override the space MRN for garbage collection (used when spaceId is set in MondooAuditConfig).")
+	scopeMrnOverride := Cmd.Flags().String("scope-mrn", "", "Override the scope MRN (space or org) for garbage collection.")
+	Cmd.Flags().String("space-mrn", "", "Deprecated: use --scope-mrn instead.")
+	_ = Cmd.Flags().MarkDeprecated("space-mrn", "use --scope-mrn instead")
 	Cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		log.SetLogger(logger.NewLogger())
 		logger := log.Log.WithName("garbage-collect")
@@ -78,20 +80,25 @@ func init() {
 			return fmt.Errorf("no filters provided to garbage collect by")
 		}
 
-		spaceMrn := *spaceMrnOverride
-		if spaceMrn == "" {
-			spaceMrn = serviceAccount.SpaceMrn
-			if spaceMrn == "" {
-				spaceMrn = mondoo.SpaceMrnFromServiceAccountMrn(serviceAccount.Mrn)
+		scopeMrn := *scopeMrnOverride
+		if scopeMrn == "" {
+			if spaceMrn, _ := cmd.Flags().GetString("space-mrn"); spaceMrn != "" {
+				scopeMrn = spaceMrn
 			}
 		}
-		return GarbageCollectCmd(ctx, client, spaceMrn, *filterPlatformRuntime, *filterOlderThan, *filterManagedBy, logger)
+		if scopeMrn == "" {
+			scopeMrn = serviceAccount.ScopeMrn
+		}
+		if scopeMrn == "" {
+			scopeMrn = serviceAccount.SpaceMrn
+		}
+		return GarbageCollectCmd(ctx, client, scopeMrn, *filterPlatformRuntime, *filterOlderThan, *filterManagedBy, logger)
 	}
 }
 
-func GarbageCollectCmd(ctx context.Context, client mondooclient.MondooClient, spaceMrn, platformRuntime, olderThan, managedBy string, logger logr.Logger) error {
+func GarbageCollectCmd(ctx context.Context, client mondooclient.MondooClient, scopeMrn, platformRuntime, olderThan, managedBy string, logger logr.Logger) error {
 	req := &mondooclient.GarbageCollectAssetsRequest{
-		SpaceMrn:  spaceMrn,
+		ScopeMrn:  scopeMrn,
 		ManagedBy: managedBy,
 	}
 

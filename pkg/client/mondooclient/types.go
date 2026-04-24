@@ -51,6 +51,7 @@ type ServiceAccountCredentials struct {
 	PrivateKey  string `protobuf:"bytes,3,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"` //nolint:gosec
 	Certificate string `protobuf:"bytes,4,opt,name=certificate,proto3" json:"certificate,omitempty"`
 	ApiEndpoint string `protobuf:"bytes,5,opt,name=api_endpoint,json=apiEndpoint,proto3" json:"api_endpoint,omitempty"`
+	ScopeMrn    string `json:"scope_mrn,omitempty"`
 }
 type IntegrationCheckInInput struct {
 	// Mrn should hold the MRN of the integration that is having the CheckIn() called for
@@ -119,17 +120,20 @@ const (
 // GarbageCollectAssetsRequest matches the server-side PurgeAssetsRequest proto
 // on the PolicyResolver service (/PolicyResolver/PurgeAssets).
 type GarbageCollectAssetsRequest struct {
-	SpaceMrn        string            `json:"spaceMrn,omitempty"`
-	DateFilter      *DateFilter       `json:"date_filter,omitempty"`
-	ManagedBy       string            `json:"managed_by,omitempty"`
-	PlatformRuntime string            `json:"platform_runtime,omitempty"` // optional filter (k8s-cluster, docker-image, etc.)
-	Labels          map[string]string `json:"labels,omitempty"`
+	SpaceMrn        string            `protobuf:"bytes,1,opt,name=spaceMrn,proto3" json:"spaceMrn,omitempty"` // Deprecated: use ScopeMrn
+	AssetMrns       []string          `protobuf:"bytes,2,rep,name=asset_mrns,json=assetMrns,proto3" json:"asset_mrns,omitempty"`
+	PurgeAll        bool              `protobuf:"varint,3,opt,name=purge_all,json=purgeAll,proto3" json:"purge_all,omitempty"`
+	DateFilter      *DateFilter       `protobuf:"bytes,4,opt,name=date_filter,json=dateFilter,proto3" json:"date_filter,omitempty"`
+	ManagedBy       string            `protobuf:"bytes,5,opt,name=managed_by,json=managedBy,proto3" json:"managed_by,omitempty"`
+	PlatformRuntime string            `protobuf:"bytes,6,opt,name=platform_runtime,json=platformRuntime,proto3" json:"platform_runtime,omitempty"`
+	Labels          map[string]string `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ScopeMrn        string            `protobuf:"bytes,8,opt,name=scope_mrn,json=scopeMrn,proto3" json:"scope_mrn,omitempty"`
 }
 
 type DateFilter struct {
-	Timestamp  string          `json:"timestamp,omitempty"` // RFC3339
-	Comparison Comparison      `json:"comparison"`
-	Field      DateFilterField `json:"field"`
+	Timestamp  string          `protobuf:"bytes,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Comparison Comparison      `protobuf:"varint,2,opt,name=comparison,proto3,enum=cnspec.policy.v1.Comparison" json:"comparison,omitempty"`
+	Field      DateFilterField `protobuf:"varint,3,opt,name=field,proto3,enum=cnspec.policy.v1.DateFilterField" json:"field,omitempty"`
 }
 
 type Comparison int32

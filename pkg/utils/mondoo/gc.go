@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -113,28 +112,26 @@ func GarbageCollectAssets(
 		return fmt.Errorf("failed to generate token: %w", err)
 	}
 
-	// Use spaceId override from MondooAuditConfig if set, otherwise derive from SA credentials.
+	// Use spaceId override from MondooAuditConfig if set, otherwise use scope from SA credentials.
 	if spaceMrn := k8s.SpaceMrnForAuditConfig(*mondoo); spaceMrn != "" {
-		req.SpaceMrn = spaceMrn
+		req.ScopeMrn = spaceMrn
 		if saSpaceMrn := sa.SpaceMrn; saSpaceMrn != "" && saSpaceMrn != spaceMrn {
 			logger.V(1).Info("spaceId override targets a different space than the service account",
 				"saSpaceMrn", saSpaceMrn, "targetSpaceMrn", spaceMrn)
 		}
 	} else {
-		req.SpaceMrn = sa.SpaceMrn
-		if req.SpaceMrn == "" {
-			req.SpaceMrn = SpaceMrnFromServiceAccountMrn(sa.Mrn)
+		req.ScopeMrn = sa.ScopeMrn
+		if req.ScopeMrn == "" {
+			req.ScopeMrn = sa.SpaceMrn
 		}
 	}
 
-	// Org-level service accounts without spaceId have no determinable space for GC.
-	// This happens when asset routing is used (server-side routing, no operator-side space).
-	if req.SpaceMrn == "" {
-		logger.Info("Skipping garbage collection: no space MRN determinable (org-level SA without spaceId)")
+	if req.ScopeMrn == "" {
+		logger.Info("Skipping garbage collection: no scope MRN determinable from service account")
 		return nil
 	}
 
-	logger.Info("Preparing GarbageCollectAssets request", "spaceMrn", req.SpaceMrn, "managedBy", req.ManagedBy)
+	logger.Info("Preparing GarbageCollectAssets request", "scopeMrn", req.ScopeMrn, "managedBy", req.ManagedBy)
 
 	opts := mondooclient.MondooClientOptions{
 		ApiEndpoint: sa.ApiEndpoint,
@@ -157,21 +154,4 @@ func GarbageCollectAssets(
 
 	logger.Info("GarbageCollectAssets completed successfully")
 	return nil
-}
-
-// SpaceMrnFromServiceAccountMrn extracts the space MRN from a service account MRN.
-// SA MRN format: //agents.api.mondoo.app/spaces/<space-id>/serviceaccounts/<sa-id>
-// Space MRN format: //captain.api.mondoo.app/spaces/<space-id>
-func SpaceMrnFromServiceAccountMrn(saMrn string) string {
-	const spacesSegment = "/spaces/"
-	idx := strings.Index(saMrn, spacesSegment)
-	if idx < 0 {
-		return ""
-	}
-	after := saMrn[idx+len(spacesSegment):]
-	spaceID, _, _ := strings.Cut(after, "/")
-	if spaceID == "" {
-		return ""
-	}
-	return "//captain.api.mondoo.app/spaces/" + spaceID
 }
