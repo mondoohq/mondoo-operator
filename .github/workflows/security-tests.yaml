@@ -5,10 +5,13 @@ on:
       MONDOO_CLIENT:
         required: true
 
+# SECURITY: This workflow checks out and executes PR head code with access to secrets.
+# When called via pull_request_target (tests-forks.yaml), this code is untrusted.
+# Access controls are enforced by the calling workflow's label gate.
+#
 # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
 permissions:
   contents: read
-# Attention: These jobs still have access to all the secrets.
 
 jobs:
   security-tests:

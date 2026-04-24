@@ -1,4 +1,14 @@
 name: Run Test (forks & dependabot)
+# SECURITY: This workflow uses pull_request_target, which runs with write-scoped
+# GITHUB_TOKEN and access to repository secrets even for fork PRs.
+# The "ok to test" label gate is the primary security control.
+# Maintainers MUST review fork PR code before applying the label.
+# Downstream workflows (unit-tests, security-tests, integration-tests) checkout
+# and execute PR head code with access to secrets.
+# DO NOT:
+#   - Remove or weaken the label check
+#   - Add checkout of PR head code in this file
+#   - Pass secrets to new downstream workflows without security review
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, labeled]
@@ -49,7 +59,8 @@ jobs:
     needs: [unit-tests]
     if: needs.unit-tests.result == 'success'
     uses: ./.github/workflows/security-tests.yaml
-    secrets: inherit
+    secrets:
+      MONDOO_CLIENT: ${{ secrets.MONDOO_CLIENT }}
   integration-tests:
     name: Integration tests
     needs: [unit-tests]
@@ -57,4 +68,8 @@ jobs:
     uses: ./.github/workflows/integration-tests.yaml
     with:
       cnspecImageTag: ""
-    secrets: inherit
+    secrets:
+      MONDOO_CLIENT: ${{ secrets.MONDOO_CLIENT }}
+      MONDOO_CLIENT_EDGE: ${{ secrets.MONDOO_CLIENT_EDGE }}
+      MONDOO_TEST_ORG_TOKEN: ${{ secrets.MONDOO_TEST_ORG_TOKEN }}
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
