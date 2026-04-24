@@ -1683,6 +1683,7 @@ func (s *DeploymentHandlerSuite) createDeploymentHandlerWithGCMock(gcFunc func(c
 	key := credentials.MondooServiceAccount(s.T())
 	mockSA := mondooclient.ServiceAccountCredentials{
 		Mrn:         "//agents.api.mondoo.app/spaces/test/serviceaccounts/test",
+		ScopeMrn:    "//captain.api.mondoo.app/spaces/test",
 		PrivateKey:  key,
 		ApiEndpoint: "https://us.api.mondoo.com",
 	}
