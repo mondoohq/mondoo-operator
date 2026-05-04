@@ -125,7 +125,7 @@ jobs:
 
       - name: Scan Kubernetes manifests
         run: |
-          cnspec scan k8s --path ./manifests --score-threshold 80
+          cnspec scan k8s --path ./manifests --risk-threshold 20
         env:
           MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_SERVICE_ACCOUNT }}
 ```
@@ -137,7 +137,7 @@ scan-manifests:
   image: mondoo/cnspec:latest
   stage: test
   script:
-    - cnspec scan k8s --path ./manifests --score-threshold 80
+    - cnspec scan k8s --path ./manifests --risk-threshold 20
   variables:
     MONDOO_CONFIG_BASE64: $MONDOO_SERVICE_ACCOUNT
 ```
@@ -167,7 +167,7 @@ jobs:
         run: curl -sSL https://install.mondoo.com/sh | bash
 
       - name: Scan Kubernetes manifests
-        run: cnspec scan k8s --path . --score-threshold 80
+        run: cnspec scan k8s --path . --risk-threshold 20
         env:
           MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_SERVICE_ACCOUNT }}
 ```
@@ -190,7 +190,7 @@ spec:
     - name: scan
       image: mondoo/cnspec:latest
       script: |
-        cnspec scan k8s --path $(workspaces.source.path)/$(params.manifest-path) --score-threshold 80
+        cnspec scan k8s --path $(workspaces.source.path)/$(params.manifest-path) --risk-threshold 20
       env:
         - name: MONDOO_CONFIG_BASE64
           valueFrom:
