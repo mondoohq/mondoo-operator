@@ -97,7 +97,6 @@ func (s *Scanner) ScanResources(ctx context.Context, resources []K8sResourceIden
 		"scan", "k8s",
 		"--config", s.config.ConfigPath,
 		"--inventory-file", tempPath,
-		"--score-threshold", "0",
 	}
 	if s.config.APIProxy != "" {
 		cnspecArgs = append(cnspecArgs, "--api-proxy", s.config.APIProxy)
