@@ -44,7 +44,7 @@ func (b *IntegrationBuilder) Run(ctx context.Context) (*Integration, error) {
 		} `graphql:"createClientIntegration(input: $input)"`
 	}
 	err := b.client.Mutate(ctx, &m, mondoogql.CreateClientIntegrationInput{
-		SpaceMrn: mondoogql.String(b.spaceMrn),
+		SpaceMrn: mondoogql.NewStringPtr(mondoogql.String(b.spaceMrn)),
 		Name:     mondoogql.String(b.name),
 		Type:     mondoogql.ClientIntegrationTypeK8s,
 		ConfigurationOptions: mondoogql.ClientIntegrationConfigurationInput{
