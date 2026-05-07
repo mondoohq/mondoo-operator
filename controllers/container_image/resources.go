@@ -384,7 +384,7 @@ func validateContainerRegistryWIF(wif *v1alpha2.WorkloadIdentityConfig) error {
 // registryWIFInitContainer creates an init container that generates docker config credentials
 // using cloud-native Workload Identity Federation
 func registryWIFInitContainer(wif *v1alpha2.WorkloadIdentityConfig) corev1.Container {
-	var image, script string
+	var image, shell, script string
 	var env []corev1.EnvVar
 
 	// Common retry wrapper for transient failures
@@ -410,6 +410,7 @@ retry() {
 	switch wif.Provider {
 	case v1alpha2.CloudProviderGKE:
 		image = k8s_scan.GCloudSDKImage
+		shell = "/bin/bash"
 		script = retryWrapper + `
 # Use WIF identity to get an access token for Artifact Registry / GCR
 TOKEN=$(retry gcloud auth print-access-token)
@@ -456,6 +457,7 @@ echo "Docker config generated for $(echo "$AUTHS" | tr ',' '\n' | wc -l) registr
 
 	case v1alpha2.CloudProviderEKS:
 		image = k8s_scan.AWSCLIImage
+		shell = "/bin/bash"
 		script = retryWrapper + `
 # Use IRSA identity to get ECR login password
 PASSWORD=$(retry aws ecr get-login-password --region "$AWS_REGION")
@@ -483,6 +485,7 @@ echo "Docker config generated for ECR registry: ${REGISTRY}"
 
 	case v1alpha2.CloudProviderAKS:
 		image = k8s_scan.AzureCLIImage
+		shell = "/bin/bash"
 		script = retryWrapper + `
 # Azure WIF webhook injects AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_FEDERATED_TOKEN_FILE
 retry az login --federated-token "$(cat "$AZURE_FEDERATED_TOKEN_FILE")" \
@@ -511,6 +514,7 @@ echo "Docker config generated for ACR: ${ACR_LOGIN_SERVER}"
 
 	default:
 		image = "busybox:1.36"
+		shell = "/bin/sh"
 		script = `echo "ERROR: Unknown workload identity provider"; exit 1`
 		env = []corev1.EnvVar{}
 	}
@@ -519,7 +523,7 @@ echo "Docker config generated for ACR: ${ACR_LOGIN_SERVER}"
 		Name:            "generate-registry-creds",
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command:         []string{"/bin/sh", "-c", script},
+		Command:         []string{shell, "-c", script},
 		Env:             env,
 		VolumeMounts: []corev1.VolumeMount{
 			{Name: "docker-config", MountPath: "/etc/opt/mondoo/docker"},

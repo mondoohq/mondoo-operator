@@ -669,7 +669,7 @@ const (
 
 // wifInitContainer creates an init container that generates kubeconfig using cloud CLI tools
 func wifInitContainer(cluster v1alpha2.ExternalCluster) corev1.Container {
-	var image, script string
+	var image, shell, script string
 	var env []corev1.EnvVar
 
 	// Common retry wrapper for transient failures
@@ -695,6 +695,7 @@ retry() {
 	switch cluster.WorkloadIdentity.Provider {
 	case v1alpha2.CloudProviderGKE:
 		image = GCloudSDKImage
+		shell = "/bin/bash"
 		script = retryWrapper + `
 retry gcloud container clusters get-credentials "$CLUSTER_NAME" \
   --project "$PROJECT_ID" \
@@ -713,6 +714,7 @@ echo "=== END DEBUG ==="
 
 	case v1alpha2.CloudProviderEKS:
 		image = AWSCLIImage
+		shell = "/bin/bash"
 		script = retryWrapper + `
 retry aws eks update-kubeconfig \
   --name "$CLUSTER_NAME" \
@@ -730,6 +732,7 @@ echo "=== END DEBUG ==="
 
 	case v1alpha2.CloudProviderAKS:
 		image = AzureCLIImage
+		shell = "/bin/bash"
 		script = retryWrapper + `
 # Azure CLI requires explicit login with the federated token injected by the
 # AKS Workload Identity webhook (AZURE_CLIENT_ID, AZURE_TENANT_ID,
@@ -752,8 +755,8 @@ retry az aks get-credentials \
 		}
 
 	default:
-		// This should never happen if validation is correct, but handle gracefully
 		image = "busybox:1.36"
+		shell = "/bin/sh"
 		script = `echo "ERROR: Unknown workload identity provider"; exit 1`
 		env = []corev1.EnvVar{}
 	}
@@ -762,7 +765,7 @@ retry az aks get-credentials \
 		Name:            "generate-kubeconfig",
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command:         []string{"/bin/sh", "-c", script},
+		Command:         []string{shell, "-c", script},
 		Env:             env,
 		VolumeMounts: []corev1.VolumeMount{
 			{Name: "kubeconfig", MountPath: "/etc/opt/mondoo/kubeconfig"},
