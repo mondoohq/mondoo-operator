@@ -534,7 +534,9 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 
 	// Add WIF registry credentials when container image scanning is enabled and WIF registry auth is configured.
 	// The pod's existing cloud identity (from the external cluster's WIF SA) is used to obtain registry tokens.
-	if cluster.ContainerImageScanning && m.Spec.Containers.WorkloadIdentity != nil && cluster.WorkloadIdentity != nil {
+	// Skip when static pull secrets are already configured — they take precedence.
+	hasStaticPullSecret := cluster.PrivateRegistriesPullSecretRef != nil && cluster.PrivateRegistriesPullSecretRef.Name != ""
+	if !hasStaticPullSecret && cluster.ContainerImageScanning && m.Spec.Containers.WorkloadIdentity != nil && cluster.WorkloadIdentity != nil {
 		podSpec := &cronjob.Spec.JobTemplate.Spec.Template.Spec
 
 		podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
