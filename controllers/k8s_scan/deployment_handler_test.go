@@ -1530,11 +1530,11 @@ func TestExternalClusterNaming(t *testing.T) {
 		t.Run(tt.prefix+"-"+tt.clusterName, func(t *testing.T) {
 			// Test CronJob name
 			cronJobName := ExternalClusterCronJobName(tt.prefix, tt.clusterName)
-			if !strings.HasPrefix(cronJobName, tt.prefix) {
-				t.Errorf("CronJob name should start with prefix %q, got %q", tt.prefix, cronJobName)
+			if !strings.HasPrefix(cronJobName, "mondoo-k8s-scan-") {
+				t.Errorf("CronJob name should start with %q, got %q", "mondoo-k8s-scan-", cronJobName)
 			}
-			if !strings.HasSuffix(cronJobName, tt.clusterName) {
-				t.Errorf("CronJob name should end with cluster name %q, got %q", tt.clusterName, cronJobName)
+			if !strings.Contains(cronJobName, tt.clusterName) && len(cronJobName) < 52 {
+				t.Errorf("CronJob name should contain cluster name %q when not truncated, got %q", tt.clusterName, cronJobName)
 			}
 
 			// Test ConfigMap name

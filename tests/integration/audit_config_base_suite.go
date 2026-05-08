@@ -5,7 +5,6 @@ package integration
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -25,7 +24,6 @@ import (
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/controllers/resource_watcher"
-	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"go.mondoo.com/mondoo-operator/pkg/version"
 	"go.mondoo.com/mondoo-operator/tests/framework/installer"
@@ -159,7 +157,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 		s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(utils.LabelsToLabelSelector(cronJobLabels), auditConfig.Namespace),
 		"Kubernetes resources scan CronJob did not run successfully.")
 
-	err = s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-k8s-scan")
+	err = s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, k8s_scan.CronJobName(auditConfig.Name))
 	s.NoErrorf(err, "Couldn't find k8s scan pod in Podlist of the MondooAuditConfig Status")
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
@@ -259,7 +257,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 		s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(utils.LabelsToLabelSelector(cronJobLabels), auditConfig.Namespace),
 		"Kubernetes container image scan CronJob did not run successfully.")
 
-	err = s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-containers-scan")
+	err = s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, container_image.CronJobName(auditConfig.Name))
 	s.NoErrorf(err, "Couldn't find container image scan pod in Podlist of the MondooAuditConfig Status")
 
 	err = s.testCluster.K8sHelper.CheckForReconciledOperatorVersion(&auditConfig, version.Version)
@@ -352,10 +350,9 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesCronjobs(auditConfig mo
 	selector := utils.LabelsToLabelSelector(cronJobLabels)
 	s.True(s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(selector, auditConfig.Namespace), "Not all CronJobs have run successfully.")
 
-	base := fmt.Sprintf("%s%s", auditConfig.Name, nodes.CronJobNameBase)
 	for _, node := range nodeList.Items {
-		nodeIdentifier := nodes.NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), node.Name)
-		err := s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, "client-node-"+nodeIdentifier)
+		cronJobName := nodes.CronJobName(auditConfig.Name, node.Name)
+		err := s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, cronJobName)
 		s.NoErrorf(err, "Couldn't find NodeScan Pod for node "+node.Name+" in Podlist of the MondooAuditConfig Status")
 	}
 

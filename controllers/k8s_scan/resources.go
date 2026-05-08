@@ -5,6 +5,7 @@ package k8s_scan
 
 import (
 	"fmt"
+	"maps"
 	"path/filepath"
 	"strings"
 
@@ -487,7 +488,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 			cfg.Spec.ImagePullSecrets...)
 	}
 
-	// Add private registry pull secrets if configured
+	// Add private registry pull secrets if configured (static credentials)
 	if cluster.PrivateRegistriesPullSecretRef != nil && cluster.PrivateRegistriesPullSecretRef.Name != "" {
 		cronjob.Spec.JobTemplate.Spec.Template.Spec.Volumes = append(cronjob.Spec.JobTemplate.Spec.Template.Spec.Volumes, corev1.Volume{
 			Name: "pull-secrets",
@@ -531,6 +532,42 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 		)
 	}
 
+	// Add WIF registry credentials when container image scanning is enabled and WIF registry auth is configured.
+	// The pod's existing cloud identity (from the external cluster's WIF SA) is used to obtain registry tokens.
+	// Skip when static pull secrets are already configured — they take precedence.
+	hasStaticPullSecret := cluster.PrivateRegistriesPullSecretRef != nil && cluster.PrivateRegistriesPullSecretRef.Name != ""
+	if !hasStaticPullSecret && cluster.ContainerImageScanning && m.Spec.Containers.WorkloadIdentity != nil && cluster.WorkloadIdentity != nil {
+		podSpec := &cronjob.Spec.JobTemplate.Spec.Template.Spec
+
+		podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
+			Name: "docker-config",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
+
+		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts,
+			corev1.VolumeMount{
+				Name:      "docker-config",
+				ReadOnly:  true,
+				MountPath: "/etc/opt/mondoo/docker",
+			},
+		)
+		podSpec.Containers[0].Env = append(podSpec.Containers[0].Env,
+			corev1.EnvVar{Name: "DOCKER_CONFIG", Value: "/etc/opt/mondoo/docker"},
+		)
+
+		podSpec.InitContainers = append(podSpec.InitContainers, k8s.RegistryWIFInitContainer(m.Spec.Containers.WorkloadIdentity))
+
+		// AKS Workload Identity webhook requires this label
+		if m.Spec.Containers.WorkloadIdentity.Provider == v1alpha2.CloudProviderAKS {
+			podLabels := make(map[string]string, len(ls)+1)
+			maps.Copy(podLabels, cronjob.Spec.JobTemplate.Spec.Template.Labels)
+			podLabels["azure.workload.identity/use"] = "true"
+			cronjob.Spec.JobTemplate.Spec.Template.Labels = podLabels
+		}
+	}
+
 	return cronjob
 }
 
@@ -552,11 +589,11 @@ func ExternalClusterCronJobLabels(m v1alpha2.MondooAuditConfig, clusterName stri
 }
 
 func CronJobName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, CronJobNameSuffix)
+	return k8s.CronJobName("k8s-scan", prefix)
 }
 
 func ExternalClusterCronJobName(prefix, clusterName string) string {
-	return fmt.Sprintf("%s%s-%s", prefix, CronJobNameSuffix, clusterName)
+	return k8s.CronJobNameWithCluster("k8s-scan", prefix, clusterName)
 }
 
 func ConfigMapName(prefix string) string {
@@ -648,25 +685,6 @@ func WIFServiceAccount(cluster v1alpha2.ExternalCluster, m *v1alpha2.MondooAudit
 	return sa
 }
 
-// Container image versions for init containers (pinned for reproducibility)
-const (
-	// Google Cloud SDK image - slim variant for smaller size
-	// https://cloud.google.com/sdk/docs/downloads-docker
-	GCloudSDKImage = "gcr.io/google.com/cloudsdktool/google-cloud-cli:499.0.0-slim"
-
-	// AWS CLI image
-	// https://hub.docker.com/r/amazon/aws-cli
-	AWSCLIImage = "amazon/aws-cli:2.22.0"
-
-	// Azure CLI image
-	// https://mcr.microsoft.com/en-us/artifact/mar/azure-cli/tags
-	AzureCLIImage = "mcr.microsoft.com/azure-cli:2.67.0"
-
-	// SPIFFE Helper image
-	// https://github.com/spiffe/spiffe-helper/releases
-	SPIFFEHelperImage = "ghcr.io/spiffe/spiffe-helper:0.8.0"
-)
-
 // wifInitContainer creates an init container that generates kubeconfig using cloud CLI tools
 func wifInitContainer(cluster v1alpha2.ExternalCluster) corev1.Container {
 	var image, shell, script string
@@ -694,16 +712,41 @@ retry() {
 
 	switch cluster.WorkloadIdentity.Provider {
 	case v1alpha2.CloudProviderGKE:
-		image = GCloudSDKImage
+		image = constants.GCloudSDKImage
 		shell = "/bin/bash"
 		script = retryWrapper + `
-retry gcloud container clusters get-credentials "$CLUSTER_NAME" \
+# Build kubeconfig with a bearer token instead of gke-gcloud-auth-plugin,
+# since the main container (cnspec) doesn't have the plugin installed.
+CLUSTER_CA=$(retry gcloud container clusters describe "$CLUSTER_NAME" \
   --project "$PROJECT_ID" \
-  --location "$CLUSTER_LOCATION"
-cp ~/.kube/config /etc/opt/mondoo/kubeconfig/kubeconfig
-echo "=== DEBUG: generated kubeconfig ==="
-cat /etc/opt/mondoo/kubeconfig/kubeconfig
-echo "=== END DEBUG ==="
+  --location "$CLUSTER_LOCATION" \
+  --format='value(masterAuth.clusterCaCertificate)')
+CLUSTER_ENDPOINT=$(retry gcloud container clusters describe "$CLUSTER_NAME" \
+  --project "$PROJECT_ID" \
+  --location "$CLUSTER_LOCATION" \
+  --format='value(endpoint)')
+TOKEN=$(retry gcloud auth print-access-token)
+
+cat > /etc/opt/mondoo/kubeconfig/kubeconfig <<EOF
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority-data: ${CLUSTER_CA}
+    server: https://${CLUSTER_ENDPOINT}
+  name: external
+contexts:
+- context:
+    cluster: external
+    user: gke-wif
+  name: default
+current-context: default
+users:
+- name: gke-wif
+  user:
+    token: ${TOKEN}
+EOF
+echo "Kubeconfig generated for GKE cluster ${CLUSTER_NAME}"
 `
 		env = []corev1.EnvVar{
 			{Name: "HOME", Value: "/tmp"},
@@ -713,16 +756,13 @@ echo "=== END DEBUG ==="
 		}
 
 	case v1alpha2.CloudProviderEKS:
-		image = AWSCLIImage
+		image = constants.AWSCLIImage
 		shell = "/bin/bash"
 		script = retryWrapper + `
 retry aws eks update-kubeconfig \
   --name "$CLUSTER_NAME" \
   --region "$AWS_REGION" \
   --kubeconfig /etc/opt/mondoo/kubeconfig/kubeconfig
-echo "=== DEBUG: generated kubeconfig ==="
-cat /etc/opt/mondoo/kubeconfig/kubeconfig
-echo "=== END DEBUG ==="
 `
 		env = []corev1.EnvVar{
 			{Name: "HOME", Value: "/tmp"},
@@ -731,7 +771,7 @@ echo "=== END DEBUG ==="
 		}
 
 	case v1alpha2.CloudProviderAKS:
-		image = AzureCLIImage
+		image = constants.AzureCLIImage
 		shell = "/bin/bash"
 		script = retryWrapper + `
 # Azure CLI requires explicit login with the federated token injected by the
@@ -886,7 +926,7 @@ kill $HELPER_PID 2>/dev/null || true
 
 	return corev1.Container{
 		Name:            "fetch-spiffe-certs",
-		Image:           SPIFFEHelperImage,
+		Image:           constants.SPIFFEHelperImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Command:         []string{"/bin/sh", "-c", script},
 		Env: []corev1.EnvVar{

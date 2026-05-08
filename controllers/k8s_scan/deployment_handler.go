@@ -141,6 +141,11 @@ type DeploymentHandler struct {
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
+	// Clean up CronJobs with stale names (from old naming schemes)
+	if err := n.cleanupStaleCronJobs(ctx); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	hasExternalClusters := len(n.Mondoo.Spec.KubernetesResources.ExternalClusters) > 0
 
 	if !n.Mondoo.Spec.KubernetesResources.Enable {
@@ -399,10 +404,7 @@ func (n *DeploymentHandler) cleanupOrphanedExternalClusterResources(ctx context.
 	cronJobs := &batchv1.CronJobList{}
 	listOpts := &client.ListOptions{
 		Namespace: n.Mondoo.Namespace,
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"app":       "mondoo-k8s-scan",
-			"mondoo_cr": n.Mondoo.Name,
-		}),
+		LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
 	}
 	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
 		return err
@@ -568,10 +570,7 @@ func (n *DeploymentHandler) garbageCollectIfNeeded(ctx context.Context, clusterU
 	cronJobs := &batchv1.CronJobList{}
 	listOpts := &client.ListOptions{
 		Namespace: n.Mondoo.Namespace,
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"app":       "mondoo-k8s-scan",
-			"mondoo_cr": n.Mondoo.Name,
-		}),
+		LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
 	}
 	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
 		logger.Error(err, "Failed to list CronJobs for garbage collection")
@@ -716,5 +715,42 @@ func (n *DeploymentHandler) syncWIFServiceAccount(ctx context.Context, cluster v
 		return err
 	}
 
+	return nil
+}
+
+// cleanupStaleCronJobs removes CronJobs from old naming schemes by label selection.
+// CronJobs belonging to removed external clusters are skipped here — cleanupOrphanedExternalClusterResources
+// handles those so it can also clean up associated ConfigMaps, ServiceAccounts, and Secrets.
+func (n *DeploymentHandler) cleanupStaleCronJobs(ctx context.Context) error {
+	cronJobs := &batchv1.CronJobList{}
+	listOpts := &client.ListOptions{
+		Namespace: n.Mondoo.Namespace,
+		LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
+	}
+	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
+		return err
+	}
+
+	expected := map[string]bool{
+		CronJobName(n.Mondoo.Name): true,
+	}
+	configuredClusters := make(map[string]bool)
+	for _, cluster := range n.Mondoo.Spec.KubernetesResources.ExternalClusters {
+		expected[ExternalClusterCronJobName(n.Mondoo.Name, cluster.Name)] = true
+		configuredClusters[cluster.Name] = true
+	}
+
+	for i := range cronJobs.Items {
+		if expected[cronJobs.Items[i].Name] {
+			continue
+		}
+		if clusterName, ok := cronJobs.Items[i].Labels["cluster_name"]; ok && !configuredClusters[clusterName] {
+			continue
+		}
+		logger.Info("Deleting stale k8s scan CronJob", "name", cronJobs.Items[i].Name)
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, &cronJobs.Items[i]); err != nil {
+			return err
+		}
+	}
 	return nil
 }

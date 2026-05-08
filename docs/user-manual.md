@@ -354,6 +354,12 @@ kubectl create secret generic prod-sa-credentials \
 
 Use cloud-native identity federation with no static credentials. Supports GKE, EKS, and AKS.
 
+WIF requires setup in three places:
+
+1. **Cloud IAM**: bind the Kubernetes ServiceAccount to the cloud identity
+2. **Target cluster RBAC**: grant the cloud identity read access to the target cluster's Kubernetes API
+3. **MondooAuditConfig**: configure the external cluster with WIF auth
+
 **GKE example:**
 
 ```yaml
@@ -368,6 +374,50 @@ externalClusters:
         googleServiceAccount: scanner@my-gcp-project.iam.gserviceaccount.com
 ```
 
+GKE prerequisites:
+
+- GKE cluster with Workload Identity enabled on both scanner and target clusters
+- Google Service Account (GSA) with access to the target cluster
+- IAM binding allowing the operator's KSA to impersonate the GSA:
+
+  ```bash
+  gcloud iam service-accounts add-iam-policy-binding \
+    scanner@my-gcp-project.iam.gserviceaccount.com \
+    --project=my-gcp-project \
+    --role="roles/iam.workloadIdentityUser" \
+    --member="serviceAccount:my-gcp-project.svc.id.goog[mondoo-operator/MONDOO_AUDIT_CONFIG_NAME-wif-gke-prod]"
+  ```
+
+  Replace `MONDOO_AUDIT_CONFIG_NAME` with your MondooAuditConfig name (e.g. `mondoo-client`). The KSA name follows the pattern `<auditconfig-name>-wif-<cluster-name>`.
+
+- ClusterRole and ClusterRoleBinding on the **target cluster** granting the GSA read permissions:
+
+  ```yaml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: mondoo-operator-k8s-resources-scanning
+  rules:
+  - apiGroups: ['*']
+    resources: ['*']
+    verbs: [get, watch, list]
+  ---
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: mondoo-operator-k8s-resources-scanning
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: mondoo-operator-k8s-resources-scanning
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: scanner@my-gcp-project.iam.gserviceaccount.com
+  ```
+
+  Apply this to the target cluster: `kubectl apply --context <target-cluster-context> -f target-rbac.yaml`
+
 **EKS example:**
 
 ```yaml
@@ -380,6 +430,29 @@ externalClusters:
         clusterName: production-cluster
         roleArn: arn:aws:iam::123456789012:role/MondooScannerRole
 ```
+
+EKS prerequisites:
+
+- EKS cluster with IRSA (IAM Roles for Service Accounts) enabled on the scanner cluster
+- IAM role with a trust policy allowing the operator's KSA to assume it:
+
+  ```json
+  {
+    "Effect": "Allow",
+    "Principal": {
+      "Federated": "arn:aws:iam::123456789012:oidc-provider/oidc.eks.us-west-2.amazonaws.com/id/OIDC_ID"
+    },
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {
+      "StringEquals": {
+        "oidc.eks.us-west-2.amazonaws.com/id/OIDC_ID:sub": "system:serviceaccount:mondoo-operator:MONDOO_AUDIT_CONFIG_NAME-wif-eks-prod"
+      }
+    }
+  }
+  ```
+
+- The IAM role must be mapped to a Kubernetes user on the target cluster via [EKS access entries](https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html) or the `aws-auth` ConfigMap
+- ClusterRole and ClusterRoleBinding on the **target cluster** (same as the GKE example above, with the IAM role ARN as the subject `name`)
 
 **AKS example:**
 
@@ -396,6 +469,24 @@ externalClusters:
         tenantId: fedcba98-7654-3210-fedc-ba9876543210
 ```
 
+AKS prerequisites:
+
+- AKS cluster with Workload Identity enabled on the scanner cluster
+- User-assigned managed identity
+- Federated identity credential trusting the operator's KSA:
+
+  ```bash
+  az identity federated-credential create \
+    --name mondoo-scanner-aks-prod \
+    --identity-name my-managed-identity \
+    --resource-group my-resource-group \
+    --issuer "$(az aks show -g my-resource-group -n scanner-cluster --query oidcIssuerProfile.issuerUrl -o tsv)" \
+    --subject "system:serviceaccount:mondoo-operator:MONDOO_AUDIT_CONFIG_NAME-wif-aks-prod" \
+    --audience api://AzureADTokenExchange
+  ```
+
+- ClusterRole and ClusterRoleBinding on the **target cluster** (same as the GKE example above, with the managed identity's object ID as the subject `name`)
+
 #### 4. SPIFFE/SPIRE (zero-trust)
 
 Use SPIFFE/SPIRE for zero-trust authentication with auto-rotating X.509 certificates.
@@ -410,6 +501,12 @@ externalClusters:
       # Optional: custom socket path (default: /run/spire/sockets/agent.sock)
       # socketPath: "/run/spire/sockets/agent.sock"
 ```
+
+SPIFFE prerequisites:
+
+- SPIRE agent running on the scanner cluster nodes
+- The target cluster must have a ClusterRole and ClusterRoleBinding granting read permissions to the SPIFFE identity (same pattern as WIF — use the SPIFFE ID as the subject `name`, e.g. `spiffe://trust-domain/ns/mondoo-operator/sa/scanner`)
+- The target cluster's API server must be configured to authenticate SPIFFE/X.509 client certificates (e.g., via `--client-ca-file` including the SPIRE trust bundle)
 
 > **Important: HostPath permissions required**
 >
@@ -582,9 +679,20 @@ spec:
 ```
 
 Prerequisites:
+
 - GKE cluster with Workload Identity enabled
 - Google Service Account with `roles/artifactregistry.reader` (or `roles/storage.objectViewer` for GCR)
-- IAM policy binding the GSA to the Kubernetes ServiceAccount `mondoo-client-cr-wif` in the operator namespace
+- IAM policy binding the GSA to the Kubernetes ServiceAccount:
+
+  ```bash
+  gcloud iam service-accounts add-iam-policy-binding \
+    scanner@my-gcp-project.iam.gserviceaccount.com \
+    --project=my-gcp-project \
+    --role="roles/iam.workloadIdentityUser" \
+    --member="serviceAccount:my-gcp-project.svc.id.goog[mondoo-operator/mondoo-client-cr-wif]"
+  ```
+
+  The KSA name follows the pattern `<auditconfig-name>-cr-wif`.
 
 **EKS (ECR):**
 
@@ -601,9 +709,10 @@ spec:
 ```
 
 Prerequisites:
+
 - EKS cluster with IRSA (IAM Roles for Service Accounts) enabled
 - IAM role with `ecr:GetAuthorizationToken`, `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer`, and `ecr:BatchCheckLayerAvailability` permissions
-- IRSA trust policy allowing the Kubernetes ServiceAccount `mondoo-client-cr-wif` in the operator namespace
+- IRSA trust policy allowing the Kubernetes ServiceAccount `<auditconfig-name>-cr-wif` in the operator namespace (same trust policy pattern as external cluster WIF above)
 
 **AKS (ACR):**
 
@@ -623,9 +732,20 @@ spec:
 ```
 
 Prerequisites:
+
 - AKS cluster with Workload Identity enabled
 - User-assigned managed identity with `AcrPull` role on the ACR
-- Federated identity credential trusting the Kubernetes ServiceAccount `mondoo-client-cr-wif` in the operator namespace
+- Federated identity credential trusting the Kubernetes ServiceAccount `<auditconfig-name>-cr-wif` in the operator namespace:
+
+  ```bash
+  az identity federated-credential create \
+    --name mondoo-cr-wif \
+    --identity-name my-managed-identity \
+    --resource-group my-resource-group \
+    --issuer "$(az aks show -g my-resource-group -n my-cluster --query oidcIssuerProfile.issuerUrl -o tsv)" \
+    --subject "system:serviceaccount:mondoo-operator:mondoo-client-cr-wif" \
+    --audience api://AzureADTokenExchange
+  ```
 
 #### RBAC for the WIF ServiceAccount
 
