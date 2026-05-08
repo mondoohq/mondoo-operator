@@ -1,8 +1,9 @@
 AAD
 AADSTS
-acr
+Acr
 artifactory
 artifactregistry
+auditconfig
 bak
 bitnami
 containerregistry
@@ -28,7 +29,6 @@ psat
 rolearn
 selfsigned
 servicemonitor
-servicemonitors
 spiffe
 SResources
 SVIDs

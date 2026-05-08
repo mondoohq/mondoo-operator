@@ -29,14 +29,8 @@ type DeploymentHandler struct {
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
-	// TODO: remove in next version
-	// Delete the old container scanning cronjob if it exists
-	if err := k8s.DeleteIfExists(ctx,
-		n.KubeClient,
-		&batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{
-			Name:      OldCronJobName(n.Mondoo.Name),
-			Namespace: n.Mondoo.Namespace,
-		}}); err != nil {
+	// Clean up CronJobs with stale names (from old naming schemes)
+	if err := n.cleanupStaleCronJobs(ctx); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -232,6 +226,29 @@ func (n *DeploymentHandler) cleanupWIFServiceAccount(ctx context.Context) error 
 	if err := k8s.DeleteIfExists(ctx, n.KubeClient, sa); err != nil {
 		logger.Error(err, "failed to clean up WIF ServiceAccount for container registry")
 		return err
+	}
+	return nil
+}
+
+// cleanupStaleCronJobs removes CronJobs from old naming schemes by label selection.
+func (n *DeploymentHandler) cleanupStaleCronJobs(ctx context.Context) error {
+	cronJobs := &batchv1.CronJobList{}
+	listOpts := &client.ListOptions{
+		Namespace:     n.Mondoo.Namespace,
+		LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
+	}
+	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
+		return err
+	}
+
+	expectedName := CronJobName(n.Mondoo.Name)
+	for i := range cronJobs.Items {
+		if cronJobs.Items[i].Name != expectedName {
+			logger.Info("Deleting stale container scan CronJob", "name", cronJobs.Items[i].Name)
+			if err := k8s.DeleteIfExists(ctx, n.KubeClient, &cronJobs.Items[i]); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
