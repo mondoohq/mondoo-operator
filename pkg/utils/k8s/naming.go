@@ -109,8 +109,8 @@ func integrationID(auditConfigName string) string {
 	if auditConfigName == "mondoo-client" {
 		return ""
 	}
-	if strings.HasPrefix(auditConfigName, "mondoo-client-") {
-		return strings.TrimPrefix(auditConfigName, "mondoo-client-")
+	if id, ok := strings.CutPrefix(auditConfigName, "mondoo-client-"); ok && id != "" {
+		return id
 	}
 	return auditConfigName
 }

@@ -594,16 +594,6 @@ func ExternalClusterCronJobName(prefix, clusterName string) string {
 	return k8s.CronJobNameWithCluster("k8s-scan", prefix, clusterName)
 }
 
-// LegacyCronJobName returns the pre-v14 name format: {prefix}-k8s-scan
-func LegacyCronJobName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, CronJobNameSuffix)
-}
-
-// LegacyExternalClusterCronJobName returns the pre-v14 name format: {prefix}-k8s-scan-{clusterName}
-func LegacyExternalClusterCronJobName(prefix, clusterName string) string {
-	return fmt.Sprintf("%s%s-%s", prefix, CronJobNameSuffix, clusterName)
-}
-
 func ConfigMapName(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
 }

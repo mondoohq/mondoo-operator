@@ -233,11 +233,6 @@ func CronJobName(prefix string) string {
 	return k8s.CronJobName("container-scan", prefix)
 }
 
-// LegacyCronJobName returns the pre-v14 name format: {prefix}-containers-scan
-func LegacyCronJobName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, CronJobNameSuffix)
-}
-
 func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (*corev1.ConfigMap, error) {
 	inv, err := Inventory(integrationMRN, clusterUID, m, cfg)
 	if err != nil {

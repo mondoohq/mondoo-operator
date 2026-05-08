@@ -404,10 +404,7 @@ func (n *DeploymentHandler) cleanupOrphanedExternalClusterResources(ctx context.
 	cronJobs := &batchv1.CronJobList{}
 	listOpts := &client.ListOptions{
 		Namespace: n.Mondoo.Namespace,
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"app":       "mondoo-k8s-scan",
-			"mondoo_cr": n.Mondoo.Name,
-		}),
+		LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
 	}
 	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
 		return err
@@ -573,10 +570,7 @@ func (n *DeploymentHandler) garbageCollectIfNeeded(ctx context.Context, clusterU
 	cronJobs := &batchv1.CronJobList{}
 	listOpts := &client.ListOptions{
 		Namespace: n.Mondoo.Namespace,
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"app":       "mondoo-k8s-scan",
-			"mondoo_cr": n.Mondoo.Name,
-		}),
+		LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
 	}
 	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
 		logger.Error(err, "Failed to list CronJobs for garbage collection")
@@ -731,10 +725,7 @@ func (n *DeploymentHandler) cleanupStaleCronJobs(ctx context.Context) error {
 	cronJobs := &batchv1.CronJobList{}
 	listOpts := &client.ListOptions{
 		Namespace: n.Mondoo.Namespace,
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"app":       "mondoo-k8s-scan",
-			"mondoo_cr": n.Mondoo.Name,
-		}),
+		LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
 	}
 	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
 		return err
