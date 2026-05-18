@@ -104,7 +104,7 @@ crdUpgrade:
     ## @param crdUpgrade.image.repository Container image repository for the CRD upgrade job
     repository: bitnami/kubectl
     ## @param crdUpgrade.image.tag Container image tag for the CRD upgrade job
-    tag: "1.32"
+    tag: latest
     ## @param crdUpgrade.image.pullPolicy Image pull policy for the CRD upgrade job
     pullPolicy: IfNotPresent
 
