@@ -101,12 +101,15 @@ jobs:
       - name: Wait for cluster to be ready
         run: for i in 1 2 3 4 5; do kubectl -n kube-system wait --for=condition=Ready pods --all --timeout=180s && break || sleep 10; done
 
+      - name: Pre-pull CRD upgrade image into minikube
+        run: minikube image pull bitnami/kubectl:1.32
+
       - name: Install Mondoo Operator Helm chart
         env:
           BUILD_OPERATOR: ${{ inputs.build-operator }}
           GIT_REF_NAME: ${{ github.ref_name }}
         run: |
-          HELM_ARGS="--set operator.createConfig=false"
+          HELM_ARGS="--set operator.createConfig=false --set crdUpgrade.image.pullPolicy=Never"
           if [ "$BUILD_OPERATOR" = "true" ]; then
             HELM_ARGS="$HELM_ARGS --set controllerManager.manager.image.tag=$(make print-version) --set controllerManager.manager.imagePullPolicy=Never"
           else
