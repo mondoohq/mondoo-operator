@@ -96,6 +96,16 @@ cleanup:
   ## @param cleanup.timeout Timeout for waiting for MondooAuditConfig resources to be deleted
   timeout: 2m
 
+## @section CRD Upgrade Hook Configuration
+## This hook runs before install/upgrade to apply CRDs via kubectl.
+
+crdUpgrade:
+  image:
+    ## @param crdUpgrade.image.repository Container image repository for the CRD upgrade job
+    repository: bitnami/kubectl
+    ## @param crdUpgrade.image.tag Container image tag for the CRD upgrade job
+    tag: latest
+
 # Mondoo Operator Configuration
 # These settings are applied to the MondooOperatorConfig custom resource
 operator:

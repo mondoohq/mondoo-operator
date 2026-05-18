@@ -30,7 +30,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: crd-upgrade
-        image: "bitnami/kubectl:latest"
+        image: "{{ .Values.crdUpgrade.image.repository }}:{{ .Values.crdUpgrade.image.tag }}"
         command:
         - sh
         - -c
