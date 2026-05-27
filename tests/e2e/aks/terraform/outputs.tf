@@ -71,3 +71,14 @@ output "wif_client_id" {
 output "wif_tenant_id" {
   value = var.enable_wif_test && var.enable_target_cluster ? azurerm_user_assigned_identity.scanner[0].tenant_id : ""
 }
+
+output "target_cluster_endpoint" {
+  description = "API server endpoint of the target AKS cluster (for endpoint override tests)."
+  value       = var.enable_target_cluster ? azurerm_kubernetes_cluster.target[0].kube_config[0].host : ""
+  sensitive   = true
+}
+
+output "enable_private_endpoint_access" {
+  description = "Whether the scanner-to-target private endpoint NSG rule is enabled."
+  value       = var.enable_private_endpoint_access
+}

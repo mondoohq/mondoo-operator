@@ -341,6 +341,13 @@ spec:
                           clusterName:
                             description: ClusterName is the AKS cluster name.
                             type: string
+                          endpoint:
+                            description: |-
+                              Endpoint optionally overrides the Kubernetes API server endpoint URL.
+                              When set, the init container uses this URL instead of the auto-discovered endpoint.
+                              Must start with "https://".
+                            pattern: ^https://
+                            type: string
                           loginServer:
                             description: |-
                               LoginServer is the ACR login server URL (e.g., "myregistry.azurecr.io").
@@ -370,6 +377,13 @@ spec:
                           clusterName:
                             description: ClusterName is the EKS cluster name.
                             type: string
+                          endpoint:
+                            description: |-
+                              Endpoint optionally overrides the Kubernetes API server endpoint URL.
+                              When set, the init container uses this URL instead of the auto-discovered endpoint.
+                              Must start with "https://".
+                            pattern: ^https://
+                            type: string
                           region:
                             description: Region is the AWS region.
                             type: string
@@ -394,6 +408,13 @@ spec:
                             type: string
                           clusterName:
                             description: ClusterName is the GKE cluster name.
+                            type: string
+                          endpoint:
+                            description: |-
+                              Endpoint optionally overrides the Kubernetes API server endpoint URL.
+                              When set, the init container uses this URL instead of the auto-discovered endpoint.
+                              Must start with "https://".
+                            pattern: ^https://
                             type: string
                           googleServiceAccount:
                             description: |-
@@ -708,6 +729,13 @@ spec:
                                 clusterName:
                                   description: ClusterName is the AKS cluster name.
                                   type: string
+                                endpoint:
+                                  description: |-
+                                    Endpoint optionally overrides the Kubernetes API server endpoint URL.
+                                    When set, the init container uses this URL instead of the auto-discovered endpoint.
+                                    Must start with "https://".
+                                  pattern: ^https://
+                                  type: string
                                 loginServer:
                                   description: |-
                                     LoginServer is the ACR login server URL (e.g., "myregistry.azurecr.io").
@@ -737,6 +765,13 @@ spec:
                                 clusterName:
                                   description: ClusterName is the EKS cluster name.
                                   type: string
+                                endpoint:
+                                  description: |-
+                                    Endpoint optionally overrides the Kubernetes API server endpoint URL.
+                                    When set, the init container uses this URL instead of the auto-discovered endpoint.
+                                    Must start with "https://".
+                                  pattern: ^https://
+                                  type: string
                                 region:
                                   description: Region is the AWS region.
                                   type: string
@@ -761,6 +796,13 @@ spec:
                                   type: string
                                 clusterName:
                                   description: ClusterName is the GKE cluster name.
+                                  type: string
+                                endpoint:
+                                  description: |-
+                                    Endpoint optionally overrides the Kubernetes API server endpoint URL.
+                                    When set, the init container uses this URL instead of the auto-discovered endpoint.
+                                    Must start with "https://".
+                                  pattern: ^https://
                                   type: string
                                 googleServiceAccount:
                                   description: |-

@@ -35,3 +35,9 @@ variable "enable_wif_test" {
   type        = bool
   default     = false
 }
+
+variable "enable_private_endpoint_access" {
+  description = "Allow scanner cluster nodes to reach target cluster API server via private endpoint (SG rule). Set to false for endpoint override tests where scanner must use the public endpoint."
+  type        = bool
+  default     = true
+}

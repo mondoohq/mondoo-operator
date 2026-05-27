@@ -26,7 +26,9 @@ export NAMESPACE
 
 # Select manifest based on test type and cluster mode.
 # Autopilot variants are GKE-specific; other clouds just use the base manifest.
-if [[ "${ENABLE_WIF_TEST:-false}" == "true" ]]; then
+if [[ "${ENABLE_ENDPOINT_OVERRIDE_TEST:-false}" == "true" ]]; then
+  MANIFEST="${MANIFESTS_DIR}/mondoo-audit-config-wif-endpoint-override.yaml.tpl"
+elif [[ "${ENABLE_WIF_TEST:-false}" == "true" ]]; then
   if [[ "${AUTOPILOT:-false}" == "true" ]]; then
     MANIFEST="${MANIFESTS_DIR}/mondoo-audit-config-wif-external-autopilot.yaml.tpl"
   else

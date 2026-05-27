@@ -360,6 +360,8 @@ WIF requires setup in three places:
 2. **Target cluster RBAC**: grant the cloud identity read access to the target cluster's Kubernetes API
 3. **MondooAuditConfig**: configure the external cluster with WIF auth
 
+**Networking note:** Cloud providers with both public and private endpoints enabled (e.g., EKS with split-horizon DNS) may resolve the API server hostname to a private IP that is unreachable from the scanner cluster. If you see `i/o timeout` errors connecting to a private IP, you can either configure network access (security group rules, VPC peering) or use the optional `endpoint` field on the provider config to override the API server URL with a reachable address.
+
 **GKE example:**
 
 ```yaml
@@ -372,6 +374,9 @@ externalClusters:
         clusterName: production-cluster
         clusterLocation: us-central1-a
         googleServiceAccount: scanner@my-gcp-project.iam.gserviceaccount.com
+        # Optional: override the API server endpoint when the default is not
+        # reachable (e.g., private clusters or restricted network access)
+        # endpoint: "https://34.123.45.67"
 ```
 
 GKE prerequisites:
@@ -429,6 +434,9 @@ externalClusters:
         region: us-west-2
         clusterName: production-cluster
         roleArn: arn:aws:iam::123456789012:role/MondooScannerRole
+        # Optional: override the API server endpoint when the default is not
+        # reachable (e.g., split-horizon DNS resolving to an unreachable private IP)
+        # endpoint: "https://ABCDEF1234567890.gr7.us-west-2.eks.amazonaws.com"
 ```
 
 EKS prerequisites:
@@ -467,6 +475,9 @@ externalClusters:
         clusterName: production-cluster
         clientId: abcdef12-3456-7890-abcd-ef1234567890
         tenantId: fedcba98-7654-3210-fedc-ba9876543210
+        # Optional: override the API server endpoint when the default is not
+        # reachable (e.g., private clusters or restricted network access)
+        # endpoint: "https://my-cluster-abc123.hcp.westus2.azmk8s.io:443"
 ```
 
 AKS prerequisites:

@@ -277,6 +277,13 @@ type GKEWorkloadIdentity struct {
 	// Format: <name>@<project>.iam.gserviceaccount.com
 	// +kubebuilder:validation:Required
 	GoogleServiceAccount string `json:"googleServiceAccount"`
+
+	// Endpoint optionally overrides the Kubernetes API server endpoint URL.
+	// When set, the init container uses this URL instead of the auto-discovered endpoint.
+	// Must start with "https://".
+	// +optional
+	// +kubebuilder:validation:Pattern=`^https://`
+	Endpoint string `json:"endpoint,omitempty"`
 }
 
 // EKSWorkloadIdentity configures AWS EKS IRSA (IAM Roles for Service Accounts)
@@ -293,6 +300,13 @@ type EKSWorkloadIdentity struct {
 	// Format: arn:aws:iam::<account>:role/<name>
 	// +kubebuilder:validation:Required
 	RoleARN string `json:"roleArn"`
+
+	// Endpoint optionally overrides the Kubernetes API server endpoint URL.
+	// When set, the init container uses this URL instead of the auto-discovered endpoint.
+	// Must start with "https://".
+	// +optional
+	// +kubebuilder:validation:Pattern=`^https://`
+	Endpoint string `json:"endpoint,omitempty"`
 }
 
 // AKSWorkloadIdentity configures Azure Workload Identity
@@ -316,6 +330,13 @@ type AKSWorkloadIdentity struct {
 	// TenantID is the Azure AD tenant ID.
 	// +kubebuilder:validation:Required
 	TenantID string `json:"tenantId"`
+
+	// Endpoint optionally overrides the Kubernetes API server endpoint URL.
+	// When set, the init container uses this URL instead of the auto-discovered endpoint.
+	// Must start with "https://".
+	// +optional
+	// +kubebuilder:validation:Pattern=`^https://`
+	Endpoint string `json:"endpoint,omitempty"`
 
 	// LoginServer is the ACR login server URL (e.g., "myregistry.azurecr.io").
 	// Only used for container registry WIF authentication (containers.workloadIdentity).

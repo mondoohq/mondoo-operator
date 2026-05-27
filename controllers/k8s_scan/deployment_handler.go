@@ -403,7 +403,7 @@ func (n *DeploymentHandler) cleanupOrphanedExternalClusterResources(ctx context.
 	// List all CronJobs with our labels
 	cronJobs := &batchv1.CronJobList{}
 	listOpts := &client.ListOptions{
-		Namespace: n.Mondoo.Namespace,
+		Namespace:     n.Mondoo.Namespace,
 		LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
 	}
 	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
@@ -569,7 +569,7 @@ func (n *DeploymentHandler) garbageCollectIfNeeded(ctx context.Context, clusterU
 	// List all k8s-scan CronJobs (local + external) for this audit config
 	cronJobs := &batchv1.CronJobList{}
 	listOpts := &client.ListOptions{
-		Namespace: n.Mondoo.Namespace,
+		Namespace:     n.Mondoo.Namespace,
 		LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
 	}
 	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {
@@ -724,7 +724,7 @@ func (n *DeploymentHandler) syncWIFServiceAccount(ctx context.Context, cluster v
 func (n *DeploymentHandler) cleanupStaleCronJobs(ctx context.Context) error {
 	cronJobs := &batchv1.CronJobList{}
 	listOpts := &client.ListOptions{
-		Namespace: n.Mondoo.Namespace,
+		Namespace:     n.Mondoo.Namespace,
 		LabelSelector: labels.SelectorFromSet(CronJobLabels(*n.Mondoo)),
 	}
 	if err := n.KubeClient.List(ctx, cronJobs, listOpts); err != nil {

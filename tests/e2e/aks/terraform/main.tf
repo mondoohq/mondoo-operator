@@ -156,8 +156,10 @@ resource "azurerm_kubernetes_cluster" "target" {
 # Allow scanner cluster to reach target cluster API server.
 # Both clusters are in the same VNet but on different subnets.
 # NSG rule ensures scanner subnet can reach target subnet on port 443.
+# Disabled when enable_private_endpoint_access=false to test the endpoint override
+# feature, where the scanner must use the public endpoint instead.
 resource "azurerm_network_security_group" "scanner_to_target" {
-  count               = var.enable_target_cluster ? 1 : 0
+  count               = var.enable_target_cluster && var.enable_private_endpoint_access ? 1 : 0
   name                = "${local.name_prefix}-scanner-to-target-nsg"
   location            = azurerm_resource_group.e2e.location
   resource_group_name = azurerm_resource_group.e2e.name
@@ -165,7 +167,7 @@ resource "azurerm_network_security_group" "scanner_to_target" {
 }
 
 resource "azurerm_network_security_rule" "scanner_to_target_api" {
-  count                       = var.enable_target_cluster ? 1 : 0
+  count                       = var.enable_target_cluster && var.enable_private_endpoint_access ? 1 : 0
   name                        = "scanner-to-target-api"
   priority                    = 100
   direction                   = "Inbound"
@@ -180,7 +182,7 @@ resource "azurerm_network_security_rule" "scanner_to_target_api" {
 }
 
 resource "azurerm_subnet_network_security_group_association" "target" {
-  count                     = var.enable_target_cluster ? 1 : 0
+  count                     = var.enable_target_cluster && var.enable_private_endpoint_access ? 1 : 0
   subnet_id                 = azurerm_subnet.target[0].id
   network_security_group_id = azurerm_network_security_group.scanner_to_target[0].id
 }
