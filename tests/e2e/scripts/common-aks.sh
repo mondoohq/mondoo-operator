@@ -22,6 +22,8 @@ _load_cloud_outputs() {
   if [[ "${ENABLE_WIF_TEST}" == "true" ]]; then
     export WIF_CLIENT_ID="$(terraform output -raw wif_client_id)"
     export WIF_TENANT_ID="$(terraform output -raw wif_tenant_id)"
+    export TARGET_CLUSTER_ENDPOINT="$(terraform output -raw target_cluster_endpoint 2>/dev/null || echo "")"
+    export PRIVATE_ENDPOINT_ACCESS="$(terraform output -raw enable_private_endpoint_access 2>/dev/null || echo "true")"
   fi
 
   cd ->/dev/null

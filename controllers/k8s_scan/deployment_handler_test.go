@@ -1341,6 +1341,60 @@ func TestWIFInitContainer(t *testing.T) {
 			expectImage:   "mcr.microsoft.com/azure-cli",
 			expectEnvVars: []string{"CLUSTER_NAME", "RESOURCE_GROUP", "SUBSCRIPTION_ID"},
 		},
+		{
+			name: "GKE init container with endpoint override",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "gke-cluster",
+				WorkloadIdentity: &mondoov1alpha2.WorkloadIdentityConfig{
+					Provider: mondoov1alpha2.CloudProviderGKE,
+					GKE: &mondoov1alpha2.GKEWorkloadIdentity{
+						ProjectID:            "my-project",
+						ClusterName:          "prod-cluster",
+						ClusterLocation:      "us-central1-a",
+						GoogleServiceAccount: "scanner@my-project.iam.gserviceaccount.com",
+						Endpoint:             "https://34.123.45.67",
+					},
+				},
+			},
+			expectImage:   "gcr.io/google.com/cloudsdktool/google-cloud-cli",
+			expectEnvVars: []string{"CLUSTER_NAME", "PROJECT_ID", "CLUSTER_LOCATION", "ENDPOINT_OVERRIDE"},
+		},
+		{
+			name: "EKS init container with endpoint override",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "eks-cluster",
+				WorkloadIdentity: &mondoov1alpha2.WorkloadIdentityConfig{
+					Provider: mondoov1alpha2.CloudProviderEKS,
+					EKS: &mondoov1alpha2.EKSWorkloadIdentity{
+						Region:      "us-west-2",
+						ClusterName: "prod-cluster",
+						RoleARN:     "arn:aws:iam::123456789012:role/Scanner",
+						Endpoint:    "https://ABCDEF.gr7.us-west-2.eks.amazonaws.com",
+					},
+				},
+			},
+			expectImage:   "amazon/aws-cli",
+			expectEnvVars: []string{"CLUSTER_NAME", "AWS_REGION", "ENDPOINT"},
+		},
+		{
+			name: "AKS init container with endpoint override",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "aks-cluster",
+				WorkloadIdentity: &mondoov1alpha2.WorkloadIdentityConfig{
+					Provider: mondoov1alpha2.CloudProviderAKS,
+					AKS: &mondoov1alpha2.AKSWorkloadIdentity{
+						SubscriptionID: "sub-123",
+						ResourceGroup:  "my-rg",
+						ClusterName:    "prod-cluster",
+						ClientID:       "client-123",
+						TenantID:       "tenant-456",
+						Endpoint:       "https://my-cluster.hcp.westus2.azmk8s.io:443",
+					},
+				},
+			},
+			expectImage:   "mcr.microsoft.com/azure-cli",
+			expectEnvVars: []string{"CLUSTER_NAME", "RESOURCE_GROUP", "SUBSCRIPTION_ID", "ENDPOINT_OVERRIDE"},
+		},
 	}
 
 	for _, tt := range tests {

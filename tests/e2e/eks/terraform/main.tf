@@ -131,8 +131,10 @@ module "eks_target" {
 # Allow scanner cluster nodes to reach target cluster API server (port 443).
 # Both clusters share the same VPC, so DNS resolves to the private endpoint.
 # Without this rule, the scanner pods get "i/o timeout" connecting to the target.
+# Disabled when enable_private_endpoint_access=false to test the endpoint override
+# feature, where the scanner must use the public endpoint instead.
 resource "aws_security_group_rule" "scanner_to_target_api" {
-  count                    = var.enable_target_cluster ? 1 : 0
+  count                    = var.enable_target_cluster && var.enable_private_endpoint_access ? 1 : 0
   type                     = "ingress"
   from_port                = 443
   to_port                  = 443

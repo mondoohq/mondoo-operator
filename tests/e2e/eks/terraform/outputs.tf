@@ -53,3 +53,13 @@ output "profile" {
 output "private_test_ecr_repo" {
   value = var.enable_wif_test ? aws_ecr_repository.private_test[0].repository_url : ""
 }
+
+output "target_cluster_endpoint" {
+  description = "API server endpoint of the target EKS cluster (for endpoint override tests)."
+  value       = var.enable_target_cluster ? module.eks_target[0].cluster_endpoint : ""
+}
+
+output "enable_private_endpoint_access" {
+  description = "Whether the scanner-to-target private endpoint SG rule is enabled."
+  value       = var.enable_private_endpoint_access
+}

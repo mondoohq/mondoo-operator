@@ -721,10 +721,15 @@ CLUSTER_CA=$(retry gcloud container clusters describe "$CLUSTER_NAME" \
   --project "$PROJECT_ID" \
   --location "$CLUSTER_LOCATION" \
   --format='value(masterAuth.clusterCaCertificate)')
-CLUSTER_ENDPOINT=$(retry gcloud container clusters describe "$CLUSTER_NAME" \
-  --project "$PROJECT_ID" \
-  --location "$CLUSTER_LOCATION" \
-  --format='value(endpoint)')
+if [ -n "$ENDPOINT_OVERRIDE" ]; then
+  CLUSTER_SERVER="$ENDPOINT_OVERRIDE"
+else
+  CLUSTER_ENDPOINT=$(retry gcloud container clusters describe "$CLUSTER_NAME" \
+    --project "$PROJECT_ID" \
+    --location "$CLUSTER_LOCATION" \
+    --format='value(endpoint)')
+  CLUSTER_SERVER="https://${CLUSTER_ENDPOINT}"
+fi
 TOKEN=$(retry gcloud auth print-access-token)
 
 cat > /etc/opt/mondoo/kubeconfig/kubeconfig <<EOF
@@ -733,7 +738,7 @@ kind: Config
 clusters:
 - cluster:
     certificate-authority-data: ${CLUSTER_CA}
-    server: https://${CLUSTER_ENDPOINT}
+    server: ${CLUSTER_SERVER}
   name: external
 contexts:
 - context:
@@ -754,6 +759,9 @@ echo "Kubeconfig generated for GKE cluster ${CLUSTER_NAME}"
 			{Name: "PROJECT_ID", Value: cluster.WorkloadIdentity.GKE.ProjectID},
 			{Name: "CLUSTER_LOCATION", Value: cluster.WorkloadIdentity.GKE.ClusterLocation},
 		}
+		if cluster.WorkloadIdentity.GKE.Endpoint != "" {
+			env = append(env, corev1.EnvVar{Name: "ENDPOINT_OVERRIDE", Value: cluster.WorkloadIdentity.GKE.Endpoint})
+		}
 
 	case v1alpha2.CloudProviderEKS:
 		image = constants.AWSCLIImage
@@ -762,12 +770,16 @@ echo "Kubeconfig generated for GKE cluster ${CLUSTER_NAME}"
 retry aws eks update-kubeconfig \
   --name "$CLUSTER_NAME" \
   --region "$AWS_REGION" \
+  ${ENDPOINT:+--endpoint "$ENDPOINT"} \
   --kubeconfig /etc/opt/mondoo/kubeconfig/kubeconfig
 `
 		env = []corev1.EnvVar{
 			{Name: "HOME", Value: "/tmp"},
 			{Name: "CLUSTER_NAME", Value: cluster.WorkloadIdentity.EKS.ClusterName},
 			{Name: "AWS_REGION", Value: cluster.WorkloadIdentity.EKS.Region},
+		}
+		if cluster.WorkloadIdentity.EKS.Endpoint != "" {
+			env = append(env, corev1.EnvVar{Name: "ENDPOINT", Value: cluster.WorkloadIdentity.EKS.Endpoint})
 		}
 
 	case v1alpha2.CloudProviderAKS:
@@ -786,12 +798,18 @@ retry az aks get-credentials \
   --name "$CLUSTER_NAME" \
   --subscription "$SUBSCRIPTION_ID" \
   --file /etc/opt/mondoo/kubeconfig/kubeconfig
+if [ -n "$ENDPOINT_OVERRIDE" ]; then
+  sed -i "s|server:.*|server: $ENDPOINT_OVERRIDE|" /etc/opt/mondoo/kubeconfig/kubeconfig
+fi
 `
 		env = []corev1.EnvVar{
 			{Name: "HOME", Value: "/tmp"},
 			{Name: "CLUSTER_NAME", Value: cluster.WorkloadIdentity.AKS.ClusterName},
 			{Name: "RESOURCE_GROUP", Value: cluster.WorkloadIdentity.AKS.ResourceGroup},
 			{Name: "SUBSCRIPTION_ID", Value: cluster.WorkloadIdentity.AKS.SubscriptionID},
+		}
+		if cluster.WorkloadIdentity.AKS.Endpoint != "" {
+			env = append(env, corev1.EnvVar{Name: "ENDPOINT_OVERRIDE", Value: cluster.WorkloadIdentity.AKS.Endpoint})
 		}
 
 	default:
