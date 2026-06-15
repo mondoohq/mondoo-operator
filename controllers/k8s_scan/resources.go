@@ -1149,8 +1149,8 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 }
 
 func externalClusterFiltering(cluster v1alpha2.ExternalCluster, m v1alpha2.MondooAuditConfig) v1alpha2.Filtering {
-	if cluster.Filtering.Namespaces.Include != nil || cluster.Filtering.Namespaces.Exclude != nil {
-		return cluster.Filtering
+	if cluster.Filtering != nil {
+		return *cluster.Filtering
 	}
 	return m.Spec.Filtering
 }

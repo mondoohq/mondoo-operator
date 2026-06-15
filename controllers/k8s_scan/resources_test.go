@@ -119,7 +119,7 @@ func TestExternalClusterInventory_UsesClusterNamespaceFiltering(t *testing.T) {
 	}
 	cluster := v1alpha2.ExternalCluster{
 		Name: "remote-cluster",
-		Filtering: v1alpha2.Filtering{
+		Filtering: &v1alpha2.Filtering{
 			Namespaces: v1alpha2.FilteringSpec{
 				Exclude: []string{"kube-system", "monitoring"},
 			},
@@ -144,12 +144,8 @@ func TestExternalClusterInventory_EmptyClusterNamespaceFilteringOverridesGlobal(
 		},
 	}
 	cluster := v1alpha2.ExternalCluster{
-		Name: "remote-cluster",
-		Filtering: v1alpha2.Filtering{
-			Namespaces: v1alpha2.FilteringSpec{
-				Include: []string{},
-			},
-		},
+		Name:      "remote-cluster",
+		Filtering: &v1alpha2.Filtering{},
 	}
 
 	options := externalClusterInventoryOptions(t, auditConfig, cluster)

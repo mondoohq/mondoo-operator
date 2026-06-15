@@ -193,11 +193,10 @@ type ExternalCluster struct {
 	Schedule string `json:"schedule,omitempty"`
 
 	// Filtering allows namespace filtering specific to this external cluster.
-	// If not specified, uses the global filtering from MondooAuditConfigSpec.Filtering.
-	// Set at least one Include or Exclude namespace entry to override global filtering.
-	// Empty lists may be omitted by Kubernetes serialization and fall back to global filtering.
+	// If omitted, the external cluster inherits the global filtering from MondooAuditConfigSpec.Filtering.
+	// Set an empty filtering object to scan all namespaces for this external cluster even when global filtering is configured.
 	// +optional
-	Filtering Filtering `json:"filtering,omitempty"`
+	Filtering *Filtering `json:"filtering,omitempty"`
 
 	// ContainerImageScanning enables scanning of container images in this external cluster.
 	// +optional
