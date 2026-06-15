@@ -194,6 +194,8 @@ type ExternalCluster struct {
 
 	// Filtering allows namespace filtering specific to this external cluster.
 	// If not specified, uses the global filtering from MondooAuditConfigSpec.Filtering.
+	// Set at least one Include or Exclude namespace entry to override global filtering.
+	// Empty lists may be omitted by Kubernetes serialization and fall back to global filtering.
 	// +optional
 	Filtering Filtering `json:"filtering,omitempty"`
 

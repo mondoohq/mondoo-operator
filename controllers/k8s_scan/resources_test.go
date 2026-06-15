@@ -86,6 +86,78 @@ func TestExternalClusterInventory_WithAnnotations(t *testing.T) {
 	}
 }
 
+func TestExternalClusterInventory_InheritsGlobalNamespaceFiltering(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Filtering: v1alpha2.Filtering{
+				Namespaces: v1alpha2.FilteringSpec{
+					Include: []string{"production", "shared"},
+					Exclude: []string{"kube-system"},
+				},
+			},
+		},
+	}
+	cluster := v1alpha2.ExternalCluster{Name: "remote-cluster"}
+
+	options := externalClusterInventoryOptions(t, auditConfig, cluster)
+
+	assert.Equal(t, "production,shared", options["namespaces"])
+	assert.Equal(t, "kube-system", options["namespaces-exclude"])
+}
+
+func TestExternalClusterInventory_UsesClusterNamespaceFiltering(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Filtering: v1alpha2.Filtering{
+				Namespaces: v1alpha2.FilteringSpec{
+					Include: []string{"production"},
+				},
+			},
+		},
+	}
+	cluster := v1alpha2.ExternalCluster{
+		Name: "remote-cluster",
+		Filtering: v1alpha2.Filtering{
+			Namespaces: v1alpha2.FilteringSpec{
+				Exclude: []string{"kube-system", "monitoring"},
+			},
+		},
+	}
+
+	options := externalClusterInventoryOptions(t, auditConfig, cluster)
+
+	assert.Empty(t, options["namespaces"])
+	assert.Equal(t, "kube-system,monitoring", options["namespaces-exclude"])
+}
+
+func TestExternalClusterInventory_EmptyClusterNamespaceFilteringOverridesGlobal(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Filtering: v1alpha2.Filtering{
+				Namespaces: v1alpha2.FilteringSpec{
+					Include: []string{"production"},
+				},
+			},
+		},
+	}
+	cluster := v1alpha2.ExternalCluster{
+		Name: "remote-cluster",
+		Filtering: v1alpha2.Filtering{
+			Namespaces: v1alpha2.FilteringSpec{
+				Include: []string{},
+			},
+		},
+	}
+
+	options := externalClusterInventoryOptions(t, auditConfig, cluster)
+
+	assert.Empty(t, options["namespaces"])
+	assert.Empty(t, options["namespaces-exclude"])
+}
+
 func TestCronJob_WithProxy(t *testing.T) {
 	m := testAuditConfig()
 	cfg := v1alpha2.MondooOperatorConfig{
@@ -310,6 +382,20 @@ func TestExternalClusterInventory_WithContainerProxy(t *testing.T) {
 	require.NotEmpty(t, inv.Spec.Assets)
 
 	assert.Equal(t, "http://container-proxy:3128", inv.Spec.Assets[0].Connections[0].Options["container-proxy"])
+}
+
+func externalClusterInventoryOptions(t *testing.T, auditConfig v1alpha2.MondooAuditConfig, cluster v1alpha2.ExternalCluster) map[string]string {
+	t.Helper()
+
+	invStr, err := ExternalClusterInventory("", testClusterUID, cluster, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	require.NotEmpty(t, inv.Spec.Assets)
+	require.NotEmpty(t, inv.Spec.Assets[0].Connections)
+
+	return inv.Spec.Assets[0].Connections[0].Options
 }
 
 // envToMap converts a slice of EnvVar to a map for easy lookup.
