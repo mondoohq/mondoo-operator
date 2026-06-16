@@ -486,7 +486,8 @@ spec:
                         filtering:
                           description: |-
                             Filtering allows namespace filtering specific to this external cluster.
-                            If not specified, uses the global filtering from MondooAuditConfigSpec.Filtering.
+                            If omitted, the external cluster inherits the global filtering from MondooAuditConfigSpec.Filtering.
+                            Set an empty filtering object to scan all namespaces for this external cluster even when global filtering is configured.
                           properties:
                             namespaces:
                               properties:

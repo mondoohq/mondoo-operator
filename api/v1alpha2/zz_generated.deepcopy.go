@@ -158,7 +158,11 @@ func (in *ExternalCluster) DeepCopyInto(out *ExternalCluster) {
 		*out = new(VaultAuthConfig)
 		(*in).DeepCopyInto(*out)
 	}
-	in.Filtering.DeepCopyInto(&out.Filtering)
+	if in.Filtering != nil {
+		in, out := &in.Filtering, &out.Filtering
+		*out = new(Filtering)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.PrivateRegistriesPullSecretRef != nil {
 		in, out := &in.PrivateRegistriesPullSecretRef, &out.PrivateRegistriesPullSecretRef
 		*out = new(v1.LocalObjectReference)

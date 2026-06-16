@@ -1074,8 +1074,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 }
 
 func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster v1alpha2.ExternalCluster, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (string, error) {
-	// Use cluster-specific filtering if provided, otherwise fall back to empty filtering
-	filtering := cluster.Filtering
+	filtering := externalClusterFiltering(cluster, m)
 
 	// Determine discovery targets based on whether container image scanning is enabled
 	// Make a copy to avoid mutating the shared slice
@@ -1147,6 +1146,13 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 	}
 
 	return string(invBytes), nil
+}
+
+func externalClusterFiltering(cluster v1alpha2.ExternalCluster, m v1alpha2.MondooAuditConfig) v1alpha2.Filtering {
+	if cluster.Filtering != nil {
+		return *cluster.Filtering
+	}
+	return m.Spec.Filtering
 }
 
 func buildEnvVars(cfg v1alpha2.MondooOperatorConfig) []corev1.EnvVar {
