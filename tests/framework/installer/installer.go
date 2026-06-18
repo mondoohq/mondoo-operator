@@ -163,7 +163,7 @@ func (i *MondooInstaller) UninstallOperator() error {
 		return nil
 	}
 
-	_, err := i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.DeleteIngoreNotFoundFromStdinArgs...)
+	_, err := i.K8sHelper.KubectlWithStdin(i.readManifestWithNamespace(OperatorManifest), utils.DeleteIgnoreNotFoundFromStdinArgs...)
 	if err != nil {
 		return fmt.Errorf("failed to delete mondoo-operator manifest(s): %v ", err)
 	}
@@ -223,7 +223,7 @@ func (i *MondooInstaller) readManifestWithNamespace(manifest string) string {
 		return original
 	}
 
-	// TODO: The first occurence of "name: mondoo-operator" is actually the namespace that is going to be
+	// TODO: The first occurrence of "name: mondoo-operator" is actually the namespace that is going to be
 	// create. This hack allows us to change the name of that namespace. It is needed because all resources
 	// are bundled in a single file and we cannot create the namespace separately at the moment.
 	updatedNamespace := strings.Replace(

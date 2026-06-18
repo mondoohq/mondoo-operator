@@ -191,7 +191,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	zap.S().Info("number of assets from upstream: ", len(assets))
 
 	// TODO: the cluster name is non-deterministic currently so we cannot test for it
-	nonDetermenisticAssets := utils.ExcludeNonDetermenisticAssets(assets)
+	nonDeterministicAssets := utils.ExcludeNonDeterministicAssets(assets)
 
 	// TODO: this number should exclude services and the cluster asset
 	srvs := &corev1.ServiceList{}
@@ -202,9 +202,9 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 		return true, nil
 	})
 	s.NoError(err, "Failed to list Kubernetes Services")
-	s.Equalf(len(assets)-1-len(srvs.Items), len(nonDetermenisticAssets), "Cluster and/or Services assets were sent upstream.")
+	s.Equalf(len(assets)-1-len(srvs.Items), len(nonDeterministicAssets), "Cluster and/or Services assets were sent upstream.")
 
-	assetNames := utils.AssetNames(nonDetermenisticAssets)
+	assetNames := utils.AssetNames(nonDeterministicAssets)
 	s.ElementsMatchf(workloadNames, assetNames, "Workloads were not sent upstream.")
 
 	s.AssetsNotUnscored(assets)

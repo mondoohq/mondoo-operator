@@ -228,8 +228,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 
 		deferFuncErr = mondoo.UpdateMondooAuditStatus(deferCtx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log)
-		// do not overwrite errors which happened before the defered function is called
-		// but in case an error happend in the defered func, also overwrite the reconcileResult
+		// do not overwrite errors which happened before the deferred function is called
+		// but in case an error happened in the deferred func, also overwrite the reconcileResult
 		if reconcileError == nil && deferFuncErr != nil {
 			reconcileResult = ctrl.Result{}
 			reconcileError = deferFuncErr
