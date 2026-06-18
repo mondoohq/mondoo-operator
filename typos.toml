@@ -1,0 +1,35 @@
+# Configuration for crate-ci/typos (see .github/workflows/spell-check.yaml)
+# Docs: https://github.com/crate-ci/typos
+
+[files]
+extend-exclude = [
+  # Generated code
+  "zz_generated.deepcopy.go",
+  # Generated CRD manifests (mirror API types)
+  "config/crd/bases/",
+  "charts/mondoo-operator/crds/",
+  "charts/mondoo-operator/files/crds/",
+  # OLM ClusterServiceVersion (contains embedded base64 icon data)
+  "config/manifests/bases/",
+  # Dependency manifests (module paths / hashes, not prose)
+  "go.mod",
+  "go.sum",
+  # Binary assets
+  "*.gif",
+  "*.png",
+  "*.jpg",
+  "*.jpeg",
+  "*.svg",
+  "*.ico",
+]
+
+[default.extend-words]
+# Azure Kubernetes Service
+aks = "aks"
+AKS = "AKS"
+# HashiCorp
+Hashi = "Hashi"
+hashi = "hashi"
+# HashiCorp copyright tool
+copywrite = "copywrite"
+Copywrite = "Copywrite"

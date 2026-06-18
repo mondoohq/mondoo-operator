@@ -22,7 +22,7 @@ type MondooClient interface {
 	GarbageCollectAssets(context.Context, *GarbageCollectAssetsRequest) error
 }
 
-// ExchangeRegistrationTokenInput is used for converting a JWT to a Mondoo serivce account
+// ExchangeRegistrationTokenInput is used for converting a JWT to a Mondoo service account
 type ExchangeRegistrationTokenInput struct {
 	// JWT token, only available during creation
 	Token string `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
@@ -41,7 +41,7 @@ type IntegrationRegisterInput struct {
 type IntegrationRegisterOutput struct {
 	// Mrn is the integration MRN
 	Mrn string `protobuf:"bytes,1,opt,name=mrn,proto3" json:"mrn,omitempty"`
-	// Creds holds all the Mondoo serivce account data
+	// Creds holds all the Mondoo service account data
 	Creds *ServiceAccountCredentials `protobuf:"bytes,2,opt,name=creds,proto3" json:"creds,omitempty"`
 }
 
@@ -78,7 +78,7 @@ type ReportStatusRequest struct {
 	// Allows the agent to report its current version
 	Version string `protobuf:"bytes,5,opt,name=version,proto3" json:"version,omitempty"`
 	// messages that convey extra information about the integration - these messages can be informational, warnings or errors. Can be used
-	// to report non-critical errors/warnings without neccesarily changing the whole integration status.
+	// to report non-critical errors/warnings without necessarily changing the whole integration status.
 	Messages Messages `protobuf:"bytes,7,opt,name=messages,proto3" json:"messages,omitempty"`
 }
 

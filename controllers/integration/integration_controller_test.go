@@ -123,7 +123,7 @@ func (s *IntegrationCheckInSuite) TestCheckIn() {
 
 	// Assert
 	s.NoError(err, "should not error while processing valid MondooAuditConfig")
-	s.Zero(len(mondooAuditConfig.Status.Conditions), "expected no condtion set on happy path")
+	s.Zero(len(mondooAuditConfig.Status.Conditions), "expected no condition set on happy path")
 	mockCtrl.Finish()
 }
 

@@ -24,7 +24,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// CommandArgs is a warpper for cmd args
+// CommandArgs is a wrapper for cmd args
 type CommandArgs struct {
 	Command             string
 	CmdArgs             []string

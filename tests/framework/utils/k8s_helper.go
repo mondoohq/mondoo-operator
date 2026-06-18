@@ -56,7 +56,7 @@ var (
 	DeleteArgs                        = []string{"delete", "-f"}
 	DeleteArgsIgnoreNotFound          = []string{"delete", "--ignore-not-found=true", "-f"}
 	DeleteFromStdinArgs               = append(DeleteArgs, "-")
-	DeleteIngoreNotFoundFromStdinArgs = append(DeleteArgsIgnoreNotFound, "-")
+	DeleteIgnoreNotFoundFromStdinArgs = append(DeleteArgsIgnoreNotFound, "-")
 )
 
 type K8sHelper struct {

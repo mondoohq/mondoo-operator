@@ -398,7 +398,7 @@ $(README_GENERATOR): $(LOCALBIN)
 		cd $(README_GENERATOR_DIR) && npm install --production; \
 	fi
 
-# Install prettier gloablly via
+# Install prettier globally via
 # yarn global add prettier --prefix /usr/local
 .PHONY: fmt/docs
 fmt/docs:
