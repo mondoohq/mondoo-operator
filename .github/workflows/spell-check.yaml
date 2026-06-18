@@ -2,7 +2,7 @@
 name: Spell Checking
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, reopened, synchronize]
 
 jobs:
@@ -10,12 +10,7 @@ jobs:
     name: Run spell check
     permissions:
       contents: read
-      pull-requests: read
-      actions: read
-    outputs:
-      followup: ${{ steps.spelling.outputs.followup }}
     runs-on: ubuntu-latest
-    if: "contains(github.event_name, 'pull_request') || github.event_name == 'push'"
     concurrency:
       group: spelling-${{ github.event.pull_request.number || github.ref }}
       # note: If you use only_check_changed_files, you do not want cancel-in-progress
@@ -40,22 +35,3 @@ jobs:
             cspell:software-terms/src/software-tools.txt
             cspell:companies/src/companies.txt
             mondoo:mondoo_dictionary.txt
-
-  comment:
-    name: Report
-    runs-on: ubuntu-latest
-    needs: spelling
-    permissions:
-      actions: read
-      contents: read
-      pull-requests: write
-    if: (success() || failure()) && needs.spelling.outputs.followup
-    steps:
-      - name: comment
-        uses: check-spelling/check-spelling@cfb6f7e75bbfc89c71eaa30366d0c166f1bd9c8c # v0.0.26
-        env:
-          INPUT_IGNORE_SECURITY_ADVISORY: Sorry. https://github.com/jsoref/2026-06-16-credential-leak/blob/main/README.md
-        with:
-          checkout: true
-          ignore_security_advisory: Sorry. https://github.com/jsoref/2026-06-16-credential-leak/blob/main/README.md
-          task: ${{ needs.spelling.outputs.followup }}
