@@ -40,7 +40,7 @@ func DeploymentLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 }
 
 // Deployment creates a Deployment spec for the resource watcher.
-func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *appsv1.Deployment {
+func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (*appsv1.Deployment, error) {
 	ls := DeploymentLabels(*m)
 
 	// Build command arguments
@@ -89,6 +89,13 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 	}
 	if len(m.Spec.Filtering.Namespaces.Exclude) > 0 {
 		cmd = append(cmd, "--namespaces-exclude", strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","))
+	}
+	var err error
+	if cmd, err = appendLabelSelectorArg(cmd, "--namespace-label-selector", m.Spec.KubernetesResources.ResourceWatcher.NamespaceLabelSelector); err != nil {
+		return nil, fmt.Errorf("invalid resource watcher namespace label selector: %w", err)
+	}
+	if cmd, err = appendLabelSelectorArg(cmd, "--object-label-selector", m.Spec.KubernetesResources.ResourceWatcher.ObjectLabelSelector); err != nil {
+		return nil, fmt.Errorf("invalid resource watcher object label selector: %w", err)
 	}
 
 	// Add API proxy if configured (respect SkipProxyForCnspec since resource watcher uses cnspec)
@@ -202,5 +209,19 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 			cfg.Spec.ImagePullSecrets...)
 	}
 
-	return deployment
+	return deployment, nil
+}
+
+func appendLabelSelectorArg(cmd []string, arg string, labelSelector *metav1.LabelSelector) ([]string, error) {
+	if labelSelector == nil {
+		return cmd, nil
+	}
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		return nil, err
+	}
+	if selector.Empty() {
+		return cmd, nil
+	}
+	return append(cmd, arg, selector.String()), nil
 }

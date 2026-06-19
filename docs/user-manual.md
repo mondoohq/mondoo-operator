@@ -943,6 +943,8 @@ When enabled with default settings, the resource watcher:
 | `debounceInterval` | `10s` | Time to wait after last change before triggering a scan |
 | `watchAllResources` | `false` | When `true`, watches all resources including Pods, Jobs, CronJobs |
 | `resourceTypes` | (auto) | Explicit list of resource types to watch (overrides `watchAllResources`) |
+| `namespaceLabelSelector` | unset | Select namespaces whose resources should be watched |
+| `objectLabelSelector` | unset | Select watched non-Namespace objects by their own labels |
 
 ### Example: Custom Configuration
 
@@ -983,6 +985,38 @@ spec:
         - deployments
         - services
         - ingresses
+```
+
+### Example: Watch Resources by Label Selector
+
+Resource watcher label selectors limit which changed Kubernetes objects are
+queued for immediate scans. `namespaceLabelSelector` selects namespaces whose
+resources should be watched. `objectLabelSelector` selects watched non-Namespace
+objects by their own labels; Namespace objects are gated by
+`namespaceLabelSelector` instead.
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    resourceWatcher:
+      enable: true
+      namespaceLabelSelector:
+        matchLabels:
+          tenant: team-a
+      objectLabelSelector:
+        matchExpressions:
+          - key: mondoo.com/scan
+            operator: NotIn
+            values:
+              - disabled
 ```
 
 ### Why High-Priority Resources by Default?
