@@ -54,6 +54,7 @@ func UpdateDeploymentFields(obj, desired *appsv1.Deployment) {
 	ps := &obj.Spec.Template.Spec
 	dps := &desired.Spec.Template.Spec
 	ps.ServiceAccountName = dps.ServiceAccountName
+	ps.InitContainers = dps.InitContainers
 	ps.Containers = dps.Containers
 	ps.Volumes = dps.Volumes
 	ps.ImagePullSecrets = dps.ImagePullSecrets
@@ -74,6 +75,7 @@ func UpdateDaemonSetFields(obj, desired *appsv1.DaemonSet) {
 	ps.PriorityClassName = dps.PriorityClassName
 	ps.AutomountServiceAccountToken = dps.AutomountServiceAccountToken
 	ps.Tolerations = dps.Tolerations
+	ps.InitContainers = dps.InitContainers
 	ps.Containers = dps.Containers
 	ps.Volumes = dps.Volumes
 	ps.ImagePullSecrets = dps.ImagePullSecrets
