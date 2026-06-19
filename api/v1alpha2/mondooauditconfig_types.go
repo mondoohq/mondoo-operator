@@ -119,10 +119,148 @@ type KubernetesResources struct {
 	// +optional
 	ActiveDeadline *metav1.Duration `json:"activeDeadline,omitempty"`
 
+	// Kyverno configures collection of Kyverno policies, policy reports, and PolicyExceptions.
+	// When omitted, Kyverno collection is disabled. Set kyverno.enable to true to collect Kyverno resources.
+	// Collection happens through the normal cnspec Kubernetes scanner and is not part of admission handling.
+	// Requires a scanner image with cnspec Kubernetes provider support for the kyverno discovery target and options.
+	Kyverno KyvernoSpec `json:"kyverno,omitempty"`
+
 	// ExternalClusters defines remote K8s clusters to scan from this operator instance.
 	// Each external cluster will have its own CronJob created with the appropriate kubeconfig.
 	// +optional
 	ExternalClusters []ExternalCluster `json:"externalClusters,omitempty"`
+}
+
+// KyvernoSpec controls Kyverno collection in the Kubernetes resources scanner.
+type KyvernoSpec struct {
+	// Enable controls Kyverno policy, report, and PolicyException collection.
+	// Omit to disable Kyverno collection. Set true to collect Kyverno resources with Kubernetes resources scanning.
+	// Requires a scanner image with cnspec Kubernetes provider support for the kyverno discovery target and options.
+	// +optional
+	Enable *bool `json:"enable,omitempty"`
+
+	// DefaultMappings controls whether built-in Kyverno to Mondoo mappings are used.
+	// Omit to enable built-in mappings. Set false to rely only on annotation-provided mappings.
+	// +optional
+	DefaultMappings *bool `json:"defaultMappings,omitempty"`
+
+	// MirrorPolicyExceptions controls whether Kyverno PolicyExceptions should be mirrored to Mondoo external exceptions.
+	// This only takes effect when the Mondoo Platform supports external exception upserts.
+	// +optional
+	MirrorPolicyExceptions *bool `json:"mirrorPolicyExceptions,omitempty"`
+
+	// MirroredExceptionApproval controls the approval state for mirrored Kyverno PolicyExceptions.
+	// Omit to treat mirrored Kyverno PolicyExceptions as externally approved.
+	// +kubebuilder:validation:Enum=externally-approved;requires-approval
+	// +optional
+	MirroredExceptionApproval string `json:"mirroredExceptionApproval,omitempty"`
+
+	// MirroredExceptionAction controls the Mondoo exception action used for mirrored Kyverno PolicyExceptions.
+	// Omit to use RISK_ACCEPTED.
+	// +kubebuilder:validation:Enum=RISK_ACCEPTED;WORKAROUND
+	// +optional
+	MirroredExceptionAction string `json:"mirroredExceptionAction,omitempty"`
+
+	// FailExpiredPolicyExceptions controls whether expired Kyverno PolicyExceptions fail Kyverno hygiene checks.
+	// Omit to fail expired Kyverno PolicyExceptions.
+	// +optional
+	FailExpiredPolicyExceptions *bool `json:"failExpiredPolicyExceptions,omitempty"`
+
+	// ReportUnmappedPolicyExceptions controls whether unmapped Kyverno PolicyExceptions are reported in Kyverno findings.
+	// Omit to report unmapped Kyverno PolicyExceptions.
+	// +optional
+	ReportUnmappedPolicyExceptions *bool `json:"reportUnmappedPolicyExceptions,omitempty"`
+
+	// ReportUnmappedPolicyResults controls whether unmapped Kyverno PolicyReport failures are reported in Kyverno findings.
+	// Omit to report unmapped Kyverno PolicyReport failures.
+	// +optional
+	ReportUnmappedPolicyResults *bool `json:"reportUnmappedPolicyResults,omitempty"`
+
+	// MappingAnnotations configures Kyverno policy annotation keys that define Mondoo mappings.
+	// When omitted, the scanner uses its built-in Mondoo annotation keys.
+	// +optional
+	MappingAnnotations KyvernoMappingAnnotationsSpec `json:"mappingAnnotations,omitempty"`
+
+	// ExceptionAnnotations configures Kyverno PolicyException annotation keys for Mondoo exception metadata.
+	// When omitted, the scanner uses its built-in Mondoo and Kyverno annotation keys.
+	// +optional
+	ExceptionAnnotations KyvernoExceptionAnnotationsSpec `json:"exceptionAnnotations,omitempty"`
+}
+
+func (k KyvernoSpec) Enabled() bool {
+	return k.Enable != nil && *k.Enable
+}
+
+func (k KyvernoSpec) DefaultMappingsEnabled() bool {
+	return k.DefaultMappings == nil || *k.DefaultMappings
+}
+
+func (k KyvernoSpec) MirrorPolicyExceptionsEnabled() bool {
+	return k.MirrorPolicyExceptions != nil && *k.MirrorPolicyExceptions
+}
+
+func (k KyvernoSpec) MirroredExceptionApprovalMode() string {
+	if k.MirroredExceptionApproval == "" {
+		return "externally-approved"
+	}
+	return k.MirroredExceptionApproval
+}
+
+func (k KyvernoSpec) MirroredExceptionActionMode() string {
+	if k.MirroredExceptionAction == "" {
+		return "RISK_ACCEPTED"
+	}
+	return k.MirroredExceptionAction
+}
+
+func (k KyvernoSpec) FailExpiredPolicyExceptionsEnabled() bool {
+	return k.FailExpiredPolicyExceptions == nil || *k.FailExpiredPolicyExceptions
+}
+
+func (k KyvernoSpec) ReportUnmappedPolicyExceptionsEnabled() bool {
+	return k.ReportUnmappedPolicyExceptions == nil || *k.ReportUnmappedPolicyExceptions
+}
+
+func (k KyvernoSpec) ReportUnmappedPolicyResultsEnabled() bool {
+	return k.ReportUnmappedPolicyResults == nil || *k.ReportUnmappedPolicyResults
+}
+
+// KyvernoMappingAnnotationsSpec configures annotation keys used for policy-to-check mapping.
+type KyvernoMappingAnnotationsSpec struct {
+	// CheckUIDs lists annotation keys whose values contain Mondoo check UIDs. Values must not contain commas.
+	// +optional
+	CheckUIDs []string `json:"checkUids,omitempty"`
+
+	// CheckMRNs lists annotation keys whose values contain Mondoo check MRNs. Values must not contain commas.
+	// +optional
+	CheckMRNs []string `json:"checkMrns,omitempty"`
+
+	// PolicyUIDs lists annotation keys whose values contain Mondoo policy UIDs. Values must not contain commas.
+	// +optional
+	PolicyUIDs []string `json:"policyUids,omitempty"`
+
+	// Reasons lists annotation keys whose values contain mapping reasons. Values must not contain commas.
+	// +optional
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// KyvernoExceptionAnnotationsSpec configures annotation keys used for PolicyException metadata.
+type KyvernoExceptionAnnotationsSpec struct {
+	// ValidUntil lists annotation keys whose values contain RFC3339 or YYYY-MM-DD expiration timestamps. Values must not contain commas.
+	// +optional
+	ValidUntil []string `json:"validUntil,omitempty"`
+
+	// Justifications lists annotation keys whose values contain exception justifications. Values must not contain commas.
+	// +optional
+	Justifications []string `json:"justifications,omitempty"`
+
+	// Owners lists annotation keys whose values contain owning teams or users. Values must not contain commas.
+	// +optional
+	Owners []string `json:"owners,omitempty"`
+
+	// Tickets lists annotation keys whose values contain ticket or case references. Values must not contain commas.
+	// +optional
+	Tickets []string `json:"tickets,omitempty"`
 }
 
 // ResourceWatcherSpec defines the configuration for real-time resource watching.
