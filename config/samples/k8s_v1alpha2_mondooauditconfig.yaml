@@ -70,6 +70,40 @@ spec:
     #   #   - deployments
     #   #   - daemonsets
 
+    # Extended network inventory for HBN, Gateway API, AdminNetworkPolicy, Calico,
+    # Cilium, secondary-interface policies, and egress posture.
+    # This is scan-time collection only and does not put Mondoo in the admission path.
+    # networkInventory:
+    #   enable: true
+    #   hbn:
+    #     enable: true
+    #     includeLegacyResources: true
+    #   multiNetworkPolicy:
+    #     enable: true
+    #   classifications:
+    #     publicCidrs:
+    #       - 0.0.0.0/0
+    #       - ::/0
+    #     privateCidrs:
+    #       - 10.0.0.0/8
+    #       - 172.16.0.0/12
+    #       - 192.168.0.0/16
+    #     trustedEgressCidrs:
+    #       - 203.0.113.0/24
+    #   observedFlows:
+    #     enable: false
+    #     maxRecords: 1000
+    #     lookback: 5m
+    #     timeout: 10s
+    #     calicoWhisker:
+    #       enable: false
+    #       namespace: calico-system
+    #       serviceName: whisker
+    #     ciliumHubble:
+    #       enable: false
+    #       namespace: kube-system
+    #       serviceName: hubble-relay
+
     # External clusters to scan from this operator instance
     # Four authentication methods are available (mutually exclusive):
     #
