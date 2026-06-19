@@ -139,7 +139,22 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	updateImageScanningConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs), pods)
+	n.updateScanStatus(cronJobs)
 	return nil
+}
+
+func (n *DeploymentHandler) updateScanStatus(cronJobs []batchv1.CronJob) {
+	for _, cronJob := range cronJobs {
+		if cronJob.Name != CronJobName(n.Mondoo.Name) {
+			continue
+		}
+		mondoo.ReplaceScanStatuses(
+			n.Mondoo,
+			v1alpha2.MondooAuditConfigScanTypeContainerImages,
+			mondoo.ScanStatusFromCronJob(v1alpha2.MondooAuditConfigScanTypeContainerImages, "local", cronJob),
+		)
+		return
+	}
 }
 
 func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string) error {
@@ -195,6 +210,11 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 
 	// Clear any remnant status
 	updateImageScanningConditions(n.Mondoo, false, &corev1.PodList{})
+	mondoo.ReplaceScanStatuses(
+		n.Mondoo,
+		v1alpha2.MondooAuditConfigScanTypeContainerImages,
+		mondoo.DisabledScanStatus(v1alpha2.MondooAuditConfigScanTypeContainerImages, "local"),
+	)
 
 	return nil
 }

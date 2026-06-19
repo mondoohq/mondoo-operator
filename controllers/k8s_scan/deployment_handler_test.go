@@ -157,11 +157,17 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	s.Equal("Kubernetes Resources Scanning is available", condition.Message)
 	s.Equal("KubernetesResourcesScanningAvailable", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
+	s.Require().Len(d.Mondoo.Status.Scans, 1)
+	scanStatus := d.Mondoo.Status.Scans[0]
+	s.Equal(mondoov1alpha2.MondooAuditConfigScanTypeKubernetesResources, scanStatus.Type)
+	s.Equal("local", scanStatus.Target)
+	s.Equal(CronJobName(s.auditConfig.Name), scanStatus.CronJob)
+	s.Equal(mondoov1alpha2.MondooAuditConfigScanPhasePending, scanStatus.Phase)
 
 	cronJobs := &batchv1.CronJobList{}
 	s.NoError(d.KubeClient.List(s.ctx, cronJobs))
 
-	now := time.Now()
+	now := time.Now().Truncate(time.Second)
 	metaNow := metav1.NewTime(now)
 	metaHourAgo := metav1.NewTime(now.Add(-1 * time.Hour))
 	cronJobs.Items[0].Status.LastScheduleTime = &metaNow
@@ -179,10 +185,15 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	s.Equal("Kubernetes Resources Scanning is unavailable", condition.Message)
 	s.Equal("KubernetesResourcesScanningUnavailable", condition.Reason)
 	s.Equal(corev1.ConditionTrue, condition.Status)
+	s.Require().Len(d.Mondoo.Status.Scans, 1)
+	scanStatus = d.Mondoo.Status.Scans[0]
+	s.Equal(mondoov1alpha2.MondooAuditConfigScanPhaseFailed, scanStatus.Phase)
+	s.Equal(&metaNow, scanStatus.LastScheduleTime)
+	s.Equal(&metaHourAgo, scanStatus.LastSuccessfulTime)
 
 	// Make the jobs successful again
-	cronJobs.Items[0].Status.LastScheduleTime = nil
-	cronJobs.Items[0].Status.LastSuccessfulTime = nil
+	cronJobs.Items[0].Status.LastScheduleTime = &metaHourAgo
+	cronJobs.Items[0].Status.LastSuccessfulTime = &metaNow
 	s.NoError(d.KubeClient.Status().Update(s.ctx, &cronJobs.Items[0]))
 
 	// Reconcile to update the audit config status
@@ -195,6 +206,11 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	s.Equal("Kubernetes Resources Scanning is available", condition.Message)
 	s.Equal("KubernetesResourcesScanningAvailable", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
+	s.Require().Len(d.Mondoo.Status.Scans, 1)
+	scanStatus = d.Mondoo.Status.Scans[0]
+	s.Equal(mondoov1alpha2.MondooAuditConfigScanPhaseSucceeded, scanStatus.Phase)
+	s.Equal(&metaHourAgo, scanStatus.LastScheduleTime)
+	s.Equal(&metaNow, scanStatus.LastSuccessfulTime)
 
 	d.Mondoo.Spec.KubernetesResources.Enable = false
 
@@ -208,6 +224,10 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	s.Equal("Kubernetes Resources Scanning is disabled", condition.Message)
 	s.Equal("KubernetesResourcesScanningDisabled", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
+	s.Require().Len(d.Mondoo.Status.Scans, 1)
+	scanStatus = d.Mondoo.Status.Scans[0]
+	s.Equal(mondoov1alpha2.MondooAuditConfigScanPhaseDisabled, scanStatus.Phase)
+	s.Equal("local", scanStatus.Target)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
@@ -287,6 +307,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_Kubeconfig() {
 	externalCronJob.Namespace = s.auditConfig.Namespace
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(externalCronJob), externalCronJob))
 	s.Equal("production", externalCronJob.Labels["cluster_name"])
+	s.Require().Len(d.Mondoo.Status.Scans, 2)
+	s.Equal(mondoov1alpha2.MondooAuditConfigScanTypeKubernetesResources, d.Mondoo.Status.Scans[0].Type)
+	s.Equal(mondoov1alpha2.MondooAuditConfigScanTypeExternalKubernetesResources, d.Mondoo.Status.Scans[1].Type)
+	s.Equal("production", d.Mondoo.Status.Scans[1].Target)
+	s.Equal(ExternalClusterCronJobName(s.auditConfig.Name, "production"), d.Mondoo.Status.Scans[1].CronJob)
+	s.Equal(mondoov1alpha2.MondooAuditConfigScanPhasePending, d.Mondoo.Status.Scans[1].Phase)
 
 	// Verify KUBECONFIG env var is set
 	container := externalCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
