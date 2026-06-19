@@ -138,7 +138,7 @@ func (i *Integration) GetCiCdProject(ctx context.Context) (*CiCdProject, error) 
 		} `graphql:"cicdProjects(input: $input)"`
 	}
 
-	err := i.gqlClient.Query(ctx, &q, map[string]interface{}{"input": mondoogql.CicdProjectsInput{SpaceMrn: i.spaceMrn}, "first": mondoogql.Int(100)})
+	err := i.gqlClient.Query(ctx, &q, map[string]interface{}{"input": mondoogql.CicdProjectsInput{SpaceMrn: mondoogql.NewIDPtr(i.spaceMrn)}, "first": mondoogql.Int(100)})
 	if err != nil {
 		return nil, err
 	}

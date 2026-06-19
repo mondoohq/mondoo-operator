@@ -58,5 +58,5 @@ func (s *Space) DeleteAssets(ctx context.Context) error {
 		} `graphql:"deleteAssets(input: $input)"`
 	}
 
-	return s.gqlClient.Mutate(ctx, &m, mondoogql.DeleteAssetsInput{SpaceMrn: mondoogql.String(s.spaceMrn)}, nil)
+	return s.gqlClient.Mutate(ctx, &m, mondoogql.DeleteAssetsInput{SpaceMrn: mondoogql.NewStringPtr(mondoogql.String(s.spaceMrn))}, nil)
 }
