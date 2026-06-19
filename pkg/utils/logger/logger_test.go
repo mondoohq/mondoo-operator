@@ -4,10 +4,15 @@
 package logger
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/go-logr/logr/funcr"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap/zapcore"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 )
 
 type testEncoder struct {
@@ -67,4 +72,40 @@ func TestNewLogger(t *testing.T) {
 
 	// Test that the logger can be used
 	logger.Info("test message", "key", "value")
+}
+
+func TestWithMondooAuditConfig(t *testing.T) {
+	var line string
+	log := funcr.NewJSON(func(obj string) {
+		line = obj
+	}, funcr.Options{})
+
+	auditConfig := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "security",
+			Name:      "mondoo",
+		},
+	}
+
+	WithMondooAuditConfig(log, auditConfig, "node-scanning").Info("test")
+
+	fields := map[string]any{}
+	assert.NoError(t, json.Unmarshal([]byte(line), &fields))
+	assert.Equal(t, "security/mondoo", fields["mondooAuditConfig"])
+	assert.NotContains(t, fields, "mondooNamespace")
+	assert.NotContains(t, fields, "mondooName")
+	assert.Equal(t, "node-scanning", fields["scanType"])
+}
+
+func TestWithExternalCluster(t *testing.T) {
+	var line string
+	log := funcr.NewJSON(func(obj string) {
+		line = obj
+	}, funcr.Options{})
+
+	WithExternalCluster(log, "prod").Info("test")
+
+	fields := map[string]any{}
+	assert.NoError(t, json.Unmarshal([]byte(line), &fields))
+	assert.Equal(t, "prod", fields["externalCluster"])
 }
