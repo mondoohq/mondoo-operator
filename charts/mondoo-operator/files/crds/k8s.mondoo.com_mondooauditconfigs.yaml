@@ -847,6 +847,133 @@ spec:
                       - name
                       type: object
                     type: array
+                  networkInventory:
+                    description: |-
+                      NetworkInventory configures extended Kubernetes network inventory collection.
+                      This remains scan-time only and does not configure admission webhooks or network policy enforcement.
+                    properties:
+                      classifications:
+                        description: Classifications configures custom CIDR classifications
+                          used by network posture resources.
+                        properties:
+                          privateCidrs:
+                            description: PrivateCIDRs are CIDR ranges treated as private/internal
+                              ranges.
+                            items:
+                              type: string
+                            type: array
+                          publicCidrs:
+                            description: PublicCIDRs are CIDR ranges treated as public
+                              exposure ranges.
+                            items:
+                              type: string
+                            type: array
+                          trustedEgressCidrs:
+                            description: TrustedEgressCIDRs are CIDR ranges treated
+                              as approved egress destinations.
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      enable:
+                        description: Enable enables extended network inventory options
+                          in the Kubernetes scanner inventory.
+                        type: boolean
+                      hbn:
+                        description: HBN configures collection hints for HBN network
+                          resources.
+                        properties:
+                          enable:
+                            default: true
+                            description: Enable enables HBN resource collection hints
+                              when network inventory is enabled.
+                            type: boolean
+                          includeLegacyResources:
+                            default: true
+                            description: IncludeLegacyResources includes legacy Telekom
+                              HBN API groups in addition to current HBN resources.
+                            type: boolean
+                        type: object
+                      multiNetworkPolicy:
+                        description: MultiNetworkPolicy configures collection hints
+                          for secondary-interface NetworkPolicy resources.
+                        properties:
+                          enable:
+                            default: true
+                            description: Enable enables MultiNetworkPolicy and NetworkAttachmentDefinition
+                              collection hints when network inventory is enabled.
+                            type: boolean
+                        type: object
+                      observedFlows:
+                        description: ObservedFlows configures optional flow evidence
+                          integrations.
+                        properties:
+                          calicoWhisker:
+                            description: CalicoWhisker configures optional Calico
+                              Whisker flow metadata.
+                            properties:
+                              enable:
+                                description: Enable enables this flow endpoint.
+                                type: boolean
+                              namespace:
+                                description: Namespace is the namespace that contains
+                                  the flow endpoint Service.
+                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                                type: string
+                              serviceName:
+                                description: ServiceName is the flow endpoint Service
+                                  name.
+                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                                type: string
+                            type: object
+                          ciliumHubble:
+                            description: CiliumHubble configures optional Cilium Hubble
+                              flow metadata.
+                            properties:
+                              enable:
+                                description: Enable enables this flow endpoint.
+                                type: boolean
+                              namespace:
+                                description: Namespace is the namespace that contains
+                                  the flow endpoint Service.
+                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                                type: string
+                              serviceName:
+                                description: ServiceName is the flow endpoint Service
+                                  name.
+                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                                type: string
+                            type: object
+                          enable:
+                            description: |-
+                              Enable enables observed flow metadata collection. Endpoint sources remain individually opt-in;
+                              when no endpoint is enabled, the scanner receives observedFlows.enabled=true without a flow source.
+                            type: boolean
+                          lookback:
+                            default: 5m
+                            description: Lookback limits how far back flow integrations
+                              may query.
+                            type: string
+                            x-kubernetes-validations:
+                            - message: lookback must be a Go duration such as 5m or
+                                10s
+                              rule: self.matches('^([0-9]+(\\.[0-9]+)?(ns|us|ms|s|m|h))+$')
+                          maxRecords:
+                            default: 1000
+                            description: MaxRecords limits flow records collected
+                              per scan.
+                            minimum: 1
+                            type: integer
+                          timeout:
+                            default: 10s
+                            description: Timeout limits each flow integration query.
+                            type: string
+                            x-kubernetes-validations:
+                            - message: timeout must be a Go duration such as 5m or
+                                10s
+                              rule: self.matches('^([0-9]+(\\.[0-9]+)?(ns|us|ms|s|m|h))+$')
+                        type: object
+                    type: object
                   resourceWatcher:
                     description: |-
                       ResourceWatcher configures real-time resource watching and scanning.
