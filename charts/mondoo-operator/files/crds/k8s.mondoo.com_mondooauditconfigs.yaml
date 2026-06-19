@@ -1402,57 +1402,125 @@ spec:
                         minimum: 0
                         type: integer
                     type: object
-                  networkInventory:
+                  kyverno:
                     description: |-
-                      NetworkInventory tunes the network posture inventory collected during Kubernetes resource
-                      scans, including scans of external clusters. Requires cnspec v13.24.0 or later.
+                      Kyverno configures collection of Kyverno policies, policy reports, and PolicyExceptions.
+                      When omitted, Kyverno collection is disabled. Set kyverno.enable to true to collect Kyverno resources.
+                      Collection happens through the normal cnspec Kubernetes scanner and is not part of admission handling.
+                      Requires a scanner image with cnspec Kubernetes provider support for the kyverno discovery target and options.
                     properties:
-                      classifications:
-                        description: Classifications configures custom CIDR classifications
-                          used by network posture resources.
+                      defaultMappings:
+                        description: |-
+                          DefaultMappings controls whether built-in Kyverno to Mondoo mappings are used.
+                          Omit to enable built-in mappings. Set false to rely only on annotation-provided mappings.
+                        type: boolean
+                      enable:
+                        description: |-
+                          Enable controls Kyverno policy, report, and PolicyException collection.
+                          Omit to disable Kyverno collection. Set true to collect Kyverno resources with Kubernetes resources scanning.
+                          Requires a scanner image with cnspec Kubernetes provider support for the kyverno discovery target and options.
+                        type: boolean
+                      exceptionAnnotations:
+                        description: |-
+                          ExceptionAnnotations configures Kyverno PolicyException annotation keys for Mondoo exception metadata.
+                          When omitted, the scanner uses its built-in Mondoo and Kyverno annotation keys.
                         properties:
-                          privateCidrs:
-                            description: PrivateCIDRs are CIDR ranges treated as private/internal
-                              ranges.
+                          justifications:
+                            description: Justifications lists annotation keys whose
+                              values contain exception justifications. Values must
+                              not contain commas.
                             items:
                               type: string
                             type: array
-                          publicCidrs:
-                            description: PublicCIDRs are CIDR ranges treated as public
-                              exposure ranges.
+                          owners:
+                            description: Owners lists annotation keys whose values
+                              contain owning teams or users. Values must not contain
+                              commas.
                             items:
                               type: string
                             type: array
-                          trustedEgressCidrs:
-                            description: TrustedEgressCIDRs are CIDR ranges treated
-                              as approved egress destinations.
+                          tickets:
+                            description: Tickets lists annotation keys whose values
+                              contain ticket or case references. Values must not contain
+                              commas.
+                            items:
+                              type: string
+                            type: array
+                          validUntil:
+                            description: ValidUntil lists annotation keys whose values
+                              contain RFC3339 or YYYY-MM-DD expiration timestamps.
+                              Values must not contain commas.
                             items:
                               type: string
                             type: array
                         type: object
-                      hbn:
-                        description: HBN configures collection of HBN network resources.
+                      failExpiredPolicyExceptions:
+                        description: |-
+                          FailExpiredPolicyExceptions controls whether expired Kyverno PolicyExceptions fail Kyverno hygiene checks.
+                          Omit to fail expired Kyverno PolicyExceptions.
+                        type: boolean
+                      mappingAnnotations:
+                        description: |-
+                          MappingAnnotations configures Kyverno policy annotation keys that define Mondoo mappings.
+                          When omitted, the scanner uses its built-in Mondoo annotation keys.
                         properties:
-                          enable:
-                            description: Enable controls whether HBN resources are
-                              collected. Defaults to true.
-                            type: boolean
-                          includeLegacyResources:
-                            description: |-
-                              IncludeLegacyResources controls whether legacy Telekom HBN API groups are collected in
-                              addition to current HBN resources. Defaults to true.
-                            type: boolean
+                          checkMrns:
+                            description: CheckMRNs lists annotation keys whose values
+                              contain Mondoo check MRNs. Values must not contain commas.
+                            items:
+                              type: string
+                            type: array
+                          checkUids:
+                            description: CheckUIDs lists annotation keys whose values
+                              contain Mondoo check UIDs. Values must not contain commas.
+                            items:
+                              type: string
+                            type: array
+                          policyUids:
+                            description: PolicyUIDs lists annotation keys whose values
+                              contain Mondoo policy UIDs. Values must not contain
+                              commas.
+                            items:
+                              type: string
+                            type: array
+                          reasons:
+                            description: Reasons lists annotation keys whose values
+                              contain mapping reasons. Values must not contain commas.
+                            items:
+                              type: string
+                            type: array
                         type: object
-                      multiNetworkPolicy:
-                        description: MultiNetworkPolicy configures collection of secondary-interface
-                          network policy resources.
-                        properties:
-                          enable:
-                            description: |-
-                              Enable controls whether MultiNetworkPolicy and NetworkAttachmentDefinition resources are
-                              collected. Defaults to true.
-                            type: boolean
-                        type: object
+                      mirrorPolicyExceptions:
+                        description: |-
+                          MirrorPolicyExceptions controls whether Kyverno PolicyExceptions should be mirrored to Mondoo external exceptions.
+                          This only takes effect when the Mondoo Platform supports external exception upserts.
+                        type: boolean
+                      mirroredExceptionAction:
+                        description: |-
+                          MirroredExceptionAction controls the Mondoo exception action used for mirrored Kyverno PolicyExceptions.
+                          Omit to use RISK_ACCEPTED.
+                        enum:
+                        - RISK_ACCEPTED
+                        - WORKAROUND
+                        type: string
+                      mirroredExceptionApproval:
+                        description: |-
+                          MirroredExceptionApproval controls the approval state for mirrored Kyverno PolicyExceptions.
+                          Omit to treat mirrored Kyverno PolicyExceptions as externally approved.
+                        enum:
+                        - externally-approved
+                        - requires-approval
+                        type: string
+                      reportUnmappedPolicyExceptions:
+                        description: |-
+                          ReportUnmappedPolicyExceptions controls whether unmapped Kyverno PolicyExceptions are reported in Kyverno findings.
+                          Omit to report unmapped Kyverno PolicyExceptions.
+                        type: boolean
+                      reportUnmappedPolicyResults:
+                        description: |-
+                          ReportUnmappedPolicyResults controls whether unmapped Kyverno PolicyReport failures are reported in Kyverno findings.
+                          Omit to report unmapped Kyverno PolicyReport failures.
+                        type: boolean
                     type: object
                   resourceWatcher:
                     description: |-
