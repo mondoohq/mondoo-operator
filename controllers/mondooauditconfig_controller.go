@@ -88,7 +88,12 @@ var MondooClientBuilder = mondooclient.NewClient
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (reconcileResult ctrl.Result, reconcileError error) {
-	log := ctrllog.FromContext(ctx)
+	log := ctrllog.FromContext(ctx).WithValues(
+		"mondooAuditConfig", req.String(),
+		"mondooNamespace", req.Namespace,
+		"mondooName", req.Name,
+	)
+	ctx = ctrllog.IntoContext(ctx, log)
 
 	// Fetch the Mondoo instance
 	mondooAuditConfig := &v1alpha2.MondooAuditConfig{}
@@ -292,9 +297,9 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// (e.g. image resolution timeout) must not block the others.
 	var firstError error
 	finalResult := ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}
-	collect := func(result ctrl.Result, err error, msg string) {
+	collect := func(result ctrl.Result, err error, msg, scanType string) {
 		if err != nil {
-			log.Error(err, msg+", continuing with other scan types")
+			log.Error(err, msg+", continuing with other scan types", "scanType", scanType)
 			if firstError == nil {
 				firstError = err
 			}
@@ -305,7 +310,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	result, err := nodes.Reconcile(ctx)
-	collect(result, err, "Failed to set up nodes scanning")
+	collect(result, err, "Failed to set up nodes scanning", "node-scanning")
 
 	containers := container_image.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
@@ -314,7 +319,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		MondooOperatorConfig:   config,
 	}
 	result, err = containers.Reconcile(ctx)
-	collect(result, err, "Failed to set up container scanning")
+	collect(result, err, "Failed to set up container scanning", "container-image-scanning")
 
 	workloads := k8s_scan.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
@@ -325,7 +330,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		VaultTokenFetcher:      k8s_scan.DefaultVaultTokenFetcher,
 	}
 	result, err = workloads.Reconcile(ctx)
-	collect(result, err, "Failed to set up Kubernetes resources scanning")
+	collect(result, err, "Failed to set up Kubernetes resources scanning", "k8s-resources-scanning")
 
 	resourceWatcher := resourcewatcher.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
@@ -334,7 +339,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		ContainerImageResolver: imageResolver,
 	}
 	result, err = resourceWatcher.Reconcile(ctx)
-	collect(result, err, "Failed to set up resource watcher")
+	collect(result, err, "Failed to set up resource watcher", "resource-watcher")
 
 	mondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
 
