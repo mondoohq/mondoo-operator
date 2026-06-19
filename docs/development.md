@@ -255,7 +255,47 @@ kubectl create secret generic prod-sa-credentials \
   --from-literal=ca.crt="$(kubectl config view --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 -d)"
 ```
 
-**3. Workload Identity Federation (cloud-native, no static credentials)**
+**3. OIDC Refresh Token (generated runtime kubeconfig)**
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    externalClusters:
+      - name: oidc-prod
+        oidcAuth:
+          server: "https://prod-cluster.example.com:6443"
+          issuerURL: "https://auth.example.com/realms/platform"
+          clientID: kubernetes
+          credentialsSecretRef:
+            name: prod-oidc-credentials
+          scopes:
+            - openid
+            - email
+            - groups
+```
+
+```bash
+# Create OIDC credentials secret in the operator namespace.
+# refresh-token is required; client-secret, ca.crt, and oidc-ca.crt are optional.
+kubectl create secret generic prod-oidc-credentials \
+  --namespace mondoo-operator \
+  --from-file=refresh-token=./refresh-token \
+  --from-file=client-secret=./client-secret \
+  --from-file=ca.crt=./target-cluster-ca.crt \
+  --from-file=oidc-ca.crt=./issuer-ca.crt
+```
+
+The OIDC mode mounts the credentials Secret only into an init container. The init container exchanges the refresh token for an ID token, writes a bearer-token kubeconfig into a memory-backed `emptyDir`, and the scanner container mounts only that generated kubeconfig read-only.
+
+**4. Workload Identity Federation (cloud-native, no static credentials)**
 
 For GKE:
 
@@ -313,7 +353,7 @@ spec:
             tenantId: fedcba98-7654-3210-fedc-ba9876543210
 ```
 
-**4. SPIFFE/SPIRE (zero-trust, auto-rotating X.509 certificates)**
+**5. SPIFFE/SPIRE (zero-trust, auto-rotating X.509 certificates)**
 
 ```yaml
 apiVersion: k8s.mondoo.com/v1alpha2
@@ -833,6 +873,95 @@ spec:
             name: target-sa-credentials
 EOF
 ```
+
+### Test Method 2a: OIDC Refresh Token Authentication
+
+Use this method when the target cluster API server is configured for OIDC and you have an offline refresh token for an identity with read access to the target cluster.
+
+#### Step 1: Prepare target cluster RBAC
+
+Create a ClusterRoleBinding on the target cluster for the OIDC username or group claim emitted by your identity provider. The exact subject depends on the target API server OIDC claim mapping.
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mondoo-oidc-scanner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: mondoo-scanners
+```
+
+#### Step 2: Create OIDC credentials on the management cluster
+
+```bash
+kubectl config use-context k3d-management
+
+kubectl create secret generic target-oidc-credentials \
+  --namespace mondoo-operator \
+  --from-file=refresh-token=./refresh-token \
+  --from-file=client-secret=./client-secret \
+  --from-file=ca.crt=./target-cluster-ca.crt \
+  --from-file=oidc-ca.crt=./issuer-ca.crt
+```
+
+Only `refresh-token` is mandatory. Omit `client-secret`, `ca.crt`, or `oidc-ca.crt` when the provider or target cluster does not require them. The refresh token must already be allowed to request the configured scopes and the claims required by the target Kubernetes API server.
+
+#### Step 3: Deploy MondooAuditConfig with OIDC auth
+
+```bash
+TARGET_IP=$(docker inspect k3d-target-server-0 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
+
+cat <<EOF | kubectl apply -f -
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    schedule: "*/5 * * * *"
+    externalClusters:
+      - name: target-oidc
+        oidcAuth:
+          server: "https://${TARGET_IP}:6443"
+          issuerURL: "https://auth.example.com/realms/platform"
+          clientID: kubernetes
+          credentialsSecretRef:
+            name: target-oidc-credentials
+          scopes:
+            - openid
+            - email
+            - groups
+EOF
+```
+
+#### Step 4: Verify generated pod configuration
+
+```bash
+kubectl get cronjob mondoo-client-k8s-scan-target-oidc -n mondoo-operator -o yaml \
+  | yq '.spec.jobTemplate.spec.template.spec.initContainers[] | select(.name == "generate-oidc-kubeconfig")'
+
+kubectl create job oidc-external-scan-test \
+  --from=cronjob/mondoo-client-k8s-scan-target-oidc \
+  -n mondoo-operator
+
+kubectl logs -n mondoo-operator job/oidc-external-scan-test -f
+```
+
+Expected behavior:
+
+- The init container logs `OIDC bearer-token kubeconfig generated for external cluster`.
+- The scanner container has `KUBECONFIG=/etc/opt/mondoo/kubeconfig/kubeconfig`.
+- The scanner container does not mount the raw `target-oidc-credentials` Secret.
 
 ### Test Method 3: SPIFFE/SPIRE Authentication
 

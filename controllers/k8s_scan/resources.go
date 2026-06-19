@@ -31,6 +31,17 @@ const (
 	InventoryConfigMapBase = "-k8s-inventory"
 )
 
+const (
+	oidcCredentialsMountPath = "/etc/opt/mondoo/oidc-credentials" // #nosec G101 -- mount path name, not an embedded credential.
+	oidcKubeconfigMountPath  = "/etc/opt/mondoo/kubeconfig"
+)
+
+const (
+	externalClusterScanActiveDeadlineSeconds = int64(6 * 60 * 60)
+	oidcCurlConnectTimeoutSeconds            = 10
+	oidcCurlMaxTimeSeconds                   = 60
+)
+
 // K8sDiscoveryTargets defines explicit targets for K8s resource scanning
 // (excludes container-images which is handled by the separate containers controller)
 var K8sDiscoveryTargets = []string{
@@ -365,6 +376,30 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 			ls["azure.workload.identity/use"] = "true"
 		}
 
+	case cluster.OIDCAuth != nil:
+		// OIDC auth: generate kubeconfig from mounted credentials at runtime.
+		volumes = append(volumes,
+			corev1.Volume{
+				Name: "oidc-credentials",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName:  cluster.OIDCAuth.CredentialsSecretRef.Name,
+						DefaultMode: ptr.To(int32(0o440)),
+					},
+				},
+			},
+			corev1.Volume{
+				Name: "kubeconfig",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{
+						Medium: corev1.StorageMediumMemory,
+					},
+				},
+			},
+		)
+
+		initContainers = append(initContainers, oidcInitContainer(cluster, cfg))
+
 	case cluster.SPIFFEAuth != nil:
 		// SPIFFE auth: use sidecar to fetch certificates, generate kubeconfig
 		serviceAccountName = m.Spec.Scanner.ServiceAccountName
@@ -459,7 +494,8 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 				ObjectMeta: metav1.ObjectMeta{Labels: ls},
 				Spec: batchv1.JobSpec{
 					// Don't retry failed scans - re-running won't fix the issue
-					BackoffLimit: ptr.To(int32(0)),
+					BackoffLimit:          ptr.To(int32(0)),
+					ActiveDeadlineSeconds: ptr.To(externalClusterScanActiveDeadlineSeconds),
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: ls},
 						Spec: corev1.PodSpec{
@@ -712,6 +748,219 @@ func WIFServiceAccount(cluster v1alpha2.ExternalCluster, m *v1alpha2.MondooAudit
 	}
 
 	return sa
+}
+
+func oidcInitContainer(cluster v1alpha2.ExternalCluster, cfg v1alpha2.MondooOperatorConfig) corev1.Container {
+	oidc := cluster.OIDCAuth
+	script := `#!/bin/sh
+set -eu
+
+credentials_dir="${OIDC_CREDENTIALS_DIR}"
+kubeconfig_path="${OIDC_KUBECONFIG_DIR}/kubeconfig"
+
+yaml_quote() {
+  printf "'"
+  printf "%s" "$1" | sed "s/'/''/g"
+  printf "'"
+}
+
+json_value() {
+  # Extract top-level simple OIDC string fields; escaped quotes and nested duplicate keys are unsupported.
+  key="$1"
+  tr -d '\n' | sed -n "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p"
+}
+
+file_base64() {
+  base64 "$1" | tr -d '\n'
+}
+
+read_secret() {
+  key="$1"
+  file="${credentials_dir}/${key}"
+  if [ ! -f "$file" ]; then
+    return 1
+  fi
+  tr -d '\r\n' < "$file"
+}
+
+require_secret() {
+  key="$1"
+  value="$(read_secret "$key" || true)"
+  if [ -z "$value" ]; then
+    echo "ERROR: OIDC credentials Secret key ${key} is required and must not be empty" >&2
+    exit 1
+  fi
+  printf "%s" "$value"
+}
+
+refresh_token="$(require_secret "$OIDC_REFRESH_TOKEN_KEY")"
+client_secret="$(read_secret "$OIDC_CLIENT_SECRET_KEY" || true)"
+cluster_ca="${credentials_dir}/${OIDC_CLUSTER_CA_KEY}"
+issuer_ca="${credentials_dir}/${OIDC_ISSUER_CA_KEY}"
+
+curl_oidc() {
+  if [ -f "$issuer_ca" ]; then
+    curl --fail --silent --show-error --proto '=https' --proto-redir '=https' --connect-timeout ` + fmt.Sprintf("%d", oidcCurlConnectTimeoutSeconds) + ` --max-time ` + fmt.Sprintf("%d", oidcCurlMaxTimeSeconds) + ` --cacert "$issuer_ca" "$@"
+  else
+    curl --fail --silent --show-error --proto '=https' --proto-redir '=https' --connect-timeout ` + fmt.Sprintf("%d", oidcCurlConnectTimeoutSeconds) + ` --max-time ` + fmt.Sprintf("%d", oidcCurlMaxTimeSeconds) + ` "$@"
+  fi
+}
+
+discovery_url="${OIDC_ISSUER_URL%/}/.well-known/openid-configuration"
+discovery="$(curl_oidc --location "$discovery_url")"
+token_endpoint="$(printf "%s" "$discovery" | json_value "token_endpoint")"
+if [ -z "$token_endpoint" ]; then
+  echo "ERROR: OIDC discovery document does not contain token_endpoint" >&2
+  exit 1
+fi
+case "$token_endpoint" in
+  https://*) ;;
+  *)
+    echo "ERROR: OIDC token_endpoint must use https" >&2
+    exit 1
+    ;;
+esac
+
+if [ -n "$client_secret" ] && [ -n "$OIDC_SCOPES" ]; then
+	  token_response="$(curl_oidc \
+	    --request POST "$token_endpoint" \
+    --data-urlencode "grant_type=refresh_token" \
+    --data-urlencode "client_id=${OIDC_CLIENT_ID}" \
+    --data-urlencode "refresh_token=${refresh_token}" \
+    --data-urlencode "client_secret=${client_secret}" \
+    --data-urlencode "scope=${OIDC_SCOPES}")"
+elif [ -n "$client_secret" ]; then
+	  token_response="$(curl_oidc \
+	    --request POST "$token_endpoint" \
+    --data-urlencode "grant_type=refresh_token" \
+    --data-urlencode "client_id=${OIDC_CLIENT_ID}" \
+    --data-urlencode "refresh_token=${refresh_token}" \
+    --data-urlencode "client_secret=${client_secret}")"
+elif [ -n "$OIDC_SCOPES" ]; then
+	  token_response="$(curl_oidc \
+	    --request POST "$token_endpoint" \
+    --data-urlencode "grant_type=refresh_token" \
+    --data-urlencode "client_id=${OIDC_CLIENT_ID}" \
+    --data-urlencode "refresh_token=${refresh_token}" \
+    --data-urlencode "scope=${OIDC_SCOPES}")"
+else
+	  token_response="$(curl_oidc \
+	    --request POST "$token_endpoint" \
+    --data-urlencode "grant_type=refresh_token" \
+    --data-urlencode "client_id=${OIDC_CLIENT_ID}" \
+    --data-urlencode "refresh_token=${refresh_token}")"
+fi
+
+id_token="$(printf "%s" "$token_response" | json_value "id_token")"
+if [ -z "$id_token" ]; then
+  echo "ERROR: OIDC token response does not contain id_token" >&2
+  exit 1
+fi
+
+{
+  echo "apiVersion: v1"
+  echo "kind: Config"
+  echo "clusters:"
+  echo "- cluster:"
+  if [ "$OIDC_INSECURE_SKIP_TLS_VERIFY" = "true" ]; then
+    echo "    insecure-skip-tls-verify: true"
+  elif [ -f "$cluster_ca" ]; then
+    printf "    certificate-authority-data: %s\n" "$(yaml_quote "$(file_base64 "$cluster_ca")")"
+  fi
+  printf "    server: %s\n" "$(yaml_quote "$K8S_SERVER")"
+  echo "  name: external"
+  echo "contexts:"
+  echo "- context:"
+  echo "    cluster: external"
+  echo "    user: oidc"
+  echo "  name: default"
+  echo "current-context: default"
+  echo "users:"
+  echo "- name: oidc"
+  echo "  user:"
+  printf "    token: %s\n" "$(yaml_quote "$id_token")"
+} > "$kubeconfig_path"
+
+chmod 0600 "$kubeconfig_path"
+echo "OIDC bearer-token kubeconfig generated for external cluster"
+`
+
+	envVars := []corev1.EnvVar{
+		{Name: "K8S_SERVER", Value: oidc.Server},
+		{Name: "OIDC_ISSUER_URL", Value: oidc.IssuerURL},
+		{Name: "OIDC_CLIENT_ID", Value: oidc.ClientID},
+		{Name: "OIDC_REFRESH_TOKEN_KEY", Value: oidcKeyOrDefault(oidc.RefreshTokenKey, "refresh-token")},
+		{Name: "OIDC_CLIENT_SECRET_KEY", Value: oidcKeyOrDefault(oidc.ClientSecretKey, "client-secret")},
+		{Name: "OIDC_CLUSTER_CA_KEY", Value: oidcKeyOrDefault(oidc.ClusterCAKey, "ca.crt")},
+		{Name: "OIDC_ISSUER_CA_KEY", Value: oidcKeyOrDefault(oidc.IssuerCAKey, "oidc-ca.crt")},
+		{Name: "OIDC_SCOPES", Value: strings.Join(oidcScopes(oidc.Scopes), " ")},
+		{Name: "OIDC_INSECURE_SKIP_TLS_VERIFY", Value: fmt.Sprintf("%t", oidc.InsecureSkipTLSVerify)},
+		{Name: "OIDC_CREDENTIALS_DIR", Value: oidcCredentialsMountPath},
+		{Name: "OIDC_KUBECONFIG_DIR", Value: oidcKubeconfigMountPath},
+	}
+	if !cfg.Spec.SkipProxyForCnspec {
+		envVars = append(envVars, k8s.ProxyEnvVars(cfg)...)
+	}
+
+	return corev1.Container{
+		Name:            "generate-oidc-kubeconfig",
+		Image:           constants.CurlImage,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command:         []string{"/bin/sh", "-c", script},
+		Env:             envVars,
+		VolumeMounts: []corev1.VolumeMount{
+			{Name: "kubeconfig", MountPath: oidcKubeconfigMountPath},
+			{Name: "oidc-credentials", MountPath: oidcCredentialsMountPath, ReadOnly: true},
+			{Name: "temp", MountPath: "/tmp"},
+		},
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("25m"),
+				corev1.ResourceMemory: resource.MustParse("32Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+		},
+		TerminationMessagePath:   "/dev/termination-log",
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+		SecurityContext: &corev1.SecurityContext{
+			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
+			RunAsNonRoot:             ptr.To(true),
+			RunAsUser:                ptr.To(int64(101)),
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+		},
+	}
+}
+
+func oidcKeyOrDefault(value, defaultValue string) string {
+	if value == "" {
+		return defaultValue
+	}
+	return value
+}
+
+func oidcScopes(scopes []string) []string {
+	out := make([]string, 0, len(scopes)+1)
+	hasOpenID := false
+	for _, scope := range scopes {
+		scope = strings.TrimSpace(scope)
+		if scope == "" {
+			continue
+		}
+		if scope == "openid" {
+			hasOpenID = true
+		}
+		out = append(out, scope)
+	}
+	if len(out) == 0 || hasOpenID {
+		return out
+	}
+	return append([]string{"openid"}, out...)
 }
 
 // wifInitContainer creates an init container that generates kubeconfig using cloud CLI tools
