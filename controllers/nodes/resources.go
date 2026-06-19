@@ -178,6 +178,12 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 		},
 	}
 
+	k8s.AddPodSchedulingToSpec(
+		&cj.Spec.JobTemplate.Spec.Template.Spec,
+		nil,
+		m.Spec.Nodes.Scheduling.Tolerations,
+	)
+
 	// Add imagePullSecrets from MondooOperatorConfig
 	if len(cfg.Spec.ImagePullSecrets) > 0 {
 		cj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = append(
@@ -309,6 +315,12 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 			},
 		},
 	}
+
+	k8s.AddPodSchedulingToSpec(
+		&ds.Spec.Template.Spec,
+		m.Spec.Nodes.Scheduling.NodeSelector,
+		m.Spec.Nodes.Scheduling.Tolerations,
+	)
 
 	// Add imagePullSecrets from MondooOperatorConfig
 	if len(cfg.Spec.ImagePullSecrets) > 0 {

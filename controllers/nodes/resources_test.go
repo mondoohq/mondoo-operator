@@ -337,6 +337,52 @@ func TestCronJob_WithImagePullSecrets(t *testing.T) {
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
 }
 
+func TestCronJob_WithSchedulingTolerations(t *testing.T) {
+	testNode := corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-node-name"},
+		Spec: corev1.NodeSpec{
+			Taints: []corev1.Taint{
+				{
+					Key:    "dedicated",
+					Value:  "node-scan",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
+			},
+		},
+	}
+	mac := testMondooAuditConfig()
+	mac.Spec.Nodes.Scheduling = v1alpha2.PodScheduling{
+		NodeSelector: map[string]string{
+			"nodepool": "scanners",
+		},
+		Tolerations: []corev1.Toleration{
+			{
+				Key:      "sriov",
+				Operator: corev1.TolerationOpExists,
+				Effect:   corev1.TaintEffectNoSchedule,
+			},
+		},
+	}
+
+	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	podSpec := cj.Spec.JobTemplate.Spec.Template.Spec
+
+	assert.Equal(t, testNode.Name, podSpec.NodeName)
+	assert.Empty(t, podSpec.NodeSelector)
+	assert.ElementsMatch(t, []corev1.Toleration{
+		{
+			Key:    "dedicated",
+			Value:  "node-scan",
+			Effect: corev1.TaintEffectNoSchedule,
+		},
+		{
+			Key:      "sriov",
+			Operator: corev1.TolerationOpExists,
+			Effect:   corev1.TaintEffectNoSchedule,
+		},
+	}, podSpec.Tolerations)
+}
+
 func TestDaemonSet_WithProxy(t *testing.T) {
 	mac := *testMondooAuditConfig()
 	cfg := v1alpha2.MondooOperatorConfig{
@@ -392,6 +438,48 @@ func TestDaemonSet_WithImagePullSecrets(t *testing.T) {
 	secrets := ds.Spec.Template.Spec.ImagePullSecrets
 	require.Len(t, secrets, 1)
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
+}
+
+func TestDaemonSet_WithScheduling(t *testing.T) {
+	mac := *testMondooAuditConfig()
+	mac.Spec.Nodes.Scheduling = v1alpha2.PodScheduling{
+		NodeSelector: map[string]string{
+			"nodepool": "scanners",
+		},
+		Tolerations: []corev1.Toleration{
+			{
+				Key:      "sriov",
+				Operator: corev1.TolerationOpExists,
+				Effect:   corev1.TaintEffectNoSchedule,
+			},
+		},
+	}
+	nodeTolerations := []corev1.Toleration{
+		{
+			Key:      "dedicated",
+			Operator: corev1.TolerationOpEqual,
+			Value:    "node-scan",
+			Effect:   corev1.TaintEffectNoSchedule,
+		},
+	}
+
+	ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nodeTolerations)
+	podSpec := ds.Spec.Template.Spec
+
+	assert.Equal(t, map[string]string{"nodepool": "scanners"}, podSpec.NodeSelector)
+	assert.ElementsMatch(t, []corev1.Toleration{
+		{
+			Key:      "dedicated",
+			Operator: corev1.TolerationOpEqual,
+			Value:    "node-scan",
+			Effect:   corev1.TaintEffectNoSchedule,
+		},
+		{
+			Key:      "sriov",
+			Operator: corev1.TolerationOpExists,
+			Effect:   corev1.TaintEffectNoSchedule,
+		},
+	}, podSpec.Tolerations)
 }
 
 // envToMap converts a slice of EnvVar to a map for easy lookup.

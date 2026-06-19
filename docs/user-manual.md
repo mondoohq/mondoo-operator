@@ -1075,6 +1075,38 @@ spec:
 ```
 After you saved the changes, the `mondoo-operator-controller-manager` will adjust the corresponding Deployment or CronJob.
 
+You can also constrain where scanner pods run and allow them onto tainted nodes:
+
+```yaml
+spec:
+  scanner:
+    scheduling:
+      nodeSelector:
+        nodepool: scanners
+      tolerations:
+        - key: sriov
+          operator: Exists
+          effect: NoSchedule
+  containers:
+    scheduling:
+      nodeSelector:
+        nodepool: scanners
+      tolerations:
+        - key: sriov
+          operator: Exists
+          effect: NoSchedule
+  nodes:
+    scheduling:
+      nodeSelector:
+        nodepool: scanners
+      tolerations:
+        - key: sriov
+          operator: Exists
+          effect: NoSchedule
+```
+
+For node scanning, `nodes.scheduling.tolerations` is added to all node scanner pods. `nodes.scheduling.nodeSelector` applies to DaemonSet style; CronJob style already pins each scanner pod to the node being scanned with `nodeName`.
+
 ## Uninstalling the Mondoo operator
 
 Before uninstalling the Mondoo operator, be sure to delete all `MondooAuditConfig` and `MondooOperatorConfig` objects. You can find any in your cluster by running:
