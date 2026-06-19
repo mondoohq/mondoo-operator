@@ -74,7 +74,7 @@ Install the operator in a central management cluster and scan remote clusters vi
 │  └──────────┬──────────────────┘    │
 └─────────────┼───────────────────────┘
               │
-              │ kubeconfig / WIF* / SPIFFE* / Vault
+              │ kubeconfig / SA / OIDC / WIF* / SPIFFE* / Vault
               │
     ┌─────────┴─────────┬─────────────────┐
     ▼                   ▼                 ▼
@@ -91,6 +91,8 @@ _*WIF and SPIFFE authentication are experimental features._
 **Authentication methods:**
 
 - **Kubeconfig**: Use a kubeconfig file stored in a Secret
+- **Service Account Token**: Generate kubeconfig from a mounted service account token and CA certificate
+- **OIDC Refresh Token**: Exchange a same-namespace OIDC refresh token in an init container and mount only a bearer-token kubeconfig into the scanner
 - **Workload Identity (WIF)** _(Experimental)_: Native cloud provider authentication for GKE, EKS, AKS
 - **SPIFFE** _(Experimental)_: Use SPIFFE/SPIRE for cross-cluster authentication
 - **HashiCorp Vault**: Dynamic short-lived credentials via Vault's Kubernetes secrets engine
@@ -140,6 +142,8 @@ spec:
 | Container Image Scanning         |      ✅      |           ✅            |
 | Namespace Filtering              |      ✅      |           ✅            |
 | Kubeconfig Auth                  |      -       |           ✅            |
+| Service Account Auth             |      -       |           ✅            |
+| OIDC Auth                        |      -       |           ✅            |
 | Workload Identity (GKE/EKS/AKS) |      -       | ✅ ⚠️ Experimental      |
 | SPIFFE Auth                      |      -       | ✅ ⚠️ Experimental      |
 | HashiCorp Vault Auth            |      -       |        ✅        |

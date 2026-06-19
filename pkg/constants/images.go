@@ -19,4 +19,8 @@ const (
 	// SPIFFE Helper image
 	// https://github.com/spiffe/spiffe-helper/releases
 	SPIFFEHelperImage = "ghcr.io/spiffe/spiffe-helper:0.8.0"
+
+	// Curl image used by lightweight auth init containers
+	// https://github.com/curl/curl-container
+	CurlImage = "curlimages/curl:8.17.0"
 )
