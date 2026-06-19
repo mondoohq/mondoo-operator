@@ -50,6 +50,17 @@ k8SResourcesScanning:
   # - name: mondoo-client-cr-wif
   #   namespace: mondoo-operator
 
+runtimeCacheScanning:
+  serviceAccount:
+    ## @param runtimeCacheScanning.serviceAccount.name Name of the runtime cache scanning service account. Defaults to the MondooAuditConfig runtimeCache.serviceAccountName default.
+    name: mondoo-operator-runtime-cache-scanning
+    ## @param runtimeCacheScanning.serviceAccount.annotations [object] Annotations to add to the runtime cache scanning service account
+    annotations: {}
+  ## @param runtimeCacheScanning.extraClusterRoleBindingSubjects [array] Additional ServiceAccount subjects to bind to the runtime-cache-scanning ClusterRole
+  extraClusterRoleBindingSubjects: []
+  # - name: custom-runtime-cache-scanner
+  #   namespace: mondoo-operator
+
 ## @section General Configuration
 
 ## @param kubernetesClusterDomain Kubernetes cluster domain used for DNS

@@ -189,7 +189,16 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 
 // DaemonSet creates a DaemonSet for node scanning
 func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg v1alpha2.MondooOperatorConfig, tolerations []corev1.Toleration) *appsv1.DaemonSet {
-	labels := NodeScanningLabels(m)
+	return daemonSet(m, isOpenshift, image, cfg, tolerations, nil)
+}
+
+func DaemonSetForScannerSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg v1alpha2.MondooOperatorConfig, tolerations []corev1.Toleration, set v1alpha2.NodeScannerSet) *appsv1.DaemonSet {
+	return daemonSet(m, isOpenshift, image, cfg, tolerations, &set)
+}
+
+func daemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg v1alpha2.MondooOperatorConfig, tolerations []corev1.Toleration, set *v1alpha2.NodeScannerSet) *appsv1.DaemonSet {
+	scannerSetName := scannerSetNameValue(set)
+	labels := NodeScanningLabelsForScannerSet(m, scannerSetName)
 	cmd := []string{
 		"cnspec", "serve",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
@@ -208,12 +217,13 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 		proxyEnvVars = k8s.ProxyEnvVars(cfg)
 	}
 
-	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
+	nodeSpec := nodeScannerSpecForSet(m.Spec.Nodes, set)
+	containerResources := k8s.ResourcesRequirementsWithDefaults(nodeSpec.Resources, k8s.DefaultNodeScanningResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
 
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      DaemonSetName(m.Name),
+			Name:      DaemonSetNameForScannerSet(m.Name, scannerSetName),
 			Namespace: m.Namespace,
 			Labels:    labels,
 			Annotations: map[string]string{
@@ -230,11 +240,13 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 					},
 				},
 				Spec: corev1.PodSpec{
-					PriorityClassName: m.Spec.Nodes.PriorityClassName,
+					NodeSelector:      nodeSpec.NodeSelector,
+					Affinity:          nodeSpec.Affinity,
+					PriorityClassName: nodeSpec.PriorityClassName,
 					// The node scanning does not use the Kubernetes API at all, therefore the service account token
 					// should not be mounted at all.
 					AutomountServiceAccountToken: ptr.To(false),
-					Tolerations:                  tolerations,
+					Tolerations:                  nodeScannerTolerations(nodeSpec, tolerations),
 					Containers: []corev1.Container{
 						{
 							Image:     image,
@@ -267,7 +279,7 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 								{Name: "MONDOO_AUTO_UPDATE", Value: "false"},
 								{Name: "GOMEMLIMIT", Value: gcLimit},
 								{Name: "NODE_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"}}},
-							}, proxyEnvVars...), m.Spec.Nodes.Env),
+							}, proxyEnvVars...), nodeSpec.Env),
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -319,6 +331,42 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 	return ds
 }
 
+func nodeScannerSpecForSet(nodes v1alpha2.Nodes, set *v1alpha2.NodeScannerSet) v1alpha2.Nodes {
+	if set == nil {
+		return nodes
+	}
+	if resourceRequirementsConfigured(set.Resources) {
+		nodes.Resources = set.Resources
+	}
+	if len(set.NodeSelector) > 0 {
+		nodes.NodeSelector = set.NodeSelector
+	}
+	if set.Affinity != nil {
+		nodes.Affinity = set.Affinity
+	}
+	if len(set.Tolerations) > 0 {
+		nodes.Tolerations = set.Tolerations
+	}
+	if set.PriorityClassName != "" {
+		nodes.PriorityClassName = set.PriorityClassName
+	}
+	if len(set.Env) > 0 {
+		nodes.Env = append(nodes.Env, set.Env...)
+	}
+	return nodes
+}
+
+func resourceRequirementsConfigured(resources corev1.ResourceRequirements) bool {
+	return len(resources.Limits) > 0 || len(resources.Requests) > 0
+}
+
+func nodeScannerTolerations(nodes v1alpha2.Nodes, inherited []corev1.Toleration) []corev1.Toleration {
+	if len(nodes.Tolerations) > 0 {
+		return nodes.Tolerations
+	}
+	return inherited
+}
+
 // ConfigMap creates a ConfigMap for node scanning inventory
 func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (*corev1.ConfigMap, error) {
 	inv, err := Inventory(integrationMRN, clusterUID, m)
@@ -352,6 +400,14 @@ func DeploymentName(prefix, suffix string) string {
 
 func DaemonSetName(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, DaemonSetNameBase)
+}
+
+func DaemonSetNameForScannerSet(prefix, scannerSetName string) string {
+	if scannerSetName == "" {
+		return DaemonSetName(prefix)
+	}
+	base := fmt.Sprintf("%s%s-", prefix, DaemonSetNameBase)
+	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), scannerSetName))
 }
 
 func GarbageCollectCronJobName(prefix string) string {
@@ -427,6 +483,21 @@ func NodeScanningLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 		"scan":      "nodes",
 		"mondoo_cr": m.Name,
 	}
+}
+
+func NodeScanningLabelsForScannerSet(m v1alpha2.MondooAuditConfig, scannerSetName string) map[string]string {
+	labels := NodeScanningLabels(m)
+	if scannerSetName != "" {
+		labels["scanner_set"] = scannerSetName
+	}
+	return labels
+}
+
+func scannerSetNameValue(set *v1alpha2.NodeScannerSet) string {
+	if set == nil {
+		return ""
+	}
+	return set.Name
 }
 
 func GarbageCollectCronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {

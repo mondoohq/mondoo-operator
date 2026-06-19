@@ -11,6 +11,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
@@ -21,7 +22,8 @@ func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{{Name: "test", Image: "test:latest"}},
+							InitContainers: []corev1.Container{{Name: "init", Image: "busybox:1.36"}},
+							Containers:     []corev1.Container{{Name: "test", Image: "test:latest"}},
 							ImagePullSecrets: []corev1.LocalObjectReference{
 								{Name: "my-secret"},
 								{Name: "another-secret"},
@@ -37,6 +39,7 @@ func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
 	UpdateCronJobFields(obj, desired)
 
 	assert.Equal(t, desired.Spec.Schedule, obj.Spec.Schedule)
+	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.InitContainers, obj.Spec.JobTemplate.Spec.Template.Spec.InitContainers)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.Containers, obj.Spec.JobTemplate.Spec.Template.Spec.Containers)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets, obj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets)
 }
@@ -87,7 +90,8 @@ func TestUpdateDeploymentFields_ImagePullSecrets(t *testing.T) {
 		Spec: appsv1.DeploymentSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{Name: "test", Image: "test:latest"}},
+					InitContainers: []corev1.Container{{Name: "init", Image: "busybox:1.36"}},
+					Containers:     []corev1.Container{{Name: "test", Image: "test:latest"}},
 					ImagePullSecrets: []corev1.LocalObjectReference{
 						{Name: "my-secret"},
 					},
@@ -100,6 +104,7 @@ func TestUpdateDeploymentFields_ImagePullSecrets(t *testing.T) {
 	UpdateDeploymentFields(obj, desired)
 
 	assert.Equal(t, desired.Spec.Template.Spec.ImagePullSecrets, obj.Spec.Template.Spec.ImagePullSecrets)
+	assert.Equal(t, desired.Spec.Template.Spec.InitContainers, obj.Spec.Template.Spec.InitContainers)
 	assert.Equal(t, desired.Spec.Template.Spec.Containers, obj.Spec.Template.Spec.Containers)
 }
 
@@ -108,7 +113,8 @@ func TestUpdateDaemonSetFields_ImagePullSecrets(t *testing.T) {
 		Spec: appsv1.DaemonSetSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{Name: "test", Image: "test:latest"}},
+					InitContainers: []corev1.Container{{Name: "init", Image: "busybox:1.36"}},
+					Containers:     []corev1.Container{{Name: "test", Image: "test:latest"}},
 					ImagePullSecrets: []corev1.LocalObjectReference{
 						{Name: "my-secret"},
 					},
@@ -121,5 +127,79 @@ func TestUpdateDaemonSetFields_ImagePullSecrets(t *testing.T) {
 	UpdateDaemonSetFields(obj, desired)
 
 	assert.Equal(t, desired.Spec.Template.Spec.ImagePullSecrets, obj.Spec.Template.Spec.ImagePullSecrets)
+	assert.Equal(t, desired.Spec.Template.Spec.InitContainers, obj.Spec.Template.Spec.InitContainers)
 	assert.Equal(t, desired.Spec.Template.Spec.Containers, obj.Spec.Template.Spec.Containers)
+}
+
+func TestUpdateDaemonSetFields_PreservesTemplateGenerationAnnotation(t *testing.T) {
+	obj := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"deprecated.daemonset.template.generation": "42",
+				"old": "remove",
+			},
+		},
+	}
+	desired := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"managed": "true",
+			},
+		},
+	}
+
+	UpdateDaemonSetFields(obj, desired)
+
+	assert.Equal(t, map[string]string{
+		"deprecated.daemonset.template.generation": "42",
+		"managed": "true",
+	}, obj.Annotations)
+}
+
+func TestUpdateDaemonSetFields_PreservesUnmanagedUpdateStrategy(t *testing.T) {
+	existing := appsv1.DaemonSetUpdateStrategy{
+		Type: appsv1.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateDaemonSet{
+			MaxUnavailable: ptrIntOrString(intstr.FromInt(1)),
+			MaxSurge:       ptrIntOrString(intstr.FromInt(0)),
+		},
+	}
+	obj := &appsv1.DaemonSet{Spec: appsv1.DaemonSetSpec{UpdateStrategy: existing}}
+	desired := &appsv1.DaemonSet{}
+
+	UpdateDaemonSetFields(obj, desired)
+
+	assert.Equal(t, existing, obj.Spec.UpdateStrategy)
+}
+
+func TestUpdateDaemonSetFields_PreservesServerDefaultedMaxSurge(t *testing.T) {
+	obj := &appsv1.DaemonSet{
+		Spec: appsv1.DaemonSetSpec{
+			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
+				Type: appsv1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDaemonSet{
+					MaxUnavailable: ptrIntOrString(intstr.FromString("10%")),
+					MaxSurge:       ptrIntOrString(intstr.FromInt(0)),
+				},
+			},
+		},
+	}
+	desired := &appsv1.DaemonSet{
+		Spec: appsv1.DaemonSetSpec{
+			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
+				Type: appsv1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDaemonSet{
+					MaxUnavailable: ptrIntOrString(intstr.FromString("10%")),
+				},
+			},
+		},
+	}
+
+	UpdateDaemonSetFields(obj, desired)
+
+	assert.Equal(t, ptrIntOrString(intstr.FromInt(0)), obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge)
+}
+
+func ptrIntOrString(value intstr.IntOrString) *intstr.IntOrString {
+	return &value
 }

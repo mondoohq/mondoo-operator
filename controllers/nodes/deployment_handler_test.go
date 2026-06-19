@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
@@ -489,6 +490,64 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_Switch() {
 	// Verify node garbage collection cronjob does not exist (removed in simplification)
 	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
 	s.Error(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_ScannerSets() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_DaemonSet
+	s.auditConfig.Spec.Nodes.ScannerSets = []v1alpha2.NodeScannerSet{
+		{
+			Name: "control-plane",
+			NodeSelector: map[string]string{
+				"node-role.kubernetes.io/master": "true",
+			},
+			Tolerations: []corev1.Toleration{
+				{Key: "node-role.kubernetes.io/master", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule},
+			},
+		},
+		{
+			Name: "workers",
+			NodeSelector: map[string]string{
+				"node-role.kubernetes.io/worker": "true",
+			},
+		},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	controlPlane := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetNameForScannerSet(s.auditConfig.Name, "control-plane"), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(controlPlane), controlPlane))
+	s.Equal("control-plane", controlPlane.Labels["scanner_set"])
+	s.Equal(map[string]string{"node-role.kubernetes.io/master": "true"}, controlPlane.Spec.Template.Spec.NodeSelector)
+	s.Equal(s.auditConfig.Spec.Nodes.ScannerSets[0].Tolerations, controlPlane.Spec.Template.Spec.Tolerations)
+
+	workers := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetNameForScannerSet(s.auditConfig.Name, "workers"), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(workers), workers))
+	s.Equal("workers", workers.Labels["scanner_set"])
+	s.Equal(map[string]string{"node-role.kubernetes.io/worker": "true"}, workers.Spec.Template.Spec.NodeSelector)
+	s.Empty(workers.Spec.Template.Spec.Tolerations)
+
+	legacy := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
+	s.Error(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(legacy), legacy))
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_NodeScannerSetsRequireDaemonSetStyle() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_CronJob
+	s.auditConfig.Spec.Nodes.ScannerSets = []v1alpha2.NodeScannerSet{{Name: "workers"}}
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	_, err := d.Reconcile(s.ctx)
+	s.ErrorContains(err, `nodes.scannerSets requires nodes.style "daemonset"`)
+	s.Require().Len(d.Mondoo.Status.Conditions, 1)
+	s.Equal(v1alpha2.NodeScanningDegraded, d.Mondoo.Status.Conditions[0].Type)
+	s.Equal(corev1.ConditionTrue, d.Mondoo.Status.Conditions[0].Status)
+	s.Equal("NodeScanningUnavailable", d.Mondoo.Status.Conditions[0].Reason)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_UpdateDaemonSets() {
@@ -974,6 +1033,71 @@ func (s *DeploymentHandlerSuite) seedKubeSystemNamespace() {
 		},
 	}
 	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(namespace)
+}
+
+func TestDaemonSetDegraded(t *testing.T) {
+	tests := []struct {
+		name       string
+		generation int64
+		status     appsv1.DaemonSetStatus
+		want       bool
+	}{
+		{
+			name:       "new daemonset not observed yet",
+			generation: 1,
+			status:     appsv1.DaemonSetStatus{},
+		},
+		{
+			name:       "observed with no desired pods",
+			generation: 1,
+			status: appsv1.DaemonSetStatus{
+				ObservedGeneration:     1,
+				DesiredNumberScheduled: 0,
+			},
+			want: true,
+		},
+		{
+			name:       "ready",
+			generation: 1,
+			status: appsv1.DaemonSetStatus{
+				ObservedGeneration:     1,
+				DesiredNumberScheduled: 2,
+				NumberReady:            2,
+			},
+		},
+		{
+			name:       "scheduled but unavailable",
+			generation: 1,
+			status: appsv1.DaemonSetStatus{
+				ObservedGeneration:     1,
+				DesiredNumberScheduled: 2,
+				CurrentNumberScheduled: 2,
+				NumberUnavailable:      1,
+				NumberReady:            1,
+			},
+			want: true,
+		},
+		{
+			name:       "scheduled but not ready",
+			generation: 1,
+			status: appsv1.DaemonSetStatus{
+				ObservedGeneration:     1,
+				DesiredNumberScheduled: 2,
+				CurrentNumberScheduled: 2,
+				NumberReady:            0,
+			},
+			want: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, daemonSetDegraded(&appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: test.generation},
+				Status:     test.status,
+			}))
+		})
+	}
 }
 
 func TestDeploymentHandlerSuite(t *testing.T) {

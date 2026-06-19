@@ -504,6 +504,73 @@ spec:
         value: "container-value"
 ```
 
+Node scanner DaemonSets and runtime-cache scanner DaemonSets can also be split into multiple scanner sets with independent sizing and scheduling. This is useful when control-plane nodes need a smaller footprint or different tolerations than worker nodes:
+
+```yaml
+spec:
+  nodes:
+    enable: true
+    style: daemonset
+    scannerSets:
+      - name: control-plane
+        nodeSelector:
+          node-role.kubernetes.io/control-plane: ""
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+        resources:
+          requests:
+            cpu: 25m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi
+      - name: workers
+        nodeSelector:
+          node-role.kubernetes.io/worker: ""
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: "1"
+            memory: 2Gi
+  containers:
+    runtimeCache:
+      enable: true
+      scannerSets:
+        - name: control-plane
+          nodeSelector:
+            node-role.kubernetes.io/control-plane: ""
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 512Mi
+        - name: workers
+          nodeSelector:
+            node-role.kubernetes.io/worker: ""
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+```
+
+Node scanner sets require `nodes.style: daemonset`. Scanner sets inherit top-level scanner fields and override only the set fields that are provided. Set names must be unique DNS labels with at most 63 characters. With node scanner sets enabled, tolerations are explicit per set or inherited from top-level `nodes.tolerations`; the legacy all-node-taint mirroring behavior is only used for the single node scanner DaemonSet.
+
+After applying a config with scanner sets, verify that the operator rendered one DaemonSet per set:
+
+```bash
+kubectl get daemonsets -n mondoo-operator -l mondoo_cr=mondoo-client
+kubectl get daemonsets -n mondoo-operator -l mondoo_cr=mondoo-client,scanner_set=workers -o yaml
+```
+
 ## Running as a Container
 
 Instead of running locally with `make run`, you can deploy the operator as a container:

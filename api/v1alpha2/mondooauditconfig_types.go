@@ -5,6 +5,7 @@ package v1alpha2
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -436,9 +437,18 @@ const (
 	NodeScanStyle_DaemonSet  NodeScanStyle = "daemonset"
 )
 
+// +kubebuilder:validation:XValidation:rule="!has(self.scannerSets) || size(self.scannerSets) == 0 || self.style == 'daemonset'",message="nodes.scannerSets requires nodes.style daemonset"
 type Nodes struct {
 	Enable    bool                        `json:"enable,omitempty"`
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// ScannerSets configures multiple node-targeted scanner workloads with
+	// independent resources and scheduling constraints. When omitted, the
+	// top-level Nodes fields render the legacy single scanner workload.
+	// Only supported when Style is "daemonset".
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	ScannerSets []NodeScannerSet `json:"scannerSets,omitempty"`
 	// Schedule specifies a custom crontab schedule for the node scanning job. If not specified, the default schedule is
 	// used. Only applicable for CronJob style
 	Schedule string `json:"schedule,omitempty"`
@@ -452,8 +462,56 @@ type Nodes struct {
 	Style NodeScanStyle `json:"style,omitempty"`
 	// PriorityClassName specifies the name of the PriorityClass for the node scanning workloads.
 	PriorityClassName string `json:"priorityClassName,omitempty"`
+	// NodeSelector limits which nodes run node scanner DaemonSet pods.
+	// Only applicable for DaemonSet style.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// Affinity configures scheduling affinity for node scanner DaemonSet pods.
+	// Only applicable for DaemonSet style.
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+	// Tolerations configures taint tolerations for node scanner DaemonSet pods.
+	// When omitted, the operator preserves the legacy behavior of mirroring
+	// node taints so the single DaemonSet can run on all nodes.
+	// Only applicable for DaemonSet style.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
+// NodeScannerSet configures a scanner workload for a subset of nodes.
+type NodeScannerSet struct {
+	// Name identifies this scanner set and is used in generated workload names.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Resources configures scanner resource requests and limits for this set.
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// NodeSelector limits this scanner set to matching nodes.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Affinity configures scheduling affinity for this scanner set.
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// Tolerations configures taint tolerations for this scanner set.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// PriorityClassName specifies the PriorityClass for this scanner set.
+	// +optional
+	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// Env allows setting extra environment variables for this scanner set.
+	// Values override the inherited node scanner env variables with the same name.
+	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
@@ -480,6 +538,150 @@ type Containers struct {
 	// scanning — cluster-specific fields (ClusterName, etc.) are ignored for registry auth.
 	// +optional
 	WorkloadIdentity *WorkloadIdentityConfig `json:"workloadIdentity,omitempty"`
+
+	// RuntimeCache configures node-local runtime cache image scanning. This scanner reuses
+	// images already present on each node and does not pull from registries or read imagePullSecrets.
+	// +optional
+	RuntimeCache RuntimeCacheScanner `json:"runtimeCache,omitempty"`
+}
+
+// RuntimeCacheScannerMode specifies how the runtime cache scanner is deployed.
+type RuntimeCacheScannerMode string
+
+const (
+	RuntimeCacheScannerMode_DaemonSet RuntimeCacheScannerMode = "daemonset"
+)
+
+// RuntimeCacheScanner configures node-local runtime cache image scanning.
+type RuntimeCacheScanner struct {
+	// Enable enables node-local runtime cache image scanning.
+	Enable bool `json:"enable,omitempty"`
+
+	// Mode specifies how the runtime cache scanner is deployed.
+	// +kubebuilder:validation:Enum=daemonset
+	// +kubebuilder:default=daemonset
+	Mode RuntimeCacheScannerMode `json:"mode,omitempty"`
+
+	// ServiceAccountName is the service account used by the runtime cache scanner.
+	// This service account only needs pod, namespace, and node list/watch permissions.
+	// +kubebuilder:default=mondoo-operator-runtime-cache-scanning
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+
+	// Resources configures scanner resource requests and limits.
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// ScannerSets configures multiple runtime cache scanner workloads with
+	// independent resources and scheduling constraints. When omitted, the
+	// top-level runtimeCache fields render the legacy single scanner DaemonSet.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	ScannerSets []NodeScannerSet `json:"scannerSets,omitempty"`
+
+	// ScanOnlyInUse restricts scans to images referenced by pods on the node.
+	// +kubebuilder:default=true
+	ScanOnlyInUse *bool `json:"scanOnlyInUse,omitempty"`
+
+	// AllowPull must remain false. Runtime cache scanning only scans node-local image content.
+	// +kubebuilder:validation:Enum=false
+	// +kubebuilder:default=false
+	AllowPull bool `json:"allowPull,omitempty"`
+
+	// IntervalTimer is the interval in seconds for cnspec serve to rescan runtime cache images.
+	// The operator applies it when the selected scanner image supports the serve timer flag.
+	// +kubebuilder:validation:Minimum=60
+	// +kubebuilder:default=14400
+	IntervalTimer int `json:"intervalTimer,omitempty"`
+
+	// TempStorageSize configures the emptyDir size limit for the scanner /tmp volume.
+	// Increase this when cached image exports need more scratch space on each node.
+	// +kubebuilder:default="1Gi"
+	// +optional
+	TempStorageSize *resource.Quantity `json:"tempStorageSize,omitempty"`
+
+	// MaxConcurrentImageScans bounds concurrent image scan work per node.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	MaxConcurrentImageScans int `json:"maxConcurrentImageScans,omitempty"`
+
+	// MaxConcurrentLayerReaders bounds concurrent runtime layer readers per node.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=2
+	MaxConcurrentLayerReaders int `json:"maxConcurrentLayerReaders,omitempty"`
+
+	// Delegates is the explicit list of node runtime endpoints the scanner may inspect.
+	// +optional
+	Delegates []RuntimeCacheDelegate `json:"delegates,omitempty"`
+
+	// NodeSelector limits which nodes run the runtime cache scanner.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Affinity configures scheduling affinity for the runtime cache scanner.
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// Tolerations configures taint tolerations for the runtime cache scanner.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// PriorityClassName specifies the PriorityClass for runtime cache scanner pods.
+	// +optional
+	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// Env allows setting extra environment variables for the runtime cache scanner.
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
+// RuntimeCacheDelegateKind specifies a supported runtime delegate kind.
+type RuntimeCacheDelegateKind string
+
+const (
+	RuntimeCacheDelegateKind_CRI        RuntimeCacheDelegateKind = "cri"
+	RuntimeCacheDelegateKind_Containerd RuntimeCacheDelegateKind = "containerd"
+	RuntimeCacheDelegateKind_CRIO       RuntimeCacheDelegateKind = "crio"
+	RuntimeCacheDelegateKind_Docker     RuntimeCacheDelegateKind = "docker"
+	RuntimeCacheDelegateKind_Podman     RuntimeCacheDelegateKind = "podman"
+)
+
+// RuntimeCacheDelegate configures a node runtime endpoint the scanner may inspect.
+type RuntimeCacheDelegate struct {
+	// Name is the stable delegate identifier.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=63
+	Name string `json:"name"`
+
+	// Kind is the runtime delegate kind. Currently only containerd is supported.
+	// +kubebuilder:validation:Enum=containerd
+	Kind RuntimeCacheDelegateKind `json:"kind"`
+
+	// Endpoint is reserved for future runtime delegates. For the current containerd delegate,
+	// the operator derives the in-container endpoint from HostPath.
+	// +optional
+	Endpoint string `json:"endpoint,omitempty"`
+
+	// HostPath is the absolute node path to the runtime socket.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^/.*`
+	HostPath string `json:"hostPath"`
+
+	// Priority controls delegate order. Lower values are tried first.
+	Priority int `json:"priority,omitempty"`
+
+	// Namespaces limits runtime namespaces, for example k8s.io for containerd.
+	// +optional
+	Namespaces []string `json:"namespaces,omitempty"`
+
+	// Snapshotters limits snapshotters inspected by this delegate.
+	// +optional
+	Snapshotters []string `json:"snapshotters,omitempty"`
+
+	// ReadOnly controls whether the delegate is used read-only.
+	// +kubebuilder:default=true
+	// +optional
+	ReadOnly *bool `json:"readOnly,omitempty"`
 }
 
 // DeprecatedAdmission exists for backward compatibility during upgrades.
@@ -578,6 +780,8 @@ const (
 	K8sResourcesScanningDegraded MondooAuditConfigConditionType = "K8sResourcesScanningDegraded"
 	// Indicates weather Kubernetes container image scanning is Degraded
 	K8sContainerImageScanningDegraded MondooAuditConfigConditionType = "K8sContainerImageScanningDegraded"
+	// Indicates whether node-local runtime cache image scanning is degraded
+	RuntimeCacheScanningDegraded MondooAuditConfigConditionType = "RuntimeCacheScanningDegraded"
 	// Indicates whether the resource watcher is Degraded
 	ResourceWatcherDegraded MondooAuditConfigConditionType = "ResourceWatcherDegraded"
 	// Indicates weather the operator itself is Degraded
