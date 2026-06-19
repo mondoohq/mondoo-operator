@@ -168,7 +168,7 @@ func TestResources(t *testing.T) {
 				},
 			}
 			mac := test.mondooauditconfig()
-			cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+			cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 			assert.Equal(t, test.expectedResources, cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Resources)
 		})
 	}
@@ -179,7 +179,7 @@ func TestCronJob_HasReportTypeNone(t *testing.T) {
 	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
 	cfg := v1alpha2.MondooOperatorConfig{}
 
-	cj := CronJob("test-image:latest", node, m, false, cfg)
+	cj := CronJob("test-image:latest", constants.BusyBoxImage, node, m, false, cfg)
 	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
 
 	cmd := strings.Join(container.Command, " ")
@@ -366,7 +366,7 @@ func TestResources_GOMemoryTuning(t *testing.T) {
 				},
 			}
 			mac := test.mondooauditconfig()
-			cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+			cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 			envMap := envToMap(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 			assert.Equal(t, test.expectedGoMemLimit, envMap["GOMEMLIMIT"])
 			assert.Equal(t, test.expectedGoGC, envMap["GOGC"])
@@ -376,7 +376,7 @@ func TestResources_GOMemoryTuning(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			mac := *test.mondooauditconfig()
-			ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
+			ds := DaemonSet(mac, false, "test123", constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{}, nil)
 			envMap := envToMap(ds.Spec.Template.Spec.Containers[0].Env)
 			assert.Equal(t, test.expectedGoMemLimit, envMap["GOMEMLIMIT"])
 			assert.Equal(t, test.expectedGoGC, envMap["GOGC"])
@@ -391,7 +391,7 @@ func TestCronJob_PrivilegedOpenshift(t *testing.T) {
 		},
 	}
 	mac := testMondooAuditConfig()
-	cj := CronJob("test123", testNode, mac, true, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, true, v1alpha2.MondooOperatorConfig{})
 	sc := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext
 	assert.True(t, *sc.Privileged)
 	assert.True(t, *sc.AllowPrivilegeEscalation)
@@ -405,7 +405,7 @@ func TestCronJob_Privileged(t *testing.T) {
 		},
 	}
 	mac := testMondooAuditConfig()
-	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 	sc := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext
 	assert.False(t, *sc.Privileged)
 	assert.False(t, *sc.AllowPrivilegeEscalation)
@@ -434,7 +434,7 @@ func TestCronJob_JobOverrides(t *testing.T) {
 		},
 	}
 
-	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 	assert.Equal(t, ptr.To(int32(300)), cj.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
 
 	// User labels are applied
@@ -503,7 +503,7 @@ func TestDaemonSet_Capabilities(t *testing.T) {
 	mac := testMondooAuditConfig()
 
 	t.Run("non-OpenShift adds proc capabilities", func(t *testing.T) {
-		ds := DaemonSet(*mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
+		ds := DaemonSet(*mac, false, "test123", constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{}, nil)
 		sc := ds.Spec.Template.Spec.Containers[0].SecurityContext
 		assert.False(t, *sc.Privileged)
 		assert.Contains(t, sc.Capabilities.Add, corev1.Capability("DAC_READ_SEARCH"))
@@ -512,7 +512,7 @@ func TestDaemonSet_Capabilities(t *testing.T) {
 	})
 
 	t.Run("OpenShift runs privileged without extra capabilities", func(t *testing.T) {
-		ds := DaemonSet(*mac, true, "test123", v1alpha2.MondooOperatorConfig{}, nil)
+		ds := DaemonSet(*mac, true, "test123", constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{}, nil)
 		sc := ds.Spec.Template.Spec.Containers[0].SecurityContext
 		assert.True(t, *sc.Privileged)
 		assert.Empty(t, sc.Capabilities.Add)
@@ -607,6 +607,9 @@ func TestInventory(t *testing.T) {
 	inventory, err := Inventory("", testClusterUID, auditConfig)
 	assert.NoError(t, err, "unexpected error generating inventory")
 	assert.NotContains(t, inventory, constants.MondooAssetsIntegrationLabel)
+	assert.NotContains(t, inventory, "{{")
+	assert.Contains(t, inventory, nodeInventoryNodeNamePlaceholder)
+	assert.Contains(t, inventory, fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/%s", testClusterUID, nodeInventoryNodeNamePlaceholder))
 
 	const integrationMRN = "//test-MRN"
 	inventory, err = Inventory(integrationMRN, testClusterUID, auditConfig)
@@ -649,7 +652,7 @@ func TestCronJob_WithProxy(t *testing.T) {
 		},
 	}
 
-	cj := CronJob("test123", testNode, mac, false, cfg)
+	cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, cfg)
 	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
 
 	cmdStr := strings.Join(container.Command, " ")
@@ -659,6 +662,35 @@ func TestCronJob_WithProxy(t *testing.T) {
 	envMap := envToMap(container.Env)
 	assert.Equal(t, "http://proxy:8080", envMap["HTTP_PROXY"])
 	assert.Equal(t, "https://proxy:8443", envMap["HTTPS_PROXY"])
+}
+
+func TestCronJob_UsesInventoryFileFlag(t *testing.T) {
+	testNode := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-name"}}
+	mac := testMondooAuditConfig()
+
+	cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	mainCommand := strings.Join(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command, " ")
+
+	assert.Contains(t, mainCommand, "cnspec scan local")
+	assert.Contains(t, mainCommand, "--inventory-file")
+	assert.Contains(t, mainCommand, nodeInventoryRenderedPath)
+	assert.NotContains(t, mainCommand, "/bin/sh")
+	assert.NotContains(t, mainCommand, "sed")
+	assert.NotContains(t, mainCommand, "--inventory-template")
+
+	initContainers := cj.Spec.JobTemplate.Spec.Template.Spec.InitContainers
+	require.Len(t, initContainers, 1)
+	init := initContainers[0]
+	assert.Equal(t, "render-node-inventory", init.Name)
+	assert.Equal(t, constants.BusyBoxImage, init.Image)
+	initCommand := strings.Join(init.Command, " ")
+	assert.Contains(t, initCommand, "/bin/sh -ec")
+	assert.Contains(t, initCommand, "sed")
+	assert.Contains(t, initCommand, nodeInventoryNodeNamePlaceholder)
+	assert.Contains(t, initCommand, nodeInventoryTemplatePath)
+	assert.Contains(t, initCommand, nodeInventoryRenderedPath)
+	envMap := envToMap(init.Env)
+	assert.Equal(t, "test-node-name", envMap["NODE_NAME"])
 }
 
 func TestCronJob_SkipProxyForCnspec(t *testing.T) {
@@ -671,7 +703,7 @@ func TestCronJob_SkipProxyForCnspec(t *testing.T) {
 		},
 	}
 
-	cj := CronJob("test123", testNode, mac, false, cfg)
+	cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, cfg)
 	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
 
 	cmdStr := strings.Join(container.Command, " ")
@@ -693,7 +725,7 @@ func TestCronJob_WithImagePullSecrets(t *testing.T) {
 		},
 	}
 
-	cj := CronJob("test123", testNode, mac, false, cfg)
+	cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, cfg)
 	secrets := cj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets
 	require.Len(t, secrets, 1)
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
@@ -743,7 +775,7 @@ func TestDaemonSet_WithProxy(t *testing.T) {
 		},
 	}
 
-	ds := DaemonSet(mac, false, "test123", cfg, nil)
+	ds := DaemonSet(mac, false, "test123", constants.BusyBoxImage, cfg, nil)
 	container := ds.Spec.Template.Spec.Containers[0]
 
 	cmdStr := strings.Join(container.Command, " ")
@@ -755,6 +787,36 @@ func TestDaemonSet_WithProxy(t *testing.T) {
 	assert.Equal(t, "https://proxy:8443", envMap["HTTPS_PROXY"])
 }
 
+func TestDaemonSet_UsesInventoryFileFlag(t *testing.T) {
+	mac := *testMondooAuditConfig()
+
+	ds := DaemonSet(mac, false, "test123", constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{}, nil)
+	mainCommand := strings.Join(ds.Spec.Template.Spec.Containers[0].Command, " ")
+
+	assert.Contains(t, mainCommand, "cnspec serve")
+	assert.Contains(t, mainCommand, "--inventory-file")
+	assert.Contains(t, mainCommand, nodeInventoryRenderedPath)
+	assert.NotContains(t, mainCommand, "/bin/sh")
+	assert.NotContains(t, mainCommand, "sed")
+	assert.NotContains(t, mainCommand, "--inventory-template")
+
+	initContainers := ds.Spec.Template.Spec.InitContainers
+	require.Len(t, initContainers, 1)
+	init := initContainers[0]
+	assert.Equal(t, "render-node-inventory", init.Name)
+	assert.Equal(t, constants.BusyBoxImage, init.Image)
+	initCommand := strings.Join(init.Command, " ")
+	assert.Contains(t, initCommand, "/bin/sh -ec")
+	assert.Contains(t, initCommand, "sed")
+	assert.Contains(t, initCommand, nodeInventoryNodeNamePlaceholder)
+	assert.Contains(t, initCommand, nodeInventoryTemplatePath)
+	assert.Contains(t, initCommand, nodeInventoryRenderedPath)
+	require.Len(t, init.Env, 1)
+	require.NotNil(t, init.Env[0].ValueFrom)
+	require.NotNil(t, init.Env[0].ValueFrom.FieldRef)
+	assert.Equal(t, "spec.nodeName", init.Env[0].ValueFrom.FieldRef.FieldPath)
+}
+
 func TestDaemonSet_SkipProxyForCnspec(t *testing.T) {
 	mac := *testMondooAuditConfig()
 	cfg := v1alpha2.MondooOperatorConfig{
@@ -764,7 +826,7 @@ func TestDaemonSet_SkipProxyForCnspec(t *testing.T) {
 		},
 	}
 
-	ds := DaemonSet(mac, false, "test123", cfg, nil)
+	ds := DaemonSet(mac, false, "test123", constants.BusyBoxImage, cfg, nil)
 	container := ds.Spec.Template.Spec.Containers[0]
 
 	cmdStr := strings.Join(container.Command, " ")
@@ -785,7 +847,7 @@ func TestDaemonSet_WithImagePullSecrets(t *testing.T) {
 		},
 	}
 
-	ds := DaemonSet(mac, false, "test123", cfg, nil)
+	ds := DaemonSet(mac, false, "test123", constants.BusyBoxImage, cfg, nil)
 	secrets := ds.Spec.Template.Spec.ImagePullSecrets
 	require.Len(t, secrets, 1)
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
