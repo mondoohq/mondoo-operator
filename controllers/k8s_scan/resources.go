@@ -14,6 +14,7 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
+	"go.mondoo.com/mondoo-operator/pkg/utils/gomemlimit"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	mondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mql/v13/providers-sdk/v1/inventory"
@@ -67,8 +68,12 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 		}
 	}
 
+	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources, k8s.DefaultK8sResourceScanningResources)
+	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
+
 	envVars := buildEnvVars(cfg)
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
+	envVars = append(envVars, corev1.EnvVar{Name: "GOMEMLIMIT", Value: gcLimit})
 
 	cronjob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -96,7 +101,7 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 									ImagePullPolicy: corev1.PullIfNotPresent,
 									Name:            "mondoo-k8s-scan",
 									Command:         cmd,
-									Resources:       k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources, k8s.DefaultK8sResourceScanningResources),
+									Resources:       containerResources,
 									SecurityContext: &corev1.SecurityContext{
 										AllowPrivilegeEscalation: ptr.To(false),
 										ReadOnlyRootFilesystem:   ptr.To(true),
@@ -173,6 +178,11 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 		},
 	}
 
+	if d := m.Spec.KubernetesResources.ActiveDeadline; d != nil {
+		seconds := int64(d.Seconds())
+		cronjob.Spec.JobTemplate.Spec.ActiveDeadlineSeconds = &seconds
+	}
+
 	// Add imagePullSecrets from MondooOperatorConfig
 	if len(cfg.Spec.ImagePullSecrets) > 0 {
 		cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = append(
@@ -200,9 +210,13 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 		}
 	}
 
+	extContainerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources, k8s.DefaultK8sResourceScanningResources)
+	extGcLimit := gomemlimit.CalculateGoMemLimit(extContainerResources)
+
 	envVars := buildEnvVars(cfg)
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_TMP_DIR", Value: "/tmp"})
+	envVars = append(envVars, corev1.EnvVar{Name: "GOMEMLIMIT", Value: extGcLimit})
 	// Point KUBECONFIG to the mounted kubeconfig file
 	envVars = append(envVars, corev1.EnvVar{Name: "KUBECONFIG", Value: "/etc/opt/mondoo/kubeconfig/kubeconfig"})
 
@@ -452,7 +466,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 									ImagePullPolicy: corev1.PullIfNotPresent,
 									Name:            "mondoo-k8s-scan",
 									Command:         cmd,
-									Resources:       k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources, k8s.DefaultK8sResourceScanningResources),
+									Resources:       extContainerResources,
 									SecurityContext: &corev1.SecurityContext{
 										AllowPrivilegeEscalation: ptr.To(false),
 										ReadOnlyRootFilesystem:   ptr.To(true),
@@ -479,6 +493,11 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
 			FailedJobsHistoryLimit:     ptr.To(int32(1)),
 		},
+	}
+
+	if d := m.Spec.KubernetesResources.ActiveDeadline; d != nil {
+		seconds := int64(d.Seconds())
+		cronjob.Spec.JobTemplate.Spec.ActiveDeadlineSeconds = &seconds
 	}
 
 	// Add imagePullSecrets from MondooOperatorConfig
