@@ -394,6 +394,40 @@ func TestDaemonSet_WithImagePullSecrets(t *testing.T) {
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
 }
 
+func TestDaemonSet_WithNodeLabelSelector(t *testing.T) {
+	mac := *testMondooAuditConfig()
+	mac.Spec.Nodes.LabelSelector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{"pool": "platform"},
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "upgrade",
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values:   []string{"paused"},
+			},
+		},
+	}
+
+	ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
+
+	require.NotNil(t, ds.Spec.Template.Spec.Affinity)
+	require.NotNil(t, ds.Spec.Template.Spec.Affinity.NodeAffinity)
+	nodeSelector := ds.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+	require.NotNil(t, nodeSelector)
+	require.Len(t, nodeSelector.NodeSelectorTerms, 1)
+	assert.ElementsMatch(t, []corev1.NodeSelectorRequirement{
+		{
+			Key:      "pool",
+			Operator: corev1.NodeSelectorOpIn,
+			Values:   []string{"platform"},
+		},
+		{
+			Key:      "upgrade",
+			Operator: corev1.NodeSelectorOpNotIn,
+			Values:   []string{"paused"},
+		},
+	}, nodeSelector.NodeSelectorTerms[0].MatchExpressions)
+}
+
 // envToMap converts a slice of EnvVar to a map for easy lookup.
 func envToMap(envVars []corev1.EnvVar) map[string]string {
 	m := make(map[string]string, len(envVars))
