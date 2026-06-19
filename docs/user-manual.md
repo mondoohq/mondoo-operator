@@ -599,6 +599,143 @@ spec:
 >         ephemeral-storage: "10Gi"
 > ```
 
+### Node-local runtime cache scanning
+
+Runtime cache scanning runs a node-local DaemonSet that scans container images already present in the node runtime cache. This mode does not pull images from registries and does not need image pull secrets, so it can scan images from protected registries as long as those images are already in use on the node.
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  containers:
+    runtimeCache:
+      enable: true
+      scanOnlyInUse: true
+      allowPull: false
+      intervalTimer: 14400
+      tempStorageSize: 1Gi
+      maxConcurrentImageScans: 1
+      maxConcurrentLayerReaders: 2
+      delegates:
+        - name: containerd-cri
+          kind: containerd
+          hostPath: /run/containerd/containerd.sock
+          priority: 10
+          namespaces:
+            - k8s.io
+```
+
+Runtime cache delegate fields:
+
+| Field | Description |
+|-------|-------------|
+| `name` | Stable delegate name used in generated volume names |
+| `kind` | Runtime kind. This release supports `containerd`; other runtime delegates are reserved for future support |
+| `hostPath` | Absolute path to the node runtime socket |
+| `endpoint` | Reserved for future runtime delegates. For `containerd`, the operator derives the in-container endpoint from `hostPath` |
+| `priority` | Lower values are tried first |
+| `namespaces` | Runtime namespaces to inspect, such as `k8s.io` for containerd |
+| `snapshotters` | Optional snapshotter allowlist |
+| `readOnly` | Defaults to `true`; keep this enabled for runtime sockets |
+
+Runtime cache scanning is intentionally node-local:
+
+- It scans image content from the runtime cache on the node where the scanner pod runs.
+- It only scans images referenced by pods on that node when `scanOnlyInUse: true`.
+- It keeps `allowPull: false`; registry pulls are not performed by this scanner.
+- It uses a read-only hostPath mount for each configured runtime socket.
+- It interprets `intervalTimer` in seconds and converts it to the scanner's minute-based timer for timer-capable scanner images. The default scanner tag supports this; the default `14400` scans every four hours.
+- It uses `tempStorageSize` for the scanner `/tmp` `emptyDir` size limit. Increase it when large cached images need more temporary export space.
+
+### Scanner sets for node-targeted scanners
+
+Use `scannerSets` when different node pools need different resources, tolerations, node selectors, priority classes, or environment variables. This is supported for node scanner DaemonSets and runtime cache scanner DaemonSets.
+
+Node scanner sets require `nodes.style: daemonset`:
+
+```yaml
+spec:
+  nodes:
+    enable: true
+    style: daemonset
+    scannerSets:
+      - name: control-plane
+        nodeSelector:
+          node-role.kubernetes.io/control-plane: ""
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+        resources:
+          requests:
+            cpu: 25m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi
+      - name: workers
+        nodeSelector:
+          node-role.kubernetes.io/worker: ""
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: "1"
+            memory: 2Gi
+```
+
+When `nodes.scannerSets` is configured, tolerations are explicit: each set uses its own `tolerations`, or the top-level `nodes.tolerations` when the set omits them. The legacy behavior that mirrors all node taints only applies to the single node scanner DaemonSet when `nodes.scannerSets` is omitted.
+
+Runtime cache scanner sets use the same set fields under `containers.runtimeCache.scannerSets`:
+
+```yaml
+spec:
+  containers:
+    runtimeCache:
+      enable: true
+      scanOnlyInUse: true
+      allowPull: false
+      delegates:
+        - name: containerd-cri
+          kind: containerd
+          hostPath: /run/containerd/containerd.sock
+          namespaces:
+            - k8s.io
+      scannerSets:
+        - name: control-plane
+          nodeSelector:
+            node-role.kubernetes.io/control-plane: ""
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 512Mi
+        - name: workers
+          nodeSelector:
+            node-role.kubernetes.io/worker: ""
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+```
+
+When `scannerSets` is configured, the operator creates one DaemonSet per set and deletes the legacy single DaemonSet for that scanner. Set names must be DNS label compatible, at most 63 characters, and unique within the scanner. Scanner sets inherit top-level scanner fields and override them only when a set field is provided. If `scannerSets` is omitted, the operator keeps the legacy single-DaemonSet behavior and uses the top-level scheduling and resource fields.
+
 ### Creating a secret for private image scanning
 
 To allow the Mondoo operator to scan private images, it needs access to image pull secrets for these private registries.

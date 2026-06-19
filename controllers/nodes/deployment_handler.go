@@ -5,8 +5,10 @@ package nodes
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -18,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -40,11 +43,15 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 	}
 
 	var syncErr error
-	switch n.Mondoo.Spec.Nodes.Style {
-	case v1alpha2.NodeScanStyle_CronJob:
-		syncErr = n.syncCronJob(ctx)
-	case v1alpha2.NodeScanStyle_Deployment, v1alpha2.NodeScanStyle_DaemonSet:
-		syncErr = n.syncDaemonSet(ctx)
+	if len(n.Mondoo.Spec.Nodes.ScannerSets) > 0 && n.Mondoo.Spec.Nodes.Style != v1alpha2.NodeScanStyle_DaemonSet {
+		syncErr = fmt.Errorf("nodes.scannerSets requires nodes.style %q", v1alpha2.NodeScanStyle_DaemonSet)
+	} else {
+		switch n.Mondoo.Spec.Nodes.Style {
+		case v1alpha2.NodeScanStyle_CronJob:
+			syncErr = n.syncCronJob(ctx)
+		case v1alpha2.NodeScanStyle_Deployment, v1alpha2.NodeScanStyle_DaemonSet:
+			syncErr = n.syncDaemonSet(ctx)
+		}
 	}
 
 	if syncErr != nil {
@@ -88,12 +95,8 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
-	// Delete DaemonSet if it exists
-	ds := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
-	}
-	if err := k8s.DeleteIfExists(ctx, n.KubeClient, ds); err != nil {
-		logger.Error(err, "Failed to clean up node scanning DaemonSet", "namespace", ds.Namespace, "name", ds.Name)
+	if err := n.cleanupOrphanedDaemonSets(ctx, map[string]struct{}{}); err != nil {
+		logger.Error(err, "Failed to clean up node scanning DaemonSets")
 		return err
 	}
 
@@ -174,6 +177,9 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 }
 
 func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
+	if err := validateScannerSets("nodes.scannerSets", n.Mondoo.Spec.Nodes.ScannerSets); err != nil {
+		return err
+	}
 	mondooClientImage, err := n.ContainerImageResolver.CnspecImage(
 		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.Mondoo.Spec.Scanner.Image.Digest, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
@@ -222,32 +228,47 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		}
 	}
 
-	tolerations := make(map[corev1.Toleration]struct{})
-	for _, node := range nodes.Items {
-		for _, toleration := range k8s.TaintsToTolerations(node.Spec.Taints) {
-			tolerations[toleration] = struct{}{}
+	var inheritedTolerations []corev1.Toleration
+	if len(n.Mondoo.Spec.Nodes.ScannerSets) == 0 {
+		tolerations := make(map[corev1.Toleration]struct{})
+		for _, node := range nodes.Items {
+			for _, toleration := range k8s.TaintsToTolerations(node.Spec.Taints) {
+				tolerations[toleration] = struct{}{}
+			}
 		}
+		inheritedTolerations = slices.Collect(maps.Keys(tolerations))
 	}
 
-	desired := DaemonSet(*n.Mondoo, n.IsOpenshift, mondooClientImage, *n.MondooOperatorConfig, slices.Collect(maps.Keys(tolerations)))
-	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
-	op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, ds, n.Mondoo, logger, func() error {
-		k8s.UpdateDaemonSetFields(ds, desired)
-		return nil
-	})
-	if err != nil {
-		return err
-	}
+	desiredSets := n.desiredDaemonSets(mondooClientImage, inheritedTolerations)
+	expectedNames := map[string]struct{}{}
+	degraded := false
+	created := false
+	for _, desired := range desiredSets {
+		expectedNames[desired.Name] = struct{}{}
+		ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+		op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, ds, n.Mondoo, logger, func() error {
+			k8s.UpdateDaemonSetFields(ds, desired)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		created = created || op == controllerutil.OperationResultCreated
 
-	if op == controllerutil.OperationResultCreated {
+		if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(ds), ds); err != nil {
+			logger.Error(err, "Failed to get DaemonSet", "namespace", ds.Namespace, "name", ds.Name)
+			return err
+		}
+		degraded = degraded || daemonSetDegraded(ds)
+	}
+	if created {
 		if err := mondoo.UpdateMondooAuditConfig(ctx, n.KubeClient, n.Mondoo, logger); err != nil {
 			logger.Error(err, "Failed to update MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
 			return err
 		}
 	}
-
-	if err := n.KubeClient.Get(ctx, client.ObjectKeyFromObject(ds), ds); err != nil {
-		logger.Error(err, "Failed to get DaemonSet", "namespace", ds.Namespace, "name", ds.Name)
+	if err := n.cleanupOrphanedDaemonSets(ctx, expectedNames); err != nil {
+		return err
 	}
 
 	// Get Pods for these Deployments
@@ -262,7 +283,7 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		return err
 	}
 
-	updateNodeConditions(n.Mondoo, ds.Status.CurrentNumberScheduled < ds.Status.DesiredNumberScheduled, pods)
+	updateNodeConditions(n.Mondoo, degraded, pods)
 
 	// Clean up any leftover GC CronJobs from previous versions
 	gcCronJob := &batchv1.CronJob{
@@ -274,6 +295,29 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (n *DeploymentHandler) desiredDaemonSets(image string, inheritedTolerations []corev1.Toleration) []*appsv1.DaemonSet {
+	if len(n.Mondoo.Spec.Nodes.ScannerSets) == 0 {
+		return []*appsv1.DaemonSet{
+			DaemonSet(*n.Mondoo, n.IsOpenshift, image, *n.MondooOperatorConfig, inheritedTolerations),
+		}
+	}
+	out := make([]*appsv1.DaemonSet, 0, len(n.Mondoo.Spec.Nodes.ScannerSets))
+	for _, set := range n.Mondoo.Spec.Nodes.ScannerSets {
+		out = append(out, DaemonSetForScannerSet(*n.Mondoo, n.IsOpenshift, image, *n.MondooOperatorConfig, inheritedTolerations, set))
+	}
+	return out
+}
+
+func daemonSetDegraded(ds *appsv1.DaemonSet) bool {
+	if ds.Status.ObservedGeneration < ds.Generation {
+		return false
+	}
+	if ds.Status.DesiredNumberScheduled == 0 {
+		return true
+	}
+	return ds.Status.NumberUnavailable > 0 || ds.Status.NumberReady < ds.Status.DesiredNumberScheduled
 }
 
 func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string) error {
@@ -363,11 +407,8 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 		}
 	}
 
-	ds := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
-	}
-	if err := k8s.DeleteIfExists(ctx, n.KubeClient, ds); err != nil {
-		logger.Error(err, "Failed to clean up node scanning DaemonSet", "namespace", ds.Namespace, "name", ds.Name)
+	if err := n.cleanupOrphanedDaemonSets(ctx, map[string]struct{}{}); err != nil {
+		logger.Error(err, "Failed to clean up node scanning DaemonSets")
 		return err
 	}
 
@@ -390,6 +431,53 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 	// Update any remnant conditions
 	updateNodeConditions(n.Mondoo, false, &corev1.PodList{})
 
+	return nil
+}
+
+func (n *DeploymentHandler) cleanupOrphanedDaemonSets(ctx context.Context, expectedNames map[string]struct{}) error {
+	legacy := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace}}
+	if _, ok := expectedNames[legacy.Name]; !ok {
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, legacy); err != nil {
+			logger.Error(err, "Failed to clean up legacy node scanning DaemonSet", "namespace", legacy.Namespace, "name", legacy.Name)
+			return err
+		}
+	}
+
+	list := &appsv1.DaemonSetList{}
+	if err := n.KubeClient.List(ctx, list, &client.ListOptions{
+		Namespace:     n.Mondoo.Namespace,
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(*n.Mondoo)),
+	}); err != nil {
+		logger.Error(err, "Failed to list node scanning DaemonSets")
+		return err
+	}
+	for i := range list.Items {
+		ds := &list.Items[i]
+		if _, ok := expectedNames[ds.Name]; ok {
+			continue
+		}
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, ds); err != nil {
+			logger.Error(err, "Failed to clean up node scanning DaemonSet", "namespace", ds.Namespace, "name", ds.Name)
+			return err
+		}
+	}
+	return nil
+}
+
+func validateScannerSets(path string, sets []v1alpha2.NodeScannerSet) error {
+	seen := map[string]struct{}{}
+	for i, set := range sets {
+		if set.Name == "" {
+			return fmt.Errorf("%s[%d].name is required", path, i)
+		}
+		if errs := k8svalidation.IsDNS1123Label(set.Name); len(errs) > 0 {
+			return fmt.Errorf("%s[%s].name must be a valid DNS label: %s", path, set.Name, strings.Join(errs, "; "))
+		}
+		if _, ok := seen[set.Name]; ok {
+			return fmt.Errorf("%s[%s].name must be unique", path, set.Name)
+		}
+		seen[set.Name] = struct{}{}
+	}
 	return nil
 }
 

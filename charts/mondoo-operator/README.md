@@ -49,6 +49,17 @@ helm uninstall mondoo-operator --namespace mondoo-operator
 | Name                                              | Description                                                             | Value |
 | ------------------------------------------------- | ----------------------------------------------------------------------- | ----- |
 | `k8SResourcesScanning.serviceAccount.annotations` | Annotations to add to the Kubernetes resources scanning service account | `{}`  |
+| `k8SResourcesScanning.extraClusterRoleBindingSubjects` | Additional ServiceAccount subjects to bind to the k8s-resources-scanning ClusterRole | `[]` |
+
+### Runtime Cache Scanning Configuration
+
+| Name                                              | Description                                                             | Value |
+| ------------------------------------------------- | ----------------------------------------------------------------------- | ----- |
+| `runtimeCacheScanning.serviceAccount.name` | Name of the runtime cache scanning service account. Defaults to the MondooAuditConfig runtimeCache.serviceAccountName default. | `mondoo-operator-runtime-cache-scanning` |
+| `runtimeCacheScanning.serviceAccount.annotations` | Annotations to add to the runtime cache scanning service account | `{}`  |
+| `runtimeCacheScanning.extraClusterRoleBindingSubjects` | Additional ServiceAccount subjects to bind to the runtime-cache-scanning ClusterRole | `[]` |
+
+When installing the chart with a custom Helm release name, keep `runtimeCacheScanning.serviceAccount.name` aligned with `spec.containers.runtimeCache.serviceAccountName` on each `MondooAuditConfig`. The chart default matches the operator's CRD/controller default so runtime-cache DaemonSets work when the field is omitted.
 
 ### General Configuration
 
@@ -85,4 +96,3 @@ leaderElection:
 | ----------------- | ----------------------------------------------------------------- | ------ |
 | `cleanup.enabled` | Enable or disable the pre-delete cleanup hook                     | `true` |
 | `cleanup.timeout` | Timeout for waiting for MondooAuditConfig resources to be deleted | `2m`   |
-

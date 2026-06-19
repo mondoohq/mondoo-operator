@@ -8,6 +8,8 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 )
 
+const daemonSetTemplateGenerationAnnotation = "deprecated.daemonset.template.generation"
+
 // UpdateCronJobFields copies managed fields from desired to obj,
 // preserving server-set defaults on unmanaged fields like
 // Completions, Parallelism, DNSPolicy, SchedulerName, etc.
@@ -55,6 +57,7 @@ func UpdateDeploymentFields(obj, desired *appsv1.Deployment) {
 	ps := &obj.Spec.Template.Spec
 	dps := &desired.Spec.Template.Spec
 	ps.ServiceAccountName = dps.ServiceAccountName
+	ps.InitContainers = dps.InitContainers
 	ps.Containers = dps.Containers
 	ps.Volumes = dps.Volumes
 	ps.ImagePullSecrets = dps.ImagePullSecrets
@@ -62,20 +65,59 @@ func UpdateDeploymentFields(obj, desired *appsv1.Deployment) {
 
 // UpdateDaemonSetFields copies managed fields from desired to obj,
 // preserving server-set defaults on unmanaged fields like
-// UpdateStrategy, RevisionHistoryLimit, DNSPolicy, etc.
+// RevisionHistoryLimit, DNSPolicy, etc.
 func UpdateDaemonSetFields(obj, desired *appsv1.DaemonSet) {
+	templateGeneration := ""
+	if obj.Annotations != nil {
+		templateGeneration = obj.Annotations[daemonSetTemplateGenerationAnnotation]
+	}
+	existingUpdateStrategy := obj.Spec.UpdateStrategy.DeepCopy()
+
 	obj.Labels = desired.Labels
-	obj.Annotations = desired.Annotations
+	obj.Annotations = copyStringMap(desired.Annotations)
+	if templateGeneration != "" {
+		if obj.Annotations == nil {
+			obj.Annotations = map[string]string{}
+		}
+		if _, ok := obj.Annotations[daemonSetTemplateGenerationAnnotation]; !ok {
+			obj.Annotations[daemonSetTemplateGenerationAnnotation] = templateGeneration
+		}
+	}
 	obj.Spec.Selector = desired.Spec.Selector
+	if desired.Spec.UpdateStrategy.Type == "" && desired.Spec.UpdateStrategy.RollingUpdate == nil {
+		obj.Spec.UpdateStrategy = *existingUpdateStrategy
+	} else {
+		obj.Spec.UpdateStrategy = desired.Spec.UpdateStrategy
+		if existingUpdateStrategy.RollingUpdate != nil &&
+			obj.Spec.UpdateStrategy.RollingUpdate != nil &&
+			obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge == nil {
+			obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge = existingUpdateStrategy.RollingUpdate.MaxSurge
+		}
+	}
 	obj.Spec.Template.Labels = desired.Spec.Template.Labels
 	obj.Spec.Template.Annotations = desired.Spec.Template.Annotations
 
 	ps := &obj.Spec.Template.Spec
 	dps := &desired.Spec.Template.Spec
+	ps.ServiceAccountName = dps.ServiceAccountName
 	ps.PriorityClassName = dps.PriorityClassName
 	ps.AutomountServiceAccountToken = dps.AutomountServiceAccountToken
+	ps.NodeSelector = dps.NodeSelector
+	ps.Affinity = dps.Affinity
 	ps.Tolerations = dps.Tolerations
+	ps.InitContainers = dps.InitContainers
 	ps.Containers = dps.Containers
 	ps.Volumes = dps.Volumes
 	ps.ImagePullSecrets = dps.ImagePullSecrets
+}
+
+func copyStringMap(in map[string]string) map[string]string {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
 }

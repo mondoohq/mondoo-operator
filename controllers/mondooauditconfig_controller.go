@@ -19,6 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,6 +30,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/container_image"
+	"go.mondoo.com/mondoo-operator/controllers/container_image/runtime_cache"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	resourcewatcher "go.mondoo.com/mondoo-operator/controllers/resource_watcher"
@@ -50,6 +52,7 @@ type MondooAuditConfigReconciler struct {
 	ContainerImageResolver mondoo.ContainerImageResolver
 	StatusReporter         *status.StatusReporter
 	RunningOnOpenShift     bool
+	EventRecorder          record.EventRecorder
 }
 
 // so we can mock out the mondoo client for testing
@@ -68,6 +71,7 @@ var MondooClientBuilder = mondooclient.NewClient
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=delete;deletecollection
 //+kubebuilder:rbac:groups=batch,resources=cronjobs;jobs,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=core,resources=pods;namespaces;nodes,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // Need to be able to create/update/delete Secrets for Mondoo service account credentials and Vault kubeconfig
@@ -312,6 +316,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		KubeClient:             r.Client,
 		ContainerImageResolver: imageResolver,
 		MondooOperatorConfig:   config,
+		EventRecorder:          r.EventRecorder,
 	}
 	result, err = containers.Reconcile(ctx)
 	collect(result, err, "Failed to set up container scanning")
@@ -359,8 +364,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	return finalResult, nil
 }
 
-// nodeEventsRequestMapper Maps node events to enqueue all MondooAuditConfigs that have node scanning enabled for
-// reconciliation.
+// nodeEventsRequestMapper maps node events to enqueue MondooAuditConfigs that reconcile node-derived resources.
 func (r *MondooAuditConfigReconciler) nodeEventsRequestMapper(ctx context.Context, o client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 	auditConfigs := &v1alpha2.MondooAuditConfigList{}
@@ -371,8 +375,7 @@ func (r *MondooAuditConfigReconciler) nodeEventsRequestMapper(ctx context.Contex
 	}
 
 	for _, a := range auditConfigs.Items {
-		// Only enqueue the MondooAuditConfig if it has node scanning enabled.
-		if a.Spec.Nodes.Enable {
+		if a.Spec.Nodes.Enable || a.Spec.Containers.RuntimeCache.Enable {
 			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&a)})
 		}
 	}
@@ -404,71 +407,28 @@ func (r *MondooAuditConfigReconciler) cronJobPodsRequestMapper(ctx context.Conte
 
 // isCronJobScanPod checks whether the provided podLabels belong to one of the Mondoo scan CronJobs
 func isCronJobScanPod(a v1alpha2.MondooAuditConfig, podLabels map[string]string) bool {
-	isNodeScanPod := true
-	isResourceScanPod := true
-	isImageScanPod := true
-
-	// Check whether it is a Pod for node scanning
-	if a.Spec.Nodes.Enable {
-		nodeCronJobLabels := nodes.NodeScanningLabels(a)
-		// podLabels should include all of the labels from type of the CronJobs
-		for k, v := range nodeCronJobLabels {
-			if val, ok := podLabels[k]; ok {
-				if val != v {
-					isNodeScanPod = false
-					break
-				}
-			} else {
-				isNodeScanPod = false
-				break
-			}
-		}
+	if a.Spec.Nodes.Enable && scanLabelsMatch(nodes.NodeScanningLabels(a), podLabels) {
+		return true
 	}
-	if isNodeScanPod {
-		return isNodeScanPod
+	if a.Spec.KubernetesResources.Enable && scanLabelsMatch(k8s_scan.CronJobLabels(a), podLabels) {
+		return true
 	}
-
-	// Check whether it is a Pod for k8s resource scanning
-	if a.Spec.KubernetesResources.Enable {
-		resourceCronJobLabels := k8s_scan.CronJobLabels(a)
-		// podLabels should include all of the labels from type of the CronJobs
-		for k, v := range resourceCronJobLabels {
-			if val, ok := podLabels[k]; ok {
-				if val != v {
-					isResourceScanPod = false
-					break
-				}
-			} else {
-				isResourceScanPod = false
-				break
-			}
-		}
+	if (a.Spec.Containers.Enable || a.Spec.KubernetesResources.ContainerImageScanning) && scanLabelsMatch(container_image.CronJobLabels(a), podLabels) {
+		return true
 	}
-	if isResourceScanPod {
-		return isResourceScanPod
+	if a.Spec.Containers.RuntimeCache.Enable && scanLabelsMatch(runtime_cache.Labels(a), podLabels) {
+		return true
 	}
-
-	// Check whether it is a Pod for container image scanning
-	if a.Spec.Containers.Enable {
-		imageCronJobLabels := container_image.CronJobLabels(a)
-		// podLabels should include all of the labels from type of the CronJobs
-		for k, v := range imageCronJobLabels {
-			if val, ok := podLabels[k]; ok {
-				if val != v {
-					isImageScanPod = false
-					break
-				}
-			} else {
-				isImageScanPod = false
-				break
-			}
-		}
-	}
-	if isImageScanPod {
-		return isImageScanPod
-	}
-
 	return false
+}
+
+func scanLabelsMatch(expected, actual map[string]string) bool {
+	for k, v := range expected {
+		if actual[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context.Context, auditConfig *v1alpha2.MondooAuditConfig, cfg *v1alpha2.MondooOperatorConfig, log logr.Logger) error {
@@ -550,6 +510,7 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager, mondooO
 		For(&v1alpha2.MondooAuditConfig{}).
 		Owns(&batchv1.CronJob{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.DaemonSet{}).
 		Watches(
 			&corev1.Pod{},
 			handler.EnqueueRequestsFromMapFunc(r.cronJobPodsRequestMapper),
@@ -562,6 +523,10 @@ func (r *MondooAuditConfigReconciler) SetupWithManager(mgr ctrl.Manager, mondooO
 		b = b.Watches(
 			&v1alpha2.MondooOperatorConfig{},
 			handler.EnqueueRequestsFromMapFunc(r.operatorConfigRequestMapper))
+	}
+	if r.EventRecorder == nil {
+		//nolint:staticcheck // Compatibility with handlers that still use record.EventRecorder.
+		r.EventRecorder = mgr.GetEventRecorderFor("mondooauditconfig-controller")
 	}
 	return b.Complete(r)
 }

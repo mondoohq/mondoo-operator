@@ -8,12 +8,14 @@ import (
 	"fmt"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/controllers/container_image/runtime_cache"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -26,6 +28,7 @@ type DeploymentHandler struct {
 	Mondoo                 *v1alpha2.MondooAuditConfig
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
+	EventRecorder          record.EventRecorder
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
@@ -34,9 +37,27 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		return ctrl.Result{}, err
 	}
 
+	runtimeCache := runtime_cache.DeploymentHandler{
+		Mondoo:                 n.Mondoo,
+		KubeClient:             n.KubeClient,
+		ContainerImageResolver: n.ContainerImageResolver,
+		MondooOperatorConfig:   n.MondooOperatorConfig,
+		EventRecorder:          n.EventRecorder,
+	}
+	runtimeResult, err := runtimeCache.Reconcile(ctx)
+	if err != nil {
+		logger.Error(err, "failed to reconcile runtime cache scanner, continuing with Kubernetes container image scanner")
+	}
+	if runtimeResult.RequeueAfter > 0 {
+		return runtimeResult, err
+	}
+
 	// TODO: KubernetesResources.ContainerImageScanning is a deprecated setting
 	if !n.Mondoo.Spec.KubernetesResources.ContainerImageScanning && !n.Mondoo.Spec.Containers.Enable {
-		return ctrl.Result{}, n.down(ctx)
+		if downErr := n.down(ctx); downErr != nil {
+			return ctrl.Result{}, downErr
+		}
+		return ctrl.Result{}, err
 	}
 
 	// Validate container registry WIF configuration
@@ -60,7 +81,7 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 	if err := n.syncCronJob(ctx); err != nil {
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
 func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
