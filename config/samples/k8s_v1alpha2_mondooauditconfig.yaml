@@ -39,6 +39,14 @@ spec:
       limits:
         cpu: 500m
         memory: 500Mi
+    # Optional: schedule Kubernetes resource scanner pods, including the resource watcher
+    # scheduling:
+    #   nodeSelector:
+    #     nodepool: scanners
+    #   tolerations:
+    #     - key: sriov
+    #       operator: Exists
+    #       effect: NoSchedule
     # For private registries - single secret
     # privateRegistriesPullSecretRef:
     #   name: mondoo-private-registries-secrets
@@ -153,6 +161,14 @@ spec:
       limits:
         cpu: 500m
         memory: 500Mi
+    # Optional: schedule container image scanner pods
+    # scheduling:
+    #   nodeSelector:
+    #     nodepool: scanners
+    #   tolerations:
+    #     - key: sriov
+    #       operator: Exists
+    #       effect: NoSchedule
 
   # Node scanning
   nodes:
@@ -170,6 +186,15 @@ spec:
       limits:
         cpu: 500m
         memory: 500Mi
+    # Optional: schedule node scanner pods.
+    # nodeSelector applies to daemonset style; cronjob style pins each pod with nodeName.
+    # scheduling:
+    #   nodeSelector:
+    #     nodepool: scanners
+    #   tolerations:
+    #     - key: sriov
+    #       operator: Exists
+    #       effect: NoSchedule
 
   # Namespace filtering (applies to K8s resources and container scanning)
   filtering:

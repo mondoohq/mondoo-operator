@@ -346,6 +346,28 @@ func TestExternalClusterCronJob_ActiveDeadline_Unset(t *testing.T) {
 	assert.Nil(t, cj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
 }
 
+func TestCronJob_WithScheduling(t *testing.T) {
+	m := testAuditConfig()
+	m.Spec.Scanner.Scheduling = v1alpha2.PodScheduling{
+		NodeSelector: map[string]string{
+			"nodepool": "scanners",
+		},
+		Tolerations: []corev1.Toleration{
+			{
+				Key:      "sriov",
+				Operator: corev1.TolerationOpExists,
+				Effect:   corev1.TaintEffectNoSchedule,
+			},
+		},
+	}
+
+	cj := CronJob("test-image:latest", m, v1alpha2.MondooOperatorConfig{})
+	podSpec := cj.Spec.JobTemplate.Spec.Template.Spec
+
+	assert.Equal(t, map[string]string{"nodepool": "scanners"}, podSpec.NodeSelector)
+	assert.Equal(t, m.Spec.Scanner.Scheduling.Tolerations, podSpec.Tolerations)
+}
+
 func TestExternalClusterCronJob_WithProxy(t *testing.T) {
 	m := testAuditConfig()
 	cluster := v1alpha2.ExternalCluster{
@@ -419,6 +441,34 @@ func TestExternalClusterCronJob_ImagePullSecrets(t *testing.T) {
 	secrets := cj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets
 	require.Len(t, secrets, 1)
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
+}
+
+func TestExternalClusterCronJob_WithScheduling(t *testing.T) {
+	m := testAuditConfig()
+	m.Spec.Scanner.Scheduling = v1alpha2.PodScheduling{
+		NodeSelector: map[string]string{
+			"nodepool": "scanners",
+		},
+		Tolerations: []corev1.Toleration{
+			{
+				Key:      "sriov",
+				Operator: corev1.TolerationOpExists,
+				Effect:   corev1.TaintEffectNoSchedule,
+			},
+		},
+	}
+	cluster := v1alpha2.ExternalCluster{
+		Name: "remote",
+		KubeconfigSecretRef: &corev1.LocalObjectReference{
+			Name: "kubeconfig-secret",
+		},
+	}
+
+	cj := ExternalClusterCronJob("test-image:latest", cluster, m, v1alpha2.MondooOperatorConfig{})
+	podSpec := cj.Spec.JobTemplate.Spec.Template.Spec
+
+	assert.Equal(t, map[string]string{"nodepool": "scanners"}, podSpec.NodeSelector)
+	assert.Equal(t, m.Spec.Scanner.Scheduling.Tolerations, podSpec.Tolerations)
 }
 
 func TestExternalClusterCronJob_HasMondooTmpDir(t *testing.T) {
