@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -254,6 +255,31 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	s.Error(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_NodeLabelSelector() {
+	s.seedLabeledNodes()
+	d := s.createDeploymentHandler()
+	s.auditConfig.Spec.Nodes.LabelSelector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{"pool": "platform"},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	cronJobs := &batchv1.CronJobList{}
+	listOpts := &client.ListOptions{
+		Namespace:     s.auditConfig.Namespace,
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
+	}
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
+	s.Require().Len(cronJobs.Items, 1)
+	s.Equal(CronJobName(s.auditConfig.Name, "node01"), cronJobs.Items[0].Name)
+
+	excluded := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, "node02"), Namespace: s.auditConfig.Namespace}}
+	s.Error(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(excluded), excluded))
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_CustomEnvVars() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
@@ -369,6 +395,70 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	}
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForNoLongerSelectedNodes() {
+	s.seedLabeledNodes()
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	cronJobs := &batchv1.CronJobList{}
+	listOpts := &client.ListOptions{
+		Namespace:     s.auditConfig.Namespace,
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
+	}
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
+	s.Require().Len(cronJobs.Items, 2)
+
+	d.Mondoo.Spec.Nodes.LabelSelector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{"pool": "platform"},
+	}
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	cronJobs = &batchv1.CronJobList{}
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
+	s.Require().Len(cronJobs.Items, 1)
+	s.Equal(CronJobName(s.auditConfig.Name, "node01"), cronJobs.Items[0].Name)
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_NodeLabelSelectorNoMatchesKeepsConfigAndCleansCronJobs() {
+	s.seedLabeledNodes()
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	cronJobs := &batchv1.CronJobList{}
+	listOpts := &client.ListOptions{
+		Namespace:     s.auditConfig.Namespace,
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(s.auditConfig)),
+	}
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
+	s.Require().Len(cronJobs.Items, 2)
+
+	d.Mondoo.Spec.Nodes.LabelSelector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{"pool": "missing"},
+	}
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	cronJobs = &batchv1.CronJobList{}
+	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
+	s.Empty(cronJobs.Items)
+
+	cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: ConfigMapName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace,
+	}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
@@ -445,6 +535,71 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets() {
 	// Verify node garbage collection cronjob does not exist (removed in simplification)
 	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
 	s.Error(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_NodeLabelSelector() {
+	s.seedLabeledNodes()
+	d := s.createDeploymentHandler()
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	s.auditConfig.Spec.Nodes.LabelSelector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{"pool": "platform"},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
+	s.Require().NotNil(ds.Spec.Template.Spec.Affinity)
+	s.Require().NotNil(ds.Spec.Template.Spec.Affinity.NodeAffinity)
+	nodeSelector := ds.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+	s.Require().NotNil(nodeSelector)
+	s.Require().Len(nodeSelector.NodeSelectorTerms, 1)
+	s.Contains(nodeSelector.NodeSelectorTerms[0].MatchExpressions, corev1.NodeSelectorRequirement{
+		Key:      "pool",
+		Operator: corev1.NodeSelectorOpIn,
+		Values:   []string{"platform"},
+	})
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_DaemonSetNodeLabelSelectorCleansLegacyPerNodeResources() {
+	s.seedLabeledNodes()
+	d := s.createDeploymentHandler()
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	s.auditConfig.Spec.Nodes.LabelSelector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{"pool": "platform"},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	labels := NodeScanningLabels(s.auditConfig)
+	staleDeployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
+		Name:      DeploymentName(s.auditConfig.Name, "node02"),
+		Namespace: s.auditConfig.Namespace,
+		Labels:    labels,
+	}}
+	staleConfigMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name:      ConfigMapNameWithNode(s.auditConfig.Name, "node02"),
+		Namespace: s.auditConfig.Namespace,
+		Labels:    labels,
+	}}
+	s.NoError(d.KubeClient.Create(s.ctx, staleDeployment))
+	s.NoError(d.KubeClient.Create(s.ctx, staleConfigMap))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	err = d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(staleDeployment), staleDeployment)
+	s.True(apierrors.IsNotFound(err))
+	err = d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(staleConfigMap), staleConfigMap)
+	s.True(apierrors.IsNotFound(err))
+
+	cfgMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: ConfigMapName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace,
+	}}
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cfgMap), cfgMap))
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_Switch() {
@@ -964,6 +1119,27 @@ func (s *DeploymentHandlerSuite) seedNodes() {
 	}
 	worker := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node02"}}
 	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(master, worker)
+}
+
+func (s *DeploymentHandlerSuite) seedLabeledNodes() {
+	platform := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "node01",
+			Labels: map[string]string{"pool": "platform"},
+		},
+		Spec: corev1.NodeSpec{
+			Taints: []corev1.Taint{
+				{Key: "node-role.kubernetes.io/master", Value: "true", Effect: corev1.TaintEffectNoExecute},
+			},
+		},
+	}
+	tenant := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "node02",
+			Labels: map[string]string{"pool": "tenant"},
+		},
+	}
+	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(platform, tenant)
 }
 
 func (s *DeploymentHandlerSuite) seedKubeSystemNamespace() {

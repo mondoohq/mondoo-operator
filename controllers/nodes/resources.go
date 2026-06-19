@@ -316,6 +316,12 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 			ds.Spec.Template.Spec.ImagePullSecrets,
 			cfg.Spec.ImagePullSecrets...)
 	}
+	if nodeAffinity := nodeSelectorAffinity(m.Spec.Nodes.LabelSelector); nodeAffinity != nil {
+		if ds.Spec.Template.Spec.Affinity == nil {
+			ds.Spec.Template.Spec.Affinity = &corev1.Affinity{}
+		}
+		ds.Spec.Template.Spec.Affinity.NodeAffinity = nodeAffinity
+	}
 
 	return ds
 }
@@ -427,6 +433,54 @@ func NodeScanningLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 		"app":       "mondoo",
 		"scan":      "nodes",
 		"mondoo_cr": m.Name,
+	}
+}
+
+func nodeSelectorAffinity(selector *metav1.LabelSelector) *corev1.NodeAffinity {
+	if selector == nil || (len(selector.MatchLabels) == 0 && len(selector.MatchExpressions) == 0) {
+		return nil
+	}
+
+	requirements := make([]corev1.NodeSelectorRequirement, 0, len(selector.MatchLabels)+len(selector.MatchExpressions))
+	for key, value := range selector.MatchLabels {
+		requirements = append(requirements, corev1.NodeSelectorRequirement{
+			Key:      key,
+			Operator: corev1.NodeSelectorOpIn,
+			Values:   []string{value},
+		})
+	}
+	for _, expression := range selector.MatchExpressions {
+		requirements = append(requirements, corev1.NodeSelectorRequirement{
+			Key:      expression.Key,
+			Operator: nodeSelectorOperator(expression.Operator),
+			Values:   append([]string(nil), expression.Values...),
+		})
+	}
+
+	return &corev1.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+			NodeSelectorTerms: []corev1.NodeSelectorTerm{
+				{
+					MatchExpressions: requirements,
+				},
+			},
+		},
+	}
+}
+
+func nodeSelectorOperator(operator metav1.LabelSelectorOperator) corev1.NodeSelectorOperator {
+	switch operator {
+	case metav1.LabelSelectorOpIn:
+		return corev1.NodeSelectorOpIn
+	case metav1.LabelSelectorOpNotIn:
+		return corev1.NodeSelectorOpNotIn
+	case metav1.LabelSelectorOpExists:
+		return corev1.NodeSelectorOpExists
+	case metav1.LabelSelectorOpDoesNotExist:
+		return corev1.NodeSelectorOpDoesNotExist
+	default:
+		logger.Info("Unknown label selector operator, defaulting to In", "operator", operator)
+		return corev1.NodeSelectorOpIn
 	}
 }
 
