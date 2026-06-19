@@ -90,6 +90,7 @@ func (s *HelmChartSuite) TestHelmTemplate() {
 	s.Contains(output, "kind: ServiceAccount", "Should contain ServiceAccount")
 	s.Contains(output, "kind: CustomResourceDefinition", "Should contain CRD")
 	s.Contains(output, "mondooauditconfigs.k8s.mondoo.com", "Should contain MondooAuditConfig CRD")
+	s.Contains(output, "name: mondoo-operator-runtime-cache-scanning", "Runtime cache ServiceAccount should match MondooAuditConfig default")
 	zap.S().Info("Helm template rendering passed successfully")
 }
 
@@ -193,6 +194,12 @@ func (s *HelmChartSuite) verifyHelmResources() {
 		Namespace: s.namespace,
 	}, sa)
 	s.Require().NoError(err, "K8s resources scanning ServiceAccount should exist")
+
+	err = s.k8sHelper.Clientset.Get(s.ctx, types.NamespacedName{
+		Name:      "mondoo-operator-runtime-cache-scanning",
+		Namespace: s.namespace,
+	}, sa)
+	s.Require().NoError(err, "Runtime cache scanning ServiceAccount should exist")
 
 	zap.S().Info("All expected Helm resources verified")
 }
