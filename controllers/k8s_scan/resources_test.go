@@ -6,10 +6,12 @@ package k8s_scan
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
@@ -229,6 +231,93 @@ func TestCronJob_WithImagePullSecrets(t *testing.T) {
 	secrets := cj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets
 	require.Len(t, secrets, 1)
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
+}
+
+func TestCronJob_HasGOMEMLIMIT(t *testing.T) {
+	m := testAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", m, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	envMap := envToMap(container.Env)
+	// Default k8s resource scanning memory limit is 1G; 90% = 900000000
+	assert.Equal(t, "900000000", envMap["GOMEMLIMIT"])
+}
+
+func TestCronJob_GOMEMLIMIT_CustomResources(t *testing.T) {
+	m := testAuditConfig()
+	m.Spec.Scanner.Resources = corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("512Mi"),
+		},
+	}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", m, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	envMap := envToMap(container.Env)
+	assert.Equal(t, "483183821", envMap["GOMEMLIMIT"])
+}
+
+func TestCronJob_ActiveDeadline(t *testing.T) {
+	m := testAuditConfig()
+	m.Spec.KubernetesResources.ActiveDeadline = &metav1.Duration{Duration: 30 * time.Minute}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", m, cfg)
+	require.NotNil(t, cj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
+	assert.Equal(t, int64(1800), *cj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
+}
+
+func TestCronJob_ActiveDeadline_Unset(t *testing.T) {
+	m := testAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", m, cfg)
+	assert.Nil(t, cj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
+}
+
+func TestExternalClusterCronJob_HasGOMEMLIMIT(t *testing.T) {
+	m := testAuditConfig()
+	cluster := v1alpha2.ExternalCluster{
+		Name:                "remote",
+		KubeconfigSecretRef: &corev1.LocalObjectReference{Name: "kubeconfig-secret"},
+	}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := ExternalClusterCronJob("test-image:latest", cluster, m, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	envMap := envToMap(container.Env)
+	assert.Equal(t, "900000000", envMap["GOMEMLIMIT"])
+}
+
+func TestExternalClusterCronJob_ActiveDeadline(t *testing.T) {
+	m := testAuditConfig()
+	m.Spec.KubernetesResources.ActiveDeadline = &metav1.Duration{Duration: 1 * time.Hour}
+	cluster := v1alpha2.ExternalCluster{
+		Name:                "remote",
+		KubeconfigSecretRef: &corev1.LocalObjectReference{Name: "kubeconfig-secret"},
+	}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := ExternalClusterCronJob("test-image:latest", cluster, m, cfg)
+	require.NotNil(t, cj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
+	assert.Equal(t, int64(3600), *cj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
+}
+
+func TestExternalClusterCronJob_ActiveDeadline_Unset(t *testing.T) {
+	m := testAuditConfig()
+	cluster := v1alpha2.ExternalCluster{
+		Name:                "remote",
+		KubeconfigSecretRef: &corev1.LocalObjectReference{Name: "kubeconfig-secret"},
+	}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := ExternalClusterCronJob("test-image:latest", cluster, m, cfg)
+	assert.Nil(t, cj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
 }
 
 func TestExternalClusterCronJob_WithProxy(t *testing.T) {
