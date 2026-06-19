@@ -19,4 +19,7 @@ const (
 	// SPIFFE Helper image
 	// https://github.com/spiffe/spiffe-helper/releases
 	SPIFFEHelperImage = "ghcr.io/spiffe/spiffe-helper:0.8.0"
+
+	// BusyBox image used for lightweight init helpers.
+	BusyBoxImage = "docker.io/library/busybox:1.36"
 )
