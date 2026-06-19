@@ -74,8 +74,8 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:                   m.Spec.Nodes.Schedule,
+			Suspend:                    ptr.To(m.Spec.Nodes.Suspend || m.Status.ScanningPaused),
 			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
-			Suspend:                    ptr.To(m.Status.ScanningPaused),
 			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
 			FailedJobsHistoryLimit:     ptr.To(int32(1)),
 			JobTemplate: batchv1.JobTemplateSpec{

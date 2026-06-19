@@ -239,6 +239,21 @@ func TestCronJob_Privileged(t *testing.T) {
 	assert.False(t, *cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
 }
 
+func TestCronJob_Suspend(t *testing.T) {
+	testNode := corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node-name",
+		},
+	}
+	mac := testMondooAuditConfig()
+	mac.Spec.Nodes.Suspend = true
+
+	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+
+	require.NotNil(t, cj.Spec.Suspend)
+	assert.True(t, *cj.Spec.Suspend)
+}
+
 func TestInventory(t *testing.T) {
 	auditConfig := v1alpha2.MondooAuditConfig{ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"}}
 

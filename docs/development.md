@@ -161,6 +161,8 @@ spec:
   nodes:
     enable: true
     style: cronjob # or "deployment" or "daemonset"
+    # Optional: pause scheduled node scan CronJobs without deleting them
+    # suspend: true
     # Optional: set priority class for node scanning workloads
     # priorityClassName: high-priority
 ```
