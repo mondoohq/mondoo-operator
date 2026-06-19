@@ -357,6 +357,180 @@ func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_ServiceAccountAut
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(externalCronJob), externalCronJob))
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_OIDCAuth() {
+	oidcSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "prod-oidc-credentials",
+			Namespace: s.auditConfig.Namespace,
+		},
+		Data: map[string][]byte{
+			"refresh-token": []byte("refresh-token-value"),
+			"client-secret": []byte("client-secret-value"),
+			"ca.crt":        []byte("target-ca"),
+			"oidc-ca.crt":   []byte("issuer-ca"),
+		},
+	}
+	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(oidcSecret)
+
+	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
+		{
+			Name: "oidc-prod",
+			OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+				Server:    "https://oidc-prod.example.com:6443",
+				IssuerURL: "https://auth.example.com/realms/platform",
+				ClientID:  "kubernetes",
+				CredentialsSecretRef: corev1.LocalObjectReference{
+					Name: "prod-oidc-credentials",
+				},
+				Scopes: []string{"openid", "email", "groups"},
+			},
+		},
+	}
+
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	externalCronJob := &batchv1.CronJob{}
+	externalCronJob.Name = ExternalClusterCronJobName(s.auditConfig.Name, "oidc-prod")
+	externalCronJob.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(externalCronJob), externalCronJob))
+	s.NotNil(externalCronJob.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
+	s.Equal(externalClusterScanActiveDeadlineSeconds, *externalCronJob.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
+
+	podSpec := externalCronJob.Spec.JobTemplate.Spec.Template.Spec
+	s.NotNil(podSpec.AutomountServiceAccountToken)
+	s.False(*podSpec.AutomountServiceAccountToken)
+	s.Empty(podSpec.ServiceAccountName)
+	s.Len(podSpec.InitContainers, 1)
+	s.Equal("generate-oidc-kubeconfig", podSpec.InitContainers[0].Name)
+	s.Equal(constants.CurlImage, podSpec.InitContainers[0].Image)
+	s.Contains(podSpec.InitContainers[0].Command[2], "grant_type=refresh_token")
+	s.Contains(podSpec.InitContainers[0].Command[2], "certificate-authority-data")
+	s.Contains(podSpec.InitContainers[0].Command[2], "scope=${OIDC_SCOPES}")
+	s.Contains(podSpec.InitContainers[0].Command[2], "--connect-timeout 10")
+	s.Contains(podSpec.InitContainers[0].Command[2], "--max-time 60")
+	s.Contains(podSpec.InitContainers[0].Command[2], "token:")
+	s.NotContains(podSpec.InitContainers[0].Command[2], "auth-provider:")
+	s.NotContains(podSpec.InitContainers[0].Command[2], "refresh-token:")
+
+	volumes := map[string]corev1.Volume{}
+	for _, volume := range podSpec.Volumes {
+		volumes[volume.Name] = volume
+	}
+	s.NotNil(volumes["kubeconfig"].EmptyDir)
+	s.Equal(corev1.StorageMediumMemory, volumes["kubeconfig"].EmptyDir.Medium)
+	s.NotNil(volumes["oidc-credentials"].Secret)
+	s.Equal("prod-oidc-credentials", volumes["oidc-credentials"].Secret.SecretName)
+	s.Equal(int32(0o440), *volumes["oidc-credentials"].Secret.DefaultMode)
+
+	mainContainer := podSpec.Containers[0]
+	for _, mount := range mainContainer.VolumeMounts {
+		s.NotEqual("oidc-credentials", mount.Name, "raw OIDC credentials must not be mounted into the scanner container")
+		if mount.Name == "kubeconfig" {
+			s.True(mount.ReadOnly, "scanner only needs the generated bearer-token kubeconfig")
+		}
+	}
+
+	configMap := &corev1.ConfigMap{}
+	configMap.Name = ExternalClusterConfigMapName(s.auditConfig.Name, "oidc-prod")
+	configMap.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(configMap), configMap))
+	s.Contains(configMap.Data, "inventory")
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_OIDCAuthMissingSecret() {
+	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
+		{
+			Name: "oidc-prod",
+			OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+				Server:    "https://oidc-prod.example.com:6443",
+				IssuerURL: "https://auth.example.com/realms/platform",
+				ClientID:  "kubernetes",
+				CredentialsSecretRef: corev1.LocalObjectReference{
+					Name: "prod-oidc-credentials",
+				},
+			},
+		},
+	}
+
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	_, err := d.Reconcile(s.ctx)
+	s.ErrorContains(err, `failed to find oidcAuth credentials Secret "prod-oidc-credentials"`)
+	s.Len(d.Mondoo.Status.Conditions, 1)
+	s.Equal(mondoov1alpha2.K8sResourcesScanningDegraded, d.Mondoo.Status.Conditions[0].Type)
+	s.Equal(corev1.ConditionTrue, d.Mondoo.Status.Conditions[0].Status)
+	s.Equal("ExternalClusterAuthInvalid", d.Mondoo.Status.Conditions[0].Reason)
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_OIDCAuthDoesNotReadCredentialData() {
+	oidcSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "prod-oidc-credentials",
+			Namespace: s.auditConfig.Namespace,
+		},
+	}
+	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(oidcSecret)
+	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
+		{
+			Name: "oidc-prod",
+			OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+				Server:    "https://oidc-prod.example.com:6443",
+				IssuerURL: "https://auth.example.com/realms/platform",
+				ClientID:  "kubernetes",
+				CredentialsSecretRef: corev1.LocalObjectReference{
+					Name: "prod-oidc-credentials",
+				},
+			},
+		},
+	}
+
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	_, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+
+	externalCronJob := &batchv1.CronJob{}
+	externalCronJob.Name = ExternalClusterCronJobName(s.auditConfig.Name, "oidc-prod")
+	externalCronJob.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(externalCronJob), externalCronJob))
+	s.Len(externalCronJob.Spec.JobTemplate.Spec.Template.Spec.InitContainers, 1)
+	s.Contains(externalCronJob.Spec.JobTemplate.Spec.Template.Spec.InitContainers[0].Command[2], "OIDC credentials Secret key ${key} is required")
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_OIDCAuthInvalidConfigSetsCondition() {
+	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
+		{
+			Name: "oidc-prod",
+			OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+				Server:    "https://oidc-prod.example.com:6443",
+				IssuerURL: "https://auth.example.com/realms/platform",
+				ClientID:  "kubernetes",
+				CredentialsSecretRef: corev1.LocalObjectReference{
+					Name: "prod-oidc-credentials",
+				},
+				RefreshTokenKey: "../refresh-token",
+			},
+		},
+	}
+
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	_, err := d.Reconcile(s.ctx)
+	s.ErrorContains(err, "refreshTokenKey")
+	s.Len(d.Mondoo.Status.Conditions, 1)
+	s.Equal(mondoov1alpha2.K8sResourcesScanningDegraded, d.Mondoo.Status.Conditions[0].Type)
+	s.Equal(corev1.ConditionTrue, d.Mondoo.Status.Conditions[0].Status)
+	s.Equal("ExternalClusterAuthInvalid", d.Mondoo.Status.Conditions[0].Reason)
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_WorkloadIdentity_GKE() {
 	// Configure external cluster with GKE WorkloadIdentity
 	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
@@ -860,6 +1034,21 @@ func TestValidateExternalClusterAuth(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name: "valid OIDC auth",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+					Server:    "https://example.com:6443",
+					IssuerURL: "https://auth.example.com/realms/platform",
+					ClientID:  "kubernetes",
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "oidc-credentials",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
 			name: "valid SPIFFE auth",
 			cluster: mondoov1alpha2.ExternalCluster{
 				Name: "test",
@@ -962,6 +1151,149 @@ func TestValidateExternalClusterAuth(t *testing.T) {
 			},
 			expectError: true,
 			errorMsg:    "kubeconfigSecretRef.name is required",
+		},
+		{
+			name: "OIDC auth without server",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+					IssuerURL: "https://auth.example.com/realms/platform",
+					ClientID:  "kubernetes",
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "oidc-credentials",
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "server is required for oidcAuth",
+		},
+		{
+			name: "OIDC auth with non-HTTPS server",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+					Server:    "http://example.com:6443",
+					IssuerURL: "https://auth.example.com/realms/platform",
+					ClientID:  "kubernetes",
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "oidc-credentials",
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "server must start with https://",
+		},
+		{
+			name: "OIDC auth without issuer",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+					Server:   "https://example.com:6443",
+					ClientID: "kubernetes",
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "oidc-credentials",
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "issuerURL is required for oidcAuth",
+		},
+		{
+			name: "OIDC auth with non-HTTPS issuer",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+					Server:    "https://example.com:6443",
+					IssuerURL: "http://auth.example.com/realms/platform",
+					ClientID:  "kubernetes",
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "oidc-credentials",
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "issuerURL must start with https://",
+		},
+		{
+			name: "OIDC auth without client ID",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+					Server:    "https://example.com:6443",
+					IssuerURL: "https://auth.example.com/realms/platform",
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "oidc-credentials",
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "clientID is required for oidcAuth",
+		},
+		{
+			name: "OIDC auth without credentials",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+					Server:    "https://example.com:6443",
+					IssuerURL: "https://auth.example.com/realms/platform",
+					ClientID:  "kubernetes",
+				},
+			},
+			expectError: true,
+			errorMsg:    "credentialsSecretRef.name is required for oidcAuth",
+		},
+		{
+			name: "OIDC auth with unsafe refresh token key",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+					Server:          "https://example.com:6443",
+					IssuerURL:       "https://auth.example.com/realms/platform",
+					ClientID:        "kubernetes",
+					RefreshTokenKey: "../refresh-token",
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "oidc-credentials",
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "refreshTokenKey must be a valid Secret key",
+		},
+		{
+			name: "OIDC auth with unsafe cluster CA key",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+					Server:       "https://example.com:6443",
+					IssuerURL:    "https://auth.example.com/realms/platform",
+					ClientID:     "kubernetes",
+					ClusterCAKey: "nested/ca.crt",
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "oidc-credentials",
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "clusterCAKey must be a valid Secret key",
+		},
+		{
+			name: "OIDC auth mutually exclusive with kubeconfig",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				KubeconfigSecretRef: &corev1.LocalObjectReference{
+					Name: "my-kubeconfig",
+				},
+				OIDCAuth: &mondoov1alpha2.OIDCAuthConfig{
+					Server:    "https://example.com:6443",
+					IssuerURL: "https://auth.example.com/realms/platform",
+					ClientID:  "kubernetes",
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "oidc-credentials",
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "mutually exclusive",
 		},
 		{
 			name: "SPIFFE auth without server",

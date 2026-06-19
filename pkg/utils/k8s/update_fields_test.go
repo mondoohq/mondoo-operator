@@ -11,6 +11,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
@@ -19,6 +20,7 @@ func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
 			Schedule: "*/5 * * * *",
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
+					ActiveDeadlineSeconds: ptr.To(int64(3600)),
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{{Name: "test", Image: "test:latest"}},
@@ -37,6 +39,7 @@ func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
 	UpdateCronJobFields(obj, desired)
 
 	assert.Equal(t, desired.Spec.Schedule, obj.Spec.Schedule)
+	assert.Equal(t, desired.Spec.JobTemplate.Spec.ActiveDeadlineSeconds, obj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.Containers, obj.Spec.JobTemplate.Spec.Template.Spec.Containers)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets, obj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets)
 }

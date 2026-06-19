@@ -95,7 +95,22 @@ spec:
     #         name: prod-sa-credentials  # Secret with "token" and "ca.crt" keys
     #       # skipTLSVerify: false  # NOT recommended for production
     #
-    # 3. Workload Identity Federation (cloud-native, no static credentials):
+    # 3. OIDC refresh-token auth:
+    # externalClusters:
+    #   - name: oidc-prod
+    #     oidcAuth:
+    #       server: "https://prod-cluster.example.com:6443"
+    #       issuerURL: "https://auth.example.com/realms/platform"
+    #       clientID: kubernetes
+    #       credentialsSecretRef:
+    #         name: prod-oidc-credentials  # Secret with "refresh-token" and optional "client-secret", "ca.crt", "oidc-ca.crt" keys
+    #       # Optional scopes sent with the refresh-token grant
+    #       # scopes:
+    #       #   - openid
+    #       #   - email
+    #       #   - groups
+    #
+    # 4. Workload Identity Federation (cloud-native, no static credentials):
     # GKE example:
     # externalClusters:
     #   - name: gke-prod
@@ -129,7 +144,7 @@ spec:
     #         clientId: abcdef12-3456-7890-abcd-ef1234567890
     #         tenantId: fedcba98-7654-3210-fedc-ba9876543210
     #
-    # 4. SPIFFE/SPIRE (zero-trust, auto-rotating X.509 certificates):
+    # 5. SPIFFE/SPIRE (zero-trust, auto-rotating X.509 certificates):
     # externalClusters:
     #   - name: spiffe-cluster
     #     spiffeAuth:
