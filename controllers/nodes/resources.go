@@ -6,10 +6,13 @@ package nodes
 import (
 	"crypto/sha256"
 	"fmt"
+	"math"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
@@ -32,22 +35,21 @@ const (
 	InventoryConfigMapBase         = "-node-inventory"
 	InventoryConfigMapWithNodeBase = "-node-inventory-"
 
-	// minNodeHashLen is the minimum number of hash chars used to replace a node name.
-	// Fewer chars make it likely that two nodes end up with the same resource name.
-	minNodeHashLen = 8
-
 	ignoreQueryAnnotationPrefix = "policies.k8s.mondoo.com/"
 
-	ignoreAnnotationValue = "ignore"
+	ignoreAnnotationValue            = "ignore"
+	nodeInventoryTemplatePath        = "/etc/opt/mondoo/inventory_template.yml"
+	nodeInventoryRenderedPath        = "/tmp/mondoo-node-inventory.yml"
+	nodeInventoryNodeNamePlaceholder = "__MONDOO_NODE_NAME__"
 )
 
 // CronJob creates a CronJob for node scanning
-func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
+func CronJob(image, renderImage string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := NodeScanningLabels(*m)
 	cmd := []string{
 		"cnspec", "scan", "local",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
-		"--inventory-template", "/etc/opt/mondoo/inventory_template.yml",
+		"--inventory-file", nodeInventoryRenderedPath,
 		"--report-type", "none",
 	}
 
@@ -99,13 +101,15 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 							},
 						},
 						Spec: corev1.PodSpec{
-							NodeName:          node.Name,
-							PriorityClassName: m.Spec.Nodes.PriorityClassName,
-							RestartPolicy:     corev1.RestartPolicyOnFailure,
-							Tolerations:       k8s.TaintsToTolerations(node.Spec.Taints),
+							NodeName:      node.Name,
+							RestartPolicy: corev1.RestartPolicyOnFailure,
+							Tolerations:   k8s.TaintsToTolerations(node.Spec.Taints),
 							// The node scanning does not use the Kubernetes API at all, therefore the service account token
 							// should not be mounted at all.
 							AutomountServiceAccountToken: ptr.To(false),
+							InitContainers: []corev1.Container{
+								renderNodeInventoryInitContainer(node.Name, renderImage),
+							},
 							Containers: []corev1.Container{
 								{
 									Image:     image,
@@ -135,7 +139,7 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 									}, proxyEnvVars...), m.Spec.Nodes.Env),
 									TerminationMessagePath:   "/dev/termination-log",
 									TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-									ImagePullPolicy:          m.Spec.Scanner.Image.PullPolicyOrDefault(),
+									ImagePullPolicy:          corev1.PullIfNotPresent,
 								},
 							},
 							Volumes: []corev1.Volume{
@@ -192,12 +196,12 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 }
 
 // DaemonSet creates a DaemonSet for node scanning
-func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg v1alpha2.MondooOperatorConfig, tolerations []corev1.Toleration) *appsv1.DaemonSet {
+func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image, renderImage string, cfg v1alpha2.MondooOperatorConfig, tolerations []corev1.Toleration) *appsv1.DaemonSet {
 	labels := NodeScanningLabels(m)
 	cmd := []string{
 		"cnspec", "serve",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
-		"--inventory-template", "/etc/opt/mondoo/inventory_template.yml",
+		"--inventory-file", nodeInventoryRenderedPath,
 		"--timer", fmt.Sprintf("%d", m.Spec.Nodes.IntervalTimer),
 	}
 	// Add API proxy if configured (respect SkipProxyForCnspec since node scanning uses cnspec)
@@ -239,6 +243,9 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 					// should not be mounted at all.
 					AutomountServiceAccountToken: ptr.To(false),
 					Tolerations:                  tolerations,
+					InitContainers: []corev1.Container{
+						renderNodeInventoryInitContainer("", renderImage),
+					},
 					Containers: []corev1.Container{
 						{
 							Image:     image,
@@ -256,7 +263,7 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 							},
 							TerminationMessagePath:   "/dev/termination-log",
 							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-							ImagePullPolicy:          m.Spec.Scanner.Image.PullPolicyOrDefault(),
+							ImagePullPolicy:          corev1.PullIfNotPresent,
 							VolumeMounts: []corev1.VolumeMount{
 								{Name: "root", ReadOnly: true, MountPath: "/mnt/host/"},
 								{Name: "config", ReadOnly: true, MountPath: "/etc/opt/"},
@@ -351,11 +358,19 @@ func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 }
 
 func CronJobName(prefix, suffix string) string {
-	return nodeScopedName(prefix, CronJobNameBase, suffix)
+	// If the name becomes longer than 52 chars, then we hash the suffix and trim
+	// it such that the full name fits within 52 chars. This is needed because in
+	// manager Kubernetes services such as EKS or GKE the node names can be very long.
+	base := fmt.Sprintf("%s%s", prefix, CronJobNameBase)
+	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), suffix))
 }
 
 func DeploymentName(prefix, suffix string) string {
-	return nodeScopedName(prefix, DeploymentNameBase, suffix)
+	// If the name becomes longer than 52 chars, then we hash the suffix and trim
+	// it such that the full name fits within 52 chars. This is needed because in
+	// manager Kubernetes services such as EKS or GKE the node names can be very long.
+	base := fmt.Sprintf("%s%s", prefix, DeploymentNameBase)
+	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), suffix))
 }
 
 func DaemonSetName(prefix string) string {
@@ -371,7 +386,8 @@ func ConfigMapName(prefix string) string {
 }
 
 func ConfigMapNameWithNode(prefix, nodeName string) string {
-	return nodeScopedName(prefix, InventoryConfigMapWithNodeBase, nodeName)
+	base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapWithNodeBase)
+	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), nodeName))
 }
 
 func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
@@ -386,12 +402,12 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 			Assets: []*inventory.Asset{
 				{
 					Id:   "host",
-					Name: `{{ getenv "NODE_NAME" }}`,
+					Name: nodeInventoryNodeNamePlaceholder,
 					Connections: []*inventory.Config{
 						{
 							Type:       "filesystem",
 							Host:       "/mnt/host",
-							PlatformId: fmt.Sprintf(`{{ printf "//platformid.api.mondoo.app/runtime/k8s/uid/%%s/node/%%s" "%s" (getenv "NODE_NAME")}}`, clusterUID),
+							PlatformId: fmt.Sprintf("//platformid.api.mondoo.app/runtime/k8s/uid/%s/node/%s", clusterUID, nodeInventoryNodeNamePlaceholder),
 						},
 					},
 					Labels: map[string]string{
@@ -428,6 +444,60 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 	return string(invBytes), nil
 }
 
+func renderNodeInventoryInitContainer(nodeName, image string) corev1.Container {
+	render := fmt.Sprintf("sed \"s#%s#${NODE_NAME}#g\" %s > %s",
+		nodeInventoryNodeNamePlaceholder,
+		shellQuote(nodeInventoryTemplatePath),
+		shellQuote(nodeInventoryRenderedPath),
+	)
+	env := []corev1.EnvVar{{
+		Name: "NODE_NAME",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+		},
+	}}
+	if nodeName != "" {
+		env[0].ValueFrom = nil
+		env[0].Value = nodeName
+	}
+
+	return corev1.Container{
+		Name:            "render-node-inventory",
+		Image:           image,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command:         []string{"/bin/sh", "-ec", render},
+		Env:             env,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("16Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("50m"),
+				corev1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+		},
+		SecurityContext: &corev1.SecurityContext{
+			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
+			RunAsNonRoot:             ptr.To(true),
+			RunAsUser:                ptr.To(int64(65532)),
+			Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{Name: "config", ReadOnly: true, MountPath: "/etc/opt/"},
+			{Name: "temp", MountPath: "/tmp"},
+		},
+	}
+}
+
+func shellQuote(arg string) string {
+	if arg == "" {
+		return "''"
+	}
+	return "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
+}
+
 func NodeScanningLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 	return map[string]string{
 		"app":       "mondoo",
@@ -444,24 +514,10 @@ func GarbageCollectCronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string
 	}
 }
 
-// nodeScopedName builds prefix+infix+nodeName and makes sure the result fits within
-// k8s.ResourceNameMaxLength chars. Node names on managed Kubernetes services such as EKS
-// or GKE can be very long, so if the node name doesn't fit it is replaced by a trimmed
-// hash. If prefix+infix is too long to leave room for at least minNodeHashLen hash chars
-// (e.g. a long MondooAuditConfig name like "mondoo-client-<integration-id>"), the prefix
-// is truncated as well and the hash is computed over the full name to keep it unique.
-func nodeScopedName(prefix, infix, nodeName string) string {
-	base := prefix + infix
-	allowedLen := k8s.ResourceNameMaxLength - len(base)
-	if len(nodeName) <= allowedLen {
-		return base + nodeName
-	}
-
-	if allowedLen >= minNodeHashLen {
+func NodeNameOrHash(allowedLen int, nodeName string) string {
+	if len(nodeName) > allowedLen {
 		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(nodeName)))
-		return base + hash[:min(allowedLen, len(hash))]
+		return hash[:int(math.Min(float64(allowedLen), float64(len(hash))))]
 	}
-
-	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(base+nodeName)))
-	return prefix[:k8s.ResourceNameMaxLength-len(infix)-minNodeHashLen] + infix + hash[:minNodeHashLen]
+	return nodeName
 }
