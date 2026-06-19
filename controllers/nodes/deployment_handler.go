@@ -7,6 +7,7 @@ import (
 	"context"
 	"maps"
 	"slices"
+	"sort"
 	"time"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -53,6 +54,14 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 			"NodeScanningUnavailable", "Node scanning setup failed: "+syncErr.Error(),
 			mondoo.UpdateConditionIfReasonOrMessageChange, nil, "",
 		)
+		// Reconciliation errors here happen before a scan workload can be trusted, so report
+		// one setup-level failure instead of preserving stale per-node scan statuses.
+		mondoo.ReplaceScanStatuses(n.Mondoo, v1alpha2.MondooAuditConfigScanTypeNodes, v1alpha2.MondooAuditConfigScanStatus{
+			Type:    v1alpha2.MondooAuditConfigScanTypeNodes,
+			Target:  "all",
+			Phase:   v1alpha2.MondooAuditConfigScanPhaseFailed,
+			Message: "Node scanning setup failed: " + syncErr.Error(),
+		})
 		return ctrl.Result{}, syncErr
 	}
 
@@ -160,6 +169,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	updateNodeConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs), pods)
+	n.updateCronJobScanStatuses(cronJobs, nodes.Items)
 
 	// Clean up any leftover GC CronJobs from previous versions
 	gcCronJob := &batchv1.CronJob{
@@ -263,6 +273,7 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 	}
 
 	updateNodeConditions(n.Mondoo, ds.Status.CurrentNumberScheduled < ds.Status.DesiredNumberScheduled, pods)
+	n.updateDaemonSetScanStatus(*ds)
 
 	// Clean up any leftover GC CronJobs from previous versions
 	gcCronJob := &batchv1.CronJob{
@@ -389,8 +400,61 @@ func (n *DeploymentHandler) down(ctx context.Context) error {
 
 	// Update any remnant conditions
 	updateNodeConditions(n.Mondoo, false, &corev1.PodList{})
+	mondoo.ReplaceScanStatuses(
+		n.Mondoo,
+		v1alpha2.MondooAuditConfigScanTypeNodes,
+		mondoo.DisabledScanStatus(v1alpha2.MondooAuditConfigScanTypeNodes, "all"),
+	)
 
 	return nil
+}
+
+func (n *DeploymentHandler) updateCronJobScanStatuses(cronJobs []batchv1.CronJob, nodes []corev1.Node) {
+	cronJobsByName := make(map[string]batchv1.CronJob, len(cronJobs))
+	for _, cronJob := range cronJobs {
+		cronJobsByName[cronJob.Name] = cronJob
+	}
+
+	nodeNames := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		nodeNames = append(nodeNames, node.Name)
+	}
+	sort.Strings(nodeNames)
+
+	statuses := make([]v1alpha2.MondooAuditConfigScanStatus, 0, len(nodeNames))
+	for _, nodeName := range nodeNames {
+		cronJobName := CronJobName(n.Mondoo.Name, nodeName)
+		cronJob, ok := cronJobsByName[cronJobName]
+		if !ok {
+			statuses = append(statuses, v1alpha2.MondooAuditConfigScanStatus{
+				Type:    v1alpha2.MondooAuditConfigScanTypeNodes,
+				Target:  nodeName,
+				Phase:   v1alpha2.MondooAuditConfigScanPhasePending,
+				Message: "Scan CronJob has not been created yet",
+			})
+			continue
+		}
+		statuses = append(statuses, mondoo.ScanStatusFromCronJob(v1alpha2.MondooAuditConfigScanTypeNodes, nodeName, cronJob))
+	}
+
+	mondoo.ReplaceScanStatuses(n.Mondoo, v1alpha2.MondooAuditConfigScanTypeNodes, statuses...)
+}
+
+func (n *DeploymentHandler) updateDaemonSetScanStatus(ds appsv1.DaemonSet) {
+	status := v1alpha2.MondooAuditConfigScanStatus{
+		Type:    v1alpha2.MondooAuditConfigScanTypeNodes,
+		Target:  "all",
+		Phase:   v1alpha2.MondooAuditConfigScanPhaseRunning,
+		Message: "Node scanning DaemonSet is scheduled",
+	}
+	if ds.Status.DesiredNumberScheduled == 0 {
+		status.Phase = v1alpha2.MondooAuditConfigScanPhasePending
+		status.Message = "Node scanning DaemonSet has not reported desired nodes yet"
+	} else if ds.Status.CurrentNumberScheduled < ds.Status.DesiredNumberScheduled {
+		status.Phase = v1alpha2.MondooAuditConfigScanPhaseFailed
+		status.Message = "Node scanning DaemonSet is not scheduled on all desired nodes"
+	}
+	mondoo.ReplaceScanStatuses(n.Mondoo, v1alpha2.MondooAuditConfigScanTypeNodes, status)
 }
 
 // garbageCollectIfNeeded checks whether a new successful node scan has completed since the last GC run,

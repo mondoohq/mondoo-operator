@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -170,6 +171,7 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		if err := n.cleanupOrphanedExternalClusterResources(ctx, make(map[string]bool)); err != nil {
 			return ctrl.Result{}, err
 		}
+		mondoo.ReplaceScanStatuses(n.Mondoo, v1alpha2.MondooAuditConfigScanTypeExternalKubernetesResources)
 	}
 
 	// Perform garbage collection of stale K8s resource scan assets if a new successful scan has completed
@@ -262,6 +264,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	updateWorkloadsConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs), pods)
+	n.updateLocalClusterScanStatus(cronJobs)
 	return n.cleanupWorkloadDeployment(ctx)
 }
 
@@ -307,6 +310,7 @@ func (n *DeploymentHandler) reconcileExternalClusters(ctx context.Context) error
 
 	// Track which external cluster names are configured
 	configuredClusters := make(map[string]bool)
+	externalCronJobs := make([]batchv1.CronJob, 0, len(n.Mondoo.Spec.KubernetesResources.ExternalClusters))
 
 	for _, cluster := range n.Mondoo.Spec.KubernetesResources.ExternalClusters {
 		configuredClusters[cluster.Name] = true
@@ -344,9 +348,11 @@ func (n *DeploymentHandler) reconcileExternalClusters(ctx context.Context) error
 		}
 
 		// Sync CronJob for this external cluster
-		if err := n.syncExternalClusterCronJob(ctx, mondooClientImage, cluster); err != nil {
+		cronJob, err := n.syncExternalClusterCronJob(ctx, mondooClientImage, cluster)
+		if err != nil {
 			return err
 		}
+		externalCronJobs = append(externalCronJobs, *cronJob)
 	}
 
 	// Clean up CronJobs and ConfigMaps for external clusters that are no longer configured
@@ -354,7 +360,58 @@ func (n *DeploymentHandler) reconcileExternalClusters(ctx context.Context) error
 		return err
 	}
 
+	n.updateExternalClusterScanStatuses(configuredClusters, externalCronJobs)
 	return nil
+}
+
+func (n *DeploymentHandler) updateLocalClusterScanStatus(cronJobs []batchv1.CronJob) {
+	for _, cronJob := range cronJobs {
+		if _, ok := cronJob.Labels["cluster_name"]; ok {
+			continue
+		}
+		if cronJob.Name != CronJobName(n.Mondoo.Name) {
+			continue
+		}
+		mondoo.ReplaceScanStatuses(
+			n.Mondoo,
+			v1alpha2.MondooAuditConfigScanTypeKubernetesResources,
+			mondoo.ScanStatusFromCronJob(v1alpha2.MondooAuditConfigScanTypeKubernetesResources, "local", cronJob),
+		)
+		return
+	}
+}
+
+func (n *DeploymentHandler) updateExternalClusterScanStatuses(configuredClusters map[string]bool, cronJobs []batchv1.CronJob) {
+	statuses := make([]v1alpha2.MondooAuditConfigScanStatus, 0, len(configuredClusters))
+	clusterNames := make([]string, 0, len(configuredClusters))
+	for clusterName := range configuredClusters {
+		clusterNames = append(clusterNames, clusterName)
+	}
+	sort.Strings(clusterNames)
+
+	cronJobsByCluster := map[string]batchv1.CronJob{}
+	for _, cronJob := range cronJobs {
+		clusterName := cronJob.Labels["cluster_name"]
+		if clusterName != "" {
+			cronJobsByCluster[clusterName] = cronJob
+		}
+	}
+
+	for _, clusterName := range clusterNames {
+		cronJob, ok := cronJobsByCluster[clusterName]
+		if !ok {
+			statuses = append(statuses, v1alpha2.MondooAuditConfigScanStatus{
+				Type:    v1alpha2.MondooAuditConfigScanTypeExternalKubernetesResources,
+				Target:  clusterName,
+				Phase:   v1alpha2.MondooAuditConfigScanPhasePending,
+				Message: "Scan CronJob has not been created yet",
+			})
+			continue
+		}
+		statuses = append(statuses, mondoo.ScanStatusFromCronJob(v1alpha2.MondooAuditConfigScanTypeExternalKubernetesResources, clusterName, cronJob))
+	}
+
+	mondoo.ReplaceScanStatuses(n.Mondoo, v1alpha2.MondooAuditConfigScanTypeExternalKubernetesResources, statuses...)
 }
 
 func (n *DeploymentHandler) syncExternalClusterConfigMap(ctx context.Context, integrationMrn, clusterUid string, cluster v1alpha2.ExternalCluster) error {
@@ -376,7 +433,7 @@ func (n *DeploymentHandler) syncExternalClusterConfigMap(ctx context.Context, in
 	return nil
 }
 
-func (n *DeploymentHandler) syncExternalClusterCronJob(ctx context.Context, image string, cluster v1alpha2.ExternalCluster) error {
+func (n *DeploymentHandler) syncExternalClusterCronJob(ctx context.Context, image string, cluster v1alpha2.ExternalCluster) (*batchv1.CronJob, error) {
 	desired := ExternalClusterCronJob(image, cluster, n.Mondoo, *n.MondooOperatorConfig)
 
 	obj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
@@ -385,18 +442,18 @@ func (n *DeploymentHandler) syncExternalClusterCronJob(ctx context.Context, imag
 		return nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// When a CronJob is updated, remove completed Jobs so they don't linger with stale config
 	if op == controllerutil.OperationResultUpdated {
 		if err := k8s.DeleteCompletedJobs(ctx, n.KubeClient, n.Mondoo.Namespace, ExternalClusterCronJobLabels(*n.Mondoo, cluster.Name), logger); err != nil {
 			logger.Error(err, "Failed to clean up completed Jobs after CronJob update for external cluster", "cluster", cluster.Name)
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return obj, nil
 }
 
 func (n *DeploymentHandler) cleanupOrphanedExternalClusterResources(ctx context.Context, configuredClusters map[string]bool) error {
@@ -514,6 +571,11 @@ func (n *DeploymentHandler) downLocalCluster(ctx context.Context) error {
 
 	// Clear local cluster status
 	updateWorkloadsConditions(n.Mondoo, false, &corev1.PodList{})
+	mondoo.ReplaceScanStatuses(
+		n.Mondoo,
+		v1alpha2.MondooAuditConfigScanTypeKubernetesResources,
+		mondoo.DisabledScanStatus(v1alpha2.MondooAuditConfigScanTypeKubernetesResources, "local"),
+	)
 
 	return nil
 }

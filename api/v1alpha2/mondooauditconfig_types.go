@@ -546,6 +546,10 @@ type MondooAuditConfigStatus struct {
 	// Conditions includes detailed status for the MondooAuditConfig
 	Conditions []MondooAuditConfigCondition `json:"conditions,omitempty"`
 
+	// Scans includes the observed status of scan workloads managed by this MondooAuditConfig.
+	// +optional
+	Scans []MondooAuditConfigScanStatus `json:"scans,omitempty"`
+
 	// ReconciledByOperatorVersion contains the version of the operator which reconciled this MondooAuditConfig
 	ReconciledByOperatorVersion string `json:"reconciledByOperatorVersion,omitempty"`
 
@@ -596,6 +600,61 @@ type MondooAuditConfigCondition struct {
 	AffectedPods []string `json:"affectedPods,omitempty"`
 	// MemoryLimit contains the currently active memory limit for a Pod
 	MemoryLimit string `json:"memoryLimit,omitempty"`
+}
+
+// MondooAuditConfigScanType identifies a scan workload managed by a MondooAuditConfig.
+type MondooAuditConfigScanType string
+
+const (
+	MondooAuditConfigScanTypeKubernetesResources         MondooAuditConfigScanType = "KubernetesResources"
+	MondooAuditConfigScanTypeExternalKubernetesResources MondooAuditConfigScanType = "ExternalKubernetesResources"
+	MondooAuditConfigScanTypeContainerImages             MondooAuditConfigScanType = "ContainerImages"
+	MondooAuditConfigScanTypeNodes                       MondooAuditConfigScanType = "Nodes"
+)
+
+// MondooAuditConfigScanPhase describes the latest observed state of a scan workload.
+type MondooAuditConfigScanPhase string
+
+const (
+	MondooAuditConfigScanPhaseDisabled  MondooAuditConfigScanPhase = "Disabled"
+	MondooAuditConfigScanPhasePending   MondooAuditConfigScanPhase = "Pending"
+	MondooAuditConfigScanPhaseRunning   MondooAuditConfigScanPhase = "Running"
+	MondooAuditConfigScanPhaseSucceeded MondooAuditConfigScanPhase = "Succeeded"
+	MondooAuditConfigScanPhaseFailed    MondooAuditConfigScanPhase = "Failed"
+)
+
+// MondooAuditConfigScanStatus reports last-run details for a scan workload.
+type MondooAuditConfigScanStatus struct {
+	// Type identifies the scan workload.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum=KubernetesResources;ExternalKubernetesResources;ContainerImages;Nodes
+	// +required
+	Type MondooAuditConfigScanType `json:"type"`
+	// Target identifies the scanned target, for example "local", an external cluster name, or a node name.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Target string `json:"target"`
+	// Phase is the latest observed scan phase.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum=Disabled;Pending;Running;Succeeded;Failed
+	// +required
+	Phase MondooAuditConfigScanPhase `json:"phase"`
+	// CronJob is the Kubernetes CronJob backing this scan, if applicable.
+	// +optional
+	CronJob string `json:"cronJob,omitempty"`
+	// ActiveJobs lists currently active Jobs for this scan.
+	// +optional
+	ActiveJobs []string `json:"activeJobs,omitempty"`
+	// LastScheduleTime is the last time Kubernetes scheduled this scan.
+	// +optional
+	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
+	// LastSuccessfulTime is the last time Kubernetes observed this scan complete successfully.
+	// +optional
+	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
+	// Message explains the current phase in human-readable form.
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 // MondooOperatorConfigConditionType is a valid value for MondooOperatorConfig.Status.Condition[].Type

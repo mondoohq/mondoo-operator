@@ -1609,6 +1609,65 @@ spec:
                   this integration. When true, all scan CronJobs are suspended.
                   Only set when ConsoleIntegration is enabled.
                 type: boolean
+              scans:
+                description: Scans includes the observed status of scan workloads
+                  managed by this MondooAuditConfig.
+                items:
+                  description: MondooAuditConfigScanStatus reports last-run details
+                    for a scan workload.
+                  properties:
+                    activeJobs:
+                      description: ActiveJobs lists currently active Jobs for this
+                        scan.
+                      items:
+                        type: string
+                      type: array
+                    cronJob:
+                      description: CronJob is the Kubernetes CronJob backing this
+                        scan, if applicable.
+                      type: string
+                    lastScheduleTime:
+                      description: LastScheduleTime is the last time Kubernetes scheduled
+                        this scan.
+                      format: date-time
+                      type: string
+                    lastSuccessfulTime:
+                      description: LastSuccessfulTime is the last time Kubernetes
+                        observed this scan complete successfully.
+                      format: date-time
+                      type: string
+                    message:
+                      description: Message explains the current phase in human-readable
+                        form.
+                      type: string
+                    phase:
+                      description: Phase is the latest observed scan phase.
+                      enum:
+                      - Disabled
+                      - Pending
+                      - Running
+                      - Succeeded
+                      - Failed
+                      type: string
+                    target:
+                      description: Target identifies the scanned target, for example
+                        "local", an external cluster name, or a node name.
+                      minLength: 1
+                      type: string
+                    type:
+                      description: Type identifies the scan workload.
+                      enum:
+                      - KubernetesResources
+                      - ExternalKubernetesResources
+                      - ContainerImages
+                      - Nodes
+                      type: string
+                  required:
+                  - phase
+                  - target
+                  - type
+                  type: object
+                type: array
             type: object
         type: object
     served: true
