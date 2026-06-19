@@ -223,6 +223,31 @@ spec:
         - ...
 ```
 
+You can also select namespaces and Kubernetes objects for scheduled scans with Kubernetes label selectors:
+
+```yaml
+spec:
+  filtering:
+    namespaceLabelSelector:
+      matchLabels:
+        tenant: team-a
+      matchExpressions:
+        - key: environment
+          operator: In
+          values: ["prod", "stage"]
+    objectLabelSelector:
+      matchLabels:
+        app: frontend
+      matchExpressions:
+        - key: scan.mondoo.com/disabled
+          operator: DoesNotExist
+```
+
+The operator passes these selectors to cnspec Kubernetes discovery as
+`namespace-label-selector` and `object-label-selector` scan options. Use an
+operator build with a cnspec Kubernetes provider that supports those options;
+older scanner images ignore them and will scan the broader configured scope.
+
 ## Scanning External Clusters
 
 The Mondoo Operator can scan remote Kubernetes clusters from a central installation. This is useful for:
@@ -295,6 +320,19 @@ externalClusters:
         exclude:
           - kube-system
           - monitoring
+      namespaceLabelSelector:
+        matchLabels:
+          tenant: team-a
+        matchExpressions:
+          - key: environment
+            operator: In
+            values: ["prod", "stage"]
+      objectLabelSelector:
+        matchLabels:
+          app: frontend
+        matchExpressions:
+          - key: scan.mondoo.com/disabled
+            operator: DoesNotExist
     # Enable container image scanning for this cluster
     containerImageScanning: true
     # Private registry credentials for this cluster
@@ -309,7 +347,7 @@ externalClusters:
 | `name` | Unique identifier for the cluster (used in CronJob names) |
 | `kubeconfigSecretRef` | Reference to Secret containing kubeconfig |
 | `schedule` | Override the default scan schedule (cron format) |
-| `filtering` | Namespace include/exclude specific to this cluster |
+| `filtering` | Namespace include/exclude and label-selector filtering specific to this cluster |
 | `containerImageScanning` | Enable container image scanning for this cluster |
 | `privateRegistriesPullSecretRef` | Registry credentials for private images |
 

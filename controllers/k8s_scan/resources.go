@@ -27,9 +27,24 @@ import (
 )
 
 const (
-	CronJobNameSuffix      = "-k8s-scan"
-	InventoryConfigMapBase = "-k8s-inventory"
+	CronJobNameSuffix               = "-k8s-scan"
+	InventoryConfigMapBase          = "-k8s-inventory"
+	k8sOptionNamespaceLabelSelector = "namespace-label-selector"
+	k8sOptionObjectLabelSelector    = "object-label-selector"
 )
+
+type invalidLabelSelectorError struct {
+	field string
+	err   error
+}
+
+func (e invalidLabelSelectorError) Error() string {
+	return e.err.Error()
+}
+
+func (e invalidLabelSelectorError) Unwrap() error {
+	return e.err
+}
 
 // K8sDiscoveryTargets defines explicit targets for K8s resource scanning
 // (excludes container-images which is handled by the separate containers controller)
@@ -1035,6 +1050,11 @@ func ExternalClusterConfigMap(integrationMRN, operatorClusterUID string, cluster
 }
 
 func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (string, error) {
+	options, err := inventoryOptions(m.Spec.Filtering)
+	if err != nil {
+		return "", err
+	}
+
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-k8s-resources-inventory",
@@ -1044,11 +1064,8 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 				{
 					Connections: []*inventory.Config{
 						{
-							Type: "k8s",
-							Options: map[string]string{
-								"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
-								"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
-							},
+							Type:    "k8s",
+							Options: options,
 							Discover: &inventory.Discovery{
 								Targets: K8sDiscoveryTargets,
 							},
@@ -1096,6 +1113,11 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 
 func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster v1alpha2.ExternalCluster, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (string, error) {
 	filtering := externalClusterFiltering(cluster, m)
+	options, err := inventoryOptions(filtering)
+	if err != nil {
+		return "", err
+	}
+	options["disable-cache"] = "false"
 
 	// Determine discovery targets based on whether container image scanning is enabled
 	// Make a copy to avoid mutating the shared slice
@@ -1114,12 +1136,8 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 				{
 					Connections: []*inventory.Config{
 						{
-							Type: "k8s",
-							Options: map[string]string{
-								"namespaces":         strings.Join(filtering.Namespaces.Include, ","),
-								"namespaces-exclude": strings.Join(filtering.Namespaces.Exclude, ","),
-								"disable-cache":      "false",
-							},
+							Type:    "k8s",
+							Options: options,
 							Discover: &inventory.Discovery{
 								Targets: targets,
 							},
@@ -1174,6 +1192,41 @@ func externalClusterFiltering(cluster v1alpha2.ExternalCluster, m v1alpha2.Mondo
 		return *cluster.Filtering
 	}
 	return m.Spec.Filtering
+}
+
+func inventoryOptions(filtering v1alpha2.Filtering) (map[string]string, error) {
+	options := map[string]string{
+		"namespaces":         strings.Join(filtering.Namespaces.Include, ","),
+		"namespaces-exclude": strings.Join(filtering.Namespaces.Exclude, ","),
+	}
+
+	if err := addLabelSelectorOption(options, k8sOptionNamespaceLabelSelector, "namespaceLabelSelector", filtering.NamespaceLabelSelector); err != nil {
+		return nil, err
+	}
+	if err := addLabelSelectorOption(options, k8sOptionObjectLabelSelector, "objectLabelSelector", filtering.ObjectLabelSelector); err != nil {
+		return nil, err
+	}
+
+	return options, nil
+}
+
+func addLabelSelectorOption(options map[string]string, optionName, fieldName string, selector *metav1.LabelSelector) error {
+	if selector == nil {
+		return nil
+	}
+
+	parsedSelector, err := metav1.LabelSelectorAsSelector(selector)
+	if err != nil {
+		return invalidLabelSelectorError{
+			field: fieldName,
+			err:   fmt.Errorf("invalid filtering.%s: %w", fieldName, err),
+		}
+	}
+	if !parsedSelector.Empty() {
+		options[optionName] = parsedSelector.String()
+	}
+
+	return nil
 }
 
 func buildEnvVars(cfg v1alpha2.MondooOperatorConfig) []corev1.EnvVar {
