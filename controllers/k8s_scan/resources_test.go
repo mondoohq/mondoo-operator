@@ -156,6 +156,225 @@ func TestExternalClusterInventory_EmptyClusterNamespaceFilteringOverridesGlobal(
 	assert.Empty(t, options["namespaces-exclude"])
 }
 
+func TestInventory_OmitsKyvernoDiscoveryByDefault(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+	}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err, "unexpected error generating inventory")
+
+	targets := discoveryTargetsFromInventory(t, invStr)
+	assert.NotContains(t, targets, K8sDiscoveryTargetKyverno)
+
+	options := connectionOptionsFromInventory(t, invStr)
+	assert.NotContains(t, options, k8sOptionKyvernoDefaultMappings)
+}
+
+func TestInventory_IncludesKyvernoDiscoveryWhenEnabled(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Kyverno: v1alpha2.KyvernoSpec{Enable: ptr.To(true)},
+			},
+		},
+	}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err, "unexpected error generating inventory")
+
+	targets := discoveryTargetsFromInventory(t, invStr)
+	assert.Contains(t, targets, K8sDiscoveryTargetKyverno)
+
+	options := connectionOptionsFromInventory(t, invStr)
+	assert.Equal(t, "true", options[k8sOptionKyvernoDefaultMappings])
+	assert.Equal(t, "false", options[k8sOptionKyvernoMirrorPolicyExceptions])
+	assert.Equal(t, "externally-approved", options[k8sOptionKyvernoMirroredExceptionApproval])
+	assert.Equal(t, "RISK_ACCEPTED", options[k8sOptionKyvernoMirroredExceptionAction])
+	assert.Equal(t, "true", options[k8sOptionKyvernoFailExpiredPolicyExceptions])
+	assert.Equal(t, "true", options[k8sOptionKyvernoReportUnmappedPolicyExceptions])
+	assert.Equal(t, "true", options[k8sOptionKyvernoReportUnmappedPolicyResults])
+}
+
+func TestK8sDiscoveryTargetsForConfigDoesNotMutateDefaults(t *testing.T) {
+	defaultTargets := append([]string(nil), K8sDiscoveryTargets...)
+
+	targets := K8sDiscoveryTargetsForConfig(v1alpha2.KubernetesResources{})
+	assert.NotContains(t, targets, K8sDiscoveryTargetKyverno)
+	assert.NotContains(t, K8sDiscoveryTargets, K8sDiscoveryTargetKyverno)
+	assert.Equal(t, defaultTargets, K8sDiscoveryTargets)
+
+	enabledTargets := K8sDiscoveryTargetsForConfig(v1alpha2.KubernetesResources{
+		Kyverno: v1alpha2.KyvernoSpec{Enable: ptr.To(true)},
+	})
+	assert.Contains(t, enabledTargets, K8sDiscoveryTargetKyverno)
+	assert.Equal(t, defaultTargets, K8sDiscoveryTargets)
+
+	disabledTargets := K8sDiscoveryTargetsForConfig(v1alpha2.KubernetesResources{
+		Kyverno: v1alpha2.KyvernoSpec{Enable: ptr.To(false)},
+	})
+	assert.Equal(t, defaultTargets, disabledTargets)
+	assert.NotContains(t, disabledTargets, K8sDiscoveryTargetKyverno)
+}
+
+func TestInventory_CanDisableKyvernoDiscovery(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Kyverno: v1alpha2.KyvernoSpec{Enable: ptr.To(false)},
+			},
+		},
+	}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err, "unexpected error generating inventory")
+
+	targets := discoveryTargetsFromInventory(t, invStr)
+	assert.NotContains(t, targets, K8sDiscoveryTargetKyverno)
+
+	options := connectionOptionsFromInventory(t, invStr)
+	assert.NotContains(t, options, k8sOptionKyvernoDefaultMappings)
+}
+
+func TestInventory_WithKyvernoOptions(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Kyverno: v1alpha2.KyvernoSpec{
+					Enable:                         ptr.To(true),
+					DefaultMappings:                ptr.To(false),
+					MirrorPolicyExceptions:         ptr.To(true),
+					MirroredExceptionApproval:      "requires-approval",
+					MirroredExceptionAction:        "WORKAROUND",
+					FailExpiredPolicyExceptions:    ptr.To(false),
+					ReportUnmappedPolicyExceptions: ptr.To(false),
+					ReportUnmappedPolicyResults:    ptr.To(false),
+					MappingAnnotations: v1alpha2.KyvernoMappingAnnotationsSpec{
+						CheckUIDs:  []string{"example.com/check-uid", "mondoo.com/check-uid"},
+						CheckMRNs:  []string{"example.com/check-mrn"},
+						PolicyUIDs: []string{"example.com/policy-uid"},
+						Reasons:    []string{"example.com/reason"},
+					},
+					ExceptionAnnotations: v1alpha2.KyvernoExceptionAnnotationsSpec{
+						ValidUntil:     []string{"example.com/valid-until"},
+						Justifications: []string{"example.com/justification"},
+						Owners:         []string{"example.com/owner"},
+						Tickets:        []string{"example.com/ticket"},
+					},
+				},
+			},
+		},
+	}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err, "unexpected error generating inventory")
+
+	targets := discoveryTargetsFromInventory(t, invStr)
+	assert.Contains(t, targets, K8sDiscoveryTargetKyverno)
+
+	options := connectionOptionsFromInventory(t, invStr)
+	assert.Equal(t, "false", options[k8sOptionKyvernoDefaultMappings])
+	assert.Equal(t, "true", options[k8sOptionKyvernoMirrorPolicyExceptions])
+	assert.Equal(t, "requires-approval", options[k8sOptionKyvernoMirroredExceptionApproval])
+	assert.Equal(t, "WORKAROUND", options[k8sOptionKyvernoMirroredExceptionAction])
+	assert.Equal(t, "false", options[k8sOptionKyvernoFailExpiredPolicyExceptions])
+	assert.Equal(t, "false", options[k8sOptionKyvernoReportUnmappedPolicyExceptions])
+	assert.Equal(t, "false", options[k8sOptionKyvernoReportUnmappedPolicyResults])
+	assert.Equal(t, "example.com/check-uid,mondoo.com/check-uid", options[k8sOptionKyvernoMappingAnnotationCheckUIDs])
+	assert.Equal(t, "example.com/check-mrn", options[k8sOptionKyvernoMappingAnnotationCheckMRNs])
+	assert.Equal(t, "example.com/policy-uid", options[k8sOptionKyvernoMappingAnnotationPolicyUIDs])
+	assert.Equal(t, "example.com/reason", options[k8sOptionKyvernoMappingAnnotationReasons])
+	assert.Equal(t, "example.com/valid-until", options[k8sOptionKyvernoExceptionAnnotationValidUntil])
+	assert.Equal(t, "example.com/justification", options[k8sOptionKyvernoExceptionAnnotationJustifications])
+	assert.Equal(t, "example.com/owner", options[k8sOptionKyvernoExceptionAnnotationOwners])
+	assert.Equal(t, "example.com/ticket", options[k8sOptionKyvernoExceptionAnnotationTickets])
+}
+
+func TestExternalClusterInventory_UsesKyvernoDiscoverySetting(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Kyverno: v1alpha2.KyvernoSpec{Enable: ptr.To(false)},
+			},
+		},
+	}
+	cluster := v1alpha2.ExternalCluster{
+		Name:                   "remote-cluster",
+		ContainerImageScanning: true,
+	}
+
+	invStr, err := ExternalClusterInventory("", testClusterUID, cluster, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err, "unexpected error generating inventory")
+
+	targets := discoveryTargetsFromInventory(t, invStr)
+	assert.NotContains(t, targets, K8sDiscoveryTargetKyverno)
+	assert.Contains(t, targets, "container-images")
+
+	options := connectionOptionsFromInventory(t, invStr)
+	assert.NotContains(t, options, k8sOptionKyvernoDefaultMappings)
+}
+
+func TestExternalClusterInventory_WithKyvernoOptions(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Kyverno: v1alpha2.KyvernoSpec{
+					Enable: ptr.To(true),
+					MappingAnnotations: v1alpha2.KyvernoMappingAnnotationsSpec{
+						CheckUIDs: []string{"example.com/check-uid"},
+					},
+					ExceptionAnnotations: v1alpha2.KyvernoExceptionAnnotationsSpec{
+						Owners: []string{"example.com/owner"},
+					},
+				},
+			},
+		},
+	}
+	cluster := v1alpha2.ExternalCluster{Name: "remote-cluster"}
+
+	invStr, err := ExternalClusterInventory("", testClusterUID, cluster, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err, "unexpected error generating inventory")
+
+	targets := discoveryTargetsFromInventory(t, invStr)
+	assert.Contains(t, targets, K8sDiscoveryTargetKyverno)
+
+	options := connectionOptionsFromInventory(t, invStr)
+	assert.Equal(t, "true", options[k8sOptionKyvernoDefaultMappings])
+	assert.Equal(t, "false", options[k8sOptionKyvernoMirrorPolicyExceptions])
+	assert.Equal(t, "externally-approved", options[k8sOptionKyvernoMirroredExceptionApproval])
+	assert.Equal(t, "RISK_ACCEPTED", options[k8sOptionKyvernoMirroredExceptionAction])
+	assert.Equal(t, "true", options[k8sOptionKyvernoFailExpiredPolicyExceptions])
+	assert.Equal(t, "true", options[k8sOptionKyvernoReportUnmappedPolicyExceptions])
+	assert.Equal(t, "true", options[k8sOptionKyvernoReportUnmappedPolicyResults])
+	assert.Equal(t, "example.com/check-uid", options[k8sOptionKyvernoMappingAnnotationCheckUIDs])
+	assert.Equal(t, "example.com/owner", options[k8sOptionKyvernoExceptionAnnotationOwners])
+}
+
+func TestInventory_ReturnsErrorForKyvernoAnnotationKeyWithComma(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Kyverno: v1alpha2.KyvernoSpec{
+					Enable: ptr.To(true),
+					MappingAnnotations: v1alpha2.KyvernoMappingAnnotationsSpec{
+						CheckUIDs: []string{"example.com/check,uid"},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "kyverno-mapping-annotation-check-uids value \"example.com/check,uid\" must not contain commas")
+}
+
 func TestCronJob_WithProxy(t *testing.T) {
 	m := testAuditConfig()
 	cfg := v1alpha2.MondooOperatorConfig{
@@ -175,6 +394,33 @@ func TestCronJob_WithProxy(t *testing.T) {
 	envMap := envToMap(container.Env)
 	assert.Equal(t, "http://proxy:8080", envMap["HTTP_PROXY"])
 	assert.Equal(t, "https://proxy:8443", envMap["HTTPS_PROXY"])
+}
+
+func discoveryTargetsFromInventory(t *testing.T, invStr string) []string {
+	t.Helper()
+
+	inv := inventoryFromString(t, invStr)
+	require.NotEmpty(t, inv.Spec.Assets, "expected at least one asset")
+	require.NotEmpty(t, inv.Spec.Assets[0].Connections, "expected at least one connection")
+	require.NotNil(t, inv.Spec.Assets[0].Connections[0].Discover, "expected discovery settings")
+	return inv.Spec.Assets[0].Connections[0].Discover.Targets
+}
+
+func connectionOptionsFromInventory(t *testing.T, invStr string) map[string]string {
+	t.Helper()
+
+	inv := inventoryFromString(t, invStr)
+	require.NotEmpty(t, inv.Spec.Assets, "expected at least one asset")
+	require.NotEmpty(t, inv.Spec.Assets[0].Connections, "expected at least one connection")
+	return inv.Spec.Assets[0].Connections[0].Options
+}
+
+func inventoryFromString(t *testing.T, invStr string) *inventory.Inventory {
+	t.Helper()
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	return &inv
 }
 
 func TestCronJob_HttpsProxyPreferred(t *testing.T) {
