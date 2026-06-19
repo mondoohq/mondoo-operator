@@ -342,6 +342,17 @@ func TestCronJob_WIF_EKS(t *testing.T) {
 	assert.Equal(t, "arn:aws:iam::123456789012:role/ecr-reader", initEnv["ROLE_ARN"])
 }
 
+func TestCronJob_Suspend(t *testing.T) {
+	m := testAuditConfig()
+	m.Spec.Containers.Suspend = true
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", "", testClusterUID, "", m, cfg)
+
+	require.NotNil(t, cj.Spec.Suspend)
+	assert.True(t, *cj.Spec.Suspend)
+}
+
 func TestCronJob_WIF_AKS(t *testing.T) {
 	m := testAuditConfig()
 	m.Spec.Containers.WorkloadIdentity = &v1alpha2.WorkloadIdentityConfig{
