@@ -113,6 +113,12 @@ type KubernetesResources struct {
 	// and scans them immediately rather than waiting for the CronJob schedule.
 	ResourceWatcher ResourceWatcherSpec `json:"resourceWatcher,omitempty"`
 
+	// ActiveDeadline sets a time limit for the scan Job. If the scan does not complete within
+	// this duration, the Job is terminated. Specified as a Go duration string (e.g. "30m", "1h").
+	// No default — if unset, the Job runs until completion or failure.
+	// +optional
+	ActiveDeadline *metav1.Duration `json:"activeDeadline,omitempty"`
+
 	// ExternalClusters defines remote K8s clusters to scan from this operator instance.
 	// Each external cluster will have its own CronJob created with the appropriate kubeconfig.
 	// +optional
@@ -459,6 +465,13 @@ type Containers struct {
 	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// ActiveDeadline sets a time limit for the scan Job. If the scan does not complete within
+	// this duration, the Job is terminated. Useful for bounding runaway scans that enter GC
+	// thrashing before OOM. Specified as a Go duration string (e.g. "30m", "1h").
+	// No default — if unset, the Job runs until completion or OOM.
+	// +optional
+	ActiveDeadline *metav1.Duration `json:"activeDeadline,omitempty"`
 
 	// WorkloadIdentity configures Workload Identity Federation for authenticating to cloud
 	// container registries (GCR/Artifact Registry, ECR, ACR) without static imagePullSecrets.

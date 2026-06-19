@@ -22,6 +22,7 @@ func UpdateCronJobFields(obj, desired *batchv1.CronJob) {
 	obj.Spec.JobTemplate.Labels = desired.Spec.JobTemplate.Labels
 	obj.Spec.JobTemplate.Annotations = desired.Spec.JobTemplate.Annotations
 	obj.Spec.JobTemplate.Spec.BackoffLimit = desired.Spec.JobTemplate.Spec.BackoffLimit
+	obj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds = desired.Spec.JobTemplate.Spec.ActiveDeadlineSeconds
 
 	obj.Spec.JobTemplate.Spec.Template.Labels = desired.Spec.JobTemplate.Spec.Template.Labels
 	obj.Spec.JobTemplate.Spec.Template.Annotations = desired.Spec.JobTemplate.Spec.Template.Annotations

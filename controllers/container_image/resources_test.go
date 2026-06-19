@@ -7,9 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
@@ -156,6 +159,52 @@ func TestCronJob_PrivateRegistrySecretMountsDockerConfig(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "pull-secrets volume mount should be present")
+}
+
+func TestCronJob_HasGOMEMLIMIT(t *testing.T) {
+	m := testAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", "", testClusterUID, "", m, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	envMap := envToMap(container.Env)
+	assert.Equal(t, "900000000", envMap["GOMEMLIMIT"])
+}
+
+func TestCronJob_GOMEMLIMIT_CustomResources(t *testing.T) {
+	m := testAuditConfig()
+	m.Spec.Containers.Resources = corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("512Mi"),
+		},
+	}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", "", testClusterUID, "", m, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	envMap := envToMap(container.Env)
+	// 512Mi = 536870912 bytes, 90% = 483183820.8 → "483183821"
+	assert.Equal(t, "483183821", envMap["GOMEMLIMIT"])
+}
+
+func TestCronJob_ActiveDeadline(t *testing.T) {
+	m := testAuditConfig()
+	m.Spec.Containers.ActiveDeadline = &metav1.Duration{Duration: 30 * time.Minute}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", "", testClusterUID, "", m, cfg)
+	require.NotNil(t, cj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
+	assert.Equal(t, int64(1800), *cj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
+}
+
+func TestCronJob_ActiveDeadline_Unset(t *testing.T) {
+	m := testAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", "", testClusterUID, "", m, cfg)
+	assert.Nil(t, cj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
 }
 
 func TestCronJob_HasMondooTmpDir(t *testing.T) {

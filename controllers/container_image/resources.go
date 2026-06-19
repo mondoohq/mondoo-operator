@@ -13,6 +13,7 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/feature_flags"
+	"go.mondoo.com/mondoo-operator/pkg/utils/gomemlimit"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	mondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	"go.mondoo.com/mql/v13/providers-sdk/v1/inventory"
@@ -48,9 +49,13 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 		}
 	}
 
+	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Containers.Resources, k8s.DefaultContainerScanningResources)
+	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
+
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_TMP_DIR", Value: "/tmp"})
+	envVars = append(envVars, corev1.EnvVar{Name: "GOMEMLIMIT", Value: gcLimit})
 
 	// Add proxy environment variables from MondooOperatorConfig only if SkipProxyForCnspec is false
 	if !cfg.Spec.SkipProxyForCnspec {
@@ -85,7 +90,7 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 									ImagePullPolicy: corev1.PullIfNotPresent,
 									Name:            "mondoo-containers-scan",
 									Command:         cmd,
-									Resources:       k8s.ResourcesRequirementsWithDefaults(m.Spec.Containers.Resources, k8s.DefaultContainerScanningResources),
+									Resources:       containerResources,
 									SecurityContext: &corev1.SecurityContext{
 										AllowPrivilegeEscalation: ptr.To(false),
 										ReadOnlyRootFilesystem:   ptr.To(true),
@@ -160,6 +165,11 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 			SuccessfulJobsHistoryLimit: ptr.To(int32(1)),
 			FailedJobsHistoryLimit:     ptr.To(int32(1)),
 		},
+	}
+
+	if d := m.Spec.Containers.ActiveDeadline; d != nil {
+		seconds := int64(d.Seconds())
+		cronjob.Spec.JobTemplate.Spec.ActiveDeadlineSeconds = &seconds
 	}
 
 	// Add WIF support for cloud registry authentication

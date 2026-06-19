@@ -95,6 +95,13 @@ spec:
                 type: object
               containers:
                 properties:
+                  activeDeadline:
+                    description: |-
+                      ActiveDeadline sets a time limit for the scan Job. If the scan does not complete within
+                      this duration, the Job is terminated. Useful for bounding runaway scans that enter GC
+                      thrashing before OOM. Specified as a Go duration string (e.g. "30m", "1h").
+                      No default — if unset, the Job runs until completion or OOM.
+                    type: string
                   enable:
                     type: boolean
                   env:
@@ -464,6 +471,12 @@ spec:
                 type: object
               kubernetesResources:
                 properties:
+                  activeDeadline:
+                    description: |-
+                      ActiveDeadline sets a time limit for the scan Job. If the scan does not complete within
+                      this duration, the Job is terminated. Specified as a Go duration string (e.g. "30m", "1h").
+                      No default — if unset, the Job runs until completion or failure.
+                    type: string
                   containerImageScanning:
                     description: |-
                       DEPRECATED: ContainerImageScanning determines whether container images are being scanned. The current implementation

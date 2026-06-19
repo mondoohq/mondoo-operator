@@ -9,6 +9,7 @@ package v1alpha2
 
 import (
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -52,6 +53,11 @@ func (in *Containers) DeepCopyInto(out *Containers) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.ActiveDeadline != nil {
+		in, out := &in.ActiveDeadline, &out.ActiveDeadline
+		*out = new(metav1.Duration)
+		**out = **in
 	}
 	if in.WorkloadIdentity != nil {
 		in, out := &in.WorkloadIdentity, &out.WorkloadIdentity
@@ -255,6 +261,11 @@ func (in *Image) DeepCopy() *Image {
 func (in *KubernetesResources) DeepCopyInto(out *KubernetesResources) {
 	*out = *in
 	in.ResourceWatcher.DeepCopyInto(&out.ResourceWatcher)
+	if in.ActiveDeadline != nil {
+		in, out := &in.ActiveDeadline, &out.ActiveDeadline
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	if in.ExternalClusters != nil {
 		in, out := &in.ExternalClusters, &out.ExternalClusters
 		*out = make([]ExternalCluster, len(*in))
