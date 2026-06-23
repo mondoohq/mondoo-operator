@@ -30,6 +30,13 @@ const (
 
 	CronJobNameSuffix      = "-containers-scan"
 	InventoryConfigMapBase = "-containers-inventory"
+
+	// Container image scanning loads tar headers into memory for every connected
+	// image. The default maxConnections (50) can load all target images at once,
+	// causing OOM. This limit keeps at most N image filesystems resident.
+	// Not applied to k8s-resource or node scanning — those scan API objects or a
+	// single local filesystem, not container images.
+	defaultMaxProviderConnections = "10"
 )
 
 func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
@@ -57,7 +64,7 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_TMP_DIR", Value: "/tmp"})
 	envVars = append(envVars, corev1.EnvVar{Name: "GOMEMLIMIT", Value: gcLimit})
-	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_MAX_PROVIDER_CONNECTIONS", Value: "10"})
+	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_MAX_PROVIDER_CONNECTIONS", Value: defaultMaxProviderConnections})
 
 	// Add proxy environment variables from MondooOperatorConfig only if SkipProxyForCnspec is false
 	if !cfg.Spec.SkipProxyForCnspec {
