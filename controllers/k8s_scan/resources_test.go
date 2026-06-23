@@ -233,6 +233,32 @@ func TestCronJob_WithImagePullSecrets(t *testing.T) {
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
 }
 
+func TestCronJob_HasReportTypeNone(t *testing.T) {
+	m := testAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", m, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	cmd := strings.Join(container.Command, " ")
+	assert.Contains(t, cmd, "--report-type none")
+}
+
+func TestExternalClusterCronJob_HasReportTypeNone(t *testing.T) {
+	m := testAuditConfig()
+	cluster := v1alpha2.ExternalCluster{
+		Name:                "remote",
+		KubeconfigSecretRef: &corev1.LocalObjectReference{Name: "kubeconfig-secret"},
+	}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := ExternalClusterCronJob("test-image:latest", cluster, m, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	cmd := strings.Join(container.Command, " ")
+	assert.Contains(t, cmd, "--report-type none")
+}
+
 func TestCronJob_HasGOMEMLIMIT(t *testing.T) {
 	m := testAuditConfig()
 	cfg := v1alpha2.MondooOperatorConfig{}

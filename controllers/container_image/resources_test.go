@@ -207,6 +207,28 @@ func TestCronJob_ActiveDeadline_Unset(t *testing.T) {
 	assert.Nil(t, cj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds)
 }
 
+func TestCronJob_HasMaxProviderConnections(t *testing.T) {
+	m := testAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", "", testClusterUID, "", m, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	envMap := envToMap(container.Env)
+	assert.Equal(t, defaultMaxProviderConnections, envMap["MONDOO_MAX_PROVIDER_CONNECTIONS"])
+}
+
+func TestCronJob_HasReportTypeNone(t *testing.T) {
+	m := testAuditConfig()
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", "", testClusterUID, "", m, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	cmd := strings.Join(container.Command, " ")
+	assert.Contains(t, cmd, "--report-type none")
+}
+
 func TestCronJob_HasMondooTmpDir(t *testing.T) {
 	m := testAuditConfig()
 	cfg := v1alpha2.MondooOperatorConfig{}
