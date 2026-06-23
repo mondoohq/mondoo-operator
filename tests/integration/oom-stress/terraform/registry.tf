@@ -65,11 +65,11 @@ locals {
 
   # Build the crane copy script. Each line copies one image from Docker Hub to
   # the local registry. crane streams layers directly (no local disk needed).
-  crane_login = var.docker_hub_username != "" ? "crane auth login -u '${var.docker_hub_username}' -p '${var.docker_hub_password}' index.docker.io" : "echo 'No Docker Hub credentials, using anonymous pulls'"
+  crane_login = var.docker_hub_username != "" ? "crane auth login -u \"$DOCKER_HUB_USERNAME\" -p \"$DOCKER_HUB_PASSWORD\" index.docker.io" : "echo 'No Docker Hub credentials, using anonymous pulls'"
 
   crane_copies = join("\n", [
     for img in var.stress_images :
-    "echo \"Copying ${img.image}...\" && crane copy \"docker.io/library/${img.image}\" \"${local.registry_host}/${img.image}\" --insecure || echo \"WARN: failed to copy ${img.image}\""
+    "echo \"Copying ${img.image}...\" && crane copy \"docker.io/library/${img.image}\" \"${local.registry_host}/${img.image}\" --insecure"
   ])
 }
 
@@ -107,6 +107,22 @@ resource "kubernetes_job_v1" "seed_registry" {
             echo "All images seeded."
           EOT
           ]
+
+          dynamic "env" {
+            for_each = var.docker_hub_username != "" ? [1] : []
+            content {
+              name  = "DOCKER_HUB_USERNAME"
+              value = var.docker_hub_username
+            }
+          }
+
+          dynamic "env" {
+            for_each = var.docker_hub_username != "" ? [1] : []
+            content {
+              name  = "DOCKER_HUB_PASSWORD"
+              value = var.docker_hub_password
+            }
+          }
 
           resources {
             requests = { memory = "64Mi", cpu = "100m" }
