@@ -14,11 +14,13 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mondoov2 "go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -79,6 +81,7 @@ var defaultStressImages = []stressImage{
 type OOMStressSuite struct {
 	AuditConfigBaseSuite
 	targetNamespaceCreated bool
+	registryHost           string
 }
 
 func (s *OOMStressSuite) SetupSuite() {
@@ -108,14 +111,152 @@ func (s *OOMStressSuite) cleanupTargetNamespace() {
 	s.targetNamespaceCreated = false
 }
 
-// deployStressTargets creates the target namespace and deploys pods with
-// distinct package-heavy images for the scanner to discover.
+// deployLocalRegistry deploys an in-cluster Docker registry and seeds it with
+// all stress images using crane. This avoids Docker Hub rate limits during
+// scanning — Docker Hub is only hit once (by the crane Job), and the scanner
+// pulls from the local registry.
+func (s *OOMStressSuite) deployLocalRegistry(images []stressImage) {
+	ctx := context.Background()
+	registryLabels := map[string]string{"app": "oom-stress-registry"}
+	s.registryHost = fmt.Sprintf("registry.%s.svc.cluster.local", oomStressNamespace)
+
+	replicas := int32(1)
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "registry",
+			Namespace: oomStressNamespace,
+			Labels:    registryLabels,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{MatchLabels: registryLabels},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: registryLabels},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:  "registry",
+						Image: "registry:2",
+						Ports: []corev1.ContainerPort{{ContainerPort: 5000}},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("64Mi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+						},
+					}},
+				},
+			},
+		},
+	}
+	s.Require().NoError(s.testCluster.K8sHelper.Clientset.Create(ctx, dep), "Failed to create registry deployment")
+
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "registry",
+			Namespace: oomStressNamespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: registryLabels,
+			Ports: []corev1.ServicePort{{
+				Port:       80,
+				TargetPort: intstr.FromInt32(5000),
+			}},
+		},
+	}
+	s.Require().NoError(s.testCluster.K8sHelper.Clientset.Create(ctx, svc), "Failed to create registry service")
+
+	zap.S().Info("Waiting for registry pod to be ready...")
+	s.Require().True(
+		s.testCluster.K8sHelper.IsPodReady("app=oom-stress-registry", oomStressNamespace),
+		"Registry pod did not become ready")
+
+	// Build the crane copy script.
+	var copies []string
+	for _, img := range images {
+		copies = append(copies, fmt.Sprintf(
+			`echo "Copying %s..." && crane copy "docker.io/library/%s" "%s/%s" --insecure`,
+			img.image, img.image, s.registryHost, img.image))
+	}
+
+	var loginCmd string
+	if u := os.Getenv("DOCKER_HUB_USERNAME"); u != "" {
+		p := os.Getenv("DOCKER_HUB_PASSWORD")
+		loginCmd = fmt.Sprintf("crane auth login -u '%s' -p '%s' index.docker.io", u, p)
+	} else {
+		loginCmd = "echo 'No Docker Hub credentials, using anonymous pulls'"
+	}
+
+	script := fmt.Sprintf("set -e\n%s\n%s\necho 'All images seeded.'",
+		loginCmd, strings.Join(copies, "\n"))
+
+	backoff := int32(2)
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "seed-registry",
+			Namespace: oomStressNamespace,
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: &backoff,
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					InitContainers: []corev1.Container{{
+						Name:    "wait-for-registry",
+						Image:   "busybox:1.36",
+						Command: []string{"sh", "-c", fmt.Sprintf("until wget -qO- http://%s/v2/ >/dev/null 2>&1; do echo 'waiting for registry...'; sleep 2; done", s.registryHost)},
+					}},
+					Containers: []corev1.Container{{
+						Name:    "crane",
+						Image:   "gcr.io/go-containerregistry/crane:latest",
+						Command: []string{"sh", "-c", script},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("64Mi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+						},
+					}},
+				},
+			},
+		},
+	}
+	s.Require().NoError(s.testCluster.K8sHelper.Clientset.Create(ctx, job), "Failed to create seed-registry job")
+
+	zap.S().Info("Waiting for seed-registry job to complete (this pulls from Docker Hub once)...")
+	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		cur := &batchv1.Job{}
+		if err := s.testCluster.K8sHelper.Clientset.Get(ctx, client.ObjectKeyFromObject(job), cur); err != nil {
+			return false, nil
+		}
+		for _, c := range cur.Status.Conditions {
+			if c.Type == batchv1.JobComplete && c.Status == corev1.ConditionTrue {
+				return true, nil
+			}
+			if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
+				return false, fmt.Errorf("seed-registry job failed: %s", c.Message)
+			}
+		}
+		return false, nil
+	})
+	s.Require().NoError(err, "seed-registry job did not complete successfully")
+
+	zap.S().Info("Local registry seeded with all stress images.")
+}
+
+// deployStressTargets creates the target namespace, deploys a local registry,
+// seeds it with images, and creates pods referencing the local registry.
 func (s *OOMStressSuite) deployStressTargets(images []stressImage) {
 	ctx := context.Background()
 
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: oomStressNamespace}}
 	s.Require().NoError(s.testCluster.K8sHelper.Clientset.Create(ctx, ns), "Failed to create stress target namespace")
 	s.targetNamespaceCreated = true
+
+	s.deployLocalRegistry(images)
 
 	for _, img := range images {
 		pod := &corev1.Pod{
@@ -130,7 +271,7 @@ func (s *OOMStressSuite) deployStressTargets(images []stressImage) {
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{
 					Name:    "target",
-					Image:   img.image,
+					Image:   fmt.Sprintf("%s/%s", s.registryHost, img.image),
 					Command: []string{"sleep", "infinity"},
 				}},
 			},

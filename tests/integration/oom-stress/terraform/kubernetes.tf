@@ -30,10 +30,12 @@ resource "kubernetes_pod_v1" "stress_target" {
   spec {
     container {
       name    = "target"
-      image   = each.value.image
+      image   = "${local.registry_host}/${each.value.image}"
       command = ["sleep", "infinity"]
     }
   }
+
+  depends_on = [kubernetes_job_v1.seed_registry]
 }
 
 # --- Mondoo credentials ---
@@ -52,31 +54,6 @@ resource "kubernetes_secret_v1" "mondoo_client" {
     # Don't destroy the secret if the operator is still running — it causes
     # reconcile errors. The operator namespace cleanup handles this.
     prevent_destroy = false
-  }
-}
-
-# --- Docker Hub pull secret (avoids rate limits) ---
-
-resource "kubernetes_secret_v1" "docker_pull" {
-  count = var.docker_hub_username != "" ? 1 : 0
-
-  metadata {
-    name      = "mondoo-private-registries-secrets"
-    namespace = var.operator_namespace
-  }
-
-  type = "kubernetes.io/dockerconfigjson"
-
-  data = {
-    ".dockerconfigjson" = jsonencode({
-      auths = {
-        "https://index.docker.io/v1/" = {
-          username = var.docker_hub_username
-          password = var.docker_hub_password
-          auth     = base64encode("${var.docker_hub_username}:${var.docker_hub_password}")
-        }
-      }
-    })
   }
 }
 
