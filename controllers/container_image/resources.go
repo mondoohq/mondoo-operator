@@ -39,6 +39,7 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 		"cnspec", "scan", "k8s",
 		"--config", "/etc/opt/mondoo/config/mondoo.yml",
 		"--inventory-file", "/etc/opt/mondoo/config/inventory.yml",
+		"--report-type", "none",
 	}
 
 	// Only add proxy settings if SkipProxyForCnspec is false
@@ -56,6 +57,7 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_TMP_DIR", Value: "/tmp"})
 	envVars = append(envVars, corev1.EnvVar{Name: "GOMEMLIMIT", Value: gcLimit})
+	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_MAX_PROVIDER_CONNECTIONS", Value: "10"})
 
 	// Add proxy environment variables from MondooOperatorConfig only if SkipProxyForCnspec is false
 	if !cfg.Spec.SkipProxyForCnspec {

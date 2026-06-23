@@ -59,6 +59,7 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 		"cnspec", "scan", "k8s",
 		"--config", "/etc/opt/mondoo/config/mondoo.yml",
 		"--inventory-file", "/etc/opt/mondoo/config/inventory.yml",
+		"--report-type", "none",
 	}
 
 	// Only add proxy if configured and not skipped for cnspec
@@ -201,6 +202,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 		"cnspec", "scan", "k8s",
 		"--config", "/etc/opt/mondoo/config/mondoo.yml",
 		"--inventory-file", "/etc/opt/mondoo/config/inventory.yml",
+		"--report-type", "none",
 	}
 
 	// Only add proxy if configured and not skipped for cnspec
