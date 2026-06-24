@@ -126,6 +126,18 @@ func TestResources(t *testing.T) {
 	}
 }
 
+func TestCronJob_HasReportTypeNone(t *testing.T) {
+	m := testMondooAuditConfig()
+	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", node, m, false, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	cmd := strings.Join(container.Command, " ")
+	assert.Contains(t, cmd, "--report-type none")
+}
+
 func TestResources_GOMEMLIMIT(t *testing.T) {
 	tests := []struct {
 		name               string

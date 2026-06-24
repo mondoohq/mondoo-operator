@@ -45,6 +45,7 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 		"cnspec", "scan", "local",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
 		"--inventory-template", "/etc/opt/mondoo/inventory_template.yml",
+		"--report-type", "none",
 	}
 
 	// Add API proxy if configured (respect SkipProxyForCnspec since node scanning uses cnspec)
