@@ -95,6 +95,13 @@ spec:
                 type: object
               containers:
                 properties:
+                  activeDeadline:
+                    description: |-
+                      ActiveDeadline sets a time limit for the scan Job. If the scan does not complete within
+                      this duration, the Job is terminated. Useful for bounding runaway scans that enter GC
+                      thrashing before OOM. Specified as a Go duration string (e.g. "30m", "1h").
+                      No default — if unset, the Job runs until completion or OOM.
+                    type: string
                   enable:
                     type: boolean
                   env:
@@ -341,6 +348,13 @@ spec:
                           clusterName:
                             description: ClusterName is the AKS cluster name.
                             type: string
+                          endpoint:
+                            description: |-
+                              Endpoint optionally overrides the Kubernetes API server endpoint URL.
+                              When set, the init container uses this URL instead of the auto-discovered endpoint.
+                              Must start with "https://".
+                            pattern: ^https://
+                            type: string
                           loginServer:
                             description: |-
                               LoginServer is the ACR login server URL (e.g., "myregistry.azurecr.io").
@@ -370,6 +384,13 @@ spec:
                           clusterName:
                             description: ClusterName is the EKS cluster name.
                             type: string
+                          endpoint:
+                            description: |-
+                              Endpoint optionally overrides the Kubernetes API server endpoint URL.
+                              When set, the init container uses this URL instead of the auto-discovered endpoint.
+                              Must start with "https://".
+                            pattern: ^https://
+                            type: string
                           region:
                             description: Region is the AWS region.
                             type: string
@@ -394,6 +415,13 @@ spec:
                             type: string
                           clusterName:
                             description: ClusterName is the GKE cluster name.
+                            type: string
+                          endpoint:
+                            description: |-
+                              Endpoint optionally overrides the Kubernetes API server endpoint URL.
+                              When set, the init container uses this URL instead of the auto-discovered endpoint.
+                              Must start with "https://".
+                            pattern: ^https://
                             type: string
                           googleServiceAccount:
                             description: |-
@@ -443,6 +471,12 @@ spec:
                 type: object
               kubernetesResources:
                 properties:
+                  activeDeadline:
+                    description: |-
+                      ActiveDeadline sets a time limit for the scan Job. If the scan does not complete within
+                      this duration, the Job is terminated. Specified as a Go duration string (e.g. "30m", "1h").
+                      No default — if unset, the Job runs until completion or failure.
+                    type: string
                   containerImageScanning:
                     description: |-
                       DEPRECATED: ContainerImageScanning determines whether container images are being scanned. The current implementation
@@ -465,7 +499,8 @@ spec:
                         filtering:
                           description: |-
                             Filtering allows namespace filtering specific to this external cluster.
-                            If not specified, uses the global filtering from MondooAuditConfigSpec.Filtering.
+                            If omitted, the external cluster inherits the global filtering from MondooAuditConfigSpec.Filtering.
+                            Set an empty filtering object to scan all namespaces for this external cluster even when global filtering is configured.
                           properties:
                             namespaces:
                               properties:
@@ -708,6 +743,13 @@ spec:
                                 clusterName:
                                   description: ClusterName is the AKS cluster name.
                                   type: string
+                                endpoint:
+                                  description: |-
+                                    Endpoint optionally overrides the Kubernetes API server endpoint URL.
+                                    When set, the init container uses this URL instead of the auto-discovered endpoint.
+                                    Must start with "https://".
+                                  pattern: ^https://
+                                  type: string
                                 loginServer:
                                   description: |-
                                     LoginServer is the ACR login server URL (e.g., "myregistry.azurecr.io").
@@ -737,6 +779,13 @@ spec:
                                 clusterName:
                                   description: ClusterName is the EKS cluster name.
                                   type: string
+                                endpoint:
+                                  description: |-
+                                    Endpoint optionally overrides the Kubernetes API server endpoint URL.
+                                    When set, the init container uses this URL instead of the auto-discovered endpoint.
+                                    Must start with "https://".
+                                  pattern: ^https://
+                                  type: string
                                 region:
                                   description: Region is the AWS region.
                                   type: string
@@ -761,6 +810,13 @@ spec:
                                   type: string
                                 clusterName:
                                   description: ClusterName is the GKE cluster name.
+                                  type: string
+                                endpoint:
+                                  description: |-
+                                    Endpoint optionally overrides the Kubernetes API server endpoint URL.
+                                    When set, the init container uses this URL instead of the auto-discovered endpoint.
+                                    Must start with "https://".
+                                  pattern: ^https://
                                   type: string
                                 googleServiceAccount:
                                   description: |-
