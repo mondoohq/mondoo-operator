@@ -146,7 +146,7 @@ jobs:
 
       - name: Scan Image
         if: matrix.arch == 'amd64'
-        uses: mondoohq/actions/docker-image@20caefcb2d1258d051149913cde321a698b1fdb9 # v13.1.0
+        uses: mondoohq/actions/docker-image@b41754752763419780430abef5e35842ba2bec66 # v13.2.0
         env:
           MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
         with:
