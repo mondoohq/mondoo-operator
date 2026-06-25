@@ -85,6 +85,19 @@ spec:
     #     #   namespaces:
     #     #     exclude:
     #     #       - kube-system
+    #     #   namespaceLabelSelector:
+    #     #     matchLabels:
+    #     #       tenant: team-a
+    #     #     matchExpressions:
+    #     #       - key: environment
+    #     #         operator: In
+    #     #         values: ["prod", "stage"]
+    #     #   objectLabelSelector:
+    #     #     matchLabels:
+    #     #       app: frontend
+    #     #     matchExpressions:
+    #     #       - key: scan.mondoo.com/disabled
+    #     #         operator: DoesNotExist
     #
     # 2. Service Account Token (simpler alternative):
     # externalClusters:
@@ -181,3 +194,18 @@ spec:
       # include:
       #   - default
       #   - production
+    # Select namespaces by label for scheduled scans.
+    # namespaceLabelSelector:
+    #   matchLabels:
+    #     tenant: team-a
+    #   matchExpressions:
+    #     - key: environment
+    #       operator: In
+    #       values: ["prod", "stage"]
+    # Select Kubernetes objects by label for scheduled scans.
+    # objectLabelSelector:
+    #   matchLabels:
+    #     app: frontend
+    #   matchExpressions:
+    #     - key: scan.mondoo.com/disabled
+    #       operator: DoesNotExist

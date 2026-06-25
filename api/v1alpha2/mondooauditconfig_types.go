@@ -50,6 +50,14 @@ type MondooAuditConfigSpec struct {
 
 type Filtering struct {
 	Namespaces FilteringSpec `json:"namespaces,omitempty"`
+	// NamespaceLabelSelector selects Kubernetes namespaces by their own labels.
+	// It is evaluated in addition to namespace include/exclude filtering.
+	// +optional
+	NamespaceLabelSelector *metav1.LabelSelector `json:"namespaceLabelSelector,omitempty"`
+	// ObjectLabelSelector selects Kubernetes objects by their own labels.
+	// It is passed to cnspec Kubernetes discovery for scheduled scans.
+	// +optional
+	ObjectLabelSelector *metav1.LabelSelector `json:"objectLabelSelector,omitempty"`
 }
 
 type FilteringSpec struct {

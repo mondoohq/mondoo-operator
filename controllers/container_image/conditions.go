@@ -4,6 +4,8 @@
 package container_image
 
 import (
+	"errors"
+
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -52,4 +54,22 @@ func updateImageScanningConditions(config *v1alpha2.MondooAuditConfig, degradedS
 
 	config.Status.Conditions = mondoo.SetMondooAuditCondition(
 		config.Status.Conditions, v1alpha2.K8sContainerImageScanningDegraded, status, reason, msg, updateCheck, affectedPods, memoryLimit)
+}
+
+func updateImageScanningConfigErrorCondition(config *v1alpha2.MondooAuditConfig, err error) {
+	reason := "KubernetesContainerImageScanConfigInvalid"
+	var labelSelectorErr invalidLabelSelectorError
+	if errors.As(err, &labelSelectorErr) {
+		reason = "InvalidLabelSelector"
+	}
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(
+		config.Status.Conditions,
+		v1alpha2.K8sContainerImageScanningDegraded,
+		corev1.ConditionTrue,
+		reason,
+		err.Error(),
+		mondoo.UpdateConditionIfReasonOrMessageChange,
+		[]string{},
+		"",
+	)
 }
