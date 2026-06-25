@@ -11,6 +11,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
@@ -39,6 +40,19 @@ func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
 	assert.Equal(t, desired.Spec.Schedule, obj.Spec.Schedule)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.Containers, obj.Spec.JobTemplate.Spec.Template.Spec.Containers)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets, obj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets)
+}
+
+func TestUpdateCronJobFields_Suspend(t *testing.T) {
+	desired := &batchv1.CronJob{
+		Spec: batchv1.CronJobSpec{
+			Suspend: ptr.To(true),
+		},
+	}
+
+	obj := &batchv1.CronJob{}
+	UpdateCronJobFields(obj, desired)
+
+	assert.Equal(t, desired.Spec.Suspend, obj.Spec.Suspend)
 }
 
 func TestUpdateCronJobFields_PreservesUnmanagedFields(t *testing.T) {

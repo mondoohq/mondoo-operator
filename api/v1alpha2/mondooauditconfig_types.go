@@ -107,6 +107,9 @@ type KubernetesResources struct {
 	ContainerImageScanning bool `json:"containerImageScanning,omitempty"`
 	// Specify a custom crontab schedule for the Kubernetes resource scanning job. If not specified, the default schedule is used.
 	Schedule string `json:"schedule,omitempty"`
+	// Suspend pauses scheduled Kubernetes resource scan CronJobs without deleting the generated resources.
+	// External cluster scan CronJobs inherit this value and can also be paused individually.
+	Suspend bool `json:"suspend,omitempty"`
 
 	// ResourceWatcher configures real-time resource watching and scanning.
 	// When enabled, a deployment will be created that watches for K8s resource changes
@@ -197,6 +200,11 @@ type ExternalCluster struct {
 	// If not specified, uses the schedule from KubernetesResources.Schedule.
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
+
+	// Suspend pauses the scheduled scan CronJob for this external cluster.
+	// The CronJob is also paused when KubernetesResources.Suspend is true.
+	// +optional
+	Suspend bool `json:"suspend,omitempty"`
 
 	// Filtering allows namespace filtering specific to this external cluster.
 	// If omitted, the external cluster inherits the global filtering from MondooAuditConfigSpec.Filtering.
@@ -442,6 +450,8 @@ type Nodes struct {
 	// Schedule specifies a custom crontab schedule for the node scanning job. If not specified, the default schedule is
 	// used. Only applicable for CronJob style
 	Schedule string `json:"schedule,omitempty"`
+	// Suspend pauses scheduled node scan CronJobs without deleting generated resources. Only applicable for CronJob style.
+	Suspend bool `json:"suspend,omitempty"`
 	// IntervalTimer is the interval (in minutes) for the node scanning. The default is "60". Only applicable for Deployment
 	// style.
 	// +kubebuilder:default=60
@@ -462,6 +472,8 @@ type Containers struct {
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 	// Specify a custom crontab schedule for the container image scanning job. If not specified, the default schedule is used.
 	Schedule string `json:"schedule,omitempty"`
+	// Suspend pauses scheduled container image scan CronJobs without deleting generated resources.
+	Suspend bool `json:"suspend,omitempty"`
 	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.
 	Env []corev1.EnvVar `json:"env,omitempty"`

@@ -53,6 +53,8 @@ spec:
     enable: true
     # Cron schedule (default: random minute each hour)
     # schedule: "0 * * * *"
+    # Pause scheduled Kubernetes resource scan CronJobs without deleting them.
+    # suspend: true
 
     # Real-time resource watching (alternative to CronJob scheduling)
     # When enabled, resources are scanned immediately when they change
@@ -80,6 +82,8 @@ spec:
     #       name: prod-kubeconfig
     #     # Optional: override schedule for this cluster
     #     # schedule: "0 */2 * * *"
+    #     # Optional: pause this external cluster scan CronJob
+    #     # suspend: true
     #     # Optional: cluster-specific filtering
     #     # filtering:
     #     #   namespaces:
@@ -146,6 +150,8 @@ spec:
     enable: true
     # Cron schedule (default: daily)
     # schedule: "0 0 * * *"
+    # Pause scheduled container image scan CronJobs without deleting them.
+    # suspend: true
     resources:
       requests:
         cpu: 100m
@@ -161,6 +167,8 @@ spec:
     style: cronjob
     # Cron schedule (only for cronjob style)
     # schedule: "0 * * * *"
+    # Pause scheduled node scan CronJobs without deleting them.
+    # suspend: true
     # Interval in minutes (only for deployment style)
     # intervalTimer: 60
     resources:
