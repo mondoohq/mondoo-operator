@@ -119,6 +119,10 @@ type KubernetesResources struct {
 	// +optional
 	ActiveDeadline *metav1.Duration `json:"activeDeadline,omitempty"`
 
+	// NetworkInventory configures extended Kubernetes network inventory collection.
+	// This remains scan-time only and does not configure admission webhooks or network policy enforcement.
+	NetworkInventory NetworkInventorySpec `json:"networkInventory,omitempty"`
+
 	// ExternalClusters defines remote K8s clusters to scan from this operator instance.
 	// Each external cluster will have its own CronJob created with the appropriate kubeconfig.
 	// +optional
@@ -155,6 +159,99 @@ type ResourceWatcherSpec struct {
 	// deployments, daemonsets, statefulsets, replicasets. When true, defaults to:
 	// pods, deployments, daemonsets, statefulsets, replicasets, jobs, cronjobs, services, ingresses, namespaces
 	ResourceTypes []string `json:"resourceTypes,omitempty"`
+}
+
+// NetworkInventorySpec configures extended Kubernetes network posture inventory.
+type NetworkInventorySpec struct {
+	// Enable enables extended network inventory options in the Kubernetes scanner inventory.
+	Enable bool `json:"enable,omitempty"`
+
+	// HBN configures collection hints for HBN network resources.
+	HBN HBNNetworkInventorySpec `json:"hbn,omitempty"`
+
+	// MultiNetworkPolicy configures collection hints for secondary-interface NetworkPolicy resources.
+	MultiNetworkPolicy MultiNetworkPolicyInventorySpec `json:"multiNetworkPolicy,omitempty"`
+
+	// Classifications configures custom CIDR classifications used by network posture resources.
+	Classifications NetworkInventoryClassifications `json:"classifications,omitempty"`
+
+	// ObservedFlows configures optional flow evidence integrations.
+	ObservedFlows ObservedFlowsSpec `json:"observedFlows,omitempty"`
+}
+
+// HBNNetworkInventorySpec configures HBN network inventory collection hints.
+type HBNNetworkInventorySpec struct {
+	// Enable enables HBN resource collection hints when network inventory is enabled.
+	// +kubebuilder:default=true
+	Enable *bool `json:"enable,omitempty"`
+
+	// IncludeLegacyResources includes legacy Telekom HBN API groups in addition to current HBN resources.
+	// +kubebuilder:default=true
+	IncludeLegacyResources *bool `json:"includeLegacyResources,omitempty"`
+}
+
+// MultiNetworkPolicyInventorySpec configures secondary-interface NetworkPolicy collection hints.
+type MultiNetworkPolicyInventorySpec struct {
+	// Enable enables MultiNetworkPolicy and NetworkAttachmentDefinition collection hints when network inventory is enabled.
+	// +kubebuilder:default=true
+	Enable *bool `json:"enable,omitempty"`
+}
+
+// NetworkInventoryClassifications configures CIDR classification overrides.
+type NetworkInventoryClassifications struct {
+	// PublicCIDRs are CIDR ranges treated as public exposure ranges.
+	// +optional
+	PublicCIDRs []string `json:"publicCidrs,omitempty"`
+
+	// PrivateCIDRs are CIDR ranges treated as private/internal ranges.
+	// +optional
+	PrivateCIDRs []string `json:"privateCidrs,omitempty"`
+
+	// TrustedEgressCIDRs are CIDR ranges treated as approved egress destinations.
+	// +optional
+	TrustedEgressCIDRs []string `json:"trustedEgressCidrs,omitempty"`
+}
+
+// ObservedFlowsSpec configures optional network-flow evidence integrations.
+type ObservedFlowsSpec struct {
+	// Enable enables observed flow metadata collection. Endpoint sources remain individually opt-in;
+	// when no endpoint is enabled, the scanner receives observedFlows.enabled=true without a flow source.
+	Enable bool `json:"enable,omitempty"`
+
+	// MaxRecords limits flow records collected per scan.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1000
+	MaxRecords int `json:"maxRecords,omitempty"`
+
+	// Lookback limits how far back flow integrations may query.
+	// +kubebuilder:default="5m"
+	// +kubebuilder:validation:XValidation:rule="self.matches('^([0-9]+(\\\\.[0-9]+)?(ns|us|ms|s|m|h))+$')",message="lookback must be a Go duration such as 5m or 10s"
+	Lookback metav1.Duration `json:"lookback,omitempty"`
+
+	// Timeout limits each flow integration query.
+	// +kubebuilder:default="10s"
+	// +kubebuilder:validation:XValidation:rule="self.matches('^([0-9]+(\\\\.[0-9]+)?(ns|us|ms|s|m|h))+$')",message="timeout must be a Go duration such as 5m or 10s"
+	Timeout metav1.Duration `json:"timeout,omitempty"`
+
+	// CalicoWhisker configures optional Calico Whisker flow metadata.
+	CalicoWhisker FlowEndpointSpec `json:"calicoWhisker,omitempty"`
+
+	// CiliumHubble configures optional Cilium Hubble flow metadata.
+	CiliumHubble FlowEndpointSpec `json:"ciliumHubble,omitempty"`
+}
+
+// FlowEndpointSpec configures a namespaced Kubernetes Service endpoint for observed flow metadata.
+type FlowEndpointSpec struct {
+	// Enable enables this flow endpoint.
+	Enable bool `json:"enable,omitempty"`
+
+	// Namespace is the namespace that contains the flow endpoint Service.
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	Namespace string `json:"namespace,omitempty"`
+
+	// ServiceName is the flow endpoint Service name.
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	ServiceName string `json:"serviceName,omitempty"`
 }
 
 // ExternalCluster defines configuration for scanning a remote K8s cluster
