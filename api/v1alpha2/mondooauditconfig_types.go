@@ -67,6 +67,17 @@ type ConsoleIntegration struct {
 	Enable bool `json:"enable,omitempty"`
 }
 
+// PodScheduling defines pod placement settings for scanner workloads.
+type PodScheduling struct {
+	// NodeSelector selects nodes where scanner pods may run.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Tolerations allows scanner pods to schedule onto nodes with matching taints.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+}
+
 // Scanner defines the settings for the Mondoo scanner that will be running in the cluster. The same scanner
 // is used for scanning the Kubernetes API and the nodes.
 type Scanner struct {
@@ -74,6 +85,8 @@ type Scanner struct {
 	ServiceAccountName string                      `json:"serviceAccountName,omitempty"`
 	Image              Image                       `json:"image,omitempty"`
 	Resources          corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Scheduling configures pod placement for Kubernetes resource scanner workloads, including the resource watcher.
+	Scheduling PodScheduling `json:"scheduling,omitempty"`
 	// Number of replicas for the scanner.
 	// For enforcing mode, the minimum should be two to prevent problems during Pod failures,
 	// e.g. node failure, node scaling, etc.
@@ -439,6 +452,9 @@ const (
 type Nodes struct {
 	Enable    bool                        `json:"enable,omitempty"`
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Scheduling configures pod placement for node scanner workloads.
+	// CronJob style pins each scanner pod to a target node by nodeName, so nodeSelector only applies to DaemonSet style.
+	Scheduling PodScheduling `json:"scheduling,omitempty"`
 	// Schedule specifies a custom crontab schedule for the node scanning job. If not specified, the default schedule is
 	// used. Only applicable for CronJob style
 	Schedule string `json:"schedule,omitempty"`
@@ -460,6 +476,8 @@ type Nodes struct {
 type Containers struct {
 	Enable    bool                        `json:"enable,omitempty"`
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Scheduling configures pod placement for container image scanner workloads.
+	Scheduling PodScheduling `json:"scheduling,omitempty"`
 	// Specify a custom crontab schedule for the container image scanning job. If not specified, the default schedule is used.
 	Schedule string `json:"schedule,omitempty"`
 	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env

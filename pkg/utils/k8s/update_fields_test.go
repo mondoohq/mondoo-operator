@@ -22,6 +22,16 @@ func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{{Name: "test", Image: "test:latest"}},
+							NodeSelector: map[string]string{
+								"nodepool": "scanners",
+							},
+							Tolerations: []corev1.Toleration{
+								{
+									Key:      "sriov",
+									Operator: corev1.TolerationOpExists,
+									Effect:   corev1.TaintEffectNoSchedule,
+								},
+							},
 							ImagePullSecrets: []corev1.LocalObjectReference{
 								{Name: "my-secret"},
 								{Name: "another-secret"},
@@ -38,6 +48,8 @@ func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
 
 	assert.Equal(t, desired.Spec.Schedule, obj.Spec.Schedule)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.Containers, obj.Spec.JobTemplate.Spec.Template.Spec.Containers)
+	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.NodeSelector, obj.Spec.JobTemplate.Spec.Template.Spec.NodeSelector)
+	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.Tolerations, obj.Spec.JobTemplate.Spec.Template.Spec.Tolerations)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets, obj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets)
 }
 
@@ -88,6 +100,16 @@ func TestUpdateDeploymentFields_ImagePullSecrets(t *testing.T) {
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{Name: "test", Image: "test:latest"}},
+					NodeSelector: map[string]string{
+						"nodepool": "scanners",
+					},
+					Tolerations: []corev1.Toleration{
+						{
+							Key:      "sriov",
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
+						},
+					},
 					ImagePullSecrets: []corev1.LocalObjectReference{
 						{Name: "my-secret"},
 					},
@@ -101,6 +123,8 @@ func TestUpdateDeploymentFields_ImagePullSecrets(t *testing.T) {
 
 	assert.Equal(t, desired.Spec.Template.Spec.ImagePullSecrets, obj.Spec.Template.Spec.ImagePullSecrets)
 	assert.Equal(t, desired.Spec.Template.Spec.Containers, obj.Spec.Template.Spec.Containers)
+	assert.Equal(t, desired.Spec.Template.Spec.NodeSelector, obj.Spec.Template.Spec.NodeSelector)
+	assert.Equal(t, desired.Spec.Template.Spec.Tolerations, obj.Spec.Template.Spec.Tolerations)
 }
 
 func TestUpdateDaemonSetFields_ImagePullSecrets(t *testing.T) {
@@ -109,6 +133,16 @@ func TestUpdateDaemonSetFields_ImagePullSecrets(t *testing.T) {
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{Name: "test", Image: "test:latest"}},
+					NodeSelector: map[string]string{
+						"nodepool": "scanners",
+					},
+					Tolerations: []corev1.Toleration{
+						{
+							Key:      "sriov",
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
+						},
+					},
 					ImagePullSecrets: []corev1.LocalObjectReference{
 						{Name: "my-secret"},
 					},
@@ -122,4 +156,6 @@ func TestUpdateDaemonSetFields_ImagePullSecrets(t *testing.T) {
 
 	assert.Equal(t, desired.Spec.Template.Spec.ImagePullSecrets, obj.Spec.Template.Spec.ImagePullSecrets)
 	assert.Equal(t, desired.Spec.Template.Spec.Containers, obj.Spec.Template.Spec.Containers)
+	assert.Equal(t, desired.Spec.Template.Spec.NodeSelector, obj.Spec.Template.Spec.NodeSelector)
+	assert.Equal(t, desired.Spec.Template.Spec.Tolerations, obj.Spec.Template.Spec.Tolerations)
 }

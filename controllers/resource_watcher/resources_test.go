@@ -501,6 +501,43 @@ func TestDeployment_WithImagePullSecrets(t *testing.T) {
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
 }
 
+func TestDeployment_WithScheduling(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-config",
+			Namespace: "mondoo-operator",
+		},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable: true,
+				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
+					Enable: true,
+				},
+			},
+			Scanner: v1alpha2.Scanner{
+				Scheduling: v1alpha2.PodScheduling{
+					NodeSelector: map[string]string{
+						"nodepool": "scanners",
+					},
+					Tolerations: []corev1.Toleration{
+						{
+							Key:      "sriov",
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, v1alpha2.MondooOperatorConfig{})
+	podSpec := deployment.Spec.Template.Spec
+
+	assert.Equal(t, map[string]string{"nodepool": "scanners"}, podSpec.NodeSelector)
+	assert.Equal(t, config.Spec.Scanner.Scheduling.Tolerations, podSpec.Tolerations)
+}
+
 // envToMap converts a slice of EnvVar to a map for easy lookup.
 func envToMap(envVars []corev1.EnvVar) map[string]string {
 	m := make(map[string]string, len(envVars))
