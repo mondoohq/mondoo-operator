@@ -308,6 +308,11 @@ externalClusters:
 |-------|-------------|
 | `name` | Unique identifier for the cluster (used in CronJob names) |
 | `kubeconfigSecretRef` | Reference to Secret containing kubeconfig |
+| `serviceAccountAuth` | Service account token authentication details |
+| `oidcAuth` | OIDC refresh-token authentication details |
+| `workloadIdentity` | Cloud workload identity authentication details |
+| `spiffeAuth` | SPIFFE/SPIRE authentication details |
+| `vaultAuth` | Vault dynamic credential authentication details |
 | `schedule` | Override the default scan schedule (cron format) |
 | `filtering` | Namespace include/exclude specific to this cluster |
 | `containerImageScanning` | Enable container image scanning for this cluster |
@@ -315,7 +320,7 @@ externalClusters:
 
 ### Authentication methods
 
-The operator supports five authentication methods for external clusters. Choose the one that best fits your security requirements:
+The operator supports six authentication methods for external clusters. Choose the one that best fits your security requirements:
 
 #### 1. Kubeconfig (most flexible)
 
@@ -350,7 +355,62 @@ kubectl create secret generic prod-sa-credentials \
   --from-file=ca.crt=./ca.crt
 ```
 
-#### 3. Workload Identity Federation (cloud-native)
+#### 3. OIDC Refresh Token
+
+Use an OIDC refresh token to generate a short-lived bearer-token kubeconfig inside the scan pod at runtime. This is useful when the target Kubernetes API server is configured with OIDC authentication and you do not want to maintain a full kubeconfig Secret.
+
+```yaml
+externalClusters:
+  - name: production
+    oidcAuth:
+      server: "https://prod-cluster.example.com:6443"
+      issuerURL: "https://auth.example.com/realms/platform"
+      clientID: kubernetes
+      credentialsSecretRef:
+        name: prod-oidc-credentials
+      # Optional key overrides. Defaults are shown.
+      # refreshTokenKey: refresh-token
+      # clientSecretKey: client-secret
+      # clusterCAKey: ca.crt
+      # issuerCAKey: oidc-ca.crt
+      # Optional scopes sent with the refresh-token grant. The refresh token
+      # must already be allowed to request these scopes.
+      # scopes:
+      #   - openid
+      #   - email
+      #   - groups
+```
+
+Create the credentials Secret in the operator namespace:
+
+```bash
+kubectl create secret generic prod-oidc-credentials \
+  --namespace mondoo-operator \
+  --from-file=refresh-token=./refresh-token \
+  --from-file=client-secret=./client-secret \
+  --from-file=ca.crt=./target-cluster-ca.crt \
+  --from-file=oidc-ca.crt=./issuer-ca.crt
+```
+
+Required and optional Secret keys:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `refresh-token` | Yes | Offline refresh token exchanged by the init container for a short-lived ID token |
+| `client-secret` | No | OIDC client secret, if required by the identity provider |
+| `ca.crt` | No | Target Kubernetes API server CA certificate; inlined into the generated kubeconfig |
+| `oidc-ca.crt` | No | OIDC issuer CA certificate used by the init container during discovery and token refresh |
+
+The operator does not copy these token values into generated ConfigMaps or Secrets. The scan CronJob mounts the credentials Secret only into an init container. That init container discovers the OIDC token endpoint, exchanges the refresh token for an ID token, writes a kubeconfig containing only that bearer token into a memory-backed `emptyDir`, and mounts only that generated kubeconfig read-only into the scanner container.
+
+OIDC limitations:
+
+- OIDC credentials Secrets must live in the same namespace as the `MondooAuditConfig`.
+- The identity provider must support the OAuth2 refresh token grant and return an `id_token`.
+- The refresh token must already be issued with the `openid` scope and the claims required by the target Kubernetes API server, such as group or email claims.
+- The target cluster must already grant RBAC permissions to the OIDC user or group claims emitted by the identity provider.
+
+#### 4. Workload Identity Federation (cloud-native)
 
 Use cloud-native identity federation with no static credentials. Supports GKE, EKS, and AKS.
 
@@ -498,7 +558,7 @@ AKS prerequisites:
 
 - ClusterRole and ClusterRoleBinding on the **target cluster** (same as the GKE example above, with the managed identity's object ID as the subject `name`)
 
-#### 4. SPIFFE/SPIRE (zero-trust)
+#### 5. SPIFFE/SPIRE (zero-trust)
 
 Use SPIFFE/SPIRE for zero-trust authentication with auto-rotating X.509 certificates.
 
@@ -533,7 +593,7 @@ SPIFFE prerequisites:
 >
 > SPIFFE certificates are fetched once at the start of each scan job and are not rotated during the scan. SPIFFE SVIDs typically have a 1-hour TTL by default. For most K8s resource scans that complete within minutes, this is sufficient. If your scans consistently exceed the SVID TTL, consider increasing the TTL in your SPIRE server configuration or using a different authentication method.
 
-#### 5. HashiCorp Vault (dynamic credentials)
+#### 6. HashiCorp Vault (dynamic credentials)
 
 Use HashiCorp Vault's [Kubernetes secrets engine](https://developer.hashicorp.com/vault/docs/secrets/kubernetes) to dynamically generate short-lived service account tokens for scanning external clusters. This avoids managing static credentials.
 

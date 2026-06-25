@@ -525,7 +525,7 @@ spec:
                           description: |-
                             KubeconfigSecretRef references a Secret containing kubeconfig for the remote cluster.
                             The Secret must have a key "kubeconfig" with the kubeconfig content.
-                            Mutually exclusive with ServiceAccountAuth, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
+                            Mutually exclusive with ServiceAccountAuth, WorkloadIdentity, OIDCAuth, SPIFFEAuth, and VaultAuth.
                           properties:
                             name:
                               default: ""
@@ -544,6 +544,107 @@ spec:
                             Must be a valid Kubernetes name (lowercase, alphanumeric, hyphens allowed).
                           pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                           type: string
+                        oidcAuth:
+                          description: |-
+                            OIDCAuth configures OIDC refresh-token authentication for an external cluster scan.
+                            The scan pod generates a kubeconfig at runtime from the referenced credentials Secret.
+                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
+                          properties:
+                            clientID:
+                              description: ClientID is the OIDC client ID used by
+                                the target Kubernetes API server.
+                              minLength: 1
+                              type: string
+                            clientSecretKey:
+                              default: client-secret
+                              description: |-
+                                ClientSecretKey is the key containing the OIDC client secret.
+                                Defaults to "client-secret". The key may be absent when the OIDC provider
+                                supports refresh token grants for a public client.
+                              minLength: 1
+                              pattern: ^[A-Za-z0-9._-]+$
+                              type: string
+                            clusterCAKey:
+                              default: ca.crt
+                              description: |-
+                                ClusterCAKey is the key containing the target Kubernetes API server CA certificate.
+                                Defaults to "ca.crt". If absent and InsecureSkipTLSVerify is false, system trust is used.
+                              minLength: 1
+                              pattern: ^[A-Za-z0-9._-]+$
+                              type: string
+                            credentialsSecretRef:
+                              description: |-
+                                CredentialsSecretRef references a same-namespace Secret containing OIDC credentials.
+                                See the OIDCAuthConfig comment for the default key names.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            idTokenKey:
+                              default: id-token
+                              description: |-
+                                IDTokenKey is deprecated and ignored. The init container always refreshes
+                                a new ID token from RefreshTokenKey.
+                              minLength: 1
+                              pattern: ^[A-Za-z0-9._-]+$
+                              type: string
+                            insecureSkipTLSVerify:
+                              default: false
+                              description: |-
+                                InsecureSkipTLSVerify skips TLS verification for the target Kubernetes API server.
+                                NOT RECOMMENDED for production.
+                              type: boolean
+                            issuerCAKey:
+                              default: oidc-ca.crt
+                              description: |-
+                                IssuerCAKey is the key containing the OIDC issuer CA certificate.
+                                Defaults to "oidc-ca.crt". If absent, system trust is used for OIDC discovery and token refresh.
+                              minLength: 1
+                              pattern: ^[A-Za-z0-9._-]+$
+                              type: string
+                            issuerURL:
+                              description: |-
+                                IssuerURL is the OIDC issuer URL configured on the target Kubernetes API server.
+                                Example: "https://auth.example.com/realms/platform"
+                              pattern: ^https://.*
+                              type: string
+                            refreshTokenKey:
+                              default: refresh-token
+                              description: |-
+                                RefreshTokenKey is the key containing the OIDC refresh token.
+                                Defaults to "refresh-token".
+                              minLength: 1
+                              pattern: ^[A-Za-z0-9._-]+$
+                              type: string
+                            scopes:
+                              description: |-
+                                Scopes lists optional scopes sent with the refresh token grant. The refresh token
+                                must already be allowed to request these scopes and must include the claims used
+                                by the target Kubernetes API server.
+                              items:
+                                pattern: ^[A-Za-z0-9_./-]+$
+                                type: string
+                              type: array
+                            server:
+                              description: |-
+                                Server is the URL of the target Kubernetes API server.
+                                Example: "https://my-cluster.example.com:6443"
+                              pattern: ^https://.*
+                              type: string
+                          required:
+                          - clientID
+                          - credentialsSecretRef
+                          - issuerURL
+                          - server
+                          type: object
                         privateRegistriesPullSecretRef:
                           description: |-
                             PrivateRegistriesPullSecretRef references a Secret containing registry credentials
@@ -568,7 +669,7 @@ spec:
                         serviceAccountAuth:
                           description: |-
                             ServiceAccountAuth configures authentication using a service account token.
-                            Mutually exclusive with KubeconfigSecretRef, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
+                            Mutually exclusive with KubeconfigSecretRef, WorkloadIdentity, OIDCAuth, SPIFFEAuth, and VaultAuth.
                           properties:
                             credentialsSecretRef:
                               description: |-
@@ -605,7 +706,7 @@ spec:
                         spiffeAuth:
                           description: |-
                             SPIFFEAuth configures SPIFFE/SPIRE-based authentication using X.509 SVIDs.
-                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, and VaultAuth.
+                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, OIDCAuth, and VaultAuth.
                           properties:
                             audience:
                               description: |-
@@ -649,7 +750,7 @@ spec:
                             VaultAuth configures HashiCorp Vault Kubernetes secrets engine for dynamic credential generation.
                             The operator authenticates to Vault during reconciliation using its own service account token,
                             fetches short-lived credentials, and writes a kubeconfig Secret that the CronJob mounts.
-                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, and SPIFFEAuth.
+                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, OIDCAuth, and SPIFFEAuth.
                           properties:
                             authPath:
                               default: auth/kubernetes
@@ -729,7 +830,7 @@ spec:
                         workloadIdentity:
                           description: |-
                             WorkloadIdentity configures cloud-native Workload Identity Federation authentication.
-                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, SPIFFEAuth, and VaultAuth.
+                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, OIDCAuth, SPIFFEAuth, and VaultAuth.
                           properties:
                             aks:
                               description: |-
