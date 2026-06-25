@@ -140,6 +140,7 @@ func init() {
 			ContainerImageResolver: containerImageResolver,
 			StatusReporter:         status.NewStatusReporter(mgr.GetClient(), controllers.MondooClientBuilder, v, containerImageResolver),
 			RunningOnOpenShift:     isOpenShift,
+			EventRecorder:          mgr.GetEventRecorderFor("mondooauditconfig-controller"), //nolint:staticcheck // Compatibility with handlers that still use record.EventRecorder.
 		}).SetupWithManager(mgr, mondooOperatorConfigExists); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "MondooAuditConfig")
 			return err

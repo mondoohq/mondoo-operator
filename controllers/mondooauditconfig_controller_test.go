@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -556,6 +558,137 @@ func TestMondooAuditConfig_Containers_Enable(t *testing.T) {
 	assert.True(t, mondooAuditConfig.Spec.Containers.Enable)
 	cronStart := time.Now().Add(1 * time.Minute)
 	assert.Equal(t, fmt.Sprintf("%d %d * * *", cronStart.Minute(), cronStart.Hour()), mondooAuditConfig.Spec.Containers.Schedule)
+}
+
+func TestMondooAuditConfigRecordsConditionEventsFromReconcile(t *testing.T) {
+	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.Annotations = map[string]string{"invalid": ""}
+
+	fakeClient := fake.NewClientBuilder().
+		WithStatusSubresource(mondooAuditConfig).
+		WithObjects(mondooAuditConfig).
+		Build()
+
+	recorder := record.NewFakeRecorder(1)
+	reconciler := &MondooAuditConfigReconciler{
+		Client:                 fakeClient,
+		StatusReporter:         status.NewStatusReporter(fakeClient, nil, k8sVersion, mondoofake.NewNoOpContainerImageResolver()),
+		ContainerImageResolver: mondoofake.NewNoOpContainerImageResolver(),
+		EventRecorder:          recorder,
+	}
+
+	_, err := reconciler.Reconcile(context.Background(), reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      testMondooAuditConfigName,
+			Namespace: testNamespace,
+		},
+	})
+	require.NoError(t, err)
+
+	assertRecordedEvent(t, recorder, "Warning", "InvalidAnnotations", "Invalid annotations in MondooAuditConfig")
+	assertNoRecordedEvent(t, recorder)
+}
+
+func TestRecordConditionEvents(t *testing.T) {
+	config := testMondooAuditConfig()
+	recorder := record.NewFakeRecorder(4)
+	reconciler := &MondooAuditConfigReconciler{EventRecorder: recorder}
+
+	oldConditions := []v1alpha2.MondooAuditConfigCondition{
+		{
+			Type:    v1alpha2.K8sResourcesScanningDegraded,
+			Status:  corev1.ConditionFalse,
+			Reason:  "KubernetesResourcesScanningAvailable",
+			Message: "Kubernetes Resources Scanning is available",
+		},
+		{
+			Type:    v1alpha2.NodeScanningDegraded,
+			Status:  corev1.ConditionTrue,
+			Reason:  "NodeScanningUnavailable",
+			Message: "Node Scanning is unavailable",
+		},
+	}
+	newConditions := []v1alpha2.MondooAuditConfigCondition{
+		{
+			Type:    v1alpha2.K8sResourcesScanningDegraded,
+			Status:  corev1.ConditionTrue,
+			Reason:  "KubernetesResourcesScanningUnavailable",
+			Message: "Kubernetes Resources Scanning is unavailable",
+		},
+		{
+			Type:    v1alpha2.NodeScanningDegraded,
+			Status:  corev1.ConditionFalse,
+			Reason:  "NodeScanningAvailable",
+			Message: "Node Scanning is available",
+		},
+	}
+
+	reconciler.recordConditionEvents(config, oldConditions, newConditions)
+
+	assertRecordedEvent(t, recorder, "Warning", "KubernetesResourcesScanningUnavailable", "Kubernetes Resources Scanning is unavailable")
+	assertRecordedEvent(t, recorder, "Normal", "NodeScanningAvailable", "Node Scanning is available")
+	assertNoRecordedEvent(t, recorder)
+}
+
+func TestRecordConditionEventsSkipsInitialHealthyConditions(t *testing.T) {
+	config := testMondooAuditConfig()
+	recorder := record.NewFakeRecorder(1)
+	reconciler := &MondooAuditConfigReconciler{EventRecorder: recorder}
+
+	newConditions := []v1alpha2.MondooAuditConfigCondition{
+		{
+			Type:    v1alpha2.K8sContainerImageScanningDegraded,
+			Status:  corev1.ConditionFalse,
+			Reason:  "KubernetesContainerImageScanningAvailable",
+			Message: "Kubernetes Container Image Scanning is available",
+		},
+	}
+
+	reconciler.recordConditionEvents(config, nil, newConditions)
+
+	assertNoRecordedEvent(t, recorder)
+}
+
+func TestRecordConditionEventsSkipsUnchangedConditions(t *testing.T) {
+	config := testMondooAuditConfig()
+	recorder := record.NewFakeRecorder(1)
+	reconciler := &MondooAuditConfigReconciler{EventRecorder: recorder}
+
+	conditions := []v1alpha2.MondooAuditConfigCondition{
+		{
+			Type:    v1alpha2.K8sContainerImageScanningDegraded,
+			Status:  corev1.ConditionFalse,
+			Reason:  "KubernetesContainerImageScanningAvailable",
+			Message: "Kubernetes Container Image Scanning is available",
+		},
+	}
+
+	reconciler.recordConditionEvents(config, conditions, conditions)
+
+	assertNoRecordedEvent(t, recorder)
+}
+
+func assertRecordedEvent(t *testing.T, recorder *record.FakeRecorder, eventType, reason, message string) {
+	t.Helper()
+
+	select {
+	case event := <-recorder.Events:
+		if !strings.Contains(event, eventType) || !strings.Contains(event, reason) || !strings.Contains(event, message) {
+			t.Fatalf("expected event to contain %q, %q, and %q, got %q", eventType, reason, message, event)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("expected event %s/%s", eventType, reason)
+	}
+}
+
+func assertNoRecordedEvent(t *testing.T, recorder *record.FakeRecorder) {
+	t.Helper()
+
+	select {
+	case event := <-recorder.Events:
+		t.Fatalf("expected no event, got %q", event)
+	default:
+	}
 }
 
 func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {

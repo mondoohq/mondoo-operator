@@ -19,6 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -50,6 +51,7 @@ type MondooAuditConfigReconciler struct {
 	ContainerImageResolver mondoo.ContainerImageResolver
 	StatusReporter         *status.StatusReporter
 	RunningOnOpenShift     bool
+	EventRecorder          record.EventRecorder
 }
 
 // so we can mock out the mondoo client for testing
@@ -68,6 +70,7 @@ var MondooClientBuilder = mondooclient.NewClient
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=delete;deletecollection
 //+kubebuilder:rbac:groups=batch,resources=cronjobs;jobs,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=core,resources=pods;namespaces;nodes,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // Need to be able to create/update/delete Secrets for Mondoo service account credentials and Vault kubeconfig
@@ -228,6 +231,9 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 
 		deferFuncErr = mondoo.UpdateMondooAuditStatus(deferCtx, r.Client, mondooAuditConfigCopy, mondooAuditConfig, log)
+		if deferFuncErr == nil {
+			r.recordConditionEvents(mondooAuditConfig, mondooAuditConfigCopy.Status.Conditions, mondooAuditConfig.Status.Conditions)
+		}
 		// do not overwrite errors which happened before the deferred function is called
 		// but in case an error happened in the deferred func, also overwrite the reconcileResult
 		if reconcileError == nil && deferFuncErr != nil {
@@ -355,6 +361,54 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
+}
+
+func (r *MondooAuditConfigReconciler) recordConditionEvents(
+	config *v1alpha2.MondooAuditConfig,
+	oldConditions []v1alpha2.MondooAuditConfigCondition,
+	newConditions []v1alpha2.MondooAuditConfigCondition,
+) {
+	if r.EventRecorder == nil {
+		return
+	}
+
+	oldByType := make(map[v1alpha2.MondooAuditConfigConditionType]v1alpha2.MondooAuditConfigCondition, len(oldConditions))
+	for _, condition := range oldConditions {
+		oldByType[condition.Type] = condition
+	}
+
+	for _, condition := range newConditions {
+		oldCondition, ok := oldByType[condition.Type]
+		if ok {
+			if conditionEventFieldsEqual(oldCondition, condition) {
+				continue
+			}
+		} else if condition.Status == corev1.ConditionFalse {
+			continue
+		}
+
+		eventType := corev1.EventTypeNormal
+		if condition.Status == corev1.ConditionTrue {
+			eventType = corev1.EventTypeWarning
+		}
+
+		reason := condition.Reason
+		if reason == "" {
+			reason = string(condition.Type)
+		}
+		message := condition.Message
+		if message == "" {
+			message = fmt.Sprintf("%s is %s", condition.Type, condition.Status)
+		}
+
+		r.EventRecorder.Event(config, eventType, reason, message)
+	}
+}
+
+func conditionEventFieldsEqual(a, b v1alpha2.MondooAuditConfigCondition) bool {
+	return a.Status == b.Status &&
+		a.Reason == b.Reason &&
+		a.Message == b.Message
 }
 
 // nodeEventsRequestMapper Maps node events to enqueue all MondooAuditConfigs that have node scanning enabled for

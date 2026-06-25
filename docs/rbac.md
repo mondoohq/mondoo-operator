@@ -28,6 +28,13 @@ rules:
   - apiGroups:
       - ""
     resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - ""
+    resources:
       - namespaces
       - nodes
       - pods
