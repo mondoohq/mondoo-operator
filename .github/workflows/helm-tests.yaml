@@ -52,7 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: [v1.32.0, v1.35.0]
+        k8s-version: [v1.34.0, v1.36.0]
 
     steps:
       - name: Checkout
