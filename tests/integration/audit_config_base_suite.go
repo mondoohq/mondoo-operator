@@ -383,14 +383,42 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesCronjobs(auditConfig mo
 	s.NoError(err, "Failed to find MondooAuditConfig")
 	s.Equal(cronJobs.Items[0].Spec.Schedule, foundMondooAuditConfig.Spec.Nodes.Schedule, "CronJob schedule was not updated in MondooAuditConfig")
 
-	// The number of assets from upstream is limited by paganiation.
-	// In case we have more than 100 workloads, we need to call this mutlple times, with different page numbers.
-	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
-	s.NoError(err, "Failed to list assets")
-	assetNames := utils.AssetNames(assets)
+	// Poll for assets to appear upstream and be scored. Scoring is asynchronous,
+	// so we poll until assets are both present and scored.
+	zap.S().Info("Waiting for node scan results to appear and be scored upstream.")
+	nodeNameSet := make(map[string]struct{}, len(nodeNames))
+	for _, n := range nodeNames {
+		nodeNameSet[n] = struct{}{}
+	}
 
-	s.ElementsMatch(assetNames, nodeNames, "Node names do not match")
-	s.AssetsNotUnscored(assets)
+	var nodeAssets []assets.AssetWithScore
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		allAssets, listErr := s.spaceClient.ListAssetsWithScores(s.ctx)
+		if listErr != nil {
+			zap.S().Infof("Failed to list assets: %v", listErr)
+			return false, nil
+		}
+		nodeAssets = nil
+		for _, asset := range allAssets {
+			if _, ok := nodeNameSet[asset.Name]; ok {
+				nodeAssets = append(nodeAssets, asset)
+			}
+		}
+		if len(nodeAssets) != len(nodeNames) {
+			zap.S().Infof("Expected %d node assets but found %d, retrying...", len(nodeNames), len(nodeAssets))
+			return false, nil
+		}
+		for _, asset := range nodeAssets {
+			if asset.Grade == "U" || asset.Grade == "" {
+				zap.S().Infof("Asset %s not yet scored, retrying...", asset.Name)
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	s.NoError(err, "Node assets were not scored in time")
+	s.ElementsMatch(utils.AssetNames(nodeAssets), nodeNames, "Node names do not match")
+	s.AssetsNotUnscored(nodeAssets)
 
 	status, err := s.integration.GetStatus(s.ctx)
 	s.NoError(err, "Failed to get status")
