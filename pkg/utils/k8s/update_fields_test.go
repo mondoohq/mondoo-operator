@@ -123,3 +123,36 @@ func TestUpdateDaemonSetFields_ImagePullSecrets(t *testing.T) {
 	assert.Equal(t, desired.Spec.Template.Spec.ImagePullSecrets, obj.Spec.Template.Spec.ImagePullSecrets)
 	assert.Equal(t, desired.Spec.Template.Spec.Containers, obj.Spec.Template.Spec.Containers)
 }
+
+func TestUpdateDaemonSetFields_Affinity(t *testing.T) {
+	desired := &appsv1.DaemonSet{
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Affinity: &corev1.Affinity{
+						NodeAffinity: &corev1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+								NodeSelectorTerms: []corev1.NodeSelectorTerm{
+									{
+										MatchExpressions: []corev1.NodeSelectorRequirement{
+											{
+												Key:      "pool",
+												Operator: corev1.NodeSelectorOpIn,
+												Values:   []string{"platform"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	obj := &appsv1.DaemonSet{}
+	UpdateDaemonSetFields(obj, desired)
+
+	assert.Equal(t, desired.Spec.Template.Spec.Affinity, obj.Spec.Template.Spec.Affinity)
+}
