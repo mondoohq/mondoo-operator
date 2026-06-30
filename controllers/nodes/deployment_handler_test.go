@@ -539,6 +539,15 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_NodeScanningStatus() {
 	s.Equal("Node Scanning is available", condition.Message)
 	s.Equal("NodeScanningAvailable", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
+	s.Require().Len(d.Mondoo.Status.Scans, 2)
+	s.Equal(v1alpha2.MondooAuditConfigScanTypeNodes, d.Mondoo.Status.Scans[0].Type)
+	s.Equal("node01", d.Mondoo.Status.Scans[0].Target)
+	s.Equal(CronJobName(s.auditConfig.Name, "node01"), d.Mondoo.Status.Scans[0].CronJob)
+	s.Equal(v1alpha2.MondooAuditConfigScanPhasePending, d.Mondoo.Status.Scans[0].Phase)
+	s.Equal(v1alpha2.MondooAuditConfigScanTypeNodes, d.Mondoo.Status.Scans[1].Type)
+	s.Equal("node02", d.Mondoo.Status.Scans[1].Target)
+	s.Equal(CronJobName(s.auditConfig.Name, "node02"), d.Mondoo.Status.Scans[1].CronJob)
+	s.Equal(v1alpha2.MondooAuditConfigScanPhasePending, d.Mondoo.Status.Scans[1].Phase)
 
 	listOpts := &client.ListOptions{
 		Namespace:     s.auditConfig.Namespace,
@@ -546,14 +555,22 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_NodeScanningStatus() {
 	}
 	cronJobs := &batchv1.CronJobList{}
 	s.NoError(d.KubeClient.List(s.ctx, cronJobs, listOpts))
+	node01CronJob := batchv1.CronJob{}
+	for _, cronJob := range cronJobs.Items {
+		if cronJob.Name == CronJobName(s.auditConfig.Name, "node01") {
+			node01CronJob = cronJob
+			break
+		}
+	}
+	s.Require().Equal(CronJobName(s.auditConfig.Name, "node01"), node01CronJob.Name)
 
-	now := time.Now()
+	now := time.Now().Truncate(time.Second)
 	metaNow := metav1.NewTime(now)
 	metaHourAgo := metav1.NewTime(now.Add(-1 * time.Hour))
-	cronJobs.Items[0].Status.LastScheduleTime = &metaNow
-	cronJobs.Items[0].Status.LastSuccessfulTime = &metaHourAgo
+	node01CronJob.Status.LastScheduleTime = &metaNow
+	node01CronJob.Status.LastSuccessfulTime = &metaHourAgo
 
-	s.NoError(d.KubeClient.Status().Update(s.ctx, &cronJobs.Items[0]))
+	s.NoError(d.KubeClient.Status().Update(s.ctx, &node01CronJob))
 
 	// Reconcile to update the audit config status
 	result, err = d.Reconcile(s.ctx)
@@ -565,11 +582,15 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_NodeScanningStatus() {
 	s.Equal("Node Scanning is unavailable", condition.Message)
 	s.Equal("NodeScanningUnavailable", condition.Reason)
 	s.Equal(corev1.ConditionTrue, condition.Status)
+	s.Require().Len(d.Mondoo.Status.Scans, 2)
+	s.Equal(v1alpha2.MondooAuditConfigScanPhaseFailed, d.Mondoo.Status.Scans[0].Phase)
+	s.Equal(&metaNow, d.Mondoo.Status.Scans[0].LastScheduleTime)
+	s.Equal(&metaHourAgo, d.Mondoo.Status.Scans[0].LastSuccessfulTime)
 
 	// Make the jobs successful again
-	cronJobs.Items[0].Status.LastScheduleTime = nil
-	cronJobs.Items[0].Status.LastSuccessfulTime = nil
-	s.NoError(d.KubeClient.Status().Update(s.ctx, &cronJobs.Items[0]))
+	node01CronJob.Status.LastScheduleTime = &metaHourAgo
+	node01CronJob.Status.LastSuccessfulTime = &metaNow
+	s.NoError(d.KubeClient.Status().Update(s.ctx, &node01CronJob))
 
 	// Reconcile to update the audit config status
 	result, err = d.Reconcile(s.ctx)
@@ -581,6 +602,10 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_NodeScanningStatus() {
 	s.Equal("Node Scanning is available", condition.Message)
 	s.Equal("NodeScanningAvailable", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
+	s.Require().Len(d.Mondoo.Status.Scans, 2)
+	s.Equal(v1alpha2.MondooAuditConfigScanPhaseSucceeded, d.Mondoo.Status.Scans[0].Phase)
+	s.Equal(&metaHourAgo, d.Mondoo.Status.Scans[0].LastScheduleTime)
+	s.Equal(&metaNow, d.Mondoo.Status.Scans[0].LastSuccessfulTime)
 
 	d.Mondoo.Spec.Nodes.Enable = false
 
@@ -594,6 +619,69 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_NodeScanningStatus() {
 	s.Equal("Node Scanning is disabled", condition.Message)
 	s.Equal("NodeScanningDisabled", condition.Reason)
 	s.Equal(corev1.ConditionFalse, condition.Status)
+	s.Require().Len(d.Mondoo.Status.Scans, 1)
+	s.Equal(v1alpha2.MondooAuditConfigScanPhaseDisabled, d.Mondoo.Status.Scans[0].Phase)
+	s.Equal("all", d.Mondoo.Status.Scans[0].Target)
+}
+
+func (s *DeploymentHandlerSuite) TestUpdateDaemonSetScanStatus() {
+	tests := []struct {
+		name        string
+		daemonSet   appsv1.DaemonSet
+		wantPhase   v1alpha2.MondooAuditConfigScanPhase
+		wantMessage string
+	}{
+		{
+			name: "pending until desired nodes are observed",
+			daemonSet: appsv1.DaemonSet{
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 0,
+					CurrentNumberScheduled: 0,
+				},
+			},
+			wantPhase:   v1alpha2.MondooAuditConfigScanPhasePending,
+			wantMessage: "Node scanning DaemonSet has not reported desired nodes yet",
+		},
+		{
+			name: "failed while not scheduled everywhere",
+			daemonSet: appsv1.DaemonSet{
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 3,
+					CurrentNumberScheduled: 2,
+				},
+			},
+			wantPhase:   v1alpha2.MondooAuditConfigScanPhaseFailed,
+			wantMessage: "Node scanning DaemonSet is not scheduled on all desired nodes",
+		},
+		{
+			name: "running when scheduled everywhere",
+			daemonSet: appsv1.DaemonSet{
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 3,
+					CurrentNumberScheduled: 3,
+				},
+			},
+			wantPhase:   v1alpha2.MondooAuditConfigScanPhaseRunning,
+			wantMessage: "Node scanning DaemonSet is scheduled",
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			d := DeploymentHandler{
+				Mondoo: &v1alpha2.MondooAuditConfig{},
+			}
+
+			d.updateDaemonSetScanStatus(tt.daemonSet)
+
+			s.Require().Len(d.Mondoo.Status.Scans, 1)
+			scan := d.Mondoo.Status.Scans[0]
+			s.Equal(v1alpha2.MondooAuditConfigScanTypeNodes, scan.Type)
+			s.Equal("all", scan.Target)
+			s.Equal(tt.wantPhase, scan.Phase)
+			s.Equal(tt.wantMessage, scan.Message)
+		})
+	}
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
