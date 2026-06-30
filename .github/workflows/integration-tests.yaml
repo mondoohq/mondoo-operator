@@ -86,6 +86,7 @@ jobs:
         with:
           version: ${{ matrix.k8s-version }}
           k3d-args: --k3s-arg=--disable=traefik@server:*
+          github-token: ${{ github.token }}
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
@@ -148,6 +149,7 @@ jobs:
         with:
           version: v1.32.0
           k3d-args: --k3s-arg=--disable=traefik@server:*
+          github-token: ${{ github.token }}
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
