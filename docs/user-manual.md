@@ -1181,6 +1181,8 @@ spec:
     enable: true
 ```
 
+Node scanning pods include a lightweight `render-node-inventory` init container that renders the node-specific inventory file before `cnspec` starts. This keeps custom scanner images simple: the scanner image must provide `cnspec`, but it does not need a POSIX shell or `sed`. The init container image uses the same `imageRegistry`, `registryMirrors`, `imagePullSecrets`, and `skipContainerResolution` settings as other operator-managed images.
+
 ### Why are (some of) my nodes unscored?
 
 In some cases a node scan can require more memory than initially allotted. You can check whether that is the case by running:
