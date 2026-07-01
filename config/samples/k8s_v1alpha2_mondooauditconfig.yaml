@@ -146,6 +146,47 @@ spec:
     enable: true
     # Cron schedule (default: daily)
     # schedule: "0 0 * * *"
+    # Node-local runtime cache scanning scans already-pulled images without registry pulls or imagePullSecrets.
+    # runtimeCache:
+    #   enable: true
+    #   scanOnlyInUse: true
+    #   allowPull: false
+    #   intervalTimer: 14400
+    #   tempStorageSize: 1Gi
+    #   delegates:
+    #     - name: containerd-cri
+    #       kind: containerd
+    #       hostPath: /run/containerd/containerd.sock
+    #       priority: 10
+    #       namespaces:
+    #         - k8s.io
+    #   # Optional: split runtime-cache scanner DaemonSets by node pool.
+    #   # Scanner sets inherit top-level runtimeCache fields and override provided set fields.
+    #   scannerSets:
+    #     - name: control-plane
+    #       nodeSelector:
+    #         node-role.kubernetes.io/control-plane: ""
+    #       tolerations:
+    #         - key: node-role.kubernetes.io/control-plane
+    #           operator: Exists
+    #           effect: NoSchedule
+    #       resources:
+    #         requests:
+    #           cpu: 25m
+    #           memory: 128Mi
+    #         limits:
+    #           cpu: 200m
+    #           memory: 512Mi
+    #     - name: workers
+    #       nodeSelector:
+    #         node-role.kubernetes.io/worker: ""
+    #       resources:
+    #         requests:
+    #           cpu: 100m
+    #           memory: 512Mi
+    #         limits:
+    #           cpu: "2"
+    #           memory: 4Gi
     resources:
       requests:
         cpu: 100m
@@ -159,6 +200,33 @@ spec:
     enable: true
     # Style: cronjob (default), deployment, or daemonset
     style: cronjob
+    # Optional when style is daemonset: split node scanner DaemonSets by node pool.
+    # Scanner sets inherit top-level node scanner fields and override provided set fields.
+    # scannerSets:
+    #   - name: control-plane
+    #     nodeSelector:
+    #       node-role.kubernetes.io/control-plane: ""
+    #     tolerations:
+    #       - key: node-role.kubernetes.io/control-plane
+    #         operator: Exists
+    #         effect: NoSchedule
+    #     resources:
+    #       requests:
+    #         cpu: 25m
+    #         memory: 128Mi
+    #       limits:
+    #         cpu: 200m
+    #         memory: 512Mi
+    #   - name: workers
+    #     nodeSelector:
+    #       node-role.kubernetes.io/worker: ""
+    #     resources:
+    #       requests:
+    #         cpu: 100m
+    #         memory: 256Mi
+    #       limits:
+    #         cpu: "1"
+    #         memory: 2Gi
     # Cron schedule (only for cronjob style)
     # schedule: "0 * * * *"
     # Interval in minutes (only for deployment style)

@@ -28,6 +28,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/controllers/container_image"
+	"go.mondoo.com/mondoo-operator/controllers/container_image/runtime_cache"
 	"go.mondoo.com/mondoo-operator/controllers/k8s_scan"
 	"go.mondoo.com/mondoo-operator/controllers/nodes"
 	"go.mondoo.com/mondoo-operator/controllers/status"
@@ -432,6 +433,42 @@ func TestMondooAuditConfig_Nodes_Schedule(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("%d * * * *", time.Now().Add(1*time.Minute).Minute()), mondooAuditConfig.Spec.Nodes.Schedule)
 }
 
+func TestNodeEventsRequestMapperEnqueuesNodeDerivedScanners(t *testing.T) {
+	nodeScanConfig := testMondooAuditConfig()
+	nodeScanConfig.Name = "node-scan"
+	nodeScanConfig.Spec.Nodes.Enable = true
+
+	runtimeCacheConfig := testMondooAuditConfig()
+	runtimeCacheConfig.Name = "runtime-cache"
+	runtimeCacheConfig.Spec.Containers.RuntimeCache.Enable = true
+
+	disabledConfig := testMondooAuditConfig()
+	disabledConfig.Name = "disabled"
+
+	containerScanConfig := testMondooAuditConfig()
+	containerScanConfig.Name = "container-scan"
+	containerScanConfig.Spec.Containers.Enable = true
+
+	fakeClient := fake.NewClientBuilder().
+		WithLists(&v1alpha2.MondooAuditConfigList{
+			Items: []v1alpha2.MondooAuditConfig{
+				*nodeScanConfig,
+				*runtimeCacheConfig,
+				*disabledConfig,
+				*containerScanConfig,
+			},
+		}).
+		Build()
+
+	reconciler := &MondooAuditConfigReconciler{Client: fakeClient}
+	requests := reconciler.nodeEventsRequestMapper(context.Background(), &corev1.Node{})
+
+	assert.ElementsMatch(t, []reconcile.Request{
+		{NamespacedName: types.NamespacedName{Name: "node-scan", Namespace: testNamespace}},
+		{NamespacedName: types.NamespacedName{Name: "runtime-cache", Namespace: testNamespace}},
+	}, requests)
+}
+
 func TestMondooAuditConfig_KubernetesResources_Schedule(t *testing.T) {
 	utilruntime.Must(v1alpha2.AddToScheme(scheme.Scheme))
 
@@ -624,6 +661,9 @@ func TestIsCronJobScanPod(t *testing.T) {
 			},
 			Containers: v1alpha2.Containers{
 				Enable: true,
+				RuntimeCache: v1alpha2.RuntimeCacheScanner{
+					Enable: true,
+				},
 			},
 		},
 	}
@@ -631,6 +671,7 @@ func TestIsCronJobScanPod(t *testing.T) {
 	nodeCronJobLabels := nodes.NodeScanningLabels(a)
 	resourceCronJobLabels := k8s_scan.CronJobLabels(a)
 	imageCronJobLabels := container_image.CronJobLabels(a)
+	runtimeCacheLabels := runtime_cache.Labels(a)
 
 	tests := []struct {
 		name       string
@@ -664,6 +705,16 @@ func TestIsCronJobScanPod(t *testing.T) {
 				"scan":      "k8s",
 				"mondoo_cr": "mondoo-client",
 				"job-name":  imageCronJobLabels["job-name"],
+			},
+			wantResult: true,
+		},
+		{
+			name: "runtime cache scan pod",
+			podLabels: map[string]string{
+				"app":               "mondoo-runtime-cache-scan",
+				"scan":              "runtime-cache",
+				"mondoo_cr":         "mondoo-client",
+				"pod-template-hash": runtimeCacheLabels["pod-template-hash"],
 			},
 			wantResult: true,
 		},

@@ -45,6 +45,10 @@ type ContainerImageResolver interface {
 	// When userDigest is specified, it takes precedence over userTag.
 	MondooOperatorImage(ctx context.Context, userImage, userTag, userDigest string, skipImageResolution bool) (string, error)
 
+	// ContainerImage returns the supplied image after applying registry mirror or registry prefix settings.
+	// If skipResolveImage is false, then the image tag is replaced by a digest.
+	ContainerImage(ctx context.Context, image string, skipImageResolution bool) (string, error)
+
 	// WithImageRegistry returns a new ContainerImageResolver that uses the specified image registry prefix.
 	// Use this for simple registry mirrors where all images go to the same mirror.
 	WithImageRegistry(imageRegistry string) ContainerImageResolver
@@ -144,6 +148,10 @@ func (c *containerImageResolver) MondooOperatorImage(ctx context.Context, userIm
 		skipImageResolution = true
 	}
 
+	return c.resolveImage(ctx, image, skipImageResolution)
+}
+
+func (c *containerImageResolver) ContainerImage(ctx context.Context, image string, skipImageResolution bool) (string, error) {
 	return c.resolveImage(ctx, image, skipImageResolution)
 }
 

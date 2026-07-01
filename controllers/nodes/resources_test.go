@@ -138,6 +138,119 @@ func TestCronJob_HasReportTypeNone(t *testing.T) {
 	assert.Contains(t, cmd, "--report-type none")
 }
 
+func TestDaemonSetForScannerSetAppliesSchedulingOverrides(t *testing.T) {
+	mac := testMondooAuditConfig()
+	mac.Spec.Nodes.Env = []corev1.EnvVar{{Name: "SHARED", Value: "base"}}
+	set := v1alpha2.NodeScannerSet{
+		Name: "workers",
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("250m")},
+			Limits:   corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("512Mi")},
+		},
+		NodeSelector: map[string]string{"node-role.kubernetes.io/worker": "true"},
+		Tolerations: []corev1.Toleration{
+			{Key: "dedicated", Operator: corev1.TolerationOpEqual, Value: "worker", Effect: corev1.TaintEffectNoSchedule},
+		},
+		PriorityClassName: "worker-scanner",
+		Env:               []corev1.EnvVar{{Name: "SHARED", Value: "set"}, {Name: "SET_ONLY", Value: "true"}},
+	}
+
+	ds := DaemonSetForScannerSet(*mac, false, "cnspec:test", v1alpha2.MondooOperatorConfig{}, nil, set)
+
+	assert.Equal(t, DaemonSetNameForScannerSet(mac.Name, set.Name), ds.Name)
+	assert.Equal(t, set.Name, ds.Labels["scanner_set"])
+	assert.Equal(t, set.Name, ds.Spec.Template.Labels["scanner_set"])
+	assert.Equal(t, set.NodeSelector, ds.Spec.Template.Spec.NodeSelector)
+	assert.Equal(t, set.Tolerations, ds.Spec.Template.Spec.Tolerations)
+	assert.Equal(t, set.PriorityClassName, ds.Spec.Template.Spec.PriorityClassName)
+	assert.Equal(t, set.Resources, ds.Spec.Template.Spec.Containers[0].Resources)
+
+	env := map[string]string{}
+	for _, item := range ds.Spec.Template.Spec.Containers[0].Env {
+		env[item.Name] = item.Value
+	}
+	assert.Equal(t, "set", env["SHARED"])
+	assert.Equal(t, "true", env["SET_ONLY"])
+}
+
+func TestDaemonSetForScannerSetInheritsTopLevelFields(t *testing.T) {
+	mac := testMondooAuditConfig()
+	mac.Spec.Nodes.NodeSelector = map[string]string{"pool": "shared"}
+	mac.Spec.Nodes.Tolerations = []corev1.Toleration{
+		{Key: "shared", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule},
+	}
+	mac.Spec.Nodes.PriorityClassName = "shared-priority"
+	mac.Spec.Nodes.Env = []corev1.EnvVar{{Name: "SHARED", Value: "true"}}
+
+	ds := DaemonSetForScannerSet(*mac, false, "cnspec:test", v1alpha2.MondooOperatorConfig{}, nil, v1alpha2.NodeScannerSet{Name: "workers"})
+
+	assert.Equal(t, map[string]string{"pool": "shared"}, ds.Spec.Template.Spec.NodeSelector)
+	assert.Equal(t, mac.Spec.Nodes.Tolerations, ds.Spec.Template.Spec.Tolerations)
+	assert.Equal(t, "shared-priority", ds.Spec.Template.Spec.PriorityClassName)
+
+	env := map[string]string{}
+	for _, item := range ds.Spec.Template.Spec.Containers[0].Env {
+		env[item.Name] = item.Value
+	}
+	assert.Equal(t, "true", env["SHARED"])
+}
+
+func TestValidateScannerSets(t *testing.T) {
+	tests := []struct {
+		name      string
+		sets      []v1alpha2.NodeScannerSet
+		wantError string
+	}{
+		{
+			name: "valid names",
+			sets: []v1alpha2.NodeScannerSet{
+				{Name: "control-plane"},
+				{Name: "workers"},
+			},
+		},
+		{
+			name: "missing name",
+			sets: []v1alpha2.NodeScannerSet{
+				{Name: ""},
+			},
+			wantError: "nodes.scannerSets[0].name is required",
+		},
+		{
+			name: "invalid label",
+			sets: []v1alpha2.NodeScannerSet{
+				{Name: "Control_Plane"},
+			},
+			wantError: "must be a valid DNS label",
+		},
+		{
+			name: "too long",
+			sets: []v1alpha2.NodeScannerSet{
+				{Name: strings.Repeat("a", 64)},
+			},
+			wantError: "must be a valid DNS label",
+		},
+		{
+			name: "duplicate name",
+			sets: []v1alpha2.NodeScannerSet{
+				{Name: "workers"},
+				{Name: "workers"},
+			},
+			wantError: "nodes.scannerSets[workers].name must be unique",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateScannerSets("nodes.scannerSets", test.sets)
+			if test.wantError == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, test.wantError)
+		})
+	}
+}
+
 func TestResources_GOMEMLIMIT(t *testing.T) {
 	tests := []struct {
 		name               string
