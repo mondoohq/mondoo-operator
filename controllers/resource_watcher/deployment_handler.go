@@ -6,6 +6,7 @@ package resource_watcher
 import (
 	"context"
 
+	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,6 +16,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
+	logutils "go.mondoo.com/mondoo-operator/pkg/utils/logger"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
@@ -26,6 +28,10 @@ type DeploymentHandler struct {
 	Mondoo                 *v1alpha2.MondooAuditConfig
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
+}
+
+func (h *DeploymentHandler) log() logr.Logger {
+	return logutils.WithMondooAuditConfig(deploymentHandlerLogger, h.Mondoo, "resource-watcher")
 }
 
 // Reconcile ensures the resource watcher deployment matches the desired state.
@@ -46,25 +52,25 @@ func (h *DeploymentHandler) syncDeployment(ctx context.Context) error {
 	mondooClientImage, err := h.ContainerImageResolver.MondooOperatorImage(
 		ctx, h.Mondoo.Spec.Scanner.Image.Name, h.Mondoo.Spec.Scanner.Image.Tag, h.Mondoo.Spec.Scanner.Image.Digest, h.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
-		deploymentHandlerLogger.Error(err, "Failed to resolve mondoo-operator container image")
+		h.log().Error(err, "Failed to resolve mondoo-operator container image")
 		return err
 	}
 
 	// Get cluster UID for asset labeling (best-effort)
-	clusterUID, err := k8s.GetClusterUID(ctx, h.KubeClient, deploymentHandlerLogger)
+	clusterUID, err := k8s.GetClusterUID(ctx, h.KubeClient, h.log())
 	if err != nil {
-		deploymentHandlerLogger.Info("Failed to get cluster UID, continuing without it", "error", err)
+		h.log().Info("Failed to get cluster UID, continuing without it", "error", err)
 	}
 
 	// Get integration MRN if available (best-effort)
 	integrationMRN, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, h.KubeClient, *h.Mondoo)
 	if err != nil {
-		deploymentHandlerLogger.Info("Failed to get integration MRN, continuing without it", "error", err)
+		h.log().Info("Failed to get integration MRN, continuing without it", "error", err)
 	}
 
 	desired := Deployment(mondooClientImage, integrationMRN, clusterUID, h.Mondoo, *h.MondooOperatorConfig)
 	obj := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
-	if _, err := k8s.CreateOrUpdate(ctx, h.KubeClient, obj, h.Mondoo, deploymentHandlerLogger, func() error {
+	if _, err := k8s.CreateOrUpdate(ctx, h.KubeClient, obj, h.Mondoo, h.log(), func() error {
 		k8s.UpdateDeploymentFields(obj, desired)
 		return nil
 	}); err != nil {
@@ -86,7 +92,7 @@ func (h *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		}
 		err = h.KubeClient.List(ctx, pods, opts)
 		if err != nil {
-			deploymentHandlerLogger.Error(err, "Failed to list Pods for Resource Watcher")
+			h.log().Error(err, "Failed to list Pods for Resource Watcher")
 			return err
 		}
 	}
@@ -115,7 +121,7 @@ func (h *DeploymentHandler) getDeploymentsForAuditConfig(ctx context.Context) ([
 
 	listOpts := &client.ListOptions{Namespace: h.Mondoo.Namespace, LabelSelector: labels.SelectorFromSet(deploymentLabels)}
 	if err := h.KubeClient.List(ctx, deployments, listOpts); err != nil {
-		deploymentHandlerLogger.Error(err, "Failed to list Deployments in namespace", "namespace", h.Mondoo.Namespace)
+		h.log().Error(err, "Failed to list Deployments in namespace", "namespace", h.Mondoo.Namespace)
 		return nil, err
 	}
 	return deployments.Items, nil
@@ -125,7 +131,7 @@ func (h *DeploymentHandler) down(ctx context.Context) error {
 	// Delete Deployment
 	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: DeploymentName(h.Mondoo.Name), Namespace: h.Mondoo.Namespace}}
 	if err := k8s.DeleteIfExists(ctx, h.KubeClient, deployment); err != nil {
-		deploymentHandlerLogger.Error(
+		h.log().Error(
 			err, "failed to clean up resource watcher Deployment", "namespace", deployment.Namespace, "name", deployment.Name)
 		return err
 	}

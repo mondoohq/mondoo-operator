@@ -88,7 +88,12 @@ var MondooClientBuilder = mondooclient.NewClient
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (reconcileResult ctrl.Result, reconcileError error) {
-	log := ctrllog.FromContext(ctx)
+	log := ctrllog.FromContext(ctx).WithValues(
+		"mondooAuditConfig", req.String(),
+		"mondooNamespace", req.Namespace,
+		"mondooName", req.Name,
+	)
+	ctx = ctrllog.IntoContext(ctx, log)
 
 	// Fetch the Mondoo instance
 	mondooAuditConfig := &v1alpha2.MondooAuditConfig{}
@@ -291,7 +296,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	var firstError error
 	result, reconcileError := nodes.Reconcile(ctx)
 	if reconcileError != nil {
-		log.Error(reconcileError, "Failed to set up nodes scanning, continuing with other scan types")
+		log.Error(reconcileError, "Failed to set up nodes scanning, continuing with other scan types", "scanType", "node-scanning")
 		firstError = reconcileError
 		reconcileError = nil
 	}
@@ -305,7 +310,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	result, reconcileError = containers.Reconcile(ctx)
 	if reconcileError != nil {
-		log.Error(reconcileError, "Failed to set up container scanning")
+		log.Error(reconcileError, "Failed to set up container scanning", "scanType", "container-image-scanning")
 	}
 	if reconcileError != nil || result.RequeueAfter > 0 {
 		return result, reconcileError
@@ -322,7 +327,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	result, reconcileError = workloads.Reconcile(ctx)
 	if reconcileError != nil {
-		log.Error(reconcileError, "Failed to set up Kubernetes resources scanning")
+		log.Error(reconcileError, "Failed to set up Kubernetes resources scanning", "scanType", "k8s-resources-scanning")
 	}
 	if reconcileError != nil || result.RequeueAfter > 0 {
 		return result, reconcileError
@@ -337,7 +342,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	result, reconcileError = resourceWatcher.Reconcile(ctx)
 	if reconcileError != nil {
-		log.Error(reconcileError, "Failed to set up resource watcher")
+		log.Error(reconcileError, "Failed to set up resource watcher", "scanType", "resource-watcher")
 	}
 	if reconcileError != nil || result.RequeueAfter > 0 {
 		return result, reconcileError
