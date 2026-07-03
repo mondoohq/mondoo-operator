@@ -543,6 +543,12 @@ type MondooAuditConfigStatus struct {
 	// garbage collection of stale node scan assets.
 	// +optional
 	LastNodeScanGarbageCollectionTime *metav1.Time `json:"lastNodeScanGarbageCollectionTime,omitempty"`
+
+	// ScanningPaused indicates that the Mondoo console has paused scanning for
+	// this integration. When true, all scan CronJobs are suspended.
+	// Only set when ConsoleIntegration is enabled.
+	// +optional
+	ScanningPaused bool `json:"scanningPaused,omitempty"`
 }
 
 type MondooAuditConfigCondition struct {
@@ -585,6 +591,8 @@ const (
 	// MondooIntegrationDegraded will hold the status for any issues encountered while trying to CheckIn()
 	// on behalf of the Mondoo integration MRN
 	MondooIntegrationDegraded MondooAuditConfigConditionType = "IntegrationDegraded"
+	// ScanningPausedCondition indicates that scanning has been paused from the Mondoo console
+	ScanningPausedCondition MondooAuditConfigConditionType = "ScanningPaused"
 )
 
 //+kubebuilder:object:root=true

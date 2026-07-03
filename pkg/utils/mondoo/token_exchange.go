@@ -128,7 +128,7 @@ func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client
 }
 
 func performInitialCheckIn(ctx context.Context, mondooClientBuilder MondooClientBuilder, integrationMrn string, sa mondooclient.ServiceAccountCredentials, httpProxy *string, httpsProxy *string, noProxy *string, logger logr.Logger) error {
-	if err := IntegrationCheckIn(ctx, integrationMrn, sa, mondooClientBuilder, httpProxy, httpsProxy, noProxy, logger); err != nil {
+	if _, err := IntegrationCheckIn(ctx, integrationMrn, "", sa, mondooClientBuilder, httpProxy, httpsProxy, noProxy, logger); err != nil {
 		logger.Error(err, "initial CheckIn() failed, will CheckIn() periodically", "integrationMRN", integrationMrn)
 		return err
 	}

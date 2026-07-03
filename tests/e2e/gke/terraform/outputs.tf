@@ -107,3 +107,7 @@ output "enable_asset_routing_test" {
 output "developers_space_id" {
   value = var.enable_asset_routing_test ? mondoo_space.developers[0].id : ""
 }
+
+output "enable_integration" {
+  value = var.enable_integration
+}

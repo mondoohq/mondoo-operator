@@ -40,3 +40,9 @@ variable "enable_private_endpoint_access" {
   type        = bool
   default     = true
 }
+
+variable "enable_integration" {
+  description = "Create a K8s integration and use integration token instead of service account credentials"
+  type        = bool
+  default     = false
+}

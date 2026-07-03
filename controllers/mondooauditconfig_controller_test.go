@@ -227,10 +227,15 @@ func TestTokenRegistration(t *testing.T) {
 					Creds: testMondooServiceAccount,
 				}, nil)
 
-				// expect initial CheckIn()
+				// expect initial CheckIn() + Configure (always called)
 				mClient.EXPECT().IntegrationCheckIn(gomock.Any(), &mondooclient.IntegrationCheckInInput{
 					Mrn: testIntegrationMRN,
-				}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{}, nil)
+				}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{ConfigurationMatch: true}, nil)
+				mClient.EXPECT().IntegrationConfigure(gomock.Any(), &mondooclient.IntegrationConfigureInput{
+					Mrn: testIntegrationMRN,
+				}).Times(1).Return(&mondooclient.IntegrationConfigureOutput{
+					Details: &mondooclient.IntegrationConfigureDetails{Config: `{}`},
+				}, nil)
 
 				mClient.EXPECT().IntegrationReportStatus(gomock.Any(), &mondooclient.ReportStatusRequest{
 					Mrn:    testIntegrationMRN,

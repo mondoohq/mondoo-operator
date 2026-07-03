@@ -95,6 +95,21 @@ func (mr *MockMondooClientMockRecorder) IntegrationCheckIn(arg0, arg1 interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IntegrationCheckIn", reflect.TypeOf((*MockMondooClient)(nil).IntegrationCheckIn), arg0, arg1)
 }
 
+// IntegrationConfigure mocks base method.
+func (m *MockMondooClient) IntegrationConfigure(arg0 context.Context, arg1 *mondooclient.IntegrationConfigureInput) (*mondooclient.IntegrationConfigureOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IntegrationConfigure", arg0, arg1)
+	ret0, _ := ret[0].(*mondooclient.IntegrationConfigureOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IntegrationConfigure indicates an expected call of IntegrationConfigure.
+func (mr *MockMondooClientMockRecorder) IntegrationConfigure(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IntegrationConfigure", reflect.TypeOf((*MockMondooClient)(nil).IntegrationConfigure), arg0, arg1)
+}
+
 // IntegrationRegister mocks base method.
 func (m *MockMondooClient) IntegrationRegister(arg0 context.Context, arg1 *mondooclient.IntegrationRegisterInput) (*mondooclient.IntegrationRegisterOutput, error) {
 	m.ctrl.T.Helper()

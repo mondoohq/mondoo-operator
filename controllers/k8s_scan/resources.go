@@ -85,6 +85,7 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 		Spec: batchv1.CronJobSpec{
 			Schedule:          m.Spec.KubernetesResources.Schedule,
 			ConcurrencyPolicy: batchv1.ForbidConcurrent,
+			Suspend:           ptr.To(m.Status.ScanningPaused),
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: ls},
 				Spec: batchv1.JobSpec{
@@ -450,6 +451,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 		Spec: batchv1.CronJobSpec{
 			Schedule:          schedule,
 			ConcurrencyPolicy: batchv1.ForbidConcurrent,
+			Suspend:           ptr.To(m.Status.ScanningPaused),
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: ls},
 				Spec: batchv1.JobSpec{

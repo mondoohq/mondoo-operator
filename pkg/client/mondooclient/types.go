@@ -17,6 +17,7 @@ type MondooClient interface {
 
 	IntegrationRegister(context.Context, *IntegrationRegisterInput) (*IntegrationRegisterOutput, error)
 	IntegrationCheckIn(context.Context, *IntegrationCheckInInput) (*IntegrationCheckInOutput, error)
+	IntegrationConfigure(context.Context, *IntegrationConfigureInput) (*IntegrationConfigureOutput, error)
 	IntegrationReportStatus(context.Context, *ReportStatusRequest) error
 
 	GarbageCollectAssets(context.Context, *GarbageCollectAssetsRequest) error
@@ -67,6 +68,22 @@ type IntegrationCheckInOutput struct {
 	Mrn string `protobuf:"bytes,1,opt,name=mrn,proto3" json:"mrn,omitempty"`
 	// true if the configuration hash sent in matches the hash of the stored configuration
 	ConfigurationMatch bool `protobuf:"varint,2,opt,name=configuration_match,json=configurationMatch,proto3" json:"configuration_match,omitempty"`
+}
+
+type IntegrationConfigureInput struct {
+	Mrn string `protobuf:"bytes,1,opt,name=mrn,proto3" json:"mrn,omitempty"`
+}
+
+type IntegrationConfigureOutput struct {
+	Details *IntegrationConfigureDetails `json:"details,omitempty"`
+}
+
+type IntegrationConfigureDetails struct {
+	Config string `json:"config,omitempty"`
+}
+
+type K8sIntegrationConfig struct {
+	PauseScanning bool `json:"pauseScanning,omitempty"`
 }
 
 type ReportStatusRequest struct {

@@ -63,3 +63,7 @@ output "enable_private_endpoint_access" {
   description = "Whether the scanner-to-target private endpoint SG rule is enabled."
   value       = var.enable_private_endpoint_access
 }
+
+output "enable_integration" {
+  value = var.enable_integration
+}

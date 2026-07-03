@@ -12,12 +12,14 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // TryGetIntegrationMrnForAuditConfig tries to get the integration-mrn for a MondooAuditConfig. If ConsoleIntegration is disabled, no
-// integration-mrn is returned but also no error.
+// integration-mrn is returned but also no error. If the secret does not exist yet or is missing the integrationmrn key
+// (token exchange has not completed), an empty string is returned without error so the operator can continue reconciling.
 func TryGetIntegrationMrnForAuditConfig(ctx context.Context, kubeClient client.Client, auditConfig v1alpha2.MondooAuditConfig) (string, error) {
 	if !auditConfig.Spec.ConsoleIntegration.Enable {
 		return "", nil
@@ -25,10 +27,17 @@ func TryGetIntegrationMrnForAuditConfig(ctx context.Context, kubeClient client.C
 
 	secret, err := GetIntegrationSecretForAuditConfig(ctx, kubeClient, auditConfig)
 	if err != nil {
+		if k8sErrors.IsNotFound(err) {
+			return "", nil
+		}
 		return "", err
 	}
 
-	return GetIntegrationMrnFromSecret(*secret)
+	mrn, ok := secret.Data[constants.MondooCredsSecretIntegrationMRNKey]
+	if !ok {
+		return "", nil
+	}
+	return string(mrn), nil
 }
 
 // GetIntegrationSecretForAuditConfig retrieves the MondooCredsSecretRef for the give MondooAuditConfig.
