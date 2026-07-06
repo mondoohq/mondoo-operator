@@ -65,6 +65,8 @@ load_tf_outputs() {
     export TARGET_SPACE_ID="${TARGET_SPACE_ID:-$(terraform output -raw target_space_id)}"
   fi
 
+  export ENABLE_INTEGRATION="$(terraform output -raw enable_integration 2>/dev/null || echo "false")"
+
   cd ->/dev/null
 
   # Delegate to cloud-specific loader for remaining outputs and credential setup

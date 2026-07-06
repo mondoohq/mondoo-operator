@@ -288,13 +288,24 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		IsOpenshift:            r.RunningOnOpenShift,
 	}
 
+	// Reconcile each scan type independently. A transient failure in one
+	// (e.g. image resolution timeout) must not block the others.
 	var firstError error
-	result, reconcileError := nodes.Reconcile(ctx)
-	if reconcileError != nil {
-		log.Error(reconcileError, "Failed to set up nodes scanning, continuing with other scan types")
-		firstError = reconcileError
-		reconcileError = nil
+	finalResult := ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}
+	collect := func(result ctrl.Result, err error, msg string) {
+		if err != nil {
+			log.Error(err, msg+", continuing with other scan types")
+			if firstError == nil {
+				firstError = err
+			}
+		}
+		if result.RequeueAfter > 0 && result.RequeueAfter < finalResult.RequeueAfter {
+			finalResult.RequeueAfter = result.RequeueAfter
+		}
 	}
+
+	result, err := nodes.Reconcile(ctx)
+	collect(result, err, "Failed to set up nodes scanning")
 
 	containers := container_image.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
@@ -302,14 +313,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		ContainerImageResolver: imageResolver,
 		MondooOperatorConfig:   config,
 	}
-
-	result, reconcileError = containers.Reconcile(ctx)
-	if reconcileError != nil {
-		log.Error(reconcileError, "Failed to set up container scanning")
-	}
-	if reconcileError != nil || result.RequeueAfter > 0 {
-		return result, reconcileError
-	}
+	result, err = containers.Reconcile(ctx)
+	collect(result, err, "Failed to set up container scanning")
 
 	workloads := k8s_scan.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
@@ -319,14 +324,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		MondooClientBuilder:    r.MondooClientBuilder,
 		VaultTokenFetcher:      k8s_scan.DefaultVaultTokenFetcher,
 	}
-
-	result, reconcileError = workloads.Reconcile(ctx)
-	if reconcileError != nil {
-		log.Error(reconcileError, "Failed to set up Kubernetes resources scanning")
-	}
-	if reconcileError != nil || result.RequeueAfter > 0 {
-		return result, reconcileError
-	}
+	result, err = workloads.Reconcile(ctx)
+	collect(result, err, "Failed to set up Kubernetes resources scanning")
 
 	resourceWatcher := resourcewatcher.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
@@ -334,27 +333,16 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		MondooOperatorConfig:   config,
 		ContainerImageResolver: imageResolver,
 	}
+	result, err = resourceWatcher.Reconcile(ctx)
+	collect(result, err, "Failed to set up resource watcher")
 
-	result, reconcileError = resourceWatcher.Reconcile(ctx)
-	if reconcileError != nil {
-		log.Error(reconcileError, "Failed to set up resource watcher")
-	}
-	if reconcileError != nil || result.RequeueAfter > 0 {
-		return result, reconcileError
-	}
-
-	// Update status.ReconciledByOperatorVersion to the running operator version
-	// This should only happen, after all objects have been reconciled
 	mondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
 
-	// If a non-critical scan type (e.g. nodes) failed but we continued, return the
-	// error so the controller requeues and retries, while still having reconciled the
-	// remaining scan types.
 	if firstError != nil {
 		return ctrl.Result{}, firstError
 	}
 
-	return ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}, nil
+	return finalResult, nil
 }
 
 // nodeEventsRequestMapper Maps node events to enqueue all MondooAuditConfigs that have node scanning enabled for

@@ -1547,6 +1547,12 @@ spec:
                 description: ReconciledByOperatorVersion contains the version of the
                   operator which reconciled this MondooAuditConfig
                 type: string
+              scanningPaused:
+                description: |-
+                  ScanningPaused indicates that the Mondoo console has paused scanning for
+                  this integration. When true, all scan CronJobs are suspended.
+                  Only set when ConsoleIntegration is enabled.
+                type: boolean
             type: object
         type: object
     served: true

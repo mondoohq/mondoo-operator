@@ -18,6 +18,7 @@ const (
 	ExchangeRegistrationTokenEndpoint = "/AgentManager/ExchangeRegistrationToken"
 	IntegrationRegisterEndpoint       = "/IntegrationsManager/Register"
 	IntegrationCheckInEndpoint        = "/IntegrationsManager/CheckIn"
+	IntegrationConfigureEndpoint      = "/IntegrationsManager/Configure"
 	IntegrationReportStatusEndpoint   = "/IntegrationsManager/ReportStatus"
 	GarbageCollectAssetsEndpoint      = "/PolicyResolver/PurgeAssets"
 )
@@ -127,6 +128,27 @@ func (s *mondooClient) IntegrationCheckIn(ctx context.Context, in *IntegrationCh
 	}
 
 	out := &IntegrationCheckInOutput{}
+	if err = json.Unmarshal(respBodyBytes, out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %v", err)
+	}
+
+	return out, nil
+}
+
+func (s *mondooClient) IntegrationConfigure(ctx context.Context, in *IntegrationConfigureInput) (*IntegrationConfigureOutput, error) {
+	url := s.ApiEndpoint + IntegrationConfigureEndpoint
+
+	reqBodyBytes, err := json.Marshal(in)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	respBodyBytes, err := common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	out := &IntegrationConfigureOutput{}
 	if err = json.Unmarshal(respBodyBytes, out); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %v", err)
 	}

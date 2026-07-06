@@ -10,7 +10,7 @@ import (
 
 // UpdateCronJobFields copies managed fields from desired to obj,
 // preserving server-set defaults on unmanaged fields like
-// Suspend, Completions, Parallelism, DNSPolicy, SchedulerName, etc.
+// Completions, Parallelism, DNSPolicy, SchedulerName, etc.
 func UpdateCronJobFields(obj, desired *batchv1.CronJob) {
 	obj.Labels = desired.Labels
 	obj.Annotations = desired.Annotations
@@ -18,6 +18,7 @@ func UpdateCronJobFields(obj, desired *batchv1.CronJob) {
 	obj.Spec.ConcurrencyPolicy = desired.Spec.ConcurrencyPolicy
 	obj.Spec.SuccessfulJobsHistoryLimit = desired.Spec.SuccessfulJobsHistoryLimit
 	obj.Spec.FailedJobsHistoryLimit = desired.Spec.FailedJobsHistoryLimit
+	obj.Spec.Suspend = desired.Spec.Suspend
 
 	obj.Spec.JobTemplate.Labels = desired.Spec.JobTemplate.Labels
 	obj.Spec.JobTemplate.Annotations = desired.Spec.JobTemplate.Annotations

@@ -32,9 +32,16 @@ done
 info "Deleting MondooAuditConfigs..."
 kubectl delete mondooauditconfigs.k8s.mondoo.com --all -n "${NAMESPACE}" --ignore-not-found --timeout=30s || true
 
-# Mondoo credentials secret
+# Mondoo credentials/token secrets
 info "Deleting mondoo-client secret..."
 kubectl delete secret mondoo-client -n "${NAMESPACE}" --ignore-not-found
+info "Deleting mondoo-token secret..."
+kubectl delete secret mondoo-token -n "${NAMESPACE}" --ignore-not-found
+
+# Delete integration if one was created (reads state file from TF_DIR)
+if [[ "${ENABLE_INTEGRATION:-false}" == "true" ]]; then
+  source "${SCRIPT_DIR}/delete-integration.sh" || warn "Failed to delete integration"
+fi
 
 # Target cluster kubeconfig secret
 info "Deleting target-kubeconfig secret..."

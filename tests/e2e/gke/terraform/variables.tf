@@ -58,3 +58,9 @@ variable "enable_asset_routing_test" {
   type        = bool
   default     = false
 }
+
+variable "enable_integration" {
+  description = "Create a K8s integration and use integration token instead of service account credentials"
+  type        = bool
+  default     = false
+}

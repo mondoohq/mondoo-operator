@@ -44,6 +44,7 @@ func Add(mgr manager.Manager) error {
 		Client:              mgr.GetClient(),
 		Interval:            interval,
 		MondooClientBuilder: mondooclient.NewClient,
+		configHashes:        make(map[string]string),
 	}
 	if err := mgr.Add(mc); err != nil {
 		logger.Error(err, "failed to add integration controller to manager")
@@ -59,6 +60,9 @@ type IntegrationReconciler struct {
 	Interval            time.Duration
 	MondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
 	ctx                 context.Context
+	// configHashes tracks the last-known configuration hash per integration MRN so CheckIn can
+	// detect server-side configuration changes (e.g. pause/unpause).
+	configHashes map[string]string
 }
 
 // Start begins the integration status loop.
@@ -123,11 +127,51 @@ func (r *IntegrationReconciler) processMondooAuditConfig(m v1alpha2.MondooAuditC
 		}
 	}
 
-	if err = mondoo.IntegrationCheckIn(r.ctx, integrationMrn, *serviceAccount, r.MondooClientBuilder, config.Spec.HttpProxy, config.Spec.HttpsProxy, config.Spec.NoProxy, logger); err != nil {
+	result, err := mondoo.IntegrationCheckIn(r.ctx, integrationMrn, r.configHashes[integrationMrn], *serviceAccount, r.MondooClientBuilder, config.Spec.HttpProxy, config.Spec.HttpsProxy, config.Spec.NoProxy, logger)
+	if err != nil {
 		logger.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
 		return err
 	}
 
+	if result != nil && result.ConfigurationHash != "" {
+		if r.configHashes == nil {
+			r.configHashes = make(map[string]string)
+		}
+		r.configHashes[integrationMrn] = result.ConfigurationHash
+	}
+
+	if result != nil && result.ConfigFetched && result.Paused != m.Status.ScanningPaused {
+		m.Status.ScanningPaused = result.Paused
+		if updateErr := r.Client.Status().Update(r.ctx, &m); updateErr != nil {
+			logger.Error(updateErr, "failed to update ScanningPaused status")
+			return updateErr
+		}
+		logger.Info("updated ScanningPaused status", "paused", result.Paused)
+	}
+
+	return r.setScanningPausedCondition(&m)
+}
+
+func (r *IntegrationReconciler) setScanningPausedCondition(config *v1alpha2.MondooAuditConfig) error {
+	originalConfig := config.DeepCopy()
+
+	if config.Status.ScanningPaused {
+		config.Status.Conditions = mondoo.SetMondooAuditCondition(
+			config.Status.Conditions, v1alpha2.ScanningPausedCondition, corev1.ConditionTrue,
+			"ScanningPaused", "Scanning has been paused from the Mondoo console",
+			mondoo.UpdateConditionIfReasonOrMessageChange, nil, "",
+		)
+	} else {
+		config.Status.Conditions = mondoo.SetMondooAuditCondition(
+			config.Status.Conditions, v1alpha2.ScanningPausedCondition, corev1.ConditionFalse,
+			"ScanningActive", "Scanning is active",
+			mondoo.UpdateConditionIfReasonOrMessageChange, nil, "",
+		)
+	}
+
+	if !reflect.DeepEqual(originalConfig.Status.Conditions, config.Status.Conditions) {
+		return r.Client.Status().Update(r.ctx, config)
+	}
 	return nil
 }
 

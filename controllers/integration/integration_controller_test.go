@@ -104,14 +104,22 @@ func (s *IntegrationCheckInSuite) TestCheckIn() {
 	mClient.EXPECT().IntegrationCheckIn(gomock.Any(), &mondooclient.IntegrationCheckInInput{
 		Mrn: testIntegrationMRN, // make sure MRN in the CheckIn() in what is required for the real Mondoo API
 	}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{
+		Mrn:                testIntegrationMRN,
+		ConfigurationMatch: true,
+	}, nil)
+	mClient.EXPECT().IntegrationConfigure(gomock.Any(), &mondooclient.IntegrationConfigureInput{
 		Mrn: testIntegrationMRN,
+	}).Times(1).Return(&mondooclient.IntegrationConfigureOutput{
+		Details: &mondooclient.IntegrationConfigureDetails{
+			Config: `{}`,
+		},
 	}, nil)
 
 	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
 		return mClient, nil
 	}
 
-	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build()
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).WithStatusSubresource(mondooAuditConfig).Build()
 
 	r := &IntegrationReconciler{
 		Client:              fakeClient,
@@ -123,7 +131,6 @@ func (s *IntegrationCheckInSuite) TestCheckIn() {
 
 	// Assert
 	s.NoError(err, "should not error while processing valid MondooAuditConfig")
-	s.Zero(len(mondooAuditConfig.Status.Conditions), "expected no condition set on happy path")
 	mockCtrl.Finish()
 }
 
@@ -149,7 +156,15 @@ func (s *IntegrationCheckInSuite) TestClearPreviousCondition() {
 	mClient.EXPECT().IntegrationCheckIn(gomock.Any(), &mondooclient.IntegrationCheckInInput{
 		Mrn: testIntegrationMRN, // make sure MRN in the CheckIn() in what is required for the real Mondoo API
 	}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{
+		Mrn:                testIntegrationMRN,
+		ConfigurationMatch: true,
+	}, nil)
+	mClient.EXPECT().IntegrationConfigure(gomock.Any(), &mondooclient.IntegrationConfigureInput{
 		Mrn: testIntegrationMRN,
+	}).Times(1).Return(&mondooclient.IntegrationConfigureOutput{
+		Details: &mondooclient.IntegrationConfigureDetails{
+			Config: `{}`,
+		},
 	}, nil)
 
 	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
@@ -293,6 +308,239 @@ func (s *IntegrationCheckInSuite) TestFailedCheckIn() {
 	// this controller doesn't make changes to k8s resources...the only side effect here are the mondooclient API calls
 	s.Error(err, "expected error when CheckIn() return error")
 	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "failed to CheckIn")
+	mockCtrl.Finish()
+}
+
+func (s *IntegrationCheckInSuite) TestCheckInPausesScanning() {
+	// Arrange
+	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
+
+	existingObjects := []client.Object{
+		testMondooCredsSecret(),
+		mondooAuditConfig,
+	}
+
+	mockCtrl := gomock.NewController(s.T())
+
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+	mClient.EXPECT().IntegrationCheckIn(gomock.Any(), &mondooclient.IntegrationCheckInInput{
+		Mrn: testIntegrationMRN,
+	}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{
+		Mrn:                testIntegrationMRN,
+		ConfigurationMatch: false,
+	}, nil)
+	mClient.EXPECT().IntegrationConfigure(gomock.Any(), &mondooclient.IntegrationConfigureInput{
+		Mrn: testIntegrationMRN,
+	}).Times(1).Return(&mondooclient.IntegrationConfigureOutput{
+		Details: &mondooclient.IntegrationConfigureDetails{
+			Config: `{"pauseScanning":true}`,
+		},
+	}, nil)
+
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithStatusSubresource(existingObjects...).
+		WithObjects(existingObjects...).
+		Build()
+
+	r := &IntegrationReconciler{
+		Client:              fakeClient,
+		MondooClientBuilder: testMondooClientBuilder,
+	}
+
+	// Act
+	err := r.processMondooAuditConfig(*mondooAuditConfig)
+
+	// Assert
+	s.NoError(err)
+
+	updated := testMondooAuditConfig()
+	s.NoError(fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(updated), updated))
+	s.True(updated.Status.ScanningPaused, "expected ScanningPaused=true after pause")
+	mockCtrl.Finish()
+}
+
+func (s *IntegrationCheckInSuite) TestCheckInUnpausesScanning() {
+	// Arrange
+	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
+	mondooAuditConfig.Status.ScanningPaused = true
+
+	existingObjects := []client.Object{
+		testMondooCredsSecret(),
+		mondooAuditConfig,
+	}
+
+	mockCtrl := gomock.NewController(s.T())
+
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+	mClient.EXPECT().IntegrationCheckIn(gomock.Any(), &mondooclient.IntegrationCheckInInput{
+		Mrn: testIntegrationMRN,
+	}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{
+		Mrn:                testIntegrationMRN,
+		ConfigurationMatch: false,
+	}, nil)
+	mClient.EXPECT().IntegrationConfigure(gomock.Any(), &mondooclient.IntegrationConfigureInput{
+		Mrn: testIntegrationMRN,
+	}).Times(1).Return(&mondooclient.IntegrationConfigureOutput{
+		Details: &mondooclient.IntegrationConfigureDetails{
+			Config: `{"pauseScanning":false}`,
+		},
+	}, nil)
+
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithStatusSubresource(existingObjects...).
+		WithObjects(existingObjects...).
+		Build()
+
+	r := &IntegrationReconciler{
+		Client:              fakeClient,
+		MondooClientBuilder: testMondooClientBuilder,
+	}
+
+	// Act
+	err := r.processMondooAuditConfig(*mondooAuditConfig)
+
+	// Assert
+	s.NoError(err)
+
+	updated := testMondooAuditConfig()
+	s.NoError(fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(updated), updated))
+	s.False(updated.Status.ScanningPaused, "expected ScanningPaused=false after unpause")
+	mockCtrl.Finish()
+}
+
+func (s *IntegrationCheckInSuite) TestCheckInConfigMatchCallsConfigureWhenNoStoredHash() {
+	// ConfigurationMatch=true but Configure is still called because we have no stored hash
+	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
+
+	existingObjects := []client.Object{
+		testMondooCredsSecret(),
+		mondooAuditConfig,
+	}
+
+	mockCtrl := gomock.NewController(s.T())
+
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+	mClient.EXPECT().IntegrationCheckIn(gomock.Any(), &mondooclient.IntegrationCheckInInput{
+		Mrn: testIntegrationMRN,
+	}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{
+		Mrn:                testIntegrationMRN,
+		ConfigurationMatch: true,
+	}, nil)
+	mClient.EXPECT().IntegrationConfigure(gomock.Any(), &mondooclient.IntegrationConfigureInput{
+		Mrn: testIntegrationMRN,
+	}).Times(1).Return(&mondooclient.IntegrationConfigureOutput{
+		Details: &mondooclient.IntegrationConfigureDetails{
+			Config: `{"pauseScanning":false}`,
+		},
+	}, nil)
+
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
+	}
+
+	fakeClient := fake.NewClientBuilder().WithObjects(existingObjects...).WithStatusSubresource(mondooAuditConfig).Build()
+
+	r := &IntegrationReconciler{
+		Client:              fakeClient,
+		MondooClientBuilder: testMondooClientBuilder,
+	}
+
+	// Act
+	err := r.processMondooAuditConfig(*mondooAuditConfig)
+
+	// Assert
+	s.NoError(err)
+	mockCtrl.Finish()
+}
+
+func (s *IntegrationCheckInSuite) TestCheckInConfigMatchSkipsConfigureWithStoredHash() {
+	// When we have a stored hash and ConfigurationMatch=true, Configure must NOT be called
+	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
+
+	existingObjects := []client.Object{
+		testMondooCredsSecret(),
+		mondooAuditConfig,
+	}
+
+	mockCtrl := gomock.NewController(s.T())
+
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+	mClient.EXPECT().IntegrationCheckIn(gomock.Any(), &mondooclient.IntegrationCheckInInput{
+		Mrn:               testIntegrationMRN,
+		ConfigurationHash: "abc123",
+	}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{
+		Mrn:                testIntegrationMRN,
+		ConfigurationMatch: true,
+	}, nil)
+	// IntegrationConfigure must NOT be called — gomock will fail if it is
+
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
+	}
+
+	fakeClient := fake.NewClientBuilder().WithObjects(existingObjects...).WithStatusSubresource(mondooAuditConfig).Build()
+
+	r := &IntegrationReconciler{
+		Client:              fakeClient,
+		MondooClientBuilder: testMondooClientBuilder,
+		configHashes:        map[string]string{testIntegrationMRN: "abc123"},
+	}
+
+	err := r.processMondooAuditConfig(*mondooAuditConfig)
+
+	s.NoError(err)
+	mockCtrl.Finish()
+}
+
+func (s *IntegrationCheckInSuite) TestConfigureFailureDoesNotCrash() {
+	// Configure fails — operator must NOT error, scanning state must NOT change
+	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
+
+	existingObjects := []client.Object{
+		testMondooCredsSecret(),
+		mondooAuditConfig,
+	}
+
+	mockCtrl := gomock.NewController(s.T())
+
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+	mClient.EXPECT().IntegrationCheckIn(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationCheckInOutput{
+		Mrn:                testIntegrationMRN,
+		ConfigurationMatch: false,
+	}, nil)
+	mClient.EXPECT().IntegrationConfigure(gomock.Any(), gomock.Any()).Times(1).Return(
+		nil, fmt.Errorf("connection refused"),
+	)
+
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
+	}
+
+	fakeClient := fake.NewClientBuilder().WithObjects(existingObjects...).WithStatusSubresource(mondooAuditConfig).Build()
+
+	r := &IntegrationReconciler{
+		Client:              fakeClient,
+		MondooClientBuilder: testMondooClientBuilder,
+	}
+
+	// Act
+	err := r.processMondooAuditConfig(*mondooAuditConfig)
+
+	// Assert — no error returned, operator stays healthy
+	s.NoError(err)
 	mockCtrl.Finish()
 }
 

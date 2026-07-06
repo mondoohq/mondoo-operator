@@ -14,6 +14,11 @@ source "${SCRIPT_DIR}/common.sh"
 
 info "Deploying operator from local chart (image: ${IMAGE_REPO}:${IMAGE_TAG})..."
 
+# Helm does not update CRDs on upgrade, only on first install.
+# Apply them explicitly so schema changes (new status fields, etc.) take effect.
+info "Applying CRDs from local chart..."
+kubectl apply --server-side --force-conflicts -f "${REPO_ROOT}/charts/mondoo-operator/crds/"
+
 # Adopt any existing Mondoo CRDs so Helm can manage them
 for crd in $(kubectl get crds -o name 2>/dev/null | grep mondoo || true); do
   info "Adopting existing CRD for Helm: ${crd}"
