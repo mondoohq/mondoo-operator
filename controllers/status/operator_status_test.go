@@ -202,6 +202,10 @@ type mockContainerImageResolver struct {
 	operatorSkipValues []bool
 }
 
+func (m *mockContainerImageResolver) CnspecImageVersion(_, _, _ string) string {
+	return ""
+}
+
 func (m *mockContainerImageResolver) CnspecImage(_, _, _ string, skipImageResolution bool) (string, error) {
 	m.cnspecSkipValues = append(m.cnspecSkipValues, skipImageResolution)
 	if skipImageResolution {

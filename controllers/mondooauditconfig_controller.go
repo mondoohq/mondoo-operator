@@ -338,6 +338,20 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	mondooAuditConfig.Status.ReconciledByOperatorVersion = version.Version
 
+	if imageResolver != nil {
+		// CnspecImage is also called by the sub-reconcilers above; the image cacher
+		// deduplicates via a 24h TTL cache, so this is a map lookup, not a registry call.
+		resolvedCnspecImage, err := imageResolver.CnspecImage(
+			mondooAuditConfig.Spec.Scanner.Image.Name, mondooAuditConfig.Spec.Scanner.Image.Tag, mondooAuditConfig.Spec.Scanner.Image.Digest, config.Spec.SkipContainerResolution)
+		if err == nil {
+			if _, digest, ok := strings.Cut(resolvedCnspecImage, "@"); ok {
+				mondooAuditConfig.Status.CnspecImageDigest = digest
+			}
+		}
+		mondooAuditConfig.Status.CnspecVersion = imageResolver.CnspecImageVersion(
+			mondooAuditConfig.Spec.Scanner.Image.Name, mondooAuditConfig.Spec.Scanner.Image.Tag, mondooAuditConfig.Spec.Scanner.Image.Digest)
+	}
+
 	if firstError != nil {
 		return ctrl.Result{}, firstError
 	}

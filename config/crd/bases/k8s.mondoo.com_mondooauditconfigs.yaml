@@ -1483,6 +1483,15 @@ spec:
           status:
             description: MondooAuditConfigStatus defines the observed state of MondooAuditConfig
             properties:
+              cnspecImageDigest:
+                description: CnspecImageDigest contains the digest of the cnspec image
+                  used for scanning
+                type: string
+              cnspecVersion:
+                description: |-
+                  CnspecVersion contains the semantic version of the cnspec image, extracted from the
+                  org.opencontainers.image.version OCI label.
+                type: string
               conditions:
                 description: Conditions includes detailed status for the MondooAuditConfig
                 items:

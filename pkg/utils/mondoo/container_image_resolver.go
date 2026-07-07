@@ -40,6 +40,10 @@ type ContainerImageResolver interface {
 	// When userDigest is specified, it takes precedence over userTag.
 	CnspecImage(userImage, userTag, userDigest string, skipImageResolution bool) (string, error)
 
+	// CnspecImageVersion returns the OCI version label (org.opencontainers.image.version) from
+	// the cnspec image. Must be called after CnspecImage to populate the cache.
+	CnspecImageVersion(userImage, userTag, userDigest string) string
+
 	// MondooOperatorImage return the Mondoo operator image. If skipResolveImage is false, then the image tag is replaced
 	// by a digest. If userImage, userTag, or userDigest are empty strings, default values are used.
 	// When userDigest is specified, it takes precedence over userTag.
@@ -111,6 +115,17 @@ func (c *containerImageResolver) CnspecImage(userImage, userTag, userDigest stri
 	}
 
 	return c.resolveImage(context.Background(), image, skipImageResolution)
+}
+
+func (c *containerImageResolver) CnspecImageVersion(userImage, userTag, userDigest string) string {
+	defaultTag := CnspecTag
+	if c.resolveForOpenShift {
+		defaultTag = OpenShiftMondooClientTag
+	}
+	defaultImage := CnspecImage
+	image := userImageOrDefault(defaultImage, defaultTag, userImage, userTag, userDigest)
+	image = c.applyImageRegistry(image)
+	return c.imageCacher.GetImageVersion(image)
 }
 
 func (c *containerImageResolver) MondooOperatorImage(ctx context.Context, userImage, userTag, userDigest string, skipImageResolution bool) (string, error) {

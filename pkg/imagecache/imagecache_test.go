@@ -31,7 +31,7 @@ func TestCache(t *testing.T) {
 	tests := []struct {
 		name            string
 		imagesMap       map[string]imageData
-		fetchImageFunc  func(string) (string, error)
+		fetchImageFunc  func(string) (fetchResult, error)
 		expectedImage   string
 		extraValidation func(*testing.T, *imageCache)
 		expectError     bool
@@ -45,8 +45,8 @@ func TestCache(t *testing.T) {
 					lastUpdated: time.Now(),
 				},
 			},
-			fetchImageFunc: func(string) (string, error) {
-				return "", fmt.Errorf("should not call fetchImage")
+			fetchImageFunc: func(string) (fetchResult, error) {
+				return fetchResult{}, fmt.Errorf("should not call fetchImage")
 			},
 		},
 		{
@@ -58,22 +58,22 @@ func TestCache(t *testing.T) {
 					lastUpdated: time.Now().Add(-25 * time.Hour),
 				},
 			},
-			fetchImageFunc: func(string) (string, error) {
-				return testUpdatedImageDigest, nil
+			fetchImageFunc: func(string) (fetchResult, error) {
+				return fetchResult{url: testUpdatedImageDigest}, nil
 			},
 		},
 		{
 			name:          "image not in cache",
 			expectedImage: testCurrentImageDigest,
 			imagesMap:     map[string]imageData{},
-			fetchImageFunc: func(string) (string, error) {
-				return testCurrentImageDigest, nil
+			fetchImageFunc: func(string) (fetchResult, error) {
+				return fetchResult{url: testCurrentImageDigest}, nil
 			},
 		},
 		{
 			name: "error during image fetching",
-			fetchImageFunc: func(string) (string, error) {
-				return "", fmt.Errorf("example error while fetching image")
+			fetchImageFunc: func(string) (fetchResult, error) {
+				return fetchResult{}, fmt.Errorf("example error while fetching image")
 			},
 			expectError: true,
 		},

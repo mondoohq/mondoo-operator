@@ -534,6 +534,15 @@ type MondooAuditConfigStatus struct {
 	// ReconciledByOperatorVersion contains the version of the operator which reconciled this MondooAuditConfig
 	ReconciledByOperatorVersion string `json:"reconciledByOperatorVersion,omitempty"`
 
+	// CnspecVersion contains the semantic version of the cnspec image, extracted from the
+	// org.opencontainers.image.version OCI label.
+	// +optional
+	CnspecVersion string `json:"cnspecVersion,omitempty"`
+
+	// CnspecImageDigest contains the digest of the cnspec image used for scanning
+	// +optional
+	CnspecImageDigest string `json:"cnspecImageDigest,omitempty"`
+
 	// LastK8sResourceGarbageCollectionTime tracks the last time the operator performed
 	// garbage collection of stale K8s resource scan assets.
 	// +optional
