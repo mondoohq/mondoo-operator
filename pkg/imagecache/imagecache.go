@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"go.mondoo.com/mql/v13/providers/os/connection/container/auth"
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +29,8 @@ const (
 
 type ImageCacher interface {
 	GetImage(string) (string, error)
+	// GetImageVersion returns the OCI version label for a previously resolved image.
+	GetImageVersion(image string) string
 	// WithAuth returns a new ImageCacher that uses the provided authentication keychain
 	WithAuth(keychain authn.Keychain) ImageCacher
 }
@@ -35,12 +38,18 @@ type ImageCacher interface {
 type imageCache struct {
 	images      map[string]imageData
 	imagesMutex *sync.RWMutex
-	fetchImage  func(string) (string, error)
+	fetchImage  func(string) (fetchResult, error)
 	keychain    authn.Keychain
+}
+
+type fetchResult struct {
+	url     string
+	version string
 }
 
 type imageData struct {
 	url         string
+	version     string
 	lastUpdated time.Time
 }
 
@@ -79,25 +88,36 @@ func (i *imageCache) getImageWithSHA(image string) (string, error) {
 	return img.url, nil
 }
 
+func (i *imageCache) GetImageVersion(image string) string {
+	i.imagesMutex.RLock()
+	defer i.imagesMutex.RUnlock()
+
+	if img, ok := i.images[image]; ok {
+		return img.version
+	}
+	return ""
+}
+
 // updateImage will make a query out to the registry and store the sha for the image
 func (i *imageCache) updateImage(image string) error {
-	imageUrl, err := i.fetchImage(image)
+	result, err := i.fetchImage(image)
 	if err != nil {
 		return err
 	}
 
 	i.images[image] = imageData{
-		url:         imageUrl,
+		url:         result.url,
+		version:     result.version,
 		lastUpdated: time.Now(),
 	}
 
 	return nil
 }
 
-func queryImageWithSHA(image string, keychain authn.Keychain) (string, error) {
+func queryImageWithSHA(image string, keychain authn.Keychain) (fetchResult, error) {
 	ref, err := name.ParseReference(image)
 	if err != nil {
-		return "", err
+		return fetchResult{}, err
 	}
 
 	// Use provided keychain if given, otherwise use cnquery's auth which supports ECR, GCR, etc.
@@ -110,20 +130,74 @@ func queryImageWithSHA(image string, keychain authn.Keychain) (string, error) {
 
 	desc, err := remote.Get(ref, remote.WithAuthFromKeychain(kc))
 	if err != nil {
-		return "", err
+		return fetchResult{}, err
 	}
 	imgDigest := desc.Digest.String()
 	repoName := ref.Context().Name()
 	imageUrl := repoName + "@" + imgDigest
 
-	return imageUrl, nil
+	version := extractVersionLabel(ref, desc, kc)
+
+	return fetchResult{url: imageUrl, version: version}, nil
+}
+
+func extractVersionLabel(ref name.Reference, desc *remote.Descriptor, kc authn.Keychain) string {
+	cf, err := configFileFromDescriptor(ref, desc, kc)
+	if err != nil || cf == nil {
+		return ""
+	}
+	version := cf.Config.Labels["org.opencontainers.image.version"]
+	for _, suffix := range []string{"-ubi-rootless", "-rootless"} {
+		if v, ok := strings.CutSuffix(version, suffix); ok {
+			return v
+		}
+	}
+	return version
+}
+
+// configFileFromDescriptor extracts the image config, handling both single-arch
+// images and multi-arch manifest lists (picking the first child manifest).
+func configFileFromDescriptor(ref name.Reference, desc *remote.Descriptor, kc authn.Keychain) (*v1.ConfigFile, error) {
+	if desc.MediaType.IsImage() {
+		img, err := desc.Image()
+		if err != nil {
+			return nil, err
+		}
+		return img.ConfigFile()
+	}
+
+	if !desc.MediaType.IsIndex() {
+		return nil, fmt.Errorf("unexpected media type: %s", desc.MediaType)
+	}
+
+	idx, err := desc.ImageIndex()
+	if err != nil {
+		return nil, err
+	}
+	manifest, err := idx.IndexManifest()
+	if err != nil {
+		return nil, err
+	}
+	if len(manifest.Manifests) == 0 {
+		return nil, fmt.Errorf("empty image index")
+	}
+	childRef := ref.Context().Digest(manifest.Manifests[0].Digest.String())
+	childDesc, err := remote.Get(childRef, remote.WithAuthFromKeychain(kc))
+	if err != nil {
+		return nil, err
+	}
+	img, err := childDesc.Image()
+	if err != nil {
+		return nil, err
+	}
+	return img.ConfigFile()
 }
 
 func NewImageCacher() ImageCacher {
 	return &imageCache{
 		images:      map[string]imageData{},
 		imagesMutex: &sync.RWMutex{},
-		fetchImage: func(image string) (string, error) {
+		fetchImage: func(image string) (fetchResult, error) {
 			return queryImageWithSHA(image, nil)
 		},
 	}
@@ -133,7 +207,7 @@ func (i *imageCache) WithAuth(keychain authn.Keychain) ImageCacher {
 	return &imageCache{
 		images:      i.images,
 		imagesMutex: i.imagesMutex,
-		fetchImage: func(image string) (string, error) {
+		fetchImage: func(image string) (fetchResult, error) {
 			return queryImageWithSHA(image, keychain)
 		},
 		keychain: keychain,

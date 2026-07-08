@@ -18,6 +18,10 @@ func NewNoOpContainerImageResolver() mondoo.ContainerImageResolver {
 	return &noOpContainerImageResolver{}
 }
 
+func (c *noOpContainerImageResolver) CnspecImageVersion(_, _, _ string) string {
+	return ""
+}
+
 func (c *noOpContainerImageResolver) CnspecImage(userImage, userTag, userDigest string, skipResolveImage bool) (string, error) {
 	image := mondoo.CnspecImage
 	if userImage != "" {
@@ -52,6 +56,10 @@ func (c *noOpContainerImageResolver) MondooOperatorImage(ctx context.Context, us
 type ContainerImageResolverMock struct {
 	CnspecImageFunc         func(userImage, userTag, userDigest string, skipResolveImage bool) (string, error)
 	MondooOperatorImageFunc func(ctx context.Context, userImage, userTag, userDigest string, skipResolveImage bool) (string, error)
+}
+
+func (c *ContainerImageResolverMock) CnspecImageVersion(_, _, _ string) string {
+	return ""
 }
 
 func (c *ContainerImageResolverMock) CnspecImage(userImage, userTag, userDigest string, skipResolveImage bool) (string, error) {

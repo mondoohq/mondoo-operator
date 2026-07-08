@@ -36,6 +36,10 @@ func (f *fakeCacher) GetImage(img string) (string, error) {
 	return f.fakeGetImage(img)
 }
 
+func (f *fakeCacher) GetImageVersion(_ string) string {
+	return ""
+}
+
 func (f *fakeCacher) WithAuth(keychain authn.Keychain) imagecache.ImageCacher {
 	return f // Return itself since we don't need auth in tests
 }
