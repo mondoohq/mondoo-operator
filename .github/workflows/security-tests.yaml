@@ -50,7 +50,7 @@ jobs:
       - name: Generate manifests
         run: make generate-manifests IMG='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE }}'
       - name: Scan Kubernetes Manifest with Mondoo
-        uses: mondoohq/actions/k8s-manifest@b41754752763419780430abef5e35842ba2bec66 # v13.2.0
+        uses: mondoohq/actions/k8s-manifest@c38cfdf99da709760f58ff35aa5608688657f2f7 # v13.3.0
         env:
           MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
         with:
