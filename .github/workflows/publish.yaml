@@ -13,6 +13,10 @@ on:
     # Publish semver tags as releases.
     tags: ["v*.*.*"]
 
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
+
 # Restrictive top-level default; individual jobs escalate as needed.
 permissions:
   contents: read

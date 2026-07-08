@@ -9,6 +9,10 @@ on:
   schedule:
     - cron: '0 4 * * 3' # Every Wednesday at 4:00 AM
 
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: false
+
 # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
 permissions:
   contents: read
