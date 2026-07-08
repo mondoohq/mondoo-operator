@@ -1483,6 +1483,15 @@ spec:
           status:
             description: MondooAuditConfigStatus defines the observed state of MondooAuditConfig
             properties:
+              cnspecImageDigest:
+                description: CnspecImageDigest contains the digest of the cnspec image
+                  used for scanning
+                type: string
+              cnspecVersion:
+                description: |-
+                  CnspecVersion contains the semantic version of the cnspec image, extracted from the
+                  org.opencontainers.image.version OCI label.
+                type: string
               conditions:
                 description: Conditions includes detailed status for the MondooAuditConfig
                 items:
@@ -1547,6 +1556,12 @@ spec:
                 description: ReconciledByOperatorVersion contains the version of the
                   operator which reconciled this MondooAuditConfig
                 type: string
+              scanningPaused:
+                description: |-
+                  ScanningPaused indicates that the Mondoo console has paused scanning for
+                  this integration. When true, all scan CronJobs are suspended.
+                  Only set when ConsoleIntegration is enabled.
+                type: boolean
             type: object
         type: object
     served: true
