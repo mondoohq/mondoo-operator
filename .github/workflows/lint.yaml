@@ -8,6 +8,10 @@ on:
       - "main"
     tags: ["v*.*.*"]
 
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

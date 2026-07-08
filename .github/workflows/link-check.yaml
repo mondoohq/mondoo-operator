@@ -6,6 +6,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: link-check-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
