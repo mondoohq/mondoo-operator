@@ -26,6 +26,7 @@ func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
 								{Name: "my-secret"},
 								{Name: "another-secret"},
 							},
+							PriorityClassName: "high-priority",
 						},
 					},
 				},
@@ -39,6 +40,7 @@ func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
 	assert.Equal(t, desired.Spec.Schedule, obj.Spec.Schedule)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.Containers, obj.Spec.JobTemplate.Spec.Template.Spec.Containers)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets, obj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets)
+	assert.Equal(t, "high-priority", obj.Spec.JobTemplate.Spec.Template.Spec.PriorityClassName)
 }
 
 func TestUpdateCronJobFields_PreservesUnmanagedFields(t *testing.T) {
@@ -48,8 +50,9 @@ func TestUpdateCronJobFields_PreservesUnmanagedFields(t *testing.T) {
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
-							DNSPolicy:     corev1.DNSClusterFirst,
-							SchedulerName: "custom-scheduler",
+							DNSPolicy:         corev1.DNSClusterFirst,
+							SchedulerName:     "custom-scheduler",
+							PriorityClassName: "original-priority",
 						},
 					},
 				},
@@ -65,7 +68,8 @@ func TestUpdateCronJobFields_PreservesUnmanagedFields(t *testing.T) {
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{{Name: "test"}},
+							Containers:        []corev1.Container{{Name: "test"}},
+							PriorityClassName: "desired-priority",
 						},
 					},
 				},
@@ -77,6 +81,7 @@ func TestUpdateCronJobFields_PreservesUnmanagedFields(t *testing.T) {
 
 	// Managed fields are updated
 	assert.Equal(t, "*/10 * * * *", obj.Spec.Schedule)
+	assert.Equal(t, "desired-priority", obj.Spec.JobTemplate.Spec.Template.Spec.PriorityClassName)
 	// Unmanaged fields are preserved
 	assert.Equal(t, corev1.DNSClusterFirst, obj.Spec.JobTemplate.Spec.Template.Spec.DNSPolicy)
 	assert.Equal(t, "custom-scheduler", obj.Spec.JobTemplate.Spec.Template.Spec.SchedulerName)

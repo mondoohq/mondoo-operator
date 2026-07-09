@@ -277,6 +277,15 @@ func TestInventory_WithAnnotations(t *testing.T) {
 	}
 }
 
+func TestCronJob_WithPriorityClassName(t *testing.T) {
+	testNode := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-name"}}
+	mac := testMondooAuditConfig()
+	mac.Spec.Nodes.PriorityClassName = "high-priority"
+
+	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	assert.Equal(t, "high-priority", cj.Spec.JobTemplate.Spec.Template.Spec.PriorityClassName)
+}
+
 func TestCronJob_WithProxy(t *testing.T) {
 	testNode := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-name"}}
 	mac := testMondooAuditConfig()
