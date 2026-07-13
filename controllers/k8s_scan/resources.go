@@ -1119,8 +1119,12 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 		"disable-cache":      "false",
 	}
 	if cluster.ContainerImageScanning {
-		opts["images"] = strings.Join(m.Spec.Containers.Repositories.Include, ",")
-		opts["images-exclude"] = strings.Join(m.Spec.Containers.Repositories.Exclude, ",")
+		if len(m.Spec.Containers.Repositories.Include) > 0 {
+			opts["images"] = strings.Join(m.Spec.Containers.Repositories.Include, ",")
+		}
+		if len(m.Spec.Containers.Repositories.Exclude) > 0 {
+			opts["images-exclude"] = strings.Join(m.Spec.Containers.Repositories.Exclude, ",")
+		}
 	}
 
 	inv := &inventory.Inventory{

@@ -286,13 +286,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 					Connections: []*inventory.Config{
 						{
 							Type: "k8s",
-							Options: map[string]string{
-								"namespaces":              strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
-								"namespaces-exclude":      strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
-								"images":         strings.Join(m.Spec.Containers.Repositories.Include, ","),
-								"images-exclude": strings.Join(m.Spec.Containers.Repositories.Exclude, ","),
-								"disable-cache":           "false",
-							},
+							Options: containerImageOptions(m),
 							Discover: &inventory.Discovery{
 								Targets: []string{"container-images"},
 							},
@@ -402,4 +396,19 @@ func validateContainerRegistryWIF(wif *v1alpha2.WorkloadIdentityConfig) error {
 	}
 
 	return nil
+}
+
+func containerImageOptions(m v1alpha2.MondooAuditConfig) map[string]string {
+	opts := map[string]string{
+		"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
+		"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
+		"disable-cache":      "false",
+	}
+	if len(m.Spec.Containers.Repositories.Include) > 0 {
+		opts["images"] = strings.Join(m.Spec.Containers.Repositories.Include, ",")
+	}
+	if len(m.Spec.Containers.Repositories.Exclude) > 0 {
+		opts["images-exclude"] = strings.Join(m.Spec.Containers.Repositories.Exclude, ",")
+	}
+	return opts
 }

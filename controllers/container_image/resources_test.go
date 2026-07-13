@@ -531,7 +531,8 @@ func TestInventory_WithRepositoryFilters(t *testing.T) {
 
 	opts := inv.Spec.Assets[0].Connections[0].Options
 	assert.Equal(t, "ghcr.io/third-party/*,docker.io/library/*", opts["images-exclude"])
-	assert.Empty(t, opts["images"])
+	_, hasInclude := opts["images"]
+	assert.False(t, hasInclude, "images key should not be present when only exclude is set")
 }
 
 func TestInventory_WithRepositoryInclude(t *testing.T) {
@@ -555,7 +556,8 @@ func TestInventory_WithRepositoryInclude(t *testing.T) {
 
 	opts := inv.Spec.Assets[0].Connections[0].Options
 	assert.Equal(t, "gcr.io/my-project/*", opts["images"])
-	assert.Empty(t, opts["images-exclude"])
+	_, hasExclude := opts["images-exclude"]
+	assert.False(t, hasExclude, "images-exclude key should not be present when only include is set")
 }
 
 func TestInventory_WithoutRepositoryFilters(t *testing.T) {
@@ -571,8 +573,10 @@ func TestInventory_WithoutRepositoryFilters(t *testing.T) {
 	require.NotEmpty(t, inv.Spec.Assets)
 
 	opts := inv.Spec.Assets[0].Connections[0].Options
-	assert.Empty(t, opts["images"])
-	assert.Empty(t, opts["images-exclude"])
+	_, hasInclude := opts["images"]
+	_, hasExclude := opts["images-exclude"]
+	assert.False(t, hasInclude, "images key should not be present when no filters configured")
+	assert.False(t, hasExclude, "images-exclude key should not be present when no filters configured")
 }
 
 // envToMap converts a slice of EnvVar to a map for easy lookup.
