@@ -199,14 +199,16 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 		})
 
 		// Mount docker config in main container
-		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts,
+		podSpec.Containers[0].VolumeMounts = append(
+			podSpec.Containers[0].VolumeMounts,
 			corev1.VolumeMount{
 				Name:      "docker-config",
 				ReadOnly:  true,
 				MountPath: "/etc/opt/mondoo/docker",
 			},
 		)
-		podSpec.Containers[0].Env = append(podSpec.Containers[0].Env,
+		podSpec.Containers[0].Env = append(
+			podSpec.Containers[0].Env,
 			corev1.EnvVar{Name: "DOCKER_CONFIG", Value: "/etc/opt/mondoo/docker"},
 		)
 
@@ -230,7 +232,8 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 	if len(cfg.Spec.ImagePullSecrets) > 0 {
 		cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = append(
 			cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets,
-			cfg.Spec.ImagePullSecrets...)
+			cfg.Spec.ImagePullSecrets...,
+		)
 	}
 
 	return cronjob
@@ -283,11 +286,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 					Connections: []*inventory.Config{
 						{
 							Type: "k8s",
-							Options: map[string]string{
-								"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
-								"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
-								"disable-cache":      "false",
-							},
+							Options: containerImageOptions(m),
 							Discover: &inventory.Discovery{
 								Targets: []string{"container-images"},
 							},
@@ -397,4 +396,19 @@ func validateContainerRegistryWIF(wif *v1alpha2.WorkloadIdentityConfig) error {
 	}
 
 	return nil
+}
+
+func containerImageOptions(m v1alpha2.MondooAuditConfig) map[string]string {
+	opts := map[string]string{
+		"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
+		"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
+		"disable-cache":      "false",
+	}
+	if len(m.Spec.Containers.Repositories.Include) > 0 {
+		opts["images"] = strings.Join(m.Spec.Containers.Repositories.Include, ",")
+	}
+	if len(m.Spec.Containers.Repositories.Exclude) > 0 {
+		opts["images-exclude"] = strings.Join(m.Spec.Containers.Repositories.Exclude, ",")
+	}
+	return opts
 }

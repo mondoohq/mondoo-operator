@@ -59,6 +59,7 @@ func (in *Containers) DeepCopyInto(out *Containers) {
 		*out = new(metav1.Duration)
 		**out = **in
 	}
+	in.Repositories.DeepCopyInto(&out.Repositories)
 	if in.WorkloadIdentity != nil {
 		in, out := &in.WorkloadIdentity, &out.WorkloadIdentity
 		*out = new(WorkloadIdentityConfig)
@@ -167,6 +168,11 @@ func (in *ExternalCluster) DeepCopyInto(out *ExternalCluster) {
 	if in.Filtering != nil {
 		in, out := &in.Filtering, &out.Filtering
 		*out = new(Filtering)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Repositories != nil {
+		in, out := &in.Repositories, &out.Repositories
+		*out = new(FilteringSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.PrivateRegistriesPullSecretRef != nil {

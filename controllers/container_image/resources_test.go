@@ -6,7 +6,6 @@ package container_image
 import (
 	"strings"
 	"testing"
-
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -509,6 +508,75 @@ func TestValidateContainerRegistryWIF(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInventory_WithRepositoryFilters(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Containers: v1alpha2.Containers{
+				Repositories: v1alpha2.FilteringSpec{
+					Exclude: []string{"ghcr.io/third-party/*", "docker.io/library/*"},
+				},
+			},
+		},
+	}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	require.NotEmpty(t, inv.Spec.Assets)
+
+	opts := inv.Spec.Assets[0].Connections[0].Options
+	assert.Equal(t, "ghcr.io/third-party/*,docker.io/library/*", opts["images-exclude"])
+	_, hasInclude := opts["images"]
+	assert.False(t, hasInclude, "images key should not be present when only exclude is set")
+}
+
+func TestInventory_WithRepositoryInclude(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Containers: v1alpha2.Containers{
+				Repositories: v1alpha2.FilteringSpec{
+					Include: []string{"gcr.io/my-project/*"},
+				},
+			},
+		},
+	}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	require.NotEmpty(t, inv.Spec.Assets)
+
+	opts := inv.Spec.Assets[0].Connections[0].Options
+	assert.Equal(t, "gcr.io/my-project/*", opts["images"])
+	_, hasExclude := opts["images-exclude"]
+	assert.False(t, hasExclude, "images-exclude key should not be present when only include is set")
+}
+
+func TestInventory_WithoutRepositoryFilters(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+	}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	require.NotEmpty(t, inv.Spec.Assets)
+
+	opts := inv.Spec.Assets[0].Connections[0].Options
+	_, hasInclude := opts["images"]
+	_, hasExclude := opts["images-exclude"]
+	assert.False(t, hasInclude, "images key should not be present when no filters configured")
+	assert.False(t, hasExclude, "images-exclude key should not be present when no filters configured")
 }
 
 // envToMap converts a slice of EnvVar to a map for easy lookup.
