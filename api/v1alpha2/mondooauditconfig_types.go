@@ -208,6 +208,14 @@ type ExternalCluster struct {
 	// +optional
 	ContainerImageScanning bool `json:"containerImageScanning,omitempty"`
 
+	// Repositories allows filtering which container images are scanned based on their
+	// repository/registry, specific to this external cluster.
+	// If omitted, inherits the global filter from spec.containers.repositories.
+	// Set an empty object to scan all images even when a global filter is configured.
+	// Only applies when ContainerImageScanning is true.
+	// +optional
+	Repositories *FilteringSpec `json:"repositories,omitempty"`
+
 	// PrivateRegistriesPullSecretRef references a Secret containing registry credentials
 	// for pulling/scanning private images in this remote cluster.
 	// +optional

@@ -1119,11 +1119,12 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 		"disable-cache":      "false",
 	}
 	if cluster.ContainerImageScanning {
-		if len(m.Spec.Containers.Repositories.Include) > 0 {
-			opts["images"] = strings.Join(m.Spec.Containers.Repositories.Include, ",")
+		repos := externalClusterRepositories(cluster, m)
+		if len(repos.Include) > 0 {
+			opts["images"] = strings.Join(repos.Include, ",")
 		}
-		if len(m.Spec.Containers.Repositories.Exclude) > 0 {
-			opts["images-exclude"] = strings.Join(m.Spec.Containers.Repositories.Exclude, ",")
+		if len(repos.Exclude) > 0 {
+			opts["images-exclude"] = strings.Join(repos.Exclude, ",")
 		}
 	}
 
@@ -1192,6 +1193,13 @@ func externalClusterFiltering(cluster v1alpha2.ExternalCluster, m v1alpha2.Mondo
 		return *cluster.Filtering
 	}
 	return m.Spec.Filtering
+}
+
+func externalClusterRepositories(cluster v1alpha2.ExternalCluster, m v1alpha2.MondooAuditConfig) v1alpha2.FilteringSpec {
+	if cluster.Repositories != nil {
+		return *cluster.Repositories
+	}
+	return m.Spec.Containers.Repositories
 }
 
 func buildEnvVars(cfg v1alpha2.MondooOperatorConfig) []corev1.EnvVar {

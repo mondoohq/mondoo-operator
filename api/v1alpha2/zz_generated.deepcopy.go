@@ -170,6 +170,11 @@ func (in *ExternalCluster) DeepCopyInto(out *ExternalCluster) {
 		*out = new(Filtering)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Repositories != nil {
+		in, out := &in.Repositories, &out.Repositories
+		*out = new(FilteringSpec)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.PrivateRegistriesPullSecretRef != nil {
 		in, out := &in.PrivateRegistriesPullSecretRef, &out.PrivateRegistriesPullSecretRef
 		*out = new(v1.LocalObjectReference)

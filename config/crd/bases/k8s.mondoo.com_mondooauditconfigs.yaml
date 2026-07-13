@@ -583,6 +583,30 @@ spec:
                               type: string
                           type: object
                           x-kubernetes-map-type: atomic
+                        repositories:
+                          description: |-
+                            Repositories allows filtering which container images are scanned based on their
+                            repository/registry, specific to this external cluster.
+                            If omitted, inherits the global filter from spec.containers.repositories.
+                            Set an empty object to scan all images even when a global filter is configured.
+                            Only applies when ContainerImageScanning is true.
+                          properties:
+                            exclude:
+                              description: |-
+                                Exclude is the list of resources to ignore for any watching/scanning actions. Use this if
+                                the goal is to watch/scan all resources except for this Exclude list.
+                              items:
+                                type: string
+                              type: array
+                            include:
+                              description: |-
+                                Include is the list of resources to watch/scan. Setting Include overrides anything in the
+                                Exclude list as specifying an Include list is effectively excluding everything except for what
+                                is on the Include list.
+                              items:
+                                type: string
+                              type: array
+                          type: object
                         schedule:
                           description: |-
                             Schedule overrides the default schedule for this cluster (optional).
