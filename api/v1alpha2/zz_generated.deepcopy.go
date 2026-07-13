@@ -59,6 +59,7 @@ func (in *Containers) DeepCopyInto(out *Containers) {
 		*out = new(metav1.Duration)
 		**out = **in
 	}
+	in.Repositories.DeepCopyInto(&out.Repositories)
 	if in.WorkloadIdentity != nil {
 		in, out := &in.WorkloadIdentity, &out.WorkloadIdentity
 		*out = new(WorkloadIdentityConfig)

@@ -189,7 +189,8 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 	if len(cfg.Spec.ImagePullSecrets) > 0 {
 		cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = append(
 			cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets,
-			cfg.Spec.ImagePullSecrets...)
+			cfg.Spec.ImagePullSecrets...,
+		)
 	}
 
 	return cronjob
@@ -307,7 +308,8 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 
 	case cluster.ServiceAccountAuth != nil:
 		// SA auth: mount credentials secret + generated kubeconfig ConfigMap
-		volumes = append(volumes,
+		volumes = append(
+			volumes,
 			corev1.Volume{
 				Name: "sa-credentials",
 				VolumeSource: corev1.VolumeSource{
@@ -414,7 +416,8 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 		})
 
 		// Add volume mounts for SPIFFE certs and trust bundle to main container
-		volumeMounts = append(volumeMounts,
+		volumeMounts = append(
+			volumeMounts,
 			corev1.VolumeMount{Name: "spiffe-certs", MountPath: "/etc/spiffe-certs", ReadOnly: true},
 			corev1.VolumeMount{Name: "trust-bundle", MountPath: "/etc/trust-bundle", ReadOnly: true},
 		)
@@ -508,7 +511,8 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 	if len(cfg.Spec.ImagePullSecrets) > 0 {
 		cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = append(
 			cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets,
-			cfg.Spec.ImagePullSecrets...)
+			cfg.Spec.ImagePullSecrets...,
+		)
 	}
 
 	// Add private registry pull secrets if configured (static credentials)
@@ -569,14 +573,16 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 			},
 		})
 
-		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts,
+		podSpec.Containers[0].VolumeMounts = append(
+			podSpec.Containers[0].VolumeMounts,
 			corev1.VolumeMount{
 				Name:      "docker-config",
 				ReadOnly:  true,
 				MountPath: "/etc/opt/mondoo/docker",
 			},
 		)
-		podSpec.Containers[0].Env = append(podSpec.Containers[0].Env,
+		podSpec.Containers[0].Env = append(
+			podSpec.Containers[0].Env,
 			corev1.EnvVar{Name: "DOCKER_CONFIG", Value: "/etc/opt/mondoo/docker"},
 		)
 
@@ -1107,6 +1113,16 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 		targets = append(targets, "container-images")
 	}
 
+	opts := map[string]string{
+		"namespaces":         strings.Join(filtering.Namespaces.Include, ","),
+		"namespaces-exclude": strings.Join(filtering.Namespaces.Exclude, ","),
+		"disable-cache":      "false",
+	}
+	if cluster.ContainerImageScanning {
+		opts["images"] = strings.Join(m.Spec.Containers.Repositories.Include, ",")
+		opts["images-exclude"] = strings.Join(m.Spec.Containers.Repositories.Exclude, ",")
+	}
+
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: fmt.Sprintf("mondoo-k8s-external-%s-inventory", cluster.Name),
@@ -1116,12 +1132,8 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 				{
 					Connections: []*inventory.Config{
 						{
-							Type: "k8s",
-							Options: map[string]string{
-								"namespaces":         strings.Join(filtering.Namespaces.Include, ","),
-								"namespaces-exclude": strings.Join(filtering.Namespaces.Exclude, ","),
-								"disable-cache":      "false",
-							},
+							Type:    "k8s",
+							Options: opts,
 							Discover: &inventory.Discovery{
 								Targets: targets,
 							},

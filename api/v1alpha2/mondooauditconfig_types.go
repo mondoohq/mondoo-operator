@@ -473,6 +473,13 @@ type Containers struct {
 	// +optional
 	ActiveDeadline *metav1.Duration `json:"activeDeadline,omitempty"`
 
+	// Repositories allows filtering which container images are scanned based on their
+	// repository/registry. Supports glob patterns (e.g. "ghcr.io/third-party/*",
+	// "docker.io/library/*"). When Include is set, only images matching the patterns
+	// are scanned. When Exclude is set, matching images are skipped.
+	// +optional
+	Repositories FilteringSpec `json:"repositories,omitempty"`
+
 	// WorkloadIdentity configures Workload Identity Federation for authenticating to cloud
 	// container registries (GCR/Artifact Registry, ECR, ACR) without static imagePullSecrets.
 	// When configured, an init container uses the pod's cloud identity to generate short-lived

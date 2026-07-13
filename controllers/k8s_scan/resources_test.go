@@ -495,6 +495,64 @@ func TestExternalClusterInventory_WithContainerProxy(t *testing.T) {
 	assert.Equal(t, "http://container-proxy:3128", inv.Spec.Assets[0].Connections[0].Options["container-proxy"])
 }
 
+func TestExternalClusterInventory_WithRepositoryFilters(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Containers: v1alpha2.Containers{
+				Repositories: v1alpha2.FilteringSpec{
+					Exclude: []string{"ghcr.io/vendor/*"},
+				},
+			},
+		},
+	}
+	cluster := v1alpha2.ExternalCluster{
+		Name:                   "remote-cluster",
+		ContainerImageScanning: true,
+	}
+
+	invStr, err := ExternalClusterInventory("", testClusterUID, cluster, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	require.NotEmpty(t, inv.Spec.Assets)
+
+	opts := inv.Spec.Assets[0].Connections[0].Options
+	assert.Equal(t, "ghcr.io/vendor/*", opts["images-exclude"])
+	assert.Empty(t, opts["images"])
+}
+
+func TestExternalClusterInventory_NoRepositoryFiltersWithoutContainerImageScanning(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Containers: v1alpha2.Containers{
+				Repositories: v1alpha2.FilteringSpec{
+					Exclude: []string{"ghcr.io/vendor/*"},
+				},
+			},
+		},
+	}
+	cluster := v1alpha2.ExternalCluster{
+		Name:                   "remote-cluster",
+		ContainerImageScanning: false,
+	}
+
+	invStr, err := ExternalClusterInventory("", testClusterUID, cluster, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	require.NotEmpty(t, inv.Spec.Assets)
+
+	opts := inv.Spec.Assets[0].Connections[0].Options
+	_, hasInclude := opts["images"]
+	_, hasExclude := opts["images-exclude"]
+	assert.False(t, hasInclude, "should not have images when container image scanning is disabled")
+	assert.False(t, hasExclude, "should not have images-exclude when container image scanning is disabled")
+}
+
 func externalClusterInventoryOptions(t *testing.T, auditConfig v1alpha2.MondooAuditConfig, cluster v1alpha2.ExternalCluster) map[string]string {
 	t.Helper()
 
