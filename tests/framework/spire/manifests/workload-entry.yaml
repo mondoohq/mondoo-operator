@@ -1,0 +1,46 @@
+# Copyright Mondoo, Inc. 2026
+# SPDX-License-Identifier: BUSL-1.1
+
+# Template for SPIRE workload entry registration
+# This template can be used to register mondoo scan pod identities
+#
+# Variables to replace:
+# - {{.TrustDomain}}: SPIFFE trust domain (e.g., "test.mondoo.local")
+# - {{.Namespace}}: Kubernetes namespace of the workload
+# - {{.ServiceAccount}}: Service account name of the workload
+# - {{.NodeParentID}}: Parent ID for the node (usually the SPIRE agent's SPIFFE ID)
+#
+# Usage with spire-server CLI:
+# spire-server entry create \
+#   -spiffeID spiffe://{{.TrustDomain}}/ns/{{.Namespace}}/sa/{{.ServiceAccount}} \
+#   -parentID {{.NodeParentID}} \
+#   -selector k8s:ns:{{.Namespace}} \
+#   -selector k8s:sa:{{.ServiceAccount}}
+#
+# Example for mondoo-operator scanning workload:
+# spire-server entry create \
+#   -spiffeID spiffe://test.mondoo.local/ns/mondoo-operator/sa/mondoo-operator-k8s-resources-scanning \
+#   -parentID spiffe://test.mondoo.local/spire/agent/k8s_psat/default \
+#   -selector k8s:ns:mondoo-operator \
+#   -selector k8s:sa:mondoo-operator-k8s-resources-scanning
+
+# When using SPIFFE/SPIRE for external cluster authentication:
+#
+# 1. The mondoo scan pod's init container fetches an X.509 SVID from SPIRE
+# 2. The SVID contains the SPIFFE ID as the Subject Alternative Name (URI SAN)
+# 3. The remote cluster's API server authenticates the client certificate
+# 4. RBAC on the remote cluster grants permissions to the SPIFFE identity
+#
+# Remote cluster RBAC example:
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: spiffe-mondoo-scanner
+# subjects:
+# - kind: User
+#   name: "spiffe://{{.TrustDomain}}/ns/{{.Namespace}}/sa/{{.ServiceAccount}}"
+#   apiGroup: rbac.authorization.k8s.io
+# roleRef:
+#   kind: ClusterRole
+#   name: view
+#   apiGroup: rbac.authorization.k8s.io
