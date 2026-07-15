@@ -42,6 +42,14 @@ func DefaultVaultTokenFetcher(ctx context.Context, saToken string, config v1alph
 		return "", fmt.Errorf("failed to create Vault client: %w", err)
 	}
 
+	// Scope all requests to the configured Vault Enterprise / HCP namespace, if any.
+	// This applies to both the Kubernetes auth login and the credential generation below.
+	if config.VaultNamespace != "" {
+		if err := client.SetNamespace(config.VaultNamespace); err != nil {
+			return "", fmt.Errorf("failed to set Vault namespace: %w", err)
+		}
+	}
+
 	// Authenticate to Vault using Kubernetes auth
 	authPath := config.AuthPath
 	if authPath == "" {

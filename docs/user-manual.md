@@ -552,6 +552,7 @@ externalClusters:
       authRole: mondoo-scanner        # Vault K8s auth role
       credsRole: target-cluster-creds  # Vault K8s secrets engine role
       # Optional fields:
+      # vaultNamespace: "admin/team-a" # Vault Enterprise / HCP Vault namespace
       # authPath: "auth/kubernetes"    # Vault K8s auth mount path (default)
       # secretsPath: "kubernetes"      # Vault K8s secrets engine mount (default)
       # kubernetesNamespace: scanning  # Target namespace for generated token

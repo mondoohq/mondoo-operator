@@ -390,6 +390,13 @@ type VaultAuthConfig struct {
 	// +kubebuilder:validation:Required
 	VaultAddr string `json:"vaultAddr"`
 
+	// VaultNamespace is the Vault Enterprise / HCP Vault namespace to use for all
+	// requests (sets the X-Vault-Namespace header). Leave empty for Vault OSS or
+	// the root namespace.
+	// Example: "admin/team-a"
+	// +optional
+	VaultNamespace string `json:"vaultNamespace,omitempty"`
+
 	// AuthPath is the Vault Kubernetes auth method mount path.
 	// +optional
 	// +kubebuilder:default="auth/kubernetes"

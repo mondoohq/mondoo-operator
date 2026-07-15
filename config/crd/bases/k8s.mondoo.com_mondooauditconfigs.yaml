@@ -720,6 +720,13 @@ spec:
                                 VaultAddr is the address of the Vault server.
                                 Example: "https://vault.example.com:8200"
                               type: string
+                            vaultNamespace:
+                              description: |-
+                                VaultNamespace is the Vault Enterprise / HCP Vault namespace to use for all
+                                requests (sets the X-Vault-Namespace header). Leave empty for Vault OSS or
+                                the root namespace.
+                                Example: "admin/team-a"
+                              type: string
                           required:
                           - authRole
                           - credsRole
