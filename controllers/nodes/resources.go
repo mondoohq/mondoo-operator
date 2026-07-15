@@ -96,9 +96,10 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 							},
 						},
 						Spec: corev1.PodSpec{
-							NodeName:      node.Name,
-							RestartPolicy: corev1.RestartPolicyOnFailure,
-							Tolerations:   k8s.TaintsToTolerations(node.Spec.Taints),
+							NodeName:          node.Name,
+							PriorityClassName: m.Spec.Nodes.PriorityClassName,
+							RestartPolicy:     corev1.RestartPolicyOnFailure,
+							Tolerations:       k8s.TaintsToTolerations(node.Spec.Taints),
 							// The node scanning does not use the Kubernetes API at all, therefore the service account token
 							// should not be mounted at all.
 							AutomountServiceAccountToken: ptr.To(false),
