@@ -167,29 +167,35 @@ type ExternalCluster struct {
 
 	// KubeconfigSecretRef references a Secret containing kubeconfig for the remote cluster.
 	// The Secret must have a key "kubeconfig" with the kubeconfig content.
-	// Mutually exclusive with ServiceAccountAuth, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
+	// Mutually exclusive with ServiceAccountAuth, WorkloadIdentity, OIDCAuth, SPIFFEAuth, and VaultAuth.
 	// +optional
 	KubeconfigSecretRef *corev1.LocalObjectReference `json:"kubeconfigSecretRef,omitempty"`
 
 	// ServiceAccountAuth configures authentication using a service account token.
-	// Mutually exclusive with KubeconfigSecretRef, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
+	// Mutually exclusive with KubeconfigSecretRef, WorkloadIdentity, OIDCAuth, SPIFFEAuth, and VaultAuth.
 	// +optional
 	ServiceAccountAuth *ServiceAccountAuth `json:"serviceAccountAuth,omitempty"`
 
 	// WorkloadIdentity configures cloud-native Workload Identity Federation authentication.
-	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, SPIFFEAuth, and VaultAuth.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, OIDCAuth, SPIFFEAuth, and VaultAuth.
 	// +optional
 	WorkloadIdentity *WorkloadIdentityConfig `json:"workloadIdentity,omitempty"`
 
+	// OIDCAuth configures OIDC refresh-token authentication for an external cluster scan.
+	// The scan pod generates a kubeconfig at runtime from the referenced credentials Secret.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
+	// +optional
+	OIDCAuth *OIDCAuthConfig `json:"oidcAuth,omitempty"`
+
 	// SPIFFEAuth configures SPIFFE/SPIRE-based authentication using X.509 SVIDs.
-	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, and VaultAuth.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, OIDCAuth, and VaultAuth.
 	// +optional
 	SPIFFEAuth *SPIFFEAuthConfig `json:"spiffeAuth,omitempty"`
 
 	// VaultAuth configures HashiCorp Vault Kubernetes secrets engine for dynamic credential generation.
 	// The operator authenticates to Vault during reconciliation using its own service account token,
 	// fetches short-lived credentials, and writes a kubeconfig Secret that the CronJob mounts.
-	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, and SPIFFEAuth.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, OIDCAuth, and SPIFFEAuth.
 	// +optional
 	VaultAuth *VaultAuthConfig `json:"vaultAuth,omitempty"`
 
@@ -240,6 +246,94 @@ type ServiceAccountAuth struct {
 	// +optional
 	// +kubebuilder:default=false
 	SkipTLSVerify bool `json:"skipTLSVerify,omitempty"`
+}
+
+// OIDCAuthConfig defines OIDC refresh-token authentication for external cluster scans.
+// The referenced Secret is mounted only into an init container and is expected to be
+// in the same namespace as the MondooAuditConfig. By default it may contain:
+//   - "refresh-token": OIDC refresh token (required)
+//   - "client-secret": OIDC client secret (optional)
+//   - "ca.crt": Target Kubernetes API server CA certificate (optional)
+//   - "oidc-ca.crt": OIDC issuer CA certificate (optional)
+//
+// The init container exchanges the refresh token for a short-lived ID token and
+// writes a kubeconfig containing only that bearer token to the scanner container.
+type OIDCAuthConfig struct {
+	// Server is the URL of the target Kubernetes API server.
+	// Example: "https://my-cluster.example.com:6443"
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^https://.*`
+	Server string `json:"server"`
+
+	// IssuerURL is the OIDC issuer URL configured on the target Kubernetes API server.
+	// Example: "https://auth.example.com/realms/platform"
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^https://.*`
+	IssuerURL string `json:"issuerURL"`
+
+	// ClientID is the OIDC client ID used by the target Kubernetes API server.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	ClientID string `json:"clientID"`
+
+	// CredentialsSecretRef references a same-namespace Secret containing OIDC credentials.
+	// See the OIDCAuthConfig comment for the default key names.
+	// +kubebuilder:validation:Required
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+
+	// RefreshTokenKey is the key containing the OIDC refresh token.
+	// Defaults to "refresh-token".
+	// +optional
+	// +kubebuilder:default="refresh-token"
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9._-]+$`
+	RefreshTokenKey string `json:"refreshTokenKey,omitempty"`
+
+	// ClientSecretKey is the key containing the OIDC client secret.
+	// Defaults to "client-secret". The key may be absent when the OIDC provider
+	// supports refresh token grants for a public client.
+	// +optional
+	// +kubebuilder:default="client-secret"
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9._-]+$`
+	ClientSecretKey string `json:"clientSecretKey,omitempty"`
+
+	// IDTokenKey is deprecated and ignored. The init container always refreshes
+	// a new ID token from RefreshTokenKey.
+	// +optional
+	// +kubebuilder:default="id-token"
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9._-]+$`
+	IDTokenKey string `json:"idTokenKey,omitempty"`
+
+	// ClusterCAKey is the key containing the target Kubernetes API server CA certificate.
+	// Defaults to "ca.crt". If absent and InsecureSkipTLSVerify is false, system trust is used.
+	// +optional
+	// +kubebuilder:default="ca.crt"
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9._-]+$`
+	ClusterCAKey string `json:"clusterCAKey,omitempty"`
+
+	// IssuerCAKey is the key containing the OIDC issuer CA certificate.
+	// Defaults to "oidc-ca.crt". If absent, system trust is used for OIDC discovery and token refresh.
+	// +optional
+	// +kubebuilder:default="oidc-ca.crt"
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9._-]+$`
+	IssuerCAKey string `json:"issuerCAKey,omitempty"`
+
+	// Scopes lists optional scopes sent with the refresh token grant. The refresh token
+	// must already be allowed to request these scopes and must include the claims used
+	// by the target Kubernetes API server.
+	// +optional
+	// +kubebuilder:validation:items:Pattern=`^[A-Za-z0-9_./-]+$`
+	Scopes []string `json:"scopes,omitempty"`
+
+	// InsecureSkipTLSVerify skips TLS verification for the target Kubernetes API server.
+	// NOT RECOMMENDED for production.
+	// +optional
+	// +kubebuilder:default=false
+	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 }
 
 // CloudProvider specifies the cloud provider for Workload Identity Federation
