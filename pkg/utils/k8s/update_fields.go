@@ -32,6 +32,7 @@ func UpdateCronJobFields(obj, desired *batchv1.CronJob) {
 	dps := &desired.Spec.JobTemplate.Spec.Template.Spec
 	ps.RestartPolicy = dps.RestartPolicy
 	ps.NodeName = dps.NodeName
+	ps.NodeSelector = dps.NodeSelector
 	ps.Tolerations = dps.Tolerations
 	ps.ServiceAccountName = dps.ServiceAccountName
 	ps.AutomountServiceAccountToken = dps.AutomountServiceAccountToken
@@ -55,6 +56,8 @@ func UpdateDeploymentFields(obj, desired *appsv1.Deployment) {
 	ps := &obj.Spec.Template.Spec
 	dps := &desired.Spec.Template.Spec
 	ps.ServiceAccountName = dps.ServiceAccountName
+	ps.NodeSelector = dps.NodeSelector
+	ps.Tolerations = dps.Tolerations
 	ps.Containers = dps.Containers
 	ps.Volumes = dps.Volumes
 	ps.ImagePullSecrets = dps.ImagePullSecrets
@@ -74,6 +77,7 @@ func UpdateDaemonSetFields(obj, desired *appsv1.DaemonSet) {
 	dps := &desired.Spec.Template.Spec
 	ps.PriorityClassName = dps.PriorityClassName
 	ps.AutomountServiceAccountToken = dps.AutomountServiceAccountToken
+	ps.NodeSelector = dps.NodeSelector
 	ps.Tolerations = dps.Tolerations
 	ps.Containers = dps.Containers
 	ps.Volumes = dps.Volumes

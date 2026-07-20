@@ -120,6 +120,28 @@ func TestCronJob_WithImagePullSecrets(t *testing.T) {
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
 }
 
+func TestCronJob_WithScheduling(t *testing.T) {
+	m := testAuditConfig()
+	m.Spec.Containers.Scheduling = v1alpha2.PodScheduling{
+		NodeSelector: map[string]string{
+			"nodepool": "scanners",
+		},
+		Tolerations: []corev1.Toleration{
+			{
+				Key:      "sriov",
+				Operator: corev1.TolerationOpExists,
+				Effect:   corev1.TaintEffectNoSchedule,
+			},
+		},
+	}
+
+	cj := CronJob("test-image:latest", "", testClusterUID, "", m, v1alpha2.MondooOperatorConfig{})
+	podSpec := cj.Spec.JobTemplate.Spec.Template.Spec
+
+	assert.Equal(t, map[string]string{"nodepool": "scanners"}, podSpec.NodeSelector)
+	assert.Equal(t, m.Spec.Containers.Scheduling.Tolerations, podSpec.Tolerations)
+}
+
 func TestCronJob_ImagePullSecrets_AppendsMultiple(t *testing.T) {
 	m := testAuditConfig()
 	cfg := v1alpha2.MondooOperatorConfig{

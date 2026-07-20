@@ -182,6 +182,12 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 		cronjob.Spec.JobTemplate.Spec.ActiveDeadlineSeconds = &seconds
 	}
 
+	k8s.AddPodSchedulingToSpec(
+		&cronjob.Spec.JobTemplate.Spec.Template.Spec,
+		m.Spec.Containers.Scheduling.NodeSelector,
+		m.Spec.Containers.Scheduling.Tolerations,
+	)
+
 	// Add WIF support for cloud registry authentication
 	if wif := m.Spec.Containers.WorkloadIdentity; wif != nil {
 		podSpec := &cronjob.Spec.JobTemplate.Spec.Template.Spec

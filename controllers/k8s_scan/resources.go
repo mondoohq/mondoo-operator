@@ -185,6 +185,12 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 		cronjob.Spec.JobTemplate.Spec.ActiveDeadlineSeconds = &seconds
 	}
 
+	k8s.AddPodSchedulingToSpec(
+		&cronjob.Spec.JobTemplate.Spec.Template.Spec,
+		m.Spec.Scanner.Scheduling.NodeSelector,
+		m.Spec.Scanner.Scheduling.Tolerations,
+	)
+
 	// Add imagePullSecrets from MondooOperatorConfig
 	if len(cfg.Spec.ImagePullSecrets) > 0 {
 		cronjob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets = append(
@@ -506,6 +512,12 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 		seconds := int64(d.Seconds())
 		cronjob.Spec.JobTemplate.Spec.ActiveDeadlineSeconds = &seconds
 	}
+
+	k8s.AddPodSchedulingToSpec(
+		&cronjob.Spec.JobTemplate.Spec.Template.Spec,
+		m.Spec.Scanner.Scheduling.NodeSelector,
+		m.Spec.Scanner.Scheduling.Tolerations,
+	)
 
 	// Add imagePullSecrets from MondooOperatorConfig
 	if len(cfg.Spec.ImagePullSecrets) > 0 {

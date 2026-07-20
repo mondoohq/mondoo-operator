@@ -475,6 +475,13 @@ spec:
       limits:
         cpu: 500m
         memory: 500Mi
+    scheduling:
+      nodeSelector:
+        nodepool: scanners
+      tolerations:
+        - key: sriov
+          operator: Exists
+          effect: NoSchedule
     # Single private registry secret (deprecated, use privateRegistriesPullSecretRefs)
     # privateRegistriesPullSecretRef:
     #   name: registry-creds
@@ -494,15 +501,29 @@ Environment variables can also be set on node and container scanners:
 spec:
   nodes:
     enable: true
+    scheduling:
+      tolerations:
+        - key: sriov
+          operator: Exists
+          effect: NoSchedule
     env:
       - name: NODE_SCAN_VAR
         value: "node-value"
   containers:
     enable: true
+    scheduling:
+      nodeSelector:
+        nodepool: scanners
+      tolerations:
+        - key: sriov
+          operator: Exists
+          effect: NoSchedule
     env:
       - name: CONTAINER_SCAN_VAR
         value: "container-value"
 ```
+
+For node scanning, `scheduling.tolerations` is added to all node scanner pods. `scheduling.nodeSelector` applies to DaemonSet style; CronJob style already pins each scanner pod to the node being scanned with `nodeName`.
 
 ## Running as a Container
 
