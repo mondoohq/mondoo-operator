@@ -210,6 +210,59 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	s.Equal(corev1.ConditionFalse, condition.Status)
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_InvalidLabelSelectorCondition() {
+	s.auditConfig.Spec.Filtering.NamespaceLabelSelector = &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{Key: "tenant", Operator: metav1.LabelSelectorOpIn},
+		},
+	}
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.Error(err)
+	s.True(result.IsZero())
+
+	s.Require().Len(d.Mondoo.Status.Conditions, 1)
+	condition := d.Mondoo.Status.Conditions[0]
+	s.Equal("InvalidLabelSelector", condition.Reason)
+	s.Contains(condition.Message, "filtering.namespaceLabelSelector")
+	s.Equal(corev1.ConditionTrue, condition.Status)
+	s.Equal(mondoov1alpha2.K8sResourcesScanningDegraded, condition.Type)
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_ExternalClusterInvalidLabelSelectorCondition() {
+	s.auditConfig.Spec.KubernetesResources.Enable = false
+	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
+		{
+			Name: "external",
+			KubeconfigSecretRef: &corev1.LocalObjectReference{
+				Name: "external-kubeconfig",
+			},
+			Filtering: &mondoov1alpha2.Filtering{
+				ObjectLabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{Key: "app", Operator: metav1.LabelSelectorOpIn},
+					},
+				},
+			},
+		},
+	}
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.Error(err)
+	s.True(result.IsZero())
+
+	s.Require().Len(d.Mondoo.Status.Conditions, 1)
+	condition := d.Mondoo.Status.Conditions[0]
+	s.Equal("InvalidLabelSelector", condition.Reason)
+	s.Contains(condition.Message, "filtering.objectLabelSelector")
+	s.Equal(corev1.ConditionTrue, condition.Status)
+	s.Equal(mondoov1alpha2.K8sResourcesScanningDegraded, condition.Type)
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
 	d := s.createDeploymentHandler()
 	mondooAuditConfig := &s.auditConfig

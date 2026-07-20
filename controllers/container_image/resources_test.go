@@ -18,6 +18,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mql/v13/providers-sdk/v1/inventory"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 const testClusterUID = "abcdefg"
@@ -273,6 +274,95 @@ func TestInventory_WithoutContainerProxy(t *testing.T) {
 
 	_, hasContainerProxy := inv.Spec.Assets[0].Connections[0].Options["container-proxy"]
 	assert.False(t, hasContainerProxy)
+}
+
+func TestInventory_WithLabelSelectors(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Filtering: v1alpha2.Filtering{
+				NamespaceLabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"tenant": "team-a"},
+				},
+				ObjectLabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "api"},
+				},
+			},
+		},
+	}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	require.NotEmpty(t, inv.Spec.Assets)
+
+	options := inv.Spec.Assets[0].Connections[0].Options
+	assert.Equal(t, "tenant=team-a", options[k8sOptionNamespaceLabelSelector])
+	assert.Equal(t, "app=api", options[k8sOptionObjectLabelSelector])
+}
+
+func TestInventory_WithLabelSelectorMatchExpressions(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Filtering: v1alpha2.Filtering{
+				NamespaceLabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{Key: "tenant", Operator: metav1.LabelSelectorOpIn, Values: []string{"team-a", "team-b"}},
+						{Key: "scan.mondoo.com/disabled", Operator: metav1.LabelSelectorOpDoesNotExist},
+					},
+				},
+				ObjectLabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "frontend"},
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{Key: "track", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"legacy"}},
+					},
+				},
+			},
+		},
+	}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	require.NotEmpty(t, inv.Spec.Assets)
+
+	options := inv.Spec.Assets[0].Connections[0].Options
+	namespaceSelector, err := labels.Parse(options[k8sOptionNamespaceLabelSelector])
+	require.NoError(t, err)
+	assert.True(t, namespaceSelector.Matches(labels.Set{"tenant": "team-a"}))
+	assert.False(t, namespaceSelector.Matches(labels.Set{"tenant": "team-c"}))
+	assert.False(t, namespaceSelector.Matches(labels.Set{"tenant": "team-a", "scan.mondoo.com/disabled": "true"}))
+
+	objectSelector, err := labels.Parse(options[k8sOptionObjectLabelSelector])
+	require.NoError(t, err)
+	assert.True(t, objectSelector.Matches(labels.Set{"app": "frontend", "track": "stable"}))
+	assert.False(t, objectSelector.Matches(labels.Set{"app": "frontend", "track": "legacy"}))
+	assert.False(t, objectSelector.Matches(labels.Set{"app": "backend", "track": "stable"}))
+}
+
+func TestInventory_InvalidLabelSelector(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Filtering: v1alpha2.Filtering{
+				ObjectLabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{Key: "track", Operator: metav1.LabelSelectorOpIn},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "filtering.objectLabelSelector")
 }
 
 func TestCronJob_WIF_GKE(t *testing.T) {

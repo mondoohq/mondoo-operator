@@ -403,6 +403,19 @@ externalClusters:
       namespaces:
         exclude:
           - kube-system
+      namespaceLabelSelector:
+        matchLabels:
+          tenant: team-a
+        matchExpressions:
+          - key: environment
+            operator: In
+            values: ["prod", "stage"]
+      objectLabelSelector:
+        matchLabels:
+          app: frontend
+        matchExpressions:
+          - key: scan.mondoo.com/disabled
+            operator: DoesNotExist
     # Enable container image scanning for this external cluster
     containerImageScanning: true
     # Reference to private registry credentials for this cluster
@@ -453,6 +466,19 @@ spec:
       # include:
       #   - production
       #   - staging
+    namespaceLabelSelector:
+      matchLabels:
+        tenant: team-a
+      matchExpressions:
+        - key: environment
+          operator: In
+          values: ["prod", "stage"]
+    objectLabelSelector:
+      matchLabels:
+        app: frontend
+      matchExpressions:
+        - key: scan.mondoo.com/disabled
+          operator: DoesNotExist
 ```
 
 Note: If both `include` and `exclude` are specified, only `include` is used.
