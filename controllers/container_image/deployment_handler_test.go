@@ -5,6 +5,7 @@ package container_image
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -70,6 +71,42 @@ func (s *DeploymentHandlerSuite) TestReconcile_Create() {
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
 
 	s.Equal(expected.Spec, created.Spec)
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_RuntimeCacheFailureStillCreatesContainerImageCronJob() {
+	expectedErr := errors.New("runtime cache image resolution failed")
+	calls := 0
+	d := s.createDeploymentHandler()
+	d.ContainerImageResolver = &fakeMondoo.ContainerImageResolverMock{
+		CnspecImageFunc: func(userImage, userTag, userDigest string, skipResolveImage bool) (string, error) {
+			calls++
+			if calls == 1 {
+				return "", expectedErr
+			}
+			return "cnspec:test", nil
+		},
+	}
+	s.auditConfig.Spec.Containers.RuntimeCache.Enable = true
+	s.auditConfig.Spec.Containers.RuntimeCache.Delegates = []mondoov1alpha2.RuntimeCacheDelegate{
+		{
+			Name:     "containerd-cri",
+			Kind:     mondoov1alpha2.RuntimeCacheDelegateKind_Containerd,
+			HostPath: "/run/containerd/containerd.sock",
+		},
+	}
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.ErrorIs(err, expectedErr)
+	s.True(result.IsZero())
+
+	created := &batchv1.CronJob{}
+	created.Name = CronJobName(s.auditConfig.Name)
+	created.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(created), created))
+	s.Require().NotEmpty(d.Mondoo.Status.Conditions)
+	s.Equal(mondoov1alpha2.RuntimeCacheScanningDegraded, d.Mondoo.Status.Conditions[0].Type)
+	s.Equal("RuntimeCacheReconcileFailed", d.Mondoo.Status.Conditions[0].Reason)
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_Create_CustomEnvVars() {
