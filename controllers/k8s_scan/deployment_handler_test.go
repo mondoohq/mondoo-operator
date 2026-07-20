@@ -210,6 +210,61 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	s.Equal(corev1.ConditionFalse, condition.Status)
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_InvalidKyvernoConfigCondition() {
+	enabled := true
+	s.auditConfig.Spec.KubernetesResources.Kyverno = mondoov1alpha2.KyvernoSpec{
+		Enable: &enabled,
+		MappingAnnotations: mondoov1alpha2.KyvernoMappingAnnotationsSpec{
+			CheckUIDs: []string{"example.com/check,uid"},
+		},
+	}
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.Error(err)
+	s.True(result.IsZero())
+
+	s.Require().Len(d.Mondoo.Status.Conditions, 1)
+	condition := d.Mondoo.Status.Conditions[0]
+	s.Equal("InvalidKyvernoConfig", condition.Reason)
+	s.Contains(condition.Message, "kyverno-mapping-annotation-check-uids")
+	s.Equal(corev1.ConditionTrue, condition.Status)
+	s.Equal(mondoov1alpha2.K8sResourcesScanningDegraded, condition.Type)
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_ExternalClusterInvalidKyvernoConfigCondition() {
+	enabled := true
+	s.auditConfig.Spec.KubernetesResources.Enable = false
+	s.auditConfig.Spec.KubernetesResources.Kyverno = mondoov1alpha2.KyvernoSpec{
+		Enable: &enabled,
+		ExceptionAnnotations: mondoov1alpha2.KyvernoExceptionAnnotationsSpec{
+			Owners: []string{"example.com/owner,team"},
+		},
+	}
+	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
+		{
+			Name: "external",
+			KubeconfigSecretRef: &corev1.LocalObjectReference{
+				Name: "external-kubeconfig",
+			},
+		},
+	}
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.Error(err)
+	s.True(result.IsZero())
+
+	s.Require().Len(d.Mondoo.Status.Conditions, 1)
+	condition := d.Mondoo.Status.Conditions[0]
+	s.Equal("InvalidKyvernoConfig", condition.Reason)
+	s.Contains(condition.Message, "kyverno-exception-annotation-owners")
+	s.Equal(corev1.ConditionTrue, condition.Status)
+	s.Equal(mondoov1alpha2.K8sResourcesScanningDegraded, condition.Type)
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
 	d := s.createDeploymentHandler()
 	mondooAuditConfig := &s.auditConfig

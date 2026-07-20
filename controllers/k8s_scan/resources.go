@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	// That's the mod k8s relies on https://github.com/kubernetes/kubernetes/blob/master/go.mod#L63
@@ -45,6 +46,38 @@ var K8sDiscoveryTargets = []string{
 	"ingresses",
 	"namespaces",
 	"services",
+}
+
+const K8sDiscoveryTargetKyverno = "kyverno"
+
+const (
+	k8sOptionKyvernoDefaultMappings                   = "kyverno-default-mappings"
+	k8sOptionKyvernoMappingAnnotationCheckUIDs        = "kyverno-mapping-annotation-check-uids"
+	k8sOptionKyvernoMappingAnnotationCheckMRNs        = "kyverno-mapping-annotation-check-mrns"
+	k8sOptionKyvernoMappingAnnotationPolicyUIDs       = "kyverno-mapping-annotation-policy-uids"
+	k8sOptionKyvernoMappingAnnotationReasons          = "kyverno-mapping-annotation-reasons"
+	k8sOptionKyvernoExceptionAnnotationValidUntil     = "kyverno-exception-annotation-valid-until"
+	k8sOptionKyvernoExceptionAnnotationJustifications = "kyverno-exception-annotation-justifications"
+	k8sOptionKyvernoExceptionAnnotationOwners         = "kyverno-exception-annotation-owners"
+	k8sOptionKyvernoExceptionAnnotationTickets        = "kyverno-exception-annotation-tickets"
+	k8sOptionKyvernoMirrorPolicyExceptions            = "kyverno-mirror-policy-exceptions"
+	k8sOptionKyvernoMirroredExceptionApproval         = "kyverno-mirrored-exception-approval"
+	k8sOptionKyvernoMirroredExceptionAction           = "kyverno-mirrored-exception-action"
+	k8sOptionKyvernoFailExpiredPolicyExceptions       = "kyverno-fail-expired-policy-exceptions"
+	k8sOptionKyvernoReportUnmappedPolicyExceptions    = "kyverno-report-unmapped-policy-exceptions"
+	k8sOptionKyvernoReportUnmappedPolicyResults       = "kyverno-report-unmapped-policy-results"
+)
+
+type invalidKyvernoConfigError struct {
+	err error
+}
+
+func (e invalidKyvernoConfigError) Error() string {
+	return e.err.Error()
+}
+
+func (e invalidKyvernoConfigError) Unwrap() error {
+	return e.err
 }
 
 const (
@@ -1043,6 +1076,7 @@ func ExternalClusterConfigMap(integrationMRN, operatorClusterUID string, cluster
 }
 
 func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (string, error) {
+	targets := K8sDiscoveryTargetsForConfig(m.Spec.KubernetesResources)
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-k8s-resources-inventory",
@@ -1058,7 +1092,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 								"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
 							},
 							Discover: &inventory.Discovery{
-								Targets: K8sDiscoveryTargets,
+								Targets: targets,
 							},
 						},
 					},
@@ -1080,6 +1114,15 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 	if cfg.Spec.ContainerProxy != nil {
 		for i := range inv.Spec.Assets {
 			inv.Spec.Assets[i].Connections[0].Options["container-proxy"] = *cfg.Spec.ContainerProxy
+		}
+	}
+	kyvernoOptions, err := K8sKyvernoOptionsForConfig(m.Spec.KubernetesResources)
+	if err != nil {
+		return "", err
+	}
+	if len(kyvernoOptions) > 0 {
+		for i := range inv.Spec.Assets {
+			maps.Copy(inv.Spec.Assets[i].Connections[0].Options, kyvernoOptions)
 		}
 	}
 
@@ -1105,10 +1148,8 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster v1alpha2.ExternalCluster, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (string, error) {
 	filtering := externalClusterFiltering(cluster, m)
 
-	// Determine discovery targets based on whether container image scanning is enabled
-	// Make a copy to avoid mutating the shared slice
-	targets := make([]string, len(K8sDiscoveryTargets))
-	copy(targets, K8sDiscoveryTargets)
+	// Determine discovery targets from the scan config and append cluster-specific targets.
+	targets := K8sDiscoveryTargetsForConfig(m.Spec.KubernetesResources)
 	if cluster.ContainerImageScanning {
 		targets = append(targets, "container-images")
 	}
@@ -1166,6 +1207,15 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 			inv.Spec.Assets[i].Connections[0].Options["container-proxy"] = *cfg.Spec.ContainerProxy
 		}
 	}
+	kyvernoOptions, err := K8sKyvernoOptionsForConfig(m.Spec.KubernetesResources)
+	if err != nil {
+		return "", err
+	}
+	if len(kyvernoOptions) > 0 {
+		for i := range inv.Spec.Assets {
+			maps.Copy(inv.Spec.Assets[i].Connections[0].Options, kyvernoOptions)
+		}
+	}
 
 	// Add user-defined annotations first, then operator-managed annotations.
 	// Operator annotations go last so they cannot be overwritten by user values.
@@ -1200,6 +1250,62 @@ func externalClusterRepositories(cluster v1alpha2.ExternalCluster, m v1alpha2.Mo
 		return *cluster.Repositories
 	}
 	return m.Spec.Containers.Repositories
+}
+
+func K8sDiscoveryTargetsForConfig(config v1alpha2.KubernetesResources) []string {
+	targets := make([]string, len(K8sDiscoveryTargets))
+	copy(targets, K8sDiscoveryTargets)
+	if config.Kyverno.Enabled() {
+		targets = append(targets, K8sDiscoveryTargetKyverno)
+	}
+	return targets
+}
+
+func K8sKyvernoOptionsForConfig(config v1alpha2.KubernetesResources) (map[string]string, error) {
+	if !config.Kyverno.Enabled() {
+		return nil, nil
+	}
+	kyverno := config.Kyverno
+	options := map[string]string{
+		k8sOptionKyvernoDefaultMappings:                strconv.FormatBool(kyverno.DefaultMappingsEnabled()),
+		k8sOptionKyvernoMirrorPolicyExceptions:         strconv.FormatBool(kyverno.MirrorPolicyExceptionsEnabled()),
+		k8sOptionKyvernoMirroredExceptionApproval:      kyverno.MirroredExceptionApprovalMode(),
+		k8sOptionKyvernoMirroredExceptionAction:        kyverno.MirroredExceptionActionMode(),
+		k8sOptionKyvernoFailExpiredPolicyExceptions:    strconv.FormatBool(kyverno.FailExpiredPolicyExceptionsEnabled()),
+		k8sOptionKyvernoReportUnmappedPolicyExceptions: strconv.FormatBool(kyverno.ReportUnmappedPolicyExceptionsEnabled()),
+		k8sOptionKyvernoReportUnmappedPolicyResults:    strconv.FormatBool(kyverno.ReportUnmappedPolicyResultsEnabled()),
+	}
+	for _, stringListOption := range []struct {
+		key    string
+		values []string
+	}{
+		{key: k8sOptionKyvernoMappingAnnotationCheckUIDs, values: kyverno.MappingAnnotations.CheckUIDs},
+		{key: k8sOptionKyvernoMappingAnnotationCheckMRNs, values: kyverno.MappingAnnotations.CheckMRNs},
+		{key: k8sOptionKyvernoMappingAnnotationPolicyUIDs, values: kyverno.MappingAnnotations.PolicyUIDs},
+		{key: k8sOptionKyvernoMappingAnnotationReasons, values: kyverno.MappingAnnotations.Reasons},
+		{key: k8sOptionKyvernoExceptionAnnotationValidUntil, values: kyverno.ExceptionAnnotations.ValidUntil},
+		{key: k8sOptionKyvernoExceptionAnnotationJustifications, values: kyverno.ExceptionAnnotations.Justifications},
+		{key: k8sOptionKyvernoExceptionAnnotationOwners, values: kyverno.ExceptionAnnotations.Owners},
+		{key: k8sOptionKyvernoExceptionAnnotationTickets, values: kyverno.ExceptionAnnotations.Tickets},
+	} {
+		if err := addStringListOption(options, stringListOption.key, stringListOption.values); err != nil {
+			return nil, invalidKyvernoConfigError{err: err}
+		}
+	}
+	return options, nil
+}
+
+func addStringListOption(options map[string]string, key string, values []string) error {
+	if len(values) == 0 {
+		return nil
+	}
+	for _, value := range values {
+		if strings.Contains(value, ",") {
+			return fmt.Errorf("%s value %q must not contain commas", key, value)
+		}
+	}
+	options[key] = strings.Join(values, ",")
+	return nil
 }
 
 func buildEnvVars(cfg v1alpha2.MondooOperatorConfig) []corev1.EnvVar {
