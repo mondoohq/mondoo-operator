@@ -6,6 +6,7 @@ package mondoo
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -118,5 +119,6 @@ func extractPlatformIds(resp *mondooclient.RefreshAssetScoresResponse) []string 
 	for id := range seen {
 		ids = append(ids, id)
 	}
+	sort.Strings(ids)
 	return ids
 }

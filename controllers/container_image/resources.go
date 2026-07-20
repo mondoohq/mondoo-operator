@@ -410,7 +410,6 @@ func containerImageOptions(m v1alpha2.MondooAuditConfig) map[string]string {
 		"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
 		"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
 		"disable-cache":      "false",
-		"staged-discovery":   "true",
 	}
 	if len(m.Spec.Containers.Repositories.Include) > 0 {
 		opts["images"] = strings.Join(m.Spec.Containers.Repositories.Include, ",")

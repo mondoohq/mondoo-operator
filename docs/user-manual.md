@@ -777,6 +777,20 @@ k8SResourcesScanning:
       namespace: mondoo-operator
 ```
 
+### Scan cache
+
+By default, every scan cycle pulls and analyzes all container images in scope. When scan cache is enabled, the operator asks the Mondoo platform to re-evaluate policies against stored scan data before each cycle. Images whose scores were successfully refreshed are excluded from the cnspec scan, skipping the image pull entirely. Only new or changed images (different digest) are scanned.
+
+```yaml
+spec:
+  containers:
+    enable: true
+    scanCache:
+      enable: true
+```
+
+This is most useful in clusters with many images that rarely change. The feature degrades gracefully: if the server is unreachable or returns an error, the operator falls back to a normal full scan.
+
 ## Routing assets to a specific space with `spaceId`
 
 By default, scanned assets are sent to the space associated with the service account credentials. The `spaceId` field lets you override this, routing assets to any space the service account has access to. This is especially useful with **org-level service accounts**, which have access to all spaces in the organization.
