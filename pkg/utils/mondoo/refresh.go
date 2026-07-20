@@ -57,7 +57,7 @@ func RefreshAssetScores(
 	}
 
 	req := &mondooclient.RefreshAssetScoresRequest{
-		ManagedBy:       ManagedByLabel(clusterUID),
+		ManagedBy:       ManagedByContainersLabel(clusterUID),
 		PlatformRuntime: "docker-image",
 	}
 

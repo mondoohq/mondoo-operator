@@ -10,6 +10,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestManagedByLabels(t *testing.T) {
+	t.Run("ManagedByLabel", func(t *testing.T) {
+		assert.Equal(t, "mondoo-operator", ManagedByLabel(""))
+		assert.Equal(t, "mondoo-operator-abc123", ManagedByLabel("abc123"))
+	})
+
+	t.Run("ManagedByContainersLabel", func(t *testing.T) {
+		assert.Equal(t, "mondoo-operator-containers", ManagedByContainersLabel(""))
+		assert.Equal(t, "mondoo-operator-containers-abc123", ManagedByContainersLabel("abc123"))
+	})
+
+	t.Run("ManagedByNodesLabel", func(t *testing.T) {
+		assert.Equal(t, "mondoo-operator-nodes", ManagedByNodesLabel(""))
+		assert.Equal(t, "mondoo-operator-nodes-abc123", ManagedByNodesLabel("abc123"))
+	})
+
+	t.Run("labels are distinct", func(t *testing.T) {
+		uid := "test-uid"
+		labels := []string{ManagedByLabel(uid), ManagedByContainersLabel(uid), ManagedByNodesLabel(uid)}
+		for i := range labels {
+			for j := i + 1; j < len(labels); j++ {
+				assert.NotEqual(t, labels[i], labels[j])
+			}
+		}
+	})
+}
+
 func TestGCOlderThanFromSchedule(t *testing.T) {
 	tests := []struct {
 		name     string
