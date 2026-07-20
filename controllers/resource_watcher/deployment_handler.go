@@ -62,7 +62,11 @@ func (h *DeploymentHandler) syncDeployment(ctx context.Context) error {
 		deploymentHandlerLogger.Info("Failed to get integration MRN, continuing without it", "error", err)
 	}
 
-	desired := Deployment(mondooClientImage, integrationMRN, clusterUID, h.Mondoo, *h.MondooOperatorConfig)
+	desired, err := Deployment(mondooClientImage, integrationMRN, clusterUID, h.Mondoo, *h.MondooOperatorConfig)
+	if err != nil {
+		deploymentHandlerLogger.Error(err, "Failed to build resource watcher Deployment")
+		return err
+	}
 	obj := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
 	if _, err := k8s.CreateOrUpdate(ctx, h.KubeClient, obj, h.Mondoo, deploymentHandlerLogger, func() error {
 		k8s.UpdateDeploymentFields(obj, desired)

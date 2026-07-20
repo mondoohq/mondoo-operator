@@ -13,10 +13,13 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -53,6 +56,8 @@ func init() {
 	minimumScanInterval := Cmd.Flags().Duration("minimum-scan-interval", 2*time.Minute, "Minimum time between scans (rate limit).")
 	watchAllResources := Cmd.Flags().Bool("watch-all-resources", false, "Watch all resource types including ephemeral ones (Pods, Jobs). Default is to only watch high-priority resources (Deployments, DaemonSets, StatefulSets, ReplicaSets).")
 	resourceTypes := Cmd.Flags().StringSlice("resource-types", nil, "Resource types to watch (comma-separated). Overrides --watch-all-resources if specified.")
+	namespaceLabelSelector := Cmd.Flags().String("namespace-label-selector", "", "Kubernetes label selector for namespaces whose resources should be watched.")
+	objectLabelSelector := Cmd.Flags().String("object-label-selector", "", "Kubernetes label selector for watched objects.")
 	apiProxy := Cmd.Flags().String("api-proxy", "", "HTTP proxy to use for API requests.")
 	timeout := Cmd.Flags().Duration("timeout", 25*time.Minute, "Timeout for scan operations.")
 	annotations := Cmd.Flags().StringToString("annotation", nil, "Annotations to add to scanned assets (can specify multiple, e.g., --annotation env=prod --annotation team=platform).")
@@ -113,6 +118,16 @@ func init() {
 			}
 		}
 
+		parsedNamespaceLabelSelector, err := parseOptionalLabelSelector("namespace-label-selector", *namespaceLabelSelector)
+		if err != nil {
+			return err
+		}
+
+		parsedObjectLabelSelector, err := parseOptionalLabelSelector("object-label-selector", *objectLabelSelector)
+		if err != nil {
+			return err
+		}
+
 		// Validate annotations
 		if err := annot.Validate(*annotations); err != nil {
 			return fmt.Errorf("invalid annotations: %w", err)
@@ -122,6 +137,8 @@ func init() {
 			"config", *configPath,
 			"namespaces", namespacesList,
 			"namespacesExclude", namespacesExcludeList,
+			"namespaceLabelSelector", *namespaceLabelSelector,
+			"objectLabelSelector", *objectLabelSelector,
 			"debounceInterval", *debounceInterval,
 			"minimumScanInterval", *minimumScanInterval,
 			"watchAllResources", *watchAllResources,
@@ -151,6 +168,29 @@ func init() {
 		// Create cache
 		cacheOpts := cache.Options{
 			Scheme: scheme,
+		}
+		if !parsedObjectLabelSelector.Empty() {
+			// The API server filters watched resources before they enter this cache.
+			// If a resource label changes so it no longer matches, the filtered
+			// informer drops it without delivering one final update event.
+			cacheOpts.DefaultLabelSelector = parsedObjectLabelSelector
+		}
+		if !parsedNamespaceLabelSelector.Empty() || !parsedObjectLabelSelector.Empty() {
+			namespaceCacheSelector := labels.Everything()
+			if !parsedNamespaceLabelSelector.Empty() {
+				namespaceCacheSelector = parsedNamespaceLabelSelector
+			}
+			// Namespace resources are governed by the namespace selector, not by
+			// the object selector. This ByObject override keeps the cache's
+			// DefaultLabelSelector from filtering Namespace objects when a user
+			// configures only an object-label selector. The override only changes
+			// options for Namespace informers that are requested later; it does
+			// not create a Namespace informer by itself.
+			cacheOpts.ByObject = map[client.Object]cache.ByObject{
+				&corev1.Namespace{}: {
+					Label: namespaceCacheSelector,
+				},
+			}
 		}
 
 		// If specific namespaces are provided, configure cache to only watch those
@@ -188,6 +228,8 @@ func init() {
 			NamespacesExclude: namespacesExcludeList,
 			ResourceTypes:     resourceTypesList,
 			WatchAllResources: *watchAllResources,
+			NamespaceSelector: parsedNamespaceLabelSelector,
+			ObjectSelector:    parsedObjectLabelSelector,
 		})
 
 		// Start components
@@ -235,4 +277,15 @@ func init() {
 
 		return nil
 	}
+}
+
+func parseOptionalLabelSelector(name, value string) (labels.Selector, error) {
+	if value == "" {
+		return labels.Everything(), nil
+	}
+	selector, err := labels.Parse(value)
+	if err != nil {
+		return nil, fmt.Errorf("invalid --%s: %w", name, err)
+	}
+	return selector, nil
 }
