@@ -163,6 +163,10 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
 		// deleted should be called here
 
+		r.refreshMu.Lock()
+		delete(r.refreshCache, req.NamespacedName)
+		r.refreshMu.Unlock()
+
 		controllerutil.RemoveFinalizer(mondooAuditConfig, finalizerString)
 		if reconcileError = r.Update(ctx, mondooAuditConfig); reconcileError != nil {
 			log.Error(reconcileError, "failed to remove finalizer")
@@ -324,7 +328,6 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		KubeClient:             r.Client,
 		ContainerImageResolver: imageResolver,
 		MondooOperatorConfig:   config,
-		MondooClientBuilder:    r.MondooClientBuilder,
 		RefreshDigests:         r.refreshDigests(mondooAuditConfig, config),
 	}
 	result, err = containers.Reconcile(ctx)

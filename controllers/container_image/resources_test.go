@@ -581,7 +581,6 @@ func TestInventory_WithoutRepositoryFilters(t *testing.T) {
 
 func TestInventory_PlatformIdsExclude(t *testing.T) {
 	m := testAuditConfig()
-	m.Spec.Containers.ScanCache = &v1alpha2.ScanCacheConfig{Enable: true}
 	cfg := v1alpha2.MondooOperatorConfig{}
 
 	platformIds := []string{
@@ -609,20 +608,6 @@ func TestInventory_NoPlatformIdsExcludeWhenEmpty(t *testing.T) {
 
 	_, has := inv.Metadata.Annotations["platformids-exclude"]
 	assert.False(t, has, "platformids-exclude should not be present when no platform IDs provided")
-}
-
-func TestInventory_NoPlatformIdsExcludeWithScanCacheDisabled(t *testing.T) {
-	m := testAuditConfig()
-	cfg := v1alpha2.MondooOperatorConfig{}
-
-	invStr, err := Inventory("", testClusterUID, *m, cfg, nil)
-	require.NoError(t, err)
-
-	var inv inventory.Inventory
-	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
-
-	_, has := inv.Metadata.Annotations["platformids-exclude"]
-	assert.False(t, has, "platformids-exclude should not be present when scan cache is disabled")
 }
 
 // envToMap converts a slice of EnvVar to a map for easy lookup.

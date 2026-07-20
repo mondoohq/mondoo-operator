@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	batchv1 "k8s.io/api/batch/v1"
@@ -30,7 +29,6 @@ type DeploymentHandler struct {
 	Mondoo                 *v1alpha2.MondooAuditConfig
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
-	MondooClientBuilder    func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
 	RefreshDigests         RefreshDigestsFunc
 }
 
