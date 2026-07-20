@@ -460,6 +460,9 @@ type Nodes struct {
 	Style NodeScanStyle `json:"style,omitempty"`
 	// PriorityClassName specifies the name of the PriorityClass for the node scanning workloads.
 	PriorityClassName string `json:"priorityClassName,omitempty"`
+	// LabelSelector selects nodes to scan. When unset, all nodes are scanned.
+	// +optional
+	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.
 	Env []corev1.EnvVar `json:"env,omitempty"`

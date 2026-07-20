@@ -1215,6 +1215,17 @@ spec:
         memory: 200Mi
 ```
 
+To scan only a subset of nodes, set `nodes.labelSelector`. In CronJob mode, the operator creates node scan CronJobs only for matching nodes and removes CronJobs for nodes that no longer match. In DaemonSet mode, the selector is enforced as required node affinity.
+
+```yaml
+spec:
+  nodes:
+    enable: true
+    labelSelector:
+      matchLabels:
+        pool: platform
+```
+
 ### How can I trigger a new scan?
 
 The operator runs a full cluster scan and node scans hourly. If you need to manually trigger those scans there are two options:
