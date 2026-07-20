@@ -11,6 +11,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	appsv1 "k8s.io/api/apps/v1"
@@ -75,6 +76,11 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		logger.Error(err, "Failed to resolve mondoo-client container image")
 		return err
 	}
+	renderImage, err := n.ContainerImageResolver.ContainerImage(ctx, constants.BusyBoxImage, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	if err != nil {
+		logger.Error(err, "Failed to resolve node inventory render container image")
+		return err
+	}
 
 	clusterUid, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
 	if err != nil {
@@ -109,7 +115,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 			return err
 		}
 
-		desired := CronJob(mondooClientImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
+		desired := CronJob(mondooClientImage, renderImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
 		cronJob := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
 		op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, cronJob, n.Mondoo, logger, func() error {
 			k8s.UpdateCronJobFields(cronJob, desired)
@@ -180,6 +186,11 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		logger.Error(err, "Failed to resolve mondoo-client container image")
 		return err
 	}
+	renderImage, err := n.ContainerImageResolver.ContainerImage(ctx, constants.BusyBoxImage, n.MondooOperatorConfig.Spec.SkipContainerResolution)
+	if err != nil {
+		logger.Error(err, "Failed to resolve node inventory render container image")
+		return err
+	}
 
 	clusterUid, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
 	if err != nil {
@@ -229,7 +240,7 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		}
 	}
 
-	desired := DaemonSet(*n.Mondoo, n.IsOpenshift, mondooClientImage, *n.MondooOperatorConfig, slices.Collect(maps.Keys(tolerations)))
+	desired := DaemonSet(*n.Mondoo, n.IsOpenshift, mondooClientImage, renderImage, *n.MondooOperatorConfig, slices.Collect(maps.Keys(tolerations)))
 	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
 	op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, ds, n.Mondoo, logger, func() error {
 		k8s.UpdateDaemonSetFields(ds, desired)

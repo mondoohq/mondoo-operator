@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -242,7 +243,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		cjExpected := CronJob(image, constants.BusyBoxImage, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		// Make sure the env vars for both are sorted
 		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
@@ -252,6 +253,40 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	// Verify node garbage collection cronjob does not exist (removed in simplification)
 	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
 	s.Error(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_CronJobUsesResolvedRenderImage() {
+	s.seedNodes()
+	d := s.createDeploymentHandler()
+	d.MondooOperatorConfig = &v1alpha2.MondooOperatorConfig{Spec: v1alpha2.MondooOperatorConfigSpec{
+		SkipContainerResolution: true,
+	}}
+	d.ContainerImageResolver = &fakeMondoo.ContainerImageResolverMock{
+		CnspecImageFunc: func(userImage, userTag, userDigest string, skipResolveImage bool) (string, error) {
+			return "registry.example.com/cnspec:13-rootless", nil
+		},
+		ContainerImageFunc: func(ctx context.Context, image string, skipResolveImage bool) (string, error) {
+			s.Equal(constants.BusyBoxImage, image)
+			s.True(skipResolveImage)
+			return "registry.example.com/dockerhub/library/busybox:1.36", nil
+		},
+	}
+
+	mondooAuditConfig := &s.auditConfig
+	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	nodes := &corev1.NodeList{}
+	s.NoError(d.KubeClient.List(s.ctx, nodes))
+	for _, n := range nodes.Items {
+		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
+		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
+		s.Len(cj.Spec.JobTemplate.Spec.Template.Spec.InitContainers, 1)
+		s.Equal("registry.example.com/dockerhub/library/busybox:1.36", cj.Spec.JobTemplate.Spec.Template.Spec.InitContainers[0].Image)
+	}
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_CustomEnvVars() {
@@ -276,7 +311,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_CustomEnvVars() {
 		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		cjExpected := CronJob(image, constants.BusyBoxImage, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		// Make sure the env vars for both are sorted
 		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
@@ -309,7 +344,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_Switch() {
 		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		cjExpected := CronJob(image, constants.BusyBoxImage, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		// Make sure the env vars for both are sorted
 		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
@@ -349,7 +384,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	s.NoError(err)
 
 	// Make sure a cron job exists for one of the nodes
-	cj := CronJob(image, nodes.Items[1], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob(image, constants.BusyBoxImage, nodes.Items[1], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 	cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, cj))
 
@@ -361,7 +396,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		cjExpected := CronJob(image, constants.BusyBoxImage, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 		// Make sure the env vars for both are sorted
 		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
@@ -407,7 +442,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, nodes.Items[0].Name), Namespace: s.auditConfig.Namespace}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-	cjExpected := CronJob(image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	cjExpected := CronJob(image, constants.BusyBoxImage, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
 	// Make sure the env vars for both are sorted
 	utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 	utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
@@ -435,7 +470,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets() {
 	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
 
-	dsExpected := DaemonSet(s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{},
+	dsExpected := DaemonSet(s.auditConfig, false, image, constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{},
 		[]corev1.Toleration{{Key: "node-role.kubernetes.io/master", Value: "true", Effect: corev1.TaintEffectNoExecute}})
 	// Make sure the env vars for both are sorted
 	utils.SortEnvVars(dsExpected.Spec.Template.Spec.Containers[0].Env)
@@ -468,7 +503,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_Switch() {
 	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
 
-	dsExpected := DaemonSet(s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{},
+	dsExpected := DaemonSet(s.auditConfig, false, image, constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{},
 		[]corev1.Toleration{{Key: "node-role.kubernetes.io/master", Value: "true", Effect: corev1.TaintEffectNoExecute}})
 	s.Equal(dsExpected.Spec, ds.Spec)
 
@@ -506,7 +541,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateDaemonSets() {
 	s.NoError(err)
 
 	// Make sure a daemonset exists
-	ds := DaemonSet(s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{}, nil)
+	ds := DaemonSet(s.auditConfig, false, image, constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{}, nil)
 	ds.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, ds))
 
@@ -517,7 +552,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateDaemonSets() {
 	ds = &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
 
-	depExpected := DaemonSet(s.auditConfig, false, image, v1alpha2.MondooOperatorConfig{},
+	depExpected := DaemonSet(s.auditConfig, false, image, constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{},
 		[]corev1.Toleration{{Key: "node-role.kubernetes.io/master", Value: "true", Effect: corev1.TaintEffectNoExecute}})
 	s.Equal(depExpected.Spec, ds.Spec)
 }
@@ -765,8 +800,9 @@ func (s *DeploymentHandlerSuite) TestReconcile_Deployment_CustomInterval() {
 	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
 
-	s.Contains(ds.Spec.Template.Spec.Containers[0].Command, "--timer")
-	s.Contains(ds.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("%d", s.auditConfig.Spec.Nodes.IntervalTimer))
+	command := strings.Join(ds.Spec.Template.Spec.Containers[0].Command, " ")
+	s.Contains(command, "--timer")
+	s.Contains(command, fmt.Sprintf("%d", s.auditConfig.Spec.Nodes.IntervalTimer))
 }
 
 func (s *DeploymentHandlerSuite) TestGarbageCollection_RunsAfterSuccessfulScan() {
