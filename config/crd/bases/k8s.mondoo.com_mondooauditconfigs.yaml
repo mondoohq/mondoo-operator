@@ -347,6 +347,21 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
+                  scanCache:
+                    description: |-
+                      ScanCache configures server-side score refresh for container images.
+                      When enabled, the operator calls RefreshAssetScores before each scan
+                      cycle. Images whose scores were successfully refreshed are excluded
+                      from the cnspec scan, skipping the expensive image pull.
+                    properties:
+                      enable:
+                        description: |-
+                          Enable turns on server-side score refresh. Before each container scan
+                          cycle, the operator asks the Mondoo platform to re-evaluate policies
+                          for previously scanned images. Images that were successfully refreshed
+                          are excluded from the scan, avoiding redundant image pulls.
+                        type: boolean
+                    type: object
                   schedule:
                     description: Specify a custom crontab schedule for the container
                       image scanning job. If not specified, the default schedule is

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	batchv1 "k8s.io/api/batch/v1"
@@ -21,11 +22,16 @@ import (
 
 var logger = ctrl.Log.WithName("k8s-images-scanning")
 
+// RefreshDigestsFunc returns cached or fresh digests to exclude from scanning.
+type RefreshDigestsFunc func(ctx context.Context, clusterUID string) []string
+
 type DeploymentHandler struct {
 	KubeClient             client.Client
 	Mondoo                 *v1alpha2.MondooAuditConfig
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
+	MondooClientBuilder    func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
+	RefreshDigests         RefreshDigestsFunc
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
@@ -149,7 +155,12 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string
 		return err
 	}
 
-	desired, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo, *n.MondooOperatorConfig)
+	var platformIdsExclude []string
+	if sc := n.Mondoo.Spec.Containers.ScanCache; sc != nil && sc.Enable && n.RefreshDigests != nil {
+		platformIdsExclude = n.RefreshDigests(ctx, clusterUid)
+	}
+
+	desired, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo, *n.MondooOperatorConfig, platformIdsExclude)
 	if err != nil {
 		logger.Error(err, "failed to generate desired ConfigMap with inventory")
 		return err

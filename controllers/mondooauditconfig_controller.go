@@ -7,9 +7,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/robfig/cron/v3"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -43,6 +45,13 @@ import (
 
 const finalizerString = "k8s.mondoo.com/delete"
 
+// refreshCacheEntry holds cached RefreshAssetScores results to avoid
+// redundant API calls during reconcile cascades.
+type refreshCacheEntry struct {
+	digests []string
+	at      time.Time
+}
+
 // MondooAuditConfigReconciler reconciles a MondooAuditConfig object
 type MondooAuditConfigReconciler struct {
 	client.Client
@@ -50,6 +59,9 @@ type MondooAuditConfigReconciler struct {
 	ContainerImageResolver mondoo.ContainerImageResolver
 	StatusReporter         *status.StatusReporter
 	RunningOnOpenShift     bool
+
+	refreshMu    sync.Mutex
+	refreshCache map[types.NamespacedName]*refreshCacheEntry
 }
 
 // so we can mock out the mondoo client for testing
@@ -312,6 +324,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		KubeClient:             r.Client,
 		ContainerImageResolver: imageResolver,
 		MondooOperatorConfig:   config,
+		MondooClientBuilder:    r.MondooClientBuilder,
+		RefreshDigests:         r.refreshDigests(mondooAuditConfig, config),
 	}
 	result, err = containers.Reconcile(ctx)
 	collect(result, err, "Failed to set up container scanning")
@@ -542,6 +556,59 @@ func (r *MondooAuditConfigReconciler) operatorConfigRequestMapper(ctx context.Co
 		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&a)})
 	}
 	return requests
+}
+
+func refreshCacheTTL(schedule string) time.Duration {
+	p := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	sched, err := p.Parse(schedule)
+	if err != nil {
+		return time.Hour
+	}
+	now := time.Now()
+	next := sched.Next(now)
+	interval := sched.Next(next).Sub(next)
+	// Refresh slightly before the next CronJob fires.
+	ttl := interval - time.Minute
+	if ttl < time.Minute {
+		ttl = time.Minute
+	}
+	return ttl
+}
+
+func (r *MondooAuditConfigReconciler) refreshDigests(m *v1alpha2.MondooAuditConfig, cfg *v1alpha2.MondooOperatorConfig) container_image.RefreshDigestsFunc {
+	ttl := refreshCacheTTL(m.Spec.Containers.Schedule)
+
+	return func(ctx context.Context, clusterUID string) []string {
+		key := types.NamespacedName{Namespace: m.Namespace, Name: m.Name}
+		log := ctrllog.FromContext(ctx).WithName("k8s-images-scanning")
+
+		r.refreshMu.Lock()
+		if r.refreshCache == nil {
+			r.refreshCache = make(map[types.NamespacedName]*refreshCacheEntry)
+		}
+		if entry, ok := r.refreshCache[key]; ok && time.Since(entry.at) < ttl {
+			r.refreshMu.Unlock()
+			return entry.digests
+		}
+		r.refreshMu.Unlock()
+
+		digests, err := mondoo.RefreshAssetScores(
+			ctx, r.Client, m, cfg, r.MondooClientBuilder, clusterUID, log)
+		if err != nil {
+			log.Error(err, "RefreshAssetScores failed, proceeding with full scan")
+			// Cache the error result to avoid spamming the API on every reconcile.
+			r.refreshMu.Lock()
+			r.refreshCache[key] = &refreshCacheEntry{digests: nil, at: time.Now()}
+			r.refreshMu.Unlock()
+			return nil
+		}
+
+		r.refreshMu.Lock()
+		r.refreshCache[key] = &refreshCacheEntry{digests: digests, at: time.Now()}
+		r.refreshMu.Unlock()
+
+		return digests
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.

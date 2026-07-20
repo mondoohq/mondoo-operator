@@ -41,6 +41,12 @@ func (s *AuditConfigSuite) TestReconcile_Containers() {
 	s.testMondooAuditConfigContainers(auditConfig)
 }
 
+func (s *AuditConfigSuite) TestReconcile_ContainersWithScanCache() {
+	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, true, false)
+	auditConfig.Spec.Filtering.Namespaces.Exclude = []string{s.testCluster.Settings.Namespace, "kube-system"}
+	s.testMondooAuditConfigContainersWithScanCache(auditConfig)
+}
+
 func (s *AuditConfigSuite) TestReconcile_Nodes_CronJobs() {
 	auditConfig := utils.DefaultAuditConfigMinimal(s.testCluster.Settings.Namespace, false, false, true)
 	s.testMondooAuditConfigNodesCronjobs(auditConfig)

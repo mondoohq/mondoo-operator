@@ -495,6 +495,22 @@ type Containers struct {
 	// scanning — cluster-specific fields (ClusterName, etc.) are ignored for registry auth.
 	// +optional
 	WorkloadIdentity *WorkloadIdentityConfig `json:"workloadIdentity,omitempty"`
+
+	// ScanCache configures server-side score refresh for container images.
+	// When enabled, the operator calls RefreshAssetScores before each scan
+	// cycle. Images whose scores were successfully refreshed are excluded
+	// from the cnspec scan, skipping the expensive image pull.
+	// +optional
+	ScanCache *ScanCacheConfig `json:"scanCache,omitempty"`
+}
+
+// ScanCacheConfig configures server-side score refresh for container image scans.
+type ScanCacheConfig struct {
+	// Enable turns on server-side score refresh. Before each container scan
+	// cycle, the operator asks the Mondoo platform to re-evaluate policies
+	// for previously scanned images. Images that were successfully refreshed
+	// are excluded from the scan, avoiding redundant image pulls.
+	Enable bool `json:"enable,omitempty"`
 }
 
 // DeprecatedAdmission exists for backward compatibility during upgrades.

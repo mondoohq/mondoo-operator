@@ -256,8 +256,8 @@ func CronJobName(prefix string) string {
 	return k8s.CronJobName("container-scan", prefix)
 }
 
-func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (*corev1.ConfigMap, error) {
-	inv, err := Inventory(integrationMRN, clusterUID, m, cfg)
+func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig, platformIdsExclude []string) (*corev1.ConfigMap, error) {
+	inv, err := Inventory(integrationMRN, clusterUID, m, cfg, platformIdsExclude)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +275,7 @@ func ConfigMapName(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
 }
 
-func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (string, error) {
+func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig, platformIdsExclude []string) (string, error) {
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-k8s-containers-inventory",
@@ -285,7 +285,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 				{
 					Connections: []*inventory.Config{
 						{
-							Type: "k8s",
+							Type:    "k8s",
 							Options: containerImageOptions(m),
 							Discover: &inventory.Discovery{
 								Targets: []string{"container-images"},
@@ -305,6 +305,13 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 		for i := range inv.Spec.Assets {
 			inv.Spec.Assets[i].Labels[constants.MondooAssetsIntegrationLabel] = integrationMRN
 		}
+	}
+
+	if len(platformIdsExclude) > 0 {
+		if inv.Metadata.Annotations == nil {
+			inv.Metadata.Annotations = map[string]string{}
+		}
+		inv.Metadata.Annotations["platformids-exclude"] = strings.Join(platformIdsExclude, ",")
 	}
 
 	if cfg.Spec.ContainerProxy != nil {
@@ -403,6 +410,7 @@ func containerImageOptions(m v1alpha2.MondooAuditConfig) map[string]string {
 		"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
 		"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
 		"disable-cache":      "false",
+		"staged-discovery":   "true",
 	}
 	if len(m.Spec.Containers.Repositories.Include) > 0 {
 		opts["images"] = strings.Join(m.Spec.Containers.Repositories.Include, ",")

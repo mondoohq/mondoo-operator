@@ -21,6 +21,7 @@ const (
 	IntegrationConfigureEndpoint      = "/IntegrationsManager/Configure"
 	IntegrationReportStatusEndpoint   = "/IntegrationsManager/ReportStatus"
 	GarbageCollectAssetsEndpoint      = "/PolicyResolver/PurgeAssets"
+	RefreshAssetScoresEndpoint        = "/PolicyResolver/RefreshAssetScores"
 )
 
 type MondooClientOptions struct {
@@ -186,4 +187,25 @@ func (s *mondooClient) GarbageCollectAssets(ctx context.Context, req *GarbageCol
 	}
 
 	return nil
+}
+
+func (s *mondooClient) RefreshAssetScores(ctx context.Context, req *RefreshAssetScoresRequest) (*RefreshAssetScoresResponse, error) {
+	url := s.ApiEndpoint + RefreshAssetScoresEndpoint
+
+	reqBodyBytes, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	respBodyBytes, err := common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make refresh asset scores request: %v", err)
+	}
+
+	out := &RefreshAssetScoresResponse{}
+	if err = json.Unmarshal(respBodyBytes, out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %v", err)
+	}
+
+	return out, nil
 }
