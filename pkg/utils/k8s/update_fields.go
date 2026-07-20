@@ -15,6 +15,7 @@ func UpdateCronJobFields(obj, desired *batchv1.CronJob) {
 	obj.Labels = desired.Labels
 	obj.Annotations = desired.Annotations
 	obj.Spec.Schedule = desired.Spec.Schedule
+	obj.Spec.Suspend = desired.Spec.Suspend
 	obj.Spec.ConcurrencyPolicy = desired.Spec.ConcurrencyPolicy
 	obj.Spec.SuccessfulJobsHistoryLimit = desired.Spec.SuccessfulJobsHistoryLimit
 	obj.Spec.FailedJobsHistoryLimit = desired.Spec.FailedJobsHistoryLimit
