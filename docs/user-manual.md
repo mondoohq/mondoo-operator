@@ -12,6 +12,7 @@ This user manual describes how to install and use the Mondoo Operator.
   - [Configuring the Mondoo Secret](#configuring-the-mondoo-secret)
   - [Creating a MondooAuditConfig](#creating-a-mondooauditconfig)
     - [Filter Kubernetes objects based on namespace](#filter-kubernetes-objects-based-on-namespace)
+    - [Extended network inventory](#extended-network-inventory)
   - [Scanning External Clusters](#scanning-external-clusters)
     - [Creating a kubeconfig Secret](#creating-a-kubeconfig-secret)
     - [Configuring external cluster scanning](#configuring-external-cluster-scanning)
@@ -221,6 +222,55 @@ spec:
         - app1
         - backend2
         - ...
+```
+
+### Extended network inventory
+
+Enable `kubernetesResources.networkInventory` to collect normalized network
+posture evidence during the scheduled Kubernetes resource scan. This does not
+install webhooks, enforce network policies, or put Mondoo in the admission path.
+
+The scanner keeps working on clusters where optional CRDs are absent. When the
+CRDs exist and the scanner service account can list them, Mondoo collects
+normalized evidence for Kubernetes Services, Ingress, Gateway API gateways and
+routes, native NetworkPolicy, AdminNetworkPolicy and BaselineAdminNetworkPolicy,
+MultiNetworkPolicy and NetworkAttachmentDefinition, Calico NetworkPolicy and
+GlobalNetworkPolicy, Cilium NetworkPolicy and ClusterwideNetworkPolicy, and the
+supported HBN current or legacy resource signals. Raw HBN drill-down resources
+such as node status, traffic mirrors, collectors, and full BGP topology are
+follow-up provider work.
+
+```yaml
+spec:
+  kubernetesResources:
+    enable: true
+    networkInventory:
+      enable: true
+      hbn:
+        enable: true
+        includeLegacyResources: true
+      multiNetworkPolicy:
+        enable: true
+      classifications:
+        publicCidrs:
+          - 0.0.0.0/0
+          - ::/0
+        privateCidrs:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+        trustedEgressCidrs:
+          - 203.0.113.0/24
+      observedFlows:
+        enable: false
+        calicoWhisker:
+          enable: false
+          namespace: calico-system
+          serviceName: whisker
+        ciliumHubble:
+          enable: false
+          namespace: kube-system
+          serviceName: hubble-relay
 ```
 
 ## Scanning External Clusters
