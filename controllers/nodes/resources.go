@@ -391,7 +391,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 					Labels: map[string]string{
 						"k8s.mondoo.com/kind": "node",
 					},
-					ManagedBy: mondoo.ManagedByLabel(clusterUID),
+					ManagedBy: mondoo.ManagedByNodesLabel(clusterUID),
 				},
 			},
 		},

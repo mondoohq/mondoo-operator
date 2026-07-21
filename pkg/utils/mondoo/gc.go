@@ -34,6 +34,22 @@ func ManagedByLabel(clusterUID string) string {
 	return "mondoo-operator-" + clusterUID
 }
 
+// ManagedByContainersLabel returns a ManagedBy value specific to container-image assets.
+func ManagedByContainersLabel(clusterUID string) string {
+	if clusterUID == "" {
+		return "mondoo-operator-containers"
+	}
+	return "mondoo-operator-containers-" + clusterUID
+}
+
+// ManagedByNodesLabel returns a ManagedBy value specific to node assets.
+func ManagedByNodesLabel(clusterUID string) string {
+	if clusterUID == "" {
+		return "mondoo-operator-nodes"
+	}
+	return "mondoo-operator-nodes-" + clusterUID
+}
+
 // GCOlderThan returns the duration threshold for garbage collection based on
 // the scan schedule. It computes 2x the interval between consecutive cron runs
 // so that assets are only GC'd after missing at least one full scan cycle.
@@ -57,7 +73,8 @@ func gcOlderThanFromSchedule(schedule string) time.Duration {
 		return defaultGCOlderThan
 	}
 
-	sched, err := cron.ParseStandard(schedule)
+	p := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	sched, err := p.Parse(schedule)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "WARNING: failed to parse cron schedule %q, using default %s: %v\n", schedule, defaultGCOlderThan, err)
 		return defaultGCOlderThan

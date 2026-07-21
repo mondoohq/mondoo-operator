@@ -6,8 +6,11 @@ package container_image
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/robfig/cron/v3"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	batchv1 "k8s.io/api/batch/v1"
@@ -21,11 +24,16 @@ import (
 
 var logger = ctrl.Log.WithName("k8s-images-scanning")
 
+// RefreshDigestsFunc returns cached or fresh digests to exclude from scanning.
+type RefreshDigestsFunc func(ctx context.Context, clusterUID string) []string
+
 type DeploymentHandler struct {
 	KubeClient             client.Client
 	Mondoo                 *v1alpha2.MondooAuditConfig
 	ContainerImageResolver mondoo.ContainerImageResolver
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
+	MondooClientBuilder    func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
+	RefreshDigests         RefreshDigestsFunc
 }
 
 func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) {
@@ -57,13 +65,22 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		}
 	}
 
-	if err := n.syncCronJob(ctx); err != nil {
+	clusterUid, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
+	if err != nil {
+		logger.Error(err, "Failed to get cluster's UID")
 		return ctrl.Result{}, err
 	}
+
+	if err := n.syncCronJob(ctx, clusterUid); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	n.garbageCollectIfNeeded(ctx, clusterUid)
+
 	return ctrl.Result{}, nil
 }
 
-func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
+func (n *DeploymentHandler) syncCronJob(ctx context.Context, clusterUid string) error {
 	mondooClientImage, err := n.ContainerImageResolver.CnspecImage(
 		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.Mondoo.Spec.Scanner.Image.Digest, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
@@ -75,12 +92,6 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	if err != nil {
 		logger.Error(err,
 			"failed to retrieve integration-mrn for MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
-		return err
-	}
-
-	clusterUid, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
-	if err != nil {
-		logger.Error(err, "Failed to get cluster's UID")
 		return err
 	}
 
@@ -149,7 +160,21 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string
 		return err
 	}
 
-	desired, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo, *n.MondooOperatorConfig)
+	var platformIdsExclude []string
+	if sc := n.Mondoo.Spec.Containers.ScanCache; sc != nil && sc.Enable && n.RefreshDigests != nil {
+		platformIdsExclude = n.RefreshDigests(ctx, clusterUid)
+	}
+
+	var scanTime *time.Time
+	if sc := n.Mondoo.Spec.Containers.ScanCache; sc != nil && sc.Enable {
+		p := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+		if sched, err := p.Parse(n.Mondoo.Spec.Containers.Schedule); err == nil {
+			next := sched.Next(time.Now())
+			scanTime = &next
+		}
+	}
+
+	desired, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo, *n.MondooOperatorConfig, platformIdsExclude, scanTime)
 	if err != nil {
 		logger.Error(err, "failed to generate desired ConfigMap with inventory")
 		return err
@@ -178,6 +203,61 @@ func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]ba
 		return nil, err
 	}
 	return cronJobs.Items, nil
+}
+
+// garbageCollectIfNeeded checks whether a new successful container image scan has completed
+// since the last GC run, and if so, performs garbage collection of stale assets via the Mondoo API.
+func (n *DeploymentHandler) garbageCollectIfNeeded(ctx context.Context, clusterUid string) {
+	cronJobs, err := n.getCronJobsForAuditConfig(ctx)
+	if err != nil {
+		logger.Error(err, "Failed to list CronJobs for container image garbage collection")
+		return
+	}
+
+	var latestSuccess *metav1.Time
+	for i := range cronJobs {
+		t := cronJobs[i].Status.LastSuccessfulTime
+		if t != nil && (latestSuccess == nil || t.After(latestSuccess.Time)) {
+			latestSuccess = t
+		}
+	}
+
+	if latestSuccess == nil {
+		return
+	}
+
+	if n.Mondoo.Status.LastContainerImageGarbageCollectionTime != nil &&
+		!latestSuccess.After(n.Mondoo.Status.LastContainerImageGarbageCollectionTime.Time) {
+		return
+	}
+
+	managedBy := mondoo.ManagedByContainersLabel(clusterUid)
+	if err := n.performGarbageCollection(ctx, managedBy); err != nil {
+		logger.Error(err, "Failed to perform garbage collection of container image assets")
+	}
+
+	now := metav1.Now()
+	n.Mondoo.Status.LastContainerImageGarbageCollectionTime = &now
+}
+
+func (n *DeploymentHandler) performGarbageCollection(ctx context.Context, managedBy string) error {
+	req := &mondooclient.GarbageCollectAssetsRequest{
+		ManagedBy:       managedBy,
+		PlatformRuntime: "docker-image",
+		Labels:          map[string]string{"k8s.mondoo.com/kind": "container-image"},
+		DateFilter: &mondooclient.DateFilter{
+			Timestamp:  time.Now().Add(-mondoo.GCOlderThan(n.Mondoo.Spec.Containers.Schedule)).Format(time.RFC3339),
+			Comparison: mondooclient.Comparison_LESS_THAN,
+			Field:      mondooclient.DateFilterField_FILTER_LAST_UPDATED,
+		},
+	}
+
+	if err := mondoo.GarbageCollectAssets(ctx, n.KubeClient, n.Mondoo, n.MondooOperatorConfig, n.MondooClientBuilder, req, logger); err != nil {
+		return err
+	}
+
+	logger.Info("Successfully performed garbage collection of container image assets")
+	return nil
 }
 
 func (n *DeploymentHandler) down(ctx context.Context) error {

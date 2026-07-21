@@ -214,6 +214,48 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 	s.Equal("ACTIVE", status)
 }
 
+func (s *AuditConfigBaseSuite) testMondooAuditConfigContainersWithScanCache(auditConfig mondoov2.MondooAuditConfig) {
+	auditConfig.Spec.Containers.ScanCache = &mondoov2.ScanCacheConfig{
+		Enable: true,
+	}
+
+	pauseLabel := "app.kubernetes.io/name=pause"
+	_, err := s.testCluster.K8sHelper.Kubectl("run", "-n", "default", "pause-cache", "--image", "registry.k8s.io/pause:3.10", "-l", pauseLabel)
+	s.Require().NoError(err, "Failed to create pause pod.")
+	defer func() {
+		_, _ = s.testCluster.K8sHelper.Kubectl("delete", "pod", "-n", "default", "pause-cache")
+	}()
+	s.True(s.testCluster.K8sHelper.IsPodReady(pauseLabel, "default"), "pause pod is not ready")
+
+	s.auditConfig = auditConfig
+
+	cleanup := s.disableContainerImageResolution()
+	defer cleanup()
+
+	zap.S().Info("Create an audit config that enables container scanning with scan cache.")
+	s.NoErrorf(
+		s.testCluster.K8sHelper.Clientset.Create(s.ctx, &auditConfig),
+		"Failed to create Mondoo audit config.")
+
+	// Verify the CronJob is created
+	cronJob := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{Name: container_image.CronJobName(auditConfig.Name), Namespace: auditConfig.Namespace},
+	}
+	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		if err := s.testCluster.K8sHelper.Clientset.Get(s.ctx, client.ObjectKeyFromObject(cronJob), cronJob); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	s.NoError(err, "Container image scanning CronJob was not created.")
+
+	// Wait for the scan to complete successfully
+	cronJobLabels := container_image.CronJobLabels(auditConfig)
+	s.True(
+		s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(utils.LabelsToLabelSelector(cronJobLabels), auditConfig.Namespace),
+		"Container image scan CronJob with scan cache did not run successfully.")
+}
+
 func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondoov2.MondooAuditConfig) {
 	pauseLabel := "app.kubernetes.io/name=pause"
 	_, err := s.testCluster.K8sHelper.Kubectl("run", "-n", "default", "pause", "--image", "registry.k8s.io/pause:3.10", "-l", pauseLabel)

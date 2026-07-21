@@ -422,7 +422,7 @@ func (n *DeploymentHandler) garbageCollectIfNeeded(ctx context.Context, clusterU
 		return
 	}
 
-	managedBy := mondoo.ManagedByLabel(clusterUid)
+	managedBy := mondoo.ManagedByNodesLabel(clusterUid)
 	if err := n.performGarbageCollection(ctx, managedBy); err != nil {
 		logger.Error(err, "Failed to perform garbage collection of node scan assets")
 	}
@@ -440,6 +440,7 @@ func (n *DeploymentHandler) performGarbageCollection(ctx context.Context, manage
 	// Omitting PlatformRuntime so the filter matches node assets.
 	req := &mondooclient.GarbageCollectAssetsRequest{
 		ManagedBy: managedBy,
+		Labels:    map[string]string{"k8s.mondoo.com/kind": "node"},
 		DateFilter: &mondooclient.DateFilter{
 			Timestamp:  time.Now().Add(-mondoo.GCOlderThan(n.Mondoo.Spec.Nodes.Schedule)).Format(time.RFC3339),
 			Comparison: mondooclient.Comparison_LESS_THAN,

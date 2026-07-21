@@ -21,6 +21,7 @@ type MondooClient interface {
 	IntegrationReportStatus(context.Context, *ReportStatusRequest) error
 
 	GarbageCollectAssets(context.Context, *GarbageCollectAssetsRequest) error
+	RefreshAssetScores(context.Context, *RefreshAssetScoresRequest) (*RefreshAssetScoresResponse, error)
 }
 
 // ExchangeRegistrationTokenInput is used for converting a JWT to a Mondoo service account
@@ -166,3 +167,55 @@ const (
 	DateFilterField_FILTER_LAST_UPDATED DateFilterField = 0
 	DateFilterField_FILTER_CREATED      DateFilterField = 1
 )
+
+// RefreshAssetScores — server-side proto spec:
+//
+//	service PolicyResolver {
+//	  rpc RefreshAssetScores(RefreshAssetScoresRequest)
+//	      returns (RefreshAssetScoresResponse);
+//	}
+//
+//	message RefreshAssetScoresRequest {
+//	  string scope_mrn = 1;        // space MRN to scope the query
+//	  string managed_by = 2;       // e.g. "mondoo-operator-<clusterUID>"
+//	  string platform_runtime = 3; // e.g. "docker-image"
+//	  map<string, string> labels = 4;
+//	}
+//
+//	message RefreshAssetScoresResponse {
+//	  // Assets whose scores were successfully re-evaluated.
+//	  repeated AssetRefreshResult refreshed = 1;
+//	  // Assets found matching the filter but whose scores could not
+//	  // be refreshed (e.g. no policies resolved yet).
+//	  repeated AssetRefreshResult missing = 2;
+//	}
+//
+//	message AssetRefreshResult {
+//	  string asset_mrn = 1;
+//	  // Platform IDs for this asset, e.g.
+//	  // "//platformid.api.mondoo.app/runtime/docker/images/<sha256-hex>"
+//	  repeated string platform_ids = 2;
+//	}
+//
+// The operator collects platform_ids from refreshed entries and passes
+// them to cnspec as "platformids-exclude". Missing entries are NOT
+// excluded — they represent assets whose scores could not be refreshed,
+// so they need to be re-scanned.
+type RefreshAssetScoresRequest struct {
+	ScopeMrn          string            `protobuf:"bytes,1,opt,name=scope_mrn,json=scopeMrn,proto3" json:"scope_mrn,omitempty"`
+	ManagedBy         string            `protobuf:"bytes,2,opt,name=managed_by,json=managedBy,proto3" json:"managed_by,omitempty"`
+	PlatformRuntime   string            `protobuf:"bytes,3,opt,name=platform_runtime,json=platformRuntime,proto3" json:"platform_runtime,omitempty"`
+	Labels            map[string]string `protobuf:"bytes,4,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	EnableCacheExpiry bool              `protobuf:"varint,5,opt,name=enable_cache_expiry,json=enableCacheExpiry,proto3" json:"enable_cache_expiry,omitempty"`
+	CacheTTLSeconds   int64             `protobuf:"varint,6,opt,name=cache_ttl_seconds,json=cacheTtlSeconds,proto3" json:"cache_ttl_seconds,omitempty"`
+}
+
+type RefreshAssetScoresResponse struct {
+	Refreshed []AssetRefreshResult `protobuf:"bytes,1,rep,name=refreshed,proto3" json:"refreshed,omitempty"`
+	Missing   []AssetRefreshResult `protobuf:"bytes,2,rep,name=missing,proto3" json:"missing,omitempty"`
+}
+
+type AssetRefreshResult struct {
+	AssetMrn    string   `protobuf:"bytes,1,opt,name=asset_mrn,json=assetMrn,proto3" json:"asset_mrn,omitempty"`
+	PlatformIds []string `protobuf:"bytes,2,rep,name=platform_ids,json=platformIds,proto3" json:"platform_ids,omitempty"`
+}
