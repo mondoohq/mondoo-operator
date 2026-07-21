@@ -73,7 +73,8 @@ func gcOlderThanFromSchedule(schedule string) time.Duration {
 		return defaultGCOlderThan
 	}
 
-	sched, err := cron.ParseStandard(schedule)
+	p := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	sched, err := p.Parse(schedule)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "WARNING: failed to parse cron schedule %q, using default %s: %v\n", schedule, defaultGCOlderThan, err)
 		return defaultGCOlderThan

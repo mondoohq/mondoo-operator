@@ -65,21 +65,22 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		}
 	}
 
-	if err := n.syncCronJob(ctx); err != nil {
+	clusterUid, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
+	if err != nil {
+		logger.Error(err, "Failed to get cluster's UID")
 		return ctrl.Result{}, err
 	}
 
-	clusterUid, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
-	if err != nil {
-		logger.Error(err, "Failed to get cluster's UID for container image garbage collection")
-	} else {
-		n.garbageCollectIfNeeded(ctx, clusterUid)
+	if err := n.syncCronJob(ctx, clusterUid); err != nil {
+		return ctrl.Result{}, err
 	}
+
+	n.garbageCollectIfNeeded(ctx, clusterUid)
 
 	return ctrl.Result{}, nil
 }
 
-func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
+func (n *DeploymentHandler) syncCronJob(ctx context.Context, clusterUid string) error {
 	mondooClientImage, err := n.ContainerImageResolver.CnspecImage(
 		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.Mondoo.Spec.Scanner.Image.Digest, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
@@ -91,12 +92,6 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	if err != nil {
 		logger.Error(err,
 			"failed to retrieve integration-mrn for MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
-		return err
-	}
-
-	clusterUid, err := k8s.GetClusterUID(ctx, n.KubeClient, logger)
-	if err != nil {
-		logger.Error(err, "Failed to get cluster's UID")
 		return err
 	}
 
@@ -172,7 +167,8 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string
 
 	var scanTime *time.Time
 	if sc := n.Mondoo.Spec.Containers.ScanCache; sc != nil && sc.Enable {
-		if sched, err := cron.ParseStandard(n.Mondoo.Spec.Containers.Schedule); err == nil {
+		p := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+		if sched, err := p.Parse(n.Mondoo.Spec.Containers.Schedule); err == nil {
 			next := sched.Next(time.Now())
 			scanTime = &next
 		}
