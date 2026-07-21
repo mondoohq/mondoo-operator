@@ -202,10 +202,12 @@ const (
 // excluded — they represent assets whose scores could not be refreshed,
 // so they need to be re-scanned.
 type RefreshAssetScoresRequest struct {
-	ScopeMrn        string            `protobuf:"bytes,1,opt,name=scope_mrn,json=scopeMrn,proto3" json:"scope_mrn,omitempty"`
-	ManagedBy       string            `protobuf:"bytes,2,opt,name=managed_by,json=managedBy,proto3" json:"managed_by,omitempty"`
-	PlatformRuntime string            `protobuf:"bytes,3,opt,name=platform_runtime,json=platformRuntime,proto3" json:"platform_runtime,omitempty"`
-	Labels          map[string]string `protobuf:"bytes,4,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ScopeMrn          string            `protobuf:"bytes,1,opt,name=scope_mrn,json=scopeMrn,proto3" json:"scope_mrn,omitempty"`
+	ManagedBy         string            `protobuf:"bytes,2,opt,name=managed_by,json=managedBy,proto3" json:"managed_by,omitempty"`
+	PlatformRuntime   string            `protobuf:"bytes,3,opt,name=platform_runtime,json=platformRuntime,proto3" json:"platform_runtime,omitempty"`
+	Labels            map[string]string `protobuf:"bytes,4,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	EnableCacheExpiry bool              `protobuf:"varint,5,opt,name=enable_cache_expiry,json=enableCacheExpiry,proto3" json:"enable_cache_expiry,omitempty"`
+	CacheTTLSeconds   int64             `protobuf:"varint,6,opt,name=cache_ttl_seconds,json=cacheTtlSeconds,proto3" json:"cache_ttl_seconds,omitempty"`
 }
 
 type RefreshAssetScoresResponse struct {

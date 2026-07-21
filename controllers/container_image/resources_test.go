@@ -47,7 +47,7 @@ func TestInventory_WithAnnotations(t *testing.T) {
 		},
 	}
 
-	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{}, nil)
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{}, nil, nil)
 	require.NoError(t, err, "unexpected error generating inventory")
 
 	var inv inventory.Inventory
@@ -249,7 +249,7 @@ func TestInventory_WithContainerProxy(t *testing.T) {
 		},
 	}
 
-	invStr, err := Inventory("", testClusterUID, auditConfig, cfg, nil)
+	invStr, err := Inventory("", testClusterUID, auditConfig, cfg, nil, nil)
 	require.NoError(t, err)
 
 	var inv inventory.Inventory
@@ -264,7 +264,7 @@ func TestInventory_WithoutContainerProxy(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
 	}
 
-	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{}, nil)
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{}, nil, nil)
 	require.NoError(t, err)
 
 	var inv inventory.Inventory
@@ -522,7 +522,7 @@ func TestInventory_WithRepositoryFilters(t *testing.T) {
 		},
 	}
 
-	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{}, nil)
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{}, nil, nil)
 	require.NoError(t, err)
 
 	var inv inventory.Inventory
@@ -547,7 +547,7 @@ func TestInventory_WithRepositoryInclude(t *testing.T) {
 		},
 	}
 
-	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{}, nil)
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{}, nil, nil)
 	require.NoError(t, err)
 
 	var inv inventory.Inventory
@@ -565,7 +565,7 @@ func TestInventory_WithoutRepositoryFilters(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
 	}
 
-	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{}, nil)
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{}, nil, nil)
 	require.NoError(t, err)
 
 	var inv inventory.Inventory
@@ -587,7 +587,7 @@ func TestInventory_PlatformIdsExclude(t *testing.T) {
 		"//platformid.api.mondoo.app/runtime/docker/images/abc123",
 		"//platformid.api.mondoo.app/runtime/docker/images/def456",
 	}
-	invStr, err := Inventory("", testClusterUID, *m, cfg, platformIds)
+	invStr, err := Inventory("", testClusterUID, *m, cfg, platformIds, nil)
 	require.NoError(t, err)
 
 	var inv inventory.Inventory
@@ -600,7 +600,7 @@ func TestInventory_NoPlatformIdsExcludeWhenEmpty(t *testing.T) {
 	m := testAuditConfig()
 	cfg := v1alpha2.MondooOperatorConfig{}
 
-	invStr, err := Inventory("", testClusterUID, *m, cfg, nil)
+	invStr, err := Inventory("", testClusterUID, *m, cfg, nil, nil)
 	require.NoError(t, err)
 
 	var inv inventory.Inventory

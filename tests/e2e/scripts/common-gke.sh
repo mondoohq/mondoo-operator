@@ -44,7 +44,8 @@ build_and_push() {
   : "${GIT_SHA:?GIT_SHA must be set}"
   : "${REGION:?REGION must be set}"
 
-  export OPERATOR_IMAGE="${REGISTRY_REPO}/mondoo-operator:${GIT_SHA}"
+  local tag="${OPERATOR_IMAGE_TAG:-$(date +%Y%m%d-%H%M%S)}"
+  export OPERATOR_IMAGE="${REGISTRY_REPO}/mondoo-operator:${tag}"
 
   info "Building operator image: ${OPERATOR_IMAGE}"
   cd "${REPO_ROOT}"
@@ -58,7 +59,7 @@ build_and_push() {
   info "Image pushed: ${OPERATOR_IMAGE}"
 
   export IMAGE_REPO="${REGISTRY_REPO}/mondoo-operator"
-  export IMAGE_TAG="${GIT_SHA}"
+  export IMAGE_TAG="${tag}"
 }
 
 # Refresh target cluster kubeconfig

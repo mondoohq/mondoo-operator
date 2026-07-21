@@ -354,6 +354,14 @@ spec:
                       cycle. Images whose scores were successfully refreshed are excluded
                       from the cnspec scan, skipping the expensive image pull.
                     properties:
+                      cacheTTL:
+                        description: |-
+                          CacheTTL is the maximum duration an image can be served from cache
+                          before forcing a full rescan. After this period, RefreshAssetScores
+                          stops returning the asset, causing cnspec to rediscover and rescan it.
+                          Specified as a Go duration string (e.g. "168h" for 1 week, "5m" for testing).
+                          If unset, the server default (1 week) is used.
+                        type: string
                       enable:
                         description: |-
                           Enable turns on server-side score refresh. Before each container scan
@@ -1596,6 +1604,12 @@ spec:
                   - type
                   type: object
                 type: array
+              lastContainerImageGarbageCollectionTime:
+                description: |-
+                  LastContainerImageGarbageCollectionTime tracks the last time the operator performed
+                  garbage collection of stale container image scan assets.
+                format: date-time
+                type: string
               lastK8sResourceGarbageCollectionTime:
                 description: |-
                   LastK8sResourceGarbageCollectionTime tracks the last time the operator performed

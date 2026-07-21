@@ -29,3 +29,7 @@ spec:
     schedule: "*/5 * * * *"
     scanCache:
       enable: true
+      cacheTTL: 5m
+  nodes:
+    enable: true
+    schedule: "*/5 * * * *"

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"strings"
+	"time"
 
 	// That's the mod k8s relies on https://github.com/kubernetes/kubernetes/blob/master/go.mod#L63
 
@@ -256,8 +257,8 @@ func CronJobName(prefix string) string {
 	return k8s.CronJobName("container-scan", prefix)
 }
 
-func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig, platformIdsExclude []string) (*corev1.ConfigMap, error) {
-	inv, err := Inventory(integrationMRN, clusterUID, m, cfg, platformIdsExclude)
+func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig, platformIdsExclude []string, scanTime *time.Time) (*corev1.ConfigMap, error) {
+	inv, err := Inventory(integrationMRN, clusterUID, m, cfg, platformIdsExclude, scanTime)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +276,7 @@ func ConfigMapName(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
 }
 
-func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig, platformIdsExclude []string) (string, error) {
+func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig, platformIdsExclude []string, scanTime *time.Time) (string, error) {
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-k8s-containers-inventory",
@@ -292,9 +293,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 							},
 						},
 					},
-					Labels: map[string]string{
-						"k8s.mondoo.com/kind": "container-image",
-					},
+					Labels:    containerImageLabels(&m, scanTime),
 					ManagedBy: mondoo.ManagedByContainersLabel(clusterUID),
 				},
 			},
@@ -403,6 +402,16 @@ func validateContainerRegistryWIF(wif *v1alpha2.WorkloadIdentityConfig) error {
 	}
 
 	return nil
+}
+
+func containerImageLabels(m *v1alpha2.MondooAuditConfig, scanTime *time.Time) map[string]string {
+	labels := map[string]string{
+		"k8s.mondoo.com/kind": "container-image",
+	}
+	if sc := m.Spec.Containers.ScanCache; sc != nil && sc.Enable && scanTime != nil {
+		labels["mondoo.com/sbom-requested"] = scanTime.UTC().Format(time.RFC3339)
+	}
+	return labels
 }
 
 func containerImageOptions(m v1alpha2.MondooAuditConfig) map[string]string {

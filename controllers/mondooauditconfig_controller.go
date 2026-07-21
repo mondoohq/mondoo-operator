@@ -328,6 +328,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		KubeClient:             r.Client,
 		ContainerImageResolver: imageResolver,
 		MondooOperatorConfig:   config,
+		MondooClientBuilder:    r.MondooClientBuilder,
 		RefreshDigests:         r.refreshDigests(mondooAuditConfig, config),
 	}
 	result, err = containers.Reconcile(ctx)

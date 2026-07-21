@@ -511,6 +511,14 @@ type ScanCacheConfig struct {
 	// for previously scanned images. Images that were successfully refreshed
 	// are excluded from the scan, avoiding redundant image pulls.
 	Enable bool `json:"enable,omitempty"`
+
+	// CacheTTL is the maximum duration an image can be served from cache
+	// before forcing a full rescan. After this period, RefreshAssetScores
+	// stops returning the asset, causing cnspec to rediscover and rescan it.
+	// Specified as a Go duration string (e.g. "168h" for 1 week, "5m" for testing).
+	// If unset, the server default (1 week) is used.
+	// +optional
+	CacheTTL *metav1.Duration `json:"cacheTTL,omitempty"`
 }
 
 // DeprecatedAdmission exists for backward compatibility during upgrades.
@@ -583,6 +591,11 @@ type MondooAuditConfigStatus struct {
 	// garbage collection of stale node scan assets.
 	// +optional
 	LastNodeScanGarbageCollectionTime *metav1.Time `json:"lastNodeScanGarbageCollectionTime,omitempty"`
+
+	// LastContainerImageGarbageCollectionTime tracks the last time the operator performed
+	// garbage collection of stale container image scan assets.
+	// +optional
+	LastContainerImageGarbageCollectionTime *metav1.Time `json:"lastContainerImageGarbageCollectionTime,omitempty"`
 
 	// ScanningPaused indicates that the Mondoo console has paused scanning for
 	// this integration. When true, all scan CronJobs are suspended.

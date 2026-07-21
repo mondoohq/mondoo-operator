@@ -57,8 +57,13 @@ func RefreshAssetScores(
 	}
 
 	req := &mondooclient.RefreshAssetScoresRequest{
-		ManagedBy:       ManagedByContainersLabel(clusterUID),
-		PlatformRuntime: "docker-image",
+		ManagedBy:         ManagedByContainersLabel(clusterUID),
+		PlatformRuntime:   "docker-image",
+		EnableCacheExpiry: true,
+	}
+
+	if sc := mondoo.Spec.Containers.ScanCache; sc != nil && sc.CacheTTL != nil {
+		req.CacheTTLSeconds = int64(sc.CacheTTL.Seconds())
 	}
 
 	if spaceMrn := k8s.SpaceMrnForAuditConfig(*mondoo); spaceMrn != "" {
