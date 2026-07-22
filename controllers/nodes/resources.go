@@ -114,8 +114,7 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 										RunAsNonRoot:             ptr.To(false),
 										RunAsUser:                ptr.To(int64(0)),
 										Capabilities:             nodeScanCapabilities(isOpenshift),
-										// RHCOS requires to run as privileged to properly do node scanning. If the container
-										// is not privileged, then we have no access to /proc.
+										// RHCOS requires fully privileged mode for node scanning.
 										Privileged: ptr.To(isOpenshift),
 									},
 									VolumeMounts: []corev1.VolumeMount{
@@ -246,8 +245,7 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 								RunAsNonRoot:             ptr.To(false),
 								RunAsUser:                ptr.To(int64(0)),
 								Capabilities:             nodeScanCapabilities(isOpenshift),
-								// RHCOS requires to run as privileged to properly do node scanning. If the container
-								// is not privileged, then we have no access to /proc.
+								// RHCOS requires fully privileged mode for node scanning.
 								Privileged: ptr.To(isOpenshift),
 							},
 							TerminationMessagePath:   "/dev/termination-log",
