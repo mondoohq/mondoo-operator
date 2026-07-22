@@ -392,6 +392,23 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesCronjobs(auditConfig mo
 	selector := utils.LabelsToLabelSelector(cronJobLabels)
 	s.True(s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(selector, auditConfig.Namespace), "Not all CronJobs have run successfully.")
 
+	// Log any /proc permission errors from node scan pods for visibility.
+	// Some /proc entries remain restricted even with DAC_READ_SEARCH and SYS_PTRACE,
+	// so we log rather than fail — the real validation is that scans complete and produce scores.
+	nodeScanLogs, err := s.testCluster.K8sHelper.GetPodLogsByLabel(auditConfig.Namespace, selector)
+	if err == nil {
+		for _, line := range strings.Split(strings.ToLower(nodeScanLogs), "\n") {
+			if strings.Contains(line, "/proc") {
+				for _, errStr := range []string{"permission denied", "access denied", "operation not permitted"} {
+					if strings.Contains(line, errStr) {
+						zap.S().Warnf("Node scan /proc error (may be benign): %s", line)
+						break
+					}
+				}
+			}
+		}
+	}
+
 	for _, node := range nodeList.Items {
 		cronJobName := nodes.CronJobName(auditConfig.Name, node.Name)
 		err := s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, cronJobName)

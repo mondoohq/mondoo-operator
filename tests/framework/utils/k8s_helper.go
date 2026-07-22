@@ -189,8 +189,30 @@ func (k8sh *K8sHelper) ListPods(namespace, labelSelector string) (*v1.PodList, e
 	return podList, err
 }
 
-// IsPodInExpectedState waits for a pod to be in a Ready state
-// If the pod is in expected state within the time retry limit true is returned, if not false
+// GetPodLogsByLabel returns the combined logs for all containers in all pods matching the
+// label selector. Useful for programmatic inspection of scan output during integration tests.
+func (k8sh *K8sHelper) GetPodLogsByLabel(namespace, labelSelector string) (string, error) {
+	pods, err := k8sh.ListPods(namespace, labelSelector)
+	if err != nil {
+		return "", fmt.Errorf("failed to list pods: %w", err)
+	}
+	ctx := context.Background()
+	var sb strings.Builder
+	for _, pod := range pods.Items {
+		for _, container := range pod.Spec.Containers {
+			res := k8sh.kubeClient.CoreV1().Pods(namespace).GetLogs(pod.Name, &v1.PodLogOptions{Container: container.Name}).Do(ctx)
+			raw, err := res.Raw()
+			if err != nil {
+				zap.S().Warnf("Failed to get logs for pod %s container %s: %v", pod.Name, container.Name, err)
+				continue
+			}
+			sb.Write(raw)
+		}
+	}
+	return sb.String(), nil
+}
+
+// EnsureNoPodsPresent waits until no pods matching the list options exist.
 func (k8sh *K8sHelper) EnsureNoPodsPresent(listOpts *client.ListOptions) error {
 	ctx := context.Background()
 	podList := &v1.PodList{}

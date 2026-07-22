@@ -113,11 +113,8 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 										ReadOnlyRootFilesystem:   ptr.To(true),
 										RunAsNonRoot:             ptr.To(false),
 										RunAsUser:                ptr.To(int64(0)),
-										Capabilities: &corev1.Capabilities{
-											Drop: []corev1.Capability{"ALL"},
-										},
-										// RHCOS requires to run as privileged to properly do node scanning. If the container
-										// is not privileged, then we have no access to /proc.
+										Capabilities:             nodeScanCapabilities(isOpenshift),
+										// RHCOS requires fully privileged mode for node scanning.
 										Privileged: ptr.To(isOpenshift),
 									},
 									VolumeMounts: []corev1.VolumeMount{
@@ -247,11 +244,8 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 								ReadOnlyRootFilesystem:   ptr.To(true),
 								RunAsNonRoot:             ptr.To(false),
 								RunAsUser:                ptr.To(int64(0)),
-								Capabilities: &corev1.Capabilities{
-									Drop: []corev1.Capability{"ALL"},
-								},
-								// RHCOS requires to run as privileged to properly do node scanning. If the container
-								// is not privileged, then we have no access to /proc.
+								Capabilities:             nodeScanCapabilities(isOpenshift),
+								// RHCOS requires fully privileged mode for node scanning.
 								Privileged: ptr.To(isOpenshift),
 							},
 							TerminationMessagePath:   "/dev/termination-log",
@@ -318,6 +312,19 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 	}
 
 	return ds
+}
+
+func nodeScanCapabilities(isOpenshift bool) *corev1.Capabilities {
+	caps := &corev1.Capabilities{
+		Drop: []corev1.Capability{"ALL"},
+	}
+	// On non-OpenShift clusters the container runs as root but with all
+	// capabilities dropped.  Without DAC_READ_SEARCH and SYS_PTRACE the
+	// kernel blocks access to /proc entries owned by other processes.
+	if !isOpenshift {
+		caps.Add = []corev1.Capability{"DAC_READ_SEARCH", "SYS_PTRACE"}
+	}
+	return caps
 }
 
 // ConfigMap creates a ConfigMap for node scanning inventory
