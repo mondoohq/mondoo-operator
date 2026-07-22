@@ -29,19 +29,27 @@ jobs:
         path: ${{ github.event_path }}
   unit-tests:
     if: |
-      !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'
+      github.event_name != 'pull_request' || github.actor != 'dependabot[bot]'
     uses: ./.github/workflows/unit-tests.yaml
     name: Unit tests
   security-tests:
     name: Security tests
     needs: [unit-tests]
-    if: needs.unit-tests.result == 'success'
+    # Never expose repository secrets to code from a fork or Dependabot PR.
+    if: |
+      needs.unit-tests.result == 'success'
+      && (github.event_name != 'pull_request'
+      || (!github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'))
     uses: ./.github/workflows/security-tests.yaml
     secrets: inherit
   integration-tests:
     name: Integration tests
     needs: [unit-tests]
-    if: needs.unit-tests.result == 'success'
+    # Never expose repository secrets to code from a fork or Dependabot PR.
+    if: |
+      needs.unit-tests.result == 'success'
+      && (github.event_name != 'pull_request'
+      || (!github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'))
     uses: ./.github/workflows/integration-tests.yaml
     with:
       cnspecImageTag: ""
@@ -49,7 +57,11 @@ jobs:
   helm-tests:
     name: Helm tests
     needs: [unit-tests]
-    if: needs.unit-tests.result == 'success'
+    # Never expose repository secrets to code from a fork or Dependabot PR.
+    if: |
+      needs.unit-tests.result == 'success'
+      && (github.event_name != 'pull_request'
+      || (!github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'))
     uses: ./.github/workflows/helm-tests.yaml
     permissions:
       contents: read

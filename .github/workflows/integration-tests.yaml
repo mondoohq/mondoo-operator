@@ -18,10 +18,9 @@ on:
 env:
   CNSPEC_IMAGE_TAG: ${{ github.event.inputs.cnspecImageTag }}
 
-# SECURITY: This workflow checks out and executes PR head code with access to secrets
+# SECURITY: This workflow checks out and executes code with access to secrets
 # (MONDOO_CLIENT, MONDOO_CLIENT_EDGE, MONDOO_TEST_ORG_TOKEN, SLACK_BOT_TOKEN).
-# When called via pull_request_target (tests-forks.yaml), this code is untrusted.
-# Access controls are enforced by the calling workflow's label gate.
+# Callers must not invoke it for fork or Dependabot pull requests.
 #
 # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
 permissions:
