@@ -392,6 +392,12 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigNodesCronjobs(auditConfig mo
 	selector := utils.LabelsToLabelSelector(cronJobLabels)
 	s.True(s.testCluster.K8sHelper.WaitUntilCronJobsSuccessful(selector, auditConfig.Namespace), "Not all CronJobs have run successfully.")
 
+	// Verify node scan pods have no /proc access denied errors.
+	// These would indicate missing Linux capabilities (DAC_READ_SEARCH, SYS_PTRACE).
+	nodeScanLogs, err := s.testCluster.K8sHelper.GetPodLogsByLabel(auditConfig.Namespace, selector)
+	s.NoError(err, "Failed to get node scan pod logs")
+	s.NotContains(nodeScanLogs, "access denied", "Node scan pods should not have /proc access denied errors — check container capabilities")
+
 	for _, node := range nodeList.Items {
 		cronJobName := nodes.CronJobName(auditConfig.Name, node.Name)
 		err := s.testCluster.K8sHelper.CheckForPodInStatus(&auditConfig, cronJobName)

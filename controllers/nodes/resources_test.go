@@ -223,8 +223,10 @@ func TestCronJob_PrivilegedOpenshift(t *testing.T) {
 	}
 	mac := testMondooAuditConfig()
 	cj := CronJob("test123", testNode, mac, true, v1alpha2.MondooOperatorConfig{})
-	assert.True(t, *cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.Privileged)
-	assert.True(t, *cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
+	sc := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext
+	assert.True(t, *sc.Privileged)
+	assert.True(t, *sc.AllowPrivilegeEscalation)
+	assert.Empty(t, sc.Capabilities.Add, "OpenShift runs privileged, no extra capabilities needed")
 }
 
 func TestCronJob_Privileged(t *testing.T) {
@@ -235,8 +237,32 @@ func TestCronJob_Privileged(t *testing.T) {
 	}
 	mac := testMondooAuditConfig()
 	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
-	assert.False(t, *cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.Privileged)
-	assert.False(t, *cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
+	sc := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext
+	assert.False(t, *sc.Privileged)
+	assert.False(t, *sc.AllowPrivilegeEscalation)
+	assert.Contains(t, sc.Capabilities.Add, corev1.Capability("DAC_READ_SEARCH"))
+	assert.Contains(t, sc.Capabilities.Add, corev1.Capability("SYS_PTRACE"))
+	assert.Contains(t, sc.Capabilities.Drop, corev1.Capability("ALL"))
+}
+
+func TestDaemonSet_Capabilities(t *testing.T) {
+	mac := testMondooAuditConfig()
+
+	t.Run("non-OpenShift adds proc capabilities", func(t *testing.T) {
+		ds := DaemonSet(*mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
+		sc := ds.Spec.Template.Spec.Containers[0].SecurityContext
+		assert.False(t, *sc.Privileged)
+		assert.Contains(t, sc.Capabilities.Add, corev1.Capability("DAC_READ_SEARCH"))
+		assert.Contains(t, sc.Capabilities.Add, corev1.Capability("SYS_PTRACE"))
+		assert.Contains(t, sc.Capabilities.Drop, corev1.Capability("ALL"))
+	})
+
+	t.Run("OpenShift runs privileged without extra capabilities", func(t *testing.T) {
+		ds := DaemonSet(*mac, true, "test123", v1alpha2.MondooOperatorConfig{}, nil)
+		sc := ds.Spec.Template.Spec.Containers[0].SecurityContext
+		assert.True(t, *sc.Privileged)
+		assert.Empty(t, sc.Capabilities.Add)
+	})
 }
 
 func TestInventory(t *testing.T) {
