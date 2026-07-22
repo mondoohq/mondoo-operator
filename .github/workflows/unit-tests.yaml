@@ -2,9 +2,9 @@ name: Unit Tests
 on:
   workflow_call:
 
-# SECURITY: This workflow checks out and executes PR head code. When called via
-# pull_request_target (tests-forks.yaml), this code is untrusted.
-# Access controls are enforced by the calling workflow's label gate.
+# SECURITY: This workflow checks out and executes PR head code without repository
+# secrets. Fork PRs must call it from an unprivileged pull_request workflow with
+# a read-only GITHUB_TOKEN.
 #
 # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
 permissions:

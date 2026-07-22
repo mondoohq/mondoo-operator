@@ -5,9 +5,8 @@ on:
       MONDOO_CLIENT:
         required: true
 
-# SECURITY: This workflow checks out and executes PR head code with access to secrets.
-# When called via pull_request_target (tests-forks.yaml), this code is untrusted.
-# Access controls are enforced by the calling workflow's label gate.
+# SECURITY: This workflow checks out and executes code with access to secrets.
+# Callers must not invoke it for fork or Dependabot pull requests.
 #
 # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
 permissions:
