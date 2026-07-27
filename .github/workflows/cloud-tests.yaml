@@ -42,7 +42,7 @@ jobs:
         k8s-version: ["1.27", "1.28", "1.29"]
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
 
@@ -125,7 +125,7 @@ jobs:
       AWS_REGION: us-east-2
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
 
@@ -202,7 +202,7 @@ jobs:
       KUBECONFIG: ${{ format('{0}/{1}', github.workspace, '.github/terraform/gke/kubeconfig') }}
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # fetch is needed for "git tag --list" in the Makefile
 
