@@ -264,6 +264,75 @@ spec:
                       - name
                       type: object
                     type: array
+                  jobOverrides:
+                    description: JobOverrides customizes the Jobs generated for container
+                      image scanning.
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Annotations are added to the Jobs and their pod templates (e.g.
+                          "karpenter.sh/do-not-disrupt": "true"). Operator-managed annotations take precedence
+                          and cannot be overwritten.
+                        type: object
+                      nodeSelector:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          NodeSelector constrains the scan pods to nodes with matching labels. It is ignored for
+                          node scan pods because those are pinned to a specific node.
+                        type: object
+                      tolerations:
+                        description: Tolerations are appended to the tolerations of
+                          the scan pods.
+                        items:
+                          description: |-
+                            The pod this Toleration is attached to tolerates any taint that matches
+                            the triple <key,value,effect> using the matching operator <operator>.
+                          properties:
+                            effect:
+                              description: |-
+                                Effect indicates the taint effect to match. Empty means match all taint effects.
+                                When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
+                              type: string
+                            key:
+                              description: |-
+                                Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                                If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+                              type: string
+                            operator:
+                              description: |-
+                                Operator represents a key's relationship to the value.
+                                Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
+                                Exists is equivalent to wildcard for value, so that a pod can
+                                tolerate all taints of a particular category.
+                                Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
+                              type: string
+                            tolerationSeconds:
+                              description: |-
+                                TolerationSeconds represents the period of time the toleration (which must be
+                                of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                                it is not set, which means tolerate the taint forever (do not evict). Zero and
+                                negative values will be treated as 0 (evict immediately) by the system.
+                              format: int64
+                              type: integer
+                            value:
+                              description: |-
+                                Value is the taint value the toleration matches to.
+                                If the operator is Exists, the value should be empty, otherwise just a regular string.
+                              type: string
+                          type: object
+                        type: array
+                      ttlSecondsAfterFinished:
+                        description: |-
+                          TTLSecondsAfterFinished limits the lifetime of scan Jobs that have finished execution.
+                          The value is set as ttlSecondsAfterFinished on the Jobs spawned by the scan CronJobs.
+                          If unset, finished Jobs are kept according to the CronJob history limits.
+                        format: int32
+                        minimum: 0
+                        type: integer
+                    type: object
                   repositories:
                     description: |-
                       Repositories allows filtering which container images are scanned based on their
@@ -790,6 +859,13 @@ spec:
                                 VaultAddr is the address of the Vault server.
                                 Example: "https://vault.example.com:8200"
                               type: string
+                            vaultNamespace:
+                              description: |-
+                                VaultNamespace is the Vault Enterprise / HCP Vault namespace to use for all
+                                requests (sets the X-Vault-Namespace header). Leave empty for Vault OSS or
+                                the root namespace.
+                                Example: "admin/team-a"
+                              type: string
                           required:
                           - authRole
                           - credsRole
@@ -917,6 +993,76 @@ spec:
                       - name
                       type: object
                     type: array
+                  jobOverrides:
+                    description: |-
+                      JobOverrides customizes the Jobs generated for Kubernetes resource scanning,
+                      including the CronJobs for external clusters.
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Annotations are added to the Jobs and their pod templates (e.g.
+                          "karpenter.sh/do-not-disrupt": "true"). Operator-managed annotations take precedence
+                          and cannot be overwritten.
+                        type: object
+                      nodeSelector:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          NodeSelector constrains the scan pods to nodes with matching labels. It is ignored for
+                          node scan pods because those are pinned to a specific node.
+                        type: object
+                      tolerations:
+                        description: Tolerations are appended to the tolerations of
+                          the scan pods.
+                        items:
+                          description: |-
+                            The pod this Toleration is attached to tolerates any taint that matches
+                            the triple <key,value,effect> using the matching operator <operator>.
+                          properties:
+                            effect:
+                              description: |-
+                                Effect indicates the taint effect to match. Empty means match all taint effects.
+                                When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
+                              type: string
+                            key:
+                              description: |-
+                                Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                                If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+                              type: string
+                            operator:
+                              description: |-
+                                Operator represents a key's relationship to the value.
+                                Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
+                                Exists is equivalent to wildcard for value, so that a pod can
+                                tolerate all taints of a particular category.
+                                Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
+                              type: string
+                            tolerationSeconds:
+                              description: |-
+                                TolerationSeconds represents the period of time the toleration (which must be
+                                of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                                it is not set, which means tolerate the taint forever (do not evict). Zero and
+                                negative values will be treated as 0 (evict immediately) by the system.
+                              format: int64
+                              type: integer
+                            value:
+                              description: |-
+                                Value is the taint value the toleration matches to.
+                                If the operator is Exists, the value should be empty, otherwise just a regular string.
+                              type: string
+                          type: object
+                        type: array
+                      ttlSecondsAfterFinished:
+                        description: |-
+                          TTLSecondsAfterFinished limits the lifetime of scan Jobs that have finished execution.
+                          The value is set as ttlSecondsAfterFinished on the Jobs spawned by the scan CronJobs.
+                          If unset, finished Jobs are kept according to the CronJob history limits.
+                        format: int32
+                        minimum: 0
+                        type: integer
+                    type: object
                   resourceWatcher:
                     description: |-
                       ResourceWatcher configures real-time resource watching and scanning.
@@ -1168,6 +1314,76 @@ spec:
                       IntervalTimer is the interval (in minutes) for the node scanning. The default is "60". Only applicable for Deployment
                       style.
                     type: integer
+                  jobOverrides:
+                    description: |-
+                      JobOverrides customizes the Jobs generated for node scanning. Only applicable for CronJob
+                      style. NodeSelector is ignored because node scan pods are pinned to a specific node.
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Annotations are added to the Jobs and their pod templates (e.g.
+                          "karpenter.sh/do-not-disrupt": "true"). Operator-managed annotations take precedence
+                          and cannot be overwritten.
+                        type: object
+                      nodeSelector:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          NodeSelector constrains the scan pods to nodes with matching labels. It is ignored for
+                          node scan pods because those are pinned to a specific node.
+                        type: object
+                      tolerations:
+                        description: Tolerations are appended to the tolerations of
+                          the scan pods.
+                        items:
+                          description: |-
+                            The pod this Toleration is attached to tolerates any taint that matches
+                            the triple <key,value,effect> using the matching operator <operator>.
+                          properties:
+                            effect:
+                              description: |-
+                                Effect indicates the taint effect to match. Empty means match all taint effects.
+                                When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
+                              type: string
+                            key:
+                              description: |-
+                                Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                                If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+                              type: string
+                            operator:
+                              description: |-
+                                Operator represents a key's relationship to the value.
+                                Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
+                                Exists is equivalent to wildcard for value, so that a pod can
+                                tolerate all taints of a particular category.
+                                Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
+                              type: string
+                            tolerationSeconds:
+                              description: |-
+                                TolerationSeconds represents the period of time the toleration (which must be
+                                of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                                it is not set, which means tolerate the taint forever (do not evict). Zero and
+                                negative values will be treated as 0 (evict immediately) by the system.
+                              format: int64
+                              type: integer
+                            value:
+                              description: |-
+                                Value is the taint value the toleration matches to.
+                                If the operator is Exists, the value should be empty, otherwise just a regular string.
+                              type: string
+                          type: object
+                        type: array
+                      ttlSecondsAfterFinished:
+                        description: |-
+                          TTLSecondsAfterFinished limits the lifetime of scan Jobs that have finished execution.
+                          The value is set as ttlSecondsAfterFinished on the Jobs spawned by the scan CronJobs.
+                          If unset, finished Jobs are kept according to the CronJob history limits.
+                        format: int32
+                        minimum: 0
+                        type: integer
+                    type: object
                   priorityClassName:
                     description: PriorityClassName specifies the name of the PriorityClass
                       for the node scanning workloads.

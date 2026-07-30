@@ -24,6 +24,7 @@ func UpdateCronJobFields(obj, desired *batchv1.CronJob) {
 	obj.Spec.JobTemplate.Annotations = desired.Spec.JobTemplate.Annotations
 	obj.Spec.JobTemplate.Spec.BackoffLimit = desired.Spec.JobTemplate.Spec.BackoffLimit
 	obj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds = desired.Spec.JobTemplate.Spec.ActiveDeadlineSeconds
+	obj.Spec.JobTemplate.Spec.TTLSecondsAfterFinished = desired.Spec.JobTemplate.Spec.TTLSecondsAfterFinished
 
 	obj.Spec.JobTemplate.Spec.Template.Labels = desired.Spec.JobTemplate.Spec.Template.Labels
 	obj.Spec.JobTemplate.Spec.Template.Annotations = desired.Spec.JobTemplate.Spec.Template.Annotations
@@ -32,6 +33,7 @@ func UpdateCronJobFields(obj, desired *batchv1.CronJob) {
 	dps := &desired.Spec.JobTemplate.Spec.Template.Spec
 	ps.RestartPolicy = dps.RestartPolicy
 	ps.NodeName = dps.NodeName
+	ps.NodeSelector = dps.NodeSelector
 	ps.Tolerations = dps.Tolerations
 	ps.ServiceAccountName = dps.ServiceAccountName
 	ps.AutomountServiceAccountToken = dps.AutomountServiceAccountToken

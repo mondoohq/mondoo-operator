@@ -22,6 +22,7 @@ This user manual describes how to install and use the Mondoo Operator.
     - [Private image scanning with Workload Identity Federation](#private-image-scanning-with-workload-identity-federation)
   - [Installing Mondoo into multiple namespaces](#installing-mondoo-into-multiple-namespaces)
   - [Adjust the scan interval](#adjust-the-scan-interval)
+  - [Customize the generated scan Jobs](#customize-the-generated-scan-jobs)
   - [Real-time Resource Watcher (Opt-in)](#real-time-resource-watcher-opt-in)
   - [Configure resources for the operator and its components](#configure-resources-for-the-operator-and-its-components)
     - [Configure resources for the operator-controller](#configure-resources-for-the-operator-controller)
@@ -914,6 +915,60 @@ You can adjust the schedule for the following components:
 - Kubernetes Resources Scanning
 - Container Image Scanning
 - Node Scanning
+
+## Customize the generated scan Jobs
+
+The operator can apply common customizations to the Jobs spawned by the scan CronJobs directly,
+so you don't need mutating webhooks (such as Kyverno policies) to patch the generated resources.
+Each scanning component (`kubernetesResources`, `containers`, and `nodes`) accepts a `jobOverrides`
+section:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  mondooCredsSecretRef:
+    name: mondoo-client
+  kubernetesResources:
+    enable: true
+    jobOverrides:
+      # Delete finished scan Jobs (and their pods) after 5 minutes
+      ttlSecondsAfterFinished: 300
+      # Added to the Jobs and their pod templates
+      annotations:
+        karpenter.sh/do-not-disrupt: "true"
+      # Schedule the scan pods to dedicated nodes
+      nodeSelector:
+        workload-type: mondoo-scan
+      # Appended to the scan pods' tolerations
+      tolerations:
+        - key: workload-type
+          operator: Equal
+          value: mondoo-scan
+          effect: NoSchedule
+  containers:
+    enable: true
+    jobOverrides:
+      ttlSecondsAfterFinished: 300
+      annotations:
+        karpenter.sh/do-not-disrupt: "true"
+  nodes:
+    enable: true
+    jobOverrides:
+      ttlSecondsAfterFinished: 300
+```
+
+Notes:
+
+- `kubernetesResources.jobOverrides` also applies to the CronJobs created for
+  [external clusters](#scanning-external-clusters).
+- `annotations` are added to both the Job metadata and the pod template. Annotations managed by
+  the operator take precedence and cannot be overwritten.
+- `nodeSelector` is ignored for node scan pods because they are pinned to a specific node.
+- `nodes.jobOverrides` only applies to the `cronjob` node scanning style.
 
 ## Real-time Resource Watcher (Opt-in)
 

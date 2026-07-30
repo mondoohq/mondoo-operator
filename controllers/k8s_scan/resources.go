@@ -193,6 +193,8 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 		)
 	}
 
+	k8s.ApplyJobOverrides(cronjob, m.Spec.KubernetesResources.JobOverrides)
+
 	return cronjob
 }
 
@@ -596,6 +598,8 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 			cronjob.Spec.JobTemplate.Spec.Template.Labels = podLabels
 		}
 	}
+
+	k8s.ApplyJobOverrides(cronjob, m.Spec.KubernetesResources.JobOverrides)
 
 	return cronjob
 }

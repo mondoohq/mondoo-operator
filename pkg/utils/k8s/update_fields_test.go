@@ -11,6 +11,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
@@ -39,6 +40,41 @@ func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
 	assert.Equal(t, desired.Spec.Schedule, obj.Spec.Schedule)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.Containers, obj.Spec.JobTemplate.Spec.Template.Spec.Containers)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets, obj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets)
+}
+
+func TestUpdateCronJobFields_JobOverrides(t *testing.T) {
+	desired := &batchv1.CronJob{
+		Spec: batchv1.CronJobSpec{
+			JobTemplate: batchv1.JobTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"karpenter.sh/do-not-disrupt": "true"},
+				},
+				Spec: batchv1.JobSpec{
+					TTLSecondsAfterFinished: ptr.To(int32(300)),
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{"karpenter.sh/do-not-disrupt": "true"},
+						},
+						Spec: corev1.PodSpec{
+							NodeSelector: map[string]string{"workload-type": "mondoo-scan"},
+							Tolerations: []corev1.Toleration{
+								{Key: "workload-type", Operator: corev1.TolerationOpEqual, Value: "mondoo-scan", Effect: corev1.TaintEffectNoSchedule},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	obj := &batchv1.CronJob{}
+	UpdateCronJobFields(obj, desired)
+
+	assert.Equal(t, desired.Spec.JobTemplate.Spec.TTLSecondsAfterFinished, obj.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
+	assert.Equal(t, desired.Spec.JobTemplate.Annotations, obj.Spec.JobTemplate.Annotations)
+	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Annotations, obj.Spec.JobTemplate.Spec.Template.Annotations)
+	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.NodeSelector, obj.Spec.JobTemplate.Spec.Template.Spec.NodeSelector)
+	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.Tolerations, obj.Spec.JobTemplate.Spec.Template.Spec.Tolerations)
 }
 
 func TestUpdateCronJobFields_PreservesUnmanagedFields(t *testing.T) {

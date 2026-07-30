@@ -104,6 +104,26 @@ func TestCronJob_SkipProxyForCnspec(t *testing.T) {
 	assert.False(t, hasHTTPSProxy, "HTTPS_PROXY should not be set when SkipProxyForCnspec is true")
 }
 
+func TestCronJob_JobOverrides(t *testing.T) {
+	m := testAuditConfig()
+	m.Spec.Containers.JobOverrides = v1alpha2.JobOverrides{
+		TTLSecondsAfterFinished: ptr.To(int32(300)),
+		Annotations:             map[string]string{"karpenter.sh/do-not-disrupt": "true"},
+		NodeSelector:            map[string]string{"workload-type": "mondoo-scan"},
+		Tolerations: []corev1.Toleration{
+			{Key: "workload-type", Operator: corev1.TolerationOpEqual, Value: "mondoo-scan", Effect: corev1.TaintEffectNoSchedule},
+		},
+	}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", "", testClusterUID, "", m, cfg)
+	assert.Equal(t, ptr.To(int32(300)), cj.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
+	assert.Equal(t, "true", cj.Spec.JobTemplate.Annotations["karpenter.sh/do-not-disrupt"])
+	assert.Equal(t, "true", cj.Spec.JobTemplate.Spec.Template.Annotations["karpenter.sh/do-not-disrupt"])
+	assert.Equal(t, map[string]string{"workload-type": "mondoo-scan"}, cj.Spec.JobTemplate.Spec.Template.Spec.NodeSelector)
+	assert.Equal(t, m.Spec.Containers.JobOverrides.Tolerations, cj.Spec.JobTemplate.Spec.Template.Spec.Tolerations)
+}
+
 func TestCronJob_WithImagePullSecrets(t *testing.T) {
 	m := testAuditConfig()
 	cfg := v1alpha2.MondooOperatorConfig{

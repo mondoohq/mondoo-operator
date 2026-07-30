@@ -182,6 +182,8 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 			cfg.Spec.ImagePullSecrets...)
 	}
 
+	k8s.ApplyJobOverrides(cj, m.Spec.Nodes.JobOverrides)
+
 	return cj
 }
 

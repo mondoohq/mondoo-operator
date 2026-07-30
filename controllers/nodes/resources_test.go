@@ -245,6 +245,44 @@ func TestCronJob_Privileged(t *testing.T) {
 	assert.Contains(t, sc.Capabilities.Drop, corev1.Capability("ALL"))
 }
 
+func TestCronJob_JobOverrides(t *testing.T) {
+	testNode := corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node-name",
+		},
+		Spec: corev1.NodeSpec{
+			Taints: []corev1.Taint{{Key: "node-taint", Value: "value", Effect: corev1.TaintEffectNoSchedule}},
+		},
+	}
+	mac := testMondooAuditConfig()
+	mac.Spec.Nodes.JobOverrides = v1alpha2.JobOverrides{
+		TTLSecondsAfterFinished: ptr.To(int32(300)),
+		Annotations:             map[string]string{"karpenter.sh/do-not-disrupt": "true"},
+		NodeSelector:            map[string]string{"workload-type": "mondoo-scan"},
+		Tolerations: []corev1.Toleration{
+			{Key: "workload-type", Operator: corev1.TolerationOpEqual, Value: "mondoo-scan", Effect: corev1.TaintEffectNoSchedule},
+		},
+	}
+
+	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	assert.Equal(t, ptr.To(int32(300)), cj.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
+
+	// User annotations are merged; operator-managed annotations are kept
+	assert.Equal(t, "true", cj.Spec.JobTemplate.Annotations["karpenter.sh/do-not-disrupt"])
+	assert.Equal(t, ignoreAnnotationValue, cj.Spec.JobTemplate.Annotations[ignoreQueryAnnotationPrefix+"mondoo-kubernetes-security-job-runasnonroot"])
+	assert.Equal(t, "true", cj.Spec.JobTemplate.Spec.Template.Annotations["karpenter.sh/do-not-disrupt"])
+	assert.Equal(t, ignoreAnnotationValue, cj.Spec.JobTemplate.Spec.Template.Annotations[ignoreQueryAnnotationPrefix+"mondoo-kubernetes-security-pod-runasnonroot"])
+
+	// Node scan pods are pinned to a node, so the nodeSelector must not be applied
+	assert.Nil(t, cj.Spec.JobTemplate.Spec.Template.Spec.NodeSelector)
+
+	// User tolerations are appended to the taint-derived ones
+	tolerations := cj.Spec.JobTemplate.Spec.Template.Spec.Tolerations
+	require.Len(t, tolerations, 2)
+	assert.Equal(t, "node-taint", tolerations[0].Key)
+	assert.Equal(t, mac.Spec.Nodes.JobOverrides.Tolerations[0], tolerations[1])
+}
+
 func TestDaemonSet_Capabilities(t *testing.T) {
 	mac := testMondooAuditConfig()
 
