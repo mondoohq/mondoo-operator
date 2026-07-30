@@ -59,7 +59,7 @@ func IntegrationCheckIn(
 	})
 	if err != nil {
 		msg := "failed to CheckIn() to Mondoo API"
-		return nil, fmt.Errorf("%s: %s", msg, err)
+		return nil, fmt.Errorf("%s: %w", msg, err)
 	}
 
 	logger.Info("CheckIn response", "configurationMatch", checkInResp.ConfigurationMatch, "sentHash", configurationHash)

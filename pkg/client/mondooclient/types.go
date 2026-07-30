@@ -19,6 +19,10 @@ type MondooClient interface {
 	IntegrationCheckIn(context.Context, *IntegrationCheckInInput) (*IntegrationCheckInOutput, error)
 	IntegrationConfigure(context.Context, *IntegrationConfigureInput) (*IntegrationConfigureOutput, error)
 	IntegrationReportStatus(context.Context, *ReportStatusRequest) error
+	IntegrationCreate(context.Context, *IntegrationCreateInput) (*IntegrationCreateOutput, error)
+	IntegrationList(context.Context, *IntegrationListInput) (*IntegrationListOutput, error)
+	IntegrationGetToken(context.Context, *IntegrationGetTokenInput) (*IntegrationGetTokenOutput, error)
+	IntegrationDelete(context.Context, *IntegrationDeleteInput) error
 
 	GarbageCollectAssets(context.Context, *GarbageCollectAssetsRequest) error
 	RefreshAssetScores(context.Context, *RefreshAssetScoresRequest) (*RefreshAssetScoresResponse, error)
@@ -85,6 +89,109 @@ type IntegrationConfigureDetails struct {
 
 type K8sIntegrationConfig struct {
 	PauseScanning bool `json:"pauseScanning,omitempty"`
+}
+
+// IntegrationTypeK8s is the IntegrationsManager Type enum value name for Kubernetes client
+// integrations (mondoo.integrations.v1.Type, K8S = 2). Sent as the enum name string, which
+// protojson accepts on the server side.
+const IntegrationTypeK8s = "K8S"
+
+// Node scanning style enum value names (mondoo.integrations.v1.ScanNodesStyle).
+const (
+	ScanNodesStyleCronJob    = "CRONJOB"
+	ScanNodesStyleDeployment = "DEPLOYMENT"
+	ScanNodesStyleDaemonSet  = "DAEMONSET"
+)
+
+// IntegrationCreateInput matches the server-side CreateIntegrationRequest proto on the
+// IntegrationsManager service (/IntegrationsManager/Create). JSON field names follow the
+// proto field names, which the server's protojson unmarshaling accepts.
+type IntegrationCreateInput struct {
+	// ScopeMrn is the space (or organization) MRN the integration is created in.
+	ScopeMrn string `protobuf:"bytes,1,opt,name=scope_mrn,json=scopeMrn,proto3" json:"scope_mrn,omitempty"`
+	// Name is the display name shown in the Mondoo console.
+	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Identifiers are source identifiers for the integration (e.g. an AWS account id, or for
+	// the operator a cluster UID). They can be filtered on via IntegrationList and are the
+	// operator's idempotency key.
+	Identifiers []string `protobuf:"bytes,3,rep,name=identifiers,proto3" json:"identifiers,omitempty"`
+	// ConfigurationInput holds the type-specific scan configuration.
+	ConfigurationInput *IntegrationConfigurationInput `protobuf:"bytes,4,opt,name=configuration_input,json=configurationInput,proto3" json:"configuration_input,omitempty"`
+	Labels             map[string]string              `protobuf:"bytes,5,rep,name=labels,proto3" json:"labels,omitempty"`
+	// Type is the integration type enum value name, e.g. IntegrationTypeK8s.
+	Type string `protobuf:"varint,6,opt,name=type,proto3,enum=mondoo.integrations.v1.Type" json:"type,omitempty"`
+	// LongLivedToken controls whether the registration token returned with the created
+	// integration expires (false ⇒ 30 minutes). Service accounts derived from short-lived
+	// tokens do not expire, so the operator can keep this false.
+	LongLivedToken bool `protobuf:"varint,7,opt,name=long_lived_token,json=longLivedToken,proto3" json:"long_lived_token,omitempty"`
+}
+
+type IntegrationConfigurationInput struct {
+	K8sOptions *K8sConfigurationOptionsInput `protobuf:"bytes,4,opt,name=k8s_options,json=k8sOptions,proto3,oneof" json:"k8s_options,omitempty"`
+}
+
+// K8sConfigurationOptionsInput matches mondoo.integrations.v1.K8sConfigurationOptionsInput.
+// pause_scanning is deliberately omitted: it is server-managed and force-cleared on create.
+type K8sConfigurationOptionsInput struct {
+	ScanNodes          bool     `protobuf:"varint,1,opt,name=scan_nodes,json=scanNodes,proto3" json:"scan_nodes,omitempty"`
+	ScanNodesStyle     string   `protobuf:"varint,8,opt,name=scan_nodes_style,json=scanNodesStyle,proto3,enum=mondoo.integrations.v1.ScanNodesStyle" json:"scan_nodes_style,omitempty"`
+	ScanWorkloads      bool     `protobuf:"varint,2,opt,name=scan_workloads,json=scanWorkloads,proto3" json:"scan_workloads,omitempty"`
+	ScanDeploys        bool     `protobuf:"varint,3,opt,name=scan_deploys,json=scanDeploys,proto3" json:"scan_deploys,omitempty"`
+	ScanPublicImages   bool     `protobuf:"varint,5,opt,name=scan_public_images,json=scanPublicImages,proto3" json:"scan_public_images,omitempty"`
+	NamespaceAllowList []string `protobuf:"bytes,6,rep,name=namespace_allow_list,json=namespaceAllowList,proto3" json:"namespace_allow_list,omitempty"`
+	NamespaceDenyList  []string `protobuf:"bytes,7,rep,name=namespace_deny_list,json=namespaceDenyList,proto3" json:"namespace_deny_list,omitempty"`
+	ScanLocalCluster   bool     `protobuf:"varint,10,opt,name=scan_local_cluster,json=scanLocalCluster,proto3" json:"scan_local_cluster,omitempty"`
+	Schedule           string   `protobuf:"bytes,13,opt,name=schedule,proto3" json:"schedule,omitempty"`
+	NodesSchedule      string   `protobuf:"bytes,14,opt,name=nodes_schedule,json=nodesSchedule,proto3" json:"nodes_schedule,omitempty"`
+	ContainersSchedule string   `protobuf:"bytes,15,opt,name=containers_schedule,json=containersSchedule,proto3" json:"containers_schedule,omitempty"`
+}
+
+type IntegrationCreateOutput struct {
+	Integration *Integration `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
+}
+
+// Integration mirrors the fields of the server-side Integration proto that the operator
+// consumes. Responses are marshaled by the server with proto field names, and enums are
+// serialized as their value names (e.g. status "ACTIVE", type "K8S").
+type Integration struct {
+	Mrn    string `protobuf:"bytes,1,opt,name=mrn,proto3" json:"mrn,omitempty"`
+	Name   string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Status string `protobuf:"varint,3,opt,name=status,proto3,enum=mondoo.integrations.v1.Status" json:"status,omitempty"`
+	// Token is the registration token bound to the integration. Only populated by
+	// IntegrationCreate; IntegrationList returns integrations without tokens.
+	Token       string            `protobuf:"bytes,9,opt,name=token,proto3" json:"token,omitempty"`
+	Identifiers []string          `protobuf:"bytes,10,rep,name=identifiers,proto3" json:"identifiers,omitempty"`
+	Labels      map[string]string `protobuf:"bytes,11,rep,name=labels,proto3" json:"labels,omitempty"`
+	Type        string            `protobuf:"varint,12,opt,name=type,proto3,enum=mondoo.integrations.v1.Type" json:"type,omitempty"`
+	ScopeMrn    string            `protobuf:"bytes,20,opt,name=scope_mrn,json=scopeMrn,proto3" json:"scope_mrn,omitempty"`
+}
+
+// IntegrationListInput matches the server-side Query proto for IntegrationsManager/List.
+// Note: the proto field is literally named "scopeMrn" (camelCase) in the .proto file.
+type IntegrationListInput struct {
+	ScopeMrn string   `protobuf:"bytes,1,opt,name=scopeMrn,proto3" json:"scopeMrn,omitempty"`
+	Types    []string `protobuf:"varint,2,rep,name=types,proto3,enum=mondoo.integrations.v1.Type" json:"types,omitempty"`
+	// Identifiers filters to integrations that contain any of these identifiers.
+	Identifiers []string `protobuf:"bytes,6,rep,name=identifiers,proto3" json:"identifiers,omitempty"`
+}
+
+type IntegrationListOutput struct {
+	Integrations []Integration `protobuf:"bytes,1,rep,name=integrations,proto3" json:"integrations,omitempty"`
+}
+
+type IntegrationGetTokenInput struct {
+	Mrn string `protobuf:"bytes,1,opt,name=mrn,proto3" json:"mrn,omitempty"`
+	// LongLivedToken requests a non-expiring token; the operator keeps this false and uses
+	// the (30-minute) token immediately for IntegrationRegister.
+	LongLivedToken bool `protobuf:"varint,7,opt,name=long_lived_token,json=longLivedToken,proto3" json:"long_lived_token,omitempty"`
+}
+
+type IntegrationGetTokenOutput struct {
+	Token string `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+}
+
+type IntegrationDeleteInput struct {
+	Mrn string `protobuf:"bytes,1,opt,name=mrn,proto3" json:"mrn,omitempty"`
 }
 
 type ReportStatusRequest struct {

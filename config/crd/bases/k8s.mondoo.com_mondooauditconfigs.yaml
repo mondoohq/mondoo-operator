@@ -90,8 +90,34 @@ spec:
                 type: object
               consoleIntegration:
                 properties:
+                  autoCreate:
+                    default: true
+                    description: |-
+                      AutoCreate lets the operator create (or re-attach to) the Mondoo console integration
+                      itself when the Secret referenced by .spec.mondooTokenSecretRef holds a credential that
+                      is not already bound to an integration: a space- or org-scoped registration token or
+                      service account with permission to manage integrations (e.g. the deployment-manager
+                      role). It has no effect when the token already carries an integration MRN or when the
+                      Secret referenced by .spec.mondooCredsSecretRef already exists.
+                    type: boolean
+                  deletionPolicy:
+                    default: Delete
+                    description: |-
+                      DeletionPolicy controls what happens to an operator-created integration when this
+                      MondooAuditConfig is deleted. "Delete" removes the integration from the Mondoo console
+                      (assets and their history are kept); "Retain" leaves it in place. Integrations that were
+                      not created by the operator are never deleted, regardless of this setting.
+                    enum:
+                    - Delete
+                    - Retain
+                    type: string
                   enable:
                     type: boolean
+                  name:
+                    description: |-
+                      Name is the display name for an integration created by the operator. If empty, it
+                      defaults to "mondoo-operator-" followed by the first 8 characters of the cluster UID.
+                    type: string
                 type: object
               containers:
                 properties:

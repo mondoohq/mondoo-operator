@@ -110,6 +110,65 @@ func (mr *MockMondooClientMockRecorder) IntegrationConfigure(arg0, arg1 interfac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IntegrationConfigure", reflect.TypeOf((*MockMondooClient)(nil).IntegrationConfigure), arg0, arg1)
 }
 
+// IntegrationCreate mocks base method.
+func (m *MockMondooClient) IntegrationCreate(arg0 context.Context, arg1 *mondooclient.IntegrationCreateInput) (*mondooclient.IntegrationCreateOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IntegrationCreate", arg0, arg1)
+	ret0, _ := ret[0].(*mondooclient.IntegrationCreateOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IntegrationCreate indicates an expected call of IntegrationCreate.
+func (mr *MockMondooClientMockRecorder) IntegrationCreate(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IntegrationCreate", reflect.TypeOf((*MockMondooClient)(nil).IntegrationCreate), arg0, arg1)
+}
+
+// IntegrationDelete mocks base method.
+func (m *MockMondooClient) IntegrationDelete(arg0 context.Context, arg1 *mondooclient.IntegrationDeleteInput) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IntegrationDelete", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// IntegrationDelete indicates an expected call of IntegrationDelete.
+func (mr *MockMondooClientMockRecorder) IntegrationDelete(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IntegrationDelete", reflect.TypeOf((*MockMondooClient)(nil).IntegrationDelete), arg0, arg1)
+}
+
+// IntegrationGetToken mocks base method.
+func (m *MockMondooClient) IntegrationGetToken(arg0 context.Context, arg1 *mondooclient.IntegrationGetTokenInput) (*mondooclient.IntegrationGetTokenOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IntegrationGetToken", arg0, arg1)
+	ret0, _ := ret[0].(*mondooclient.IntegrationGetTokenOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IntegrationGetToken indicates an expected call of IntegrationGetToken.
+func (mr *MockMondooClientMockRecorder) IntegrationGetToken(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IntegrationGetToken", reflect.TypeOf((*MockMondooClient)(nil).IntegrationGetToken), arg0, arg1)
+}
+
+// IntegrationList mocks base method.
+func (m *MockMondooClient) IntegrationList(arg0 context.Context, arg1 *mondooclient.IntegrationListInput) (*mondooclient.IntegrationListOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IntegrationList", arg0, arg1)
+	ret0, _ := ret[0].(*mondooclient.IntegrationListOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IntegrationList indicates an expected call of IntegrationList.
+func (mr *MockMondooClientMockRecorder) IntegrationList(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IntegrationList", reflect.TypeOf((*MockMondooClient)(nil).IntegrationList), arg0, arg1)
+}
+
 // IntegrationRegister mocks base method.
 func (m *MockMondooClient) IntegrationRegister(arg0 context.Context, arg1 *mondooclient.IntegrationRegisterInput) (*mondooclient.IntegrationRegisterOutput, error) {
 	m.ctrl.T.Helper()

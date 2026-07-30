@@ -42,6 +42,11 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 	if !m.Spec.ConsoleIntegration.Enable {
 		return nil // If ConsoleIntegration is not enabled, we cannot report status
 	}
+	if !m.DeletionTimestamp.IsZero() {
+		// The MondooAuditConfig is being deleted; the deletion flow reports the integration
+		// as DELETED and a regular report here would overwrite that.
+		return nil
+	}
 
 	nodes := v1.NodeList{}
 	if err := r.kubeClient.List(ctx, &nodes); err != nil {

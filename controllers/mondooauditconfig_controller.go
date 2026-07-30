@@ -163,6 +163,11 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// Any other Reconcile() loops that need custom cleanup when the MondooAuditConfig is being
 		// deleted should be called here
 
+		// Best-effort: report the console integration as DELETED and, if the operator created
+		// it and the deletion policy allows, delete it so it does not linger in the console.
+		mondoo.CleanupConsoleIntegration(ctx, r.Client, r.MondooClientBuilder, mondooAuditConfig,
+			config.Spec.HttpProxy, config.Spec.HttpsProxy, config.Spec.NoProxy, log)
+
 		r.refreshMu.Lock()
 		delete(r.refreshCache, req.NamespacedName)
 		r.refreshMu.Unlock()
@@ -536,7 +541,7 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 		ctx,
 		r.Client,
 		r.MondooClientBuilder,
-		auditConfig.Spec.ConsoleIntegration.Enable,
+		auditConfig,
 		client.ObjectKeyFromObject(mondooCredsSecret),
 		tokenData,
 		cfg.Spec.HttpProxy,

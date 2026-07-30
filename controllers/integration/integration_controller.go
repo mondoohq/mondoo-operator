@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/client/common"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -129,6 +130,14 @@ func (r *IntegrationReconciler) processMondooAuditConfig(m v1alpha2.MondooAuditC
 
 	result, err := mondoo.IntegrationCheckIn(r.ctx, integrationMrn, r.configHashes[integrationMrn], *serviceAccount, r.MondooClientBuilder, config.Spec.HttpProxy, config.Spec.HttpsProxy, config.Spec.NoProxy, logger)
 	if err != nil {
+		// A 404 means the integration was deleted in the Mondoo console. The operator does
+		// not recreate it on its own: re-provisioning only happens when the creds Secret is
+		// deleted, so an integration never reappears unexpectedly.
+		if common.IsNotFound(err) {
+			err = fmt.Errorf(
+				"integration %s no longer exists in the Mondoo console; check-ins, status reporting and pause/unpause are disabled while scanning continues. "+
+					"Delete the Secret %s/%s to re-provision, or disable .spec.consoleIntegration", integrationMrn, secret.Namespace, secret.Name)
+		}
 		logger.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
 		return err
 	}

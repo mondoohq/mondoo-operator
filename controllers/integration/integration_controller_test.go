@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -26,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/client/common"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	mockmondoo "go.mondoo.com/mondoo-operator/pkg/client/mondooclient/mock"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
@@ -541,6 +543,45 @@ func (s *IntegrationCheckInSuite) TestConfigureFailureDoesNotCrash() {
 
 	// Assert — no error returned, operator stays healthy
 	s.NoError(err)
+	mockCtrl.Finish()
+}
+
+func (s *IntegrationCheckInSuite) TestCheckInIntegrationDeletedInConsole() {
+	// The integration was deleted in the Mondoo console: CheckIn returns a 404. The operator
+	// must not recreate anything and must surface an actionable degraded condition.
+	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ConsoleIntegration.Enable = true
+
+	existingObjects := []client.Object{
+		testMondooCredsSecret(),
+		mondooAuditConfig,
+	}
+
+	mockCtrl := gomock.NewController(s.T())
+
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+	mClient.EXPECT().IntegrationCheckIn(gomock.Any(), gomock.Any()).Times(1).Return(
+		nil, fmt.Errorf("failed to parse response: %w", &common.HttpError{StatusCode: http.StatusNotFound, Body: "integration not found"}),
+	)
+
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
+	}
+
+	fakeClient := fake.NewClientBuilder().WithObjects(existingObjects...).WithStatusSubresource(mondooAuditConfig).Build()
+
+	r := &IntegrationReconciler{
+		Client:              fakeClient,
+		MondooClientBuilder: testMondooClientBuilder,
+	}
+
+	// Act
+	err := r.processMondooAuditConfig(*mondooAuditConfig)
+
+	// Assert
+	s.Error(err)
+	s.Contains(err.Error(), "no longer exists in the Mondoo console")
+	assertConditionExists(s.T(), fakeClient, corev1.ConditionTrue, "no longer exists in the Mondoo console")
 	mockCtrl.Finish()
 }
 

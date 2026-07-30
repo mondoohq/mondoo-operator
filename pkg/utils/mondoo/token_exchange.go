@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
@@ -25,8 +26,25 @@ import (
 type MondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
 
 // CreateServiceAccountFromToken will take the provided Mondoo token and exchange it with the Mondoo API
-// for a long lived Mondoo ServiceAccount
-func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client, mondooClientBuilder MondooClientBuilder, withConsoleIntegration bool, serviceAccountSecret types.NamespacedName, tokenSecretData string, httpProxy *string, httpsProxy *string, noProxy *string, log logr.Logger) error {
+// for a long lived Mondoo ServiceAccount. When console integration is enabled, the token either carries
+// the MRN of an existing integration (in its "owner" claim), or — with autoCreate enabled — is a space-
+// scoped credential the operator uses to create the integration itself.
+func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client, mondooClientBuilder MondooClientBuilder, auditConfig *v1alpha2.MondooAuditConfig, serviceAccountSecret types.NamespacedName, tokenSecretData string, httpProxy *string, httpsProxy *string, noProxy *string, log logr.Logger) error {
+	withConsoleIntegration := auditConfig.Spec.ConsoleIntegration.Enable
+
+	// A service account JSON (instead of a JWT) in the token Secret is only meaningful for
+	// integration auto-create: it acts as the provisioner credential.
+	if cred, ok := parseServiceAccountCredential(tokenSecretData); ok {
+		if !withConsoleIntegration || !auditConfig.Spec.ConsoleIntegration.AutoCreateIntegration() {
+			err := fmt.Errorf("the token Secret contains a service account, which is only supported with " +
+				".spec.consoleIntegration.enable=true and autoCreate enabled; " +
+				"for plain service account setups store it in the Secret referenced by .spec.mondooCredsSecretRef instead")
+			log.Error(err, "unsupported credential in token Secret")
+			return err
+		}
+		return provisionConsoleIntegration(ctx, kubeClient, mondooClientBuilder, auditConfig, cred, serviceAccountSecret, httpProxy, httpsProxy, noProxy, log)
+	}
+
 	jwtString := strings.TrimSpace(tokenSecretData)
 
 	parser := &jwt.Parser{}
@@ -64,17 +82,46 @@ func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client
 		},
 	}
 	if withConsoleIntegration {
-		// owner is the MRN of the integration
-		tokenOwner, ok := claims["owner"]
-		if !ok {
-			err := fmt.Errorf("'owner' claim missing from token which is expected for Mondoo integration registration")
-			log.Error(err, "missing data in token Secret")
-			return err
+		// owner is the MRN of the integration when the token was generated for one
+		tokenOwner := fmt.Sprintf("%v", claims["owner"])
+
+		if !IsIntegrationMrn(tokenOwner) {
+			if !auditConfig.Spec.ConsoleIntegration.AutoCreateIntegration() {
+				err := fmt.Errorf("the token is not bound to a console integration (owner claim %q) and "+
+					".spec.consoleIntegration.autoCreate is disabled; provide an integration token or enable autoCreate", tokenOwner)
+				log.Error(err, "missing data in token Secret")
+				return err
+			}
+
+			// A provisioner service account persisted by an earlier (partially failed)
+			// provisioning attempt is reused instead of exchanging the token again.
+			if cred, ok := loadPersistedProvisionerCredential(ctx, kubeClient, serviceAccountSecret); ok {
+				return provisionConsoleIntegration(ctx, kubeClient, mondooClientBuilder, auditConfig, cred, serviceAccountSecret, httpProxy, httpsProxy, noProxy, log)
+			}
+
+			// Exchange the token for a provisioner service account. The roles embedded in the
+			// token (e.g. deployment-manager) only take effect through this exchange; the raw
+			// registration token itself may only call Register.
+			resp, err := mClient.ExchangeRegistrationToken(ctx, &mondooclient.ExchangeRegistrationTokenInput{
+				Token: jwtString,
+			})
+			if err != nil {
+				log.Error(err, "failed to exchange token for a provisioner service account")
+				return err
+			}
+			cred, ok := parseServiceAccountCredential(resp.ServiceAccount)
+			if !ok {
+				err := fmt.Errorf("token exchange returned an invalid service account")
+				log.Error(err, "failed to parse provisioner service account")
+				return err
+			}
+			return provisionConsoleIntegration(ctx, kubeClient, mondooClientBuilder, auditConfig, cred, serviceAccountSecret, httpProxy, httpsProxy, noProxy, log)
 		}
+
 		// Do an integration-style registration to associate the generated
 		// service account with the Mondoo console Integration
 		resp, err := mClient.IntegrationRegister(ctx, &mondooclient.IntegrationRegisterInput{
-			Mrn:   fmt.Sprintf("%v", tokenOwner),
+			Mrn:   tokenOwner,
 			Token: jwtString,
 		})
 		if err != nil {

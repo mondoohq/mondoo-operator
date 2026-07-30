@@ -20,6 +20,10 @@ const (
 	IntegrationCheckInEndpoint        = "/IntegrationsManager/CheckIn"
 	IntegrationConfigureEndpoint      = "/IntegrationsManager/Configure"
 	IntegrationReportStatusEndpoint   = "/IntegrationsManager/ReportStatus"
+	IntegrationCreateEndpoint         = "/IntegrationsManager/Create"
+	IntegrationListEndpoint           = "/IntegrationsManager/List"
+	IntegrationGetTokenEndpoint       = "/IntegrationsManager/GetTokenForIntegration"
+	IntegrationDeleteEndpoint         = "/IntegrationsManager/Delete"
 	GarbageCollectAssetsEndpoint      = "/PolicyResolver/PurgeAssets"
 	RefreshAssetScoresEndpoint        = "/PolicyResolver/RefreshAssetScores"
 )
@@ -63,7 +67,7 @@ func (s *mondooClient) ExchangeRegistrationToken(ctx context.Context, in *Exchan
 
 	respBodyBytes, err := common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse response: %v", err)
+		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	out := &ExchangeRegistrationTokenOutput{
@@ -83,7 +87,7 @@ func (s *mondooClient) HealthCheck(ctx context.Context, in *common.HealthCheckRe
 
 	respBodyBytes, err := common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse response: %v", err)
+		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	out := &common.HealthCheckResponse{}
@@ -104,7 +108,7 @@ func (s *mondooClient) IntegrationRegister(ctx context.Context, in *IntegrationR
 
 	respBodyBytes, err := common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse response: %v", err)
+		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	out := &IntegrationRegisterOutput{}
@@ -125,7 +129,7 @@ func (s *mondooClient) IntegrationCheckIn(ctx context.Context, in *IntegrationCh
 
 	respBodyBytes, err := common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse response: %v", err)
+		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	out := &IntegrationCheckInOutput{}
@@ -146,7 +150,7 @@ func (s *mondooClient) IntegrationConfigure(ctx context.Context, in *Integration
 
 	respBodyBytes, err := common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse response: %v", err)
+		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	out := &IntegrationConfigureOutput{}
@@ -167,7 +171,86 @@ func (s *mondooClient) IntegrationReportStatus(ctx context.Context, in *ReportSt
 
 	_, err = common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
 	if err != nil {
-		return fmt.Errorf("failed to parse response: %v", err)
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return nil
+}
+
+func (s *mondooClient) IntegrationCreate(ctx context.Context, in *IntegrationCreateInput) (*IntegrationCreateOutput, error) {
+	url := s.ApiEndpoint + IntegrationCreateEndpoint
+
+	reqBodyBytes, err := json.Marshal(in)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	respBodyBytes, err := common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	out := &IntegrationCreateOutput{}
+	if err = json.Unmarshal(respBodyBytes, out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return out, nil
+}
+
+func (s *mondooClient) IntegrationList(ctx context.Context, in *IntegrationListInput) (*IntegrationListOutput, error) {
+	url := s.ApiEndpoint + IntegrationListEndpoint
+
+	reqBodyBytes, err := json.Marshal(in)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	respBodyBytes, err := common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	out := &IntegrationListOutput{}
+	if err = json.Unmarshal(respBodyBytes, out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return out, nil
+}
+
+func (s *mondooClient) IntegrationGetToken(ctx context.Context, in *IntegrationGetTokenInput) (*IntegrationGetTokenOutput, error) {
+	url := s.ApiEndpoint + IntegrationGetTokenEndpoint
+
+	reqBodyBytes, err := json.Marshal(in)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	respBodyBytes, err := common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	out := &IntegrationGetTokenOutput{}
+	if err = json.Unmarshal(respBodyBytes, out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return out, nil
+}
+
+func (s *mondooClient) IntegrationDelete(ctx context.Context, in *IntegrationDeleteInput) error {
+	url := s.ApiEndpoint + IntegrationDeleteEndpoint
+
+	reqBodyBytes, err := json.Marshal(in)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	_, err = common.Request(ctx, s.httpClient, url, s.Token, reqBodyBytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	return nil

@@ -13,6 +13,14 @@ const (
 	// MondooTokenSecretKey is the name of the key in the Secret that holds the JWT data
 	// used for creating a Mondoo service account
 	MondooTokenSecretKey = "token"
+	// MondooCredsSecretOperatorManagedKey is the name of the key in the creds Secret that
+	// marks the console integration as created by the operator (value "true"). Only
+	// integrations carrying this marker are deleted when the MondooAuditConfig is deleted.
+	MondooCredsSecretOperatorManagedKey = "operator-managed"
+	// MondooProvisionerSecretSuffix is appended to the creds Secret name to form the name of
+	// the Secret holding the provisioner service account used to create (and later delete)
+	// the console integration.
+	MondooProvisionerSecretSuffix = "-provisioner"
 	// MondooAssetsIntegrationLabel is the label we set for any assets whenever the consoleIntegration is enabled
 	// (for consistency with other integrations, the integration tag will not use the 'k8s' prefix)
 	MondooAssetsIntegrationLabel = "mondoo.com/" + "integration-mrn"

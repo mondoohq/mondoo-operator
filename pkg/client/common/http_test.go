@@ -4,8 +4,35 @@
 package common
 
 import (
+	"fmt"
+	"net/http"
 	"testing"
 )
+
+func TestHttpErrorStatusDetection(t *testing.T) {
+	notFound := &HttpError{StatusCode: http.StatusNotFound, Body: "integration not found"}
+
+	if !IsNotFound(notFound) {
+		t.Error("expected IsNotFound to detect a direct 404 error")
+	}
+	// status detection must survive fmt.Errorf %w wrapping as done by mondooclient
+	wrapped := fmt.Errorf("failed to CheckIn() to Mondoo API: %w", fmt.Errorf("failed to parse response: %w", notFound))
+	if !IsNotFound(wrapped) {
+		t.Error("expected IsNotFound to detect a wrapped 404 error")
+	}
+	if IsForbidden(wrapped) {
+		t.Error("expected IsForbidden to be false for a 404 error")
+	}
+	if IsNotFound(fmt.Errorf("some other error")) {
+		t.Error("expected IsNotFound to be false for non-HTTP errors")
+	}
+	if !IsForbidden(&HttpError{StatusCode: http.StatusForbidden}) {
+		t.Error("expected IsForbidden to detect a 403 error")
+	}
+	if expected := "http status 404: integration not found"; notFound.Error() != expected {
+		t.Errorf("unexpected error string: got %q, want %q", notFound.Error(), expected)
+	}
+}
 
 func TestShouldBypassProxy(t *testing.T) {
 	tests := []struct {

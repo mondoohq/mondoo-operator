@@ -49,6 +49,7 @@ const (
 	testServiceAccountData = `SERVICE ACCOUNT DATA HERE`
 
 	testIntegrationMRN = "//integration.api.mondoo.app/spaces/test-infallible-taussig-123456/integrations/abcdefghhijklmnop"
+	testClusterUID     = "d0d0caca-0000-1111-2222-333344445555"
 )
 
 var (
@@ -290,10 +291,15 @@ func TestTokenRegistration(t *testing.T) {
 			},
 		},
 		{
-			name: "missing owner claim error",
+			name: "missing owner claim error with autoCreate disabled",
 			existingObjects: []client.Object{
 				testTokenSecret(),
-				testMondooAuditConfigWithIntegration(),
+				func() client.Object {
+					mac := testMondooAuditConfigWithIntegration()
+					autoCreate := false
+					mac.Spec.ConsoleIntegration.AutoCreate = &autoCreate
+					return mac
+				}(),
 			},
 			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
 				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
@@ -301,6 +307,293 @@ func TestTokenRegistration(t *testing.T) {
 				return mClient
 			},
 			expectError: true,
+		},
+		{
+			name: "auto-create integration from space token",
+			existingObjects: []client.Object{
+				testTokenSecret(),
+				testMondooAuditConfigWithIntegration(),
+				testKubeSystemNamespace(),
+			},
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+
+				// the space token is first exchanged into a provisioner service account
+				mClient.EXPECT().ExchangeRegistrationToken(gomock.Any(), &mondooclient.ExchangeRegistrationTokenInput{
+					Token: testTokenData,
+				}).Times(1).Return(&mondooclient.ExchangeRegistrationTokenOutput{
+					ServiceAccount: string(testMondooServiceAccountDataBytes),
+				}, nil)
+
+				mClient.EXPECT().IntegrationList(gomock.Any(), &mondooclient.IntegrationListInput{
+					ScopeMrn:    testMondooServiceAccount.SpaceMrn,
+					Types:       []string{mondooclient.IntegrationTypeK8s},
+					Identifiers: []string{testAuditConfigIdentifier()},
+				}).Times(1).Return(&mondooclient.IntegrationListOutput{}, nil)
+
+				mClient.EXPECT().IntegrationCreate(gomock.Any(), &mondooclient.IntegrationCreateInput{
+					ScopeMrn: testMondooServiceAccount.SpaceMrn,
+					Name:     "mondoo-operator-" + testClusterUID[:8],
+					Type:     mondooclient.IntegrationTypeK8s,
+					Identifiers: []string{
+						testAuditConfigIdentifier(),
+						"k8s-cluster-uid:" + testClusterUID,
+					},
+					LongLivedToken: false,
+					Labels:         map[string]string{"mondoo.com/created-by": "mondoo-operator"},
+					ConfigurationInput: &mondooclient.IntegrationConfigurationInput{
+						K8sOptions: &mondooclient.K8sConfigurationOptionsInput{
+							ScanLocalCluster: true,
+						},
+					},
+				}).Times(1).Return(&mondooclient.IntegrationCreateOutput{
+					Integration: &mondooclient.Integration{
+						Mrn:   testIntegrationMRN,
+						Token: testIntegrationTokenData,
+					},
+				}, nil)
+
+				// registration happens with the integration's own token
+				mClient.EXPECT().IntegrationRegister(gomock.Any(), &mondooclient.IntegrationRegisterInput{
+					Mrn:   testIntegrationMRN,
+					Token: testIntegrationTokenData,
+				}).Times(1).Return(&mondooclient.IntegrationRegisterOutput{
+					Mrn:   testIntegrationMRN,
+					Creds: testMondooServiceAccount,
+				}, nil)
+
+				expectInitialCheckIn(mClient)
+				mClient.EXPECT().IntegrationReportStatus(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+				return mClient
+			},
+			verify: func(t *testing.T, kubeClient client.Client) {
+				credsSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testMondooCredsSecretName,
+						Namespace: testNamespace,
+					},
+				}
+				err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(credsSecret), credsSecret)
+				assert.NoError(t, err, "error getting secret that should exist")
+
+				assert.Equal(t, testMondooServiceAccountDataBytes, credsSecret.Data["config"])
+				assert.Equal(t, testIntegrationMRN, string(credsSecret.Data["integrationmrn"]))
+				assert.Equal(t, "true", string(credsSecret.Data["operator-managed"]))
+
+				provisionerSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testMondooCredsSecretName + "-provisioner",
+						Namespace: testNamespace,
+					},
+				}
+				err = kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(provisionerSecret), provisionerSecret)
+				assert.NoError(t, err, "error getting provisioner secret that should exist")
+				assert.Equal(t, testMondooServiceAccountDataBytes, provisionerSecret.Data["config"])
+				assert.Len(t, provisionerSecret.OwnerReferences, 1, "provisioner secret should be owner-referenced")
+			},
+		},
+		{
+			name: "auto-create adopts existing integration",
+			existingObjects: []client.Object{
+				testTokenSecret(),
+				testMondooAuditConfigWithIntegration(),
+				testKubeSystemNamespace(),
+			},
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+
+				mClient.EXPECT().ExchangeRegistrationToken(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.ExchangeRegistrationTokenOutput{
+					ServiceAccount: string(testMondooServiceAccountDataBytes),
+				}, nil)
+
+				mClient.EXPECT().IntegrationList(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationListOutput{
+					Integrations: []mondooclient.Integration{
+						{Mrn: testIntegrationMRN},
+					},
+				}, nil)
+
+				mClient.EXPECT().IntegrationGetToken(gomock.Any(), &mondooclient.IntegrationGetTokenInput{
+					Mrn:            testIntegrationMRN,
+					LongLivedToken: false,
+				}).Times(1).Return(&mondooclient.IntegrationGetTokenOutput{
+					Token: testIntegrationTokenData,
+				}, nil)
+
+				mClient.EXPECT().IntegrationRegister(gomock.Any(), &mondooclient.IntegrationRegisterInput{
+					Mrn:   testIntegrationMRN,
+					Token: testIntegrationTokenData,
+				}).Times(1).Return(&mondooclient.IntegrationRegisterOutput{
+					Mrn:   testIntegrationMRN,
+					Creds: testMondooServiceAccount,
+				}, nil)
+
+				expectInitialCheckIn(mClient)
+				mClient.EXPECT().IntegrationReportStatus(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+				return mClient
+			},
+			verify: func(t *testing.T, kubeClient client.Client) {
+				credsSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testMondooCredsSecretName,
+						Namespace: testNamespace,
+					},
+				}
+				err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(credsSecret), credsSecret)
+				assert.NoError(t, err, "error getting secret that should exist")
+				assert.Equal(t, testIntegrationMRN, string(credsSecret.Data["integrationmrn"]))
+				assert.Equal(t, "true", string(credsSecret.Data["operator-managed"]))
+			},
+		},
+		{
+			name: "auto-create errors on empty adoption token",
+			existingObjects: []client.Object{
+				testTokenSecret(),
+				testMondooAuditConfigWithIntegration(),
+				testKubeSystemNamespace(),
+			},
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+
+				mClient.EXPECT().ExchangeRegistrationToken(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.ExchangeRegistrationTokenOutput{
+					ServiceAccount: string(testMondooServiceAccountDataBytes),
+				}, nil)
+
+				mClient.EXPECT().IntegrationList(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationListOutput{
+					Integrations: []mondooclient.Integration{
+						{Mrn: testIntegrationMRN},
+					},
+				}, nil)
+
+				// no registration must be attempted with an empty token
+				mClient.EXPECT().IntegrationGetToken(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationGetTokenOutput{}, nil)
+
+				return mClient
+			},
+			expectError: true,
+		},
+		{
+			name: "auto-create errors on duplicate integrations",
+			existingObjects: []client.Object{
+				testTokenSecret(),
+				testMondooAuditConfigWithIntegration(),
+				testKubeSystemNamespace(),
+			},
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+
+				mClient.EXPECT().ExchangeRegistrationToken(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.ExchangeRegistrationTokenOutput{
+					ServiceAccount: string(testMondooServiceAccountDataBytes),
+				}, nil)
+
+				mClient.EXPECT().IntegrationList(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationListOutput{
+					Integrations: []mondooclient.Integration{
+						{Mrn: testIntegrationMRN},
+						{Mrn: testIntegrationMRN + "-duplicate"},
+					},
+				}, nil)
+
+				return mClient
+			},
+			expectError: true,
+		},
+		{
+			name: "auto-create reuses persisted provisioner credential on retry",
+			existingObjects: []client.Object{
+				testTokenSecret(),
+				testMondooAuditConfigWithIntegration(),
+				testKubeSystemNamespace(),
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testMondooCredsSecretName + "-provisioner",
+						Namespace: testNamespace,
+					},
+					Data: map[string][]byte{
+						"config": testMondooServiceAccountDataBytes,
+					},
+				},
+			},
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+
+				// no ExchangeRegistrationToken: the persisted provisioner credential is reused
+				mClient.EXPECT().IntegrationList(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationListOutput{}, nil)
+
+				mClient.EXPECT().IntegrationCreate(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationCreateOutput{
+					Integration: &mondooclient.Integration{
+						Mrn:   testIntegrationMRN,
+						Token: testIntegrationTokenData,
+					},
+				}, nil)
+
+				mClient.EXPECT().IntegrationRegister(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationRegisterOutput{
+					Mrn:   testIntegrationMRN,
+					Creds: testMondooServiceAccount,
+				}, nil)
+
+				expectInitialCheckIn(mClient)
+				mClient.EXPECT().IntegrationReportStatus(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+				return mClient
+			},
+			verify: func(t *testing.T, kubeClient client.Client) {
+				credsSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testMondooCredsSecretName,
+						Namespace: testNamespace,
+					},
+				}
+				err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(credsSecret), credsSecret)
+				assert.NoError(t, err, "error getting secret that should exist")
+				assert.Equal(t, testIntegrationMRN, string(credsSecret.Data["integrationmrn"]))
+			},
+		},
+		{
+			name: "auto-create with service account credential",
+			existingObjects: func() []client.Object {
+				sec := testTokenSecret()
+				sec.Data["token"] = testMondooServiceAccountDataBytes
+				return []client.Object{
+					sec,
+					testMondooAuditConfigWithIntegration(),
+					testKubeSystemNamespace(),
+				}
+			}(),
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+
+				// no token exchange: the service account is the provisioner credential
+				mClient.EXPECT().IntegrationList(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationListOutput{}, nil)
+
+				mClient.EXPECT().IntegrationCreate(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationCreateOutput{
+					Integration: &mondooclient.Integration{
+						Mrn:   testIntegrationMRN,
+						Token: testIntegrationTokenData,
+					},
+				}, nil)
+
+				mClient.EXPECT().IntegrationRegister(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationRegisterOutput{
+					Mrn:   testIntegrationMRN,
+					Creds: testMondooServiceAccount,
+				}, nil)
+
+				expectInitialCheckIn(mClient)
+				mClient.EXPECT().IntegrationReportStatus(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+				return mClient
+			},
+			verify: func(t *testing.T, kubeClient client.Client) {
+				credsSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testMondooCredsSecretName,
+						Namespace: testNamespace,
+					},
+				}
+				err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(credsSecret), credsSecret)
+				assert.NoError(t, err, "error getting secret that should exist")
+				assert.Equal(t, testIntegrationMRN, string(credsSecret.Data["integrationmrn"]))
+			},
 		},
 	}
 
@@ -346,6 +639,82 @@ func TestTokenRegistration(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReconcileDeletionCleansUpIntegration(t *testing.T) {
+	utilruntime.Must(v1alpha2.AddToScheme(scheme.Scheme))
+
+	testMondooServiceAccount.PrivateKey = credentials.MondooServiceAccount(t)
+	var err error
+	testMondooServiceAccountDataBytes, err = json.Marshal(testMondooServiceAccount) //nolint:gosec
+	require.NoError(t, err, "error converting sample service account data")
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+	// exactly one DELETED report from the cleanup; the status reporter must stay silent for
+	// a MondooAuditConfig that is being deleted
+	mClient.EXPECT().IntegrationReportStatus(gomock.Any(), &mondooclient.ReportStatusRequest{
+		Mrn:    testIntegrationMRN,
+		Status: mondooclient.Status_DELETED,
+	}).Times(1).Return(nil)
+	mClient.EXPECT().IntegrationDelete(gomock.Any(), &mondooclient.IntegrationDeleteInput{
+		Mrn: testIntegrationMRN,
+	}).Times(1).Return(nil)
+
+	testMondooClientBuilder := func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error) {
+		return mClient, nil
+	}
+
+	mondooAuditConfig := testMondooAuditConfigWithIntegration()
+	credsSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testMondooCredsSecretName,
+			Namespace: testNamespace,
+		},
+		Data: map[string][]byte{
+			"config":           testMondooServiceAccountDataBytes,
+			"integrationmrn":   []byte(testIntegrationMRN),
+			"operator-managed": []byte("true"),
+		},
+	}
+	provisionerSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testMondooCredsSecretName + "-provisioner",
+			Namespace: testNamespace,
+		},
+		Data: map[string][]byte{
+			"config": testMondooServiceAccountDataBytes,
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithStatusSubresource(mondooAuditConfig).
+		WithObjects(mondooAuditConfig, credsSecret, provisionerSecret).
+		Build()
+
+	ctx := context.Background()
+	// the finalizer keeps the object around with a deletion timestamp
+	require.NoError(t, fakeClient.Delete(ctx, mondooAuditConfig))
+
+	reconciler := &MondooAuditConfigReconciler{
+		MondooClientBuilder: testMondooClientBuilder,
+		Client:              fakeClient,
+		StatusReporter:      status.NewStatusReporter(fakeClient, testMondooClientBuilder, k8sVersion, mondoofake.NewNoOpContainerImageResolver()),
+	}
+
+	_, err = reconciler.Reconcile(ctx, reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      testMondooAuditConfigName,
+			Namespace: testNamespace,
+		},
+	})
+	require.NoError(t, err)
+
+	// finalizer removed → object is gone
+	err = fakeClient.Get(ctx, client.ObjectKeyFromObject(mondooAuditConfig), mondooAuditConfig)
+	assert.True(t, errors.IsNotFound(err), "expected MondooAuditConfig to be deleted after finalizer cleanup")
 }
 
 func TestMondooAuditConfigStatus(t *testing.T) {
@@ -588,6 +957,33 @@ func testMondooAuditConfigWithIntegration() *v1alpha2.MondooAuditConfig {
 	mac.Spec.ConsoleIntegration.Enable = true
 
 	return mac
+}
+
+func testKubeSystemNamespace() *corev1.Namespace {
+	return &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-system",
+			UID:  types.UID(testClusterUID),
+		},
+	}
+}
+
+func testAuditConfigIdentifier() string {
+	return mondoo.AuditConfigIdentifier(testClusterUID, client.ObjectKey{Namespace: testNamespace, Name: testMondooAuditConfigName})
+}
+
+// expectInitialCheckIn registers the mock expectations for the one-off CheckIn (plus the
+// Configure that an empty configuration hash always triggers) performed right after a
+// service account is registered for an integration.
+func expectInitialCheckIn(mClient *mockmondoo.MockMondooClient) {
+	mClient.EXPECT().IntegrationCheckIn(gomock.Any(), &mondooclient.IntegrationCheckInInput{
+		Mrn: testIntegrationMRN,
+	}).Times(1).Return(&mondooclient.IntegrationCheckInOutput{ConfigurationMatch: true}, nil)
+	mClient.EXPECT().IntegrationConfigure(gomock.Any(), &mondooclient.IntegrationConfigureInput{
+		Mrn: testIntegrationMRN,
+	}).Times(1).Return(&mondooclient.IntegrationConfigureOutput{
+		Details: &mondooclient.IntegrationConfigureDetails{Config: `{}`},
+	}, nil)
 }
 
 func testTokenSecret() *corev1.Secret {

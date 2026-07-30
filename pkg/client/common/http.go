@@ -6,6 +6,7 @@ package common
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -173,8 +174,35 @@ func Request(ctx context.Context, client http.Client, url, token string, reqBody
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("http status %d: %s", resp.StatusCode, respBody)
+		return nil, &HttpError{StatusCode: resp.StatusCode, Body: string(respBody)}
 	}
 
 	return respBody, nil
+}
+
+// HttpError is returned by Request for non-2xx responses. It preserves the HTTP status code
+// so callers can distinguish permanent failures (e.g. a 404 for an integration that was
+// deleted in the Mondoo console) from transient ones.
+type HttpError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *HttpError) Error() string {
+	return fmt.Sprintf("http status %d: %s", e.StatusCode, e.Body)
+}
+
+// IsNotFound returns true if err wraps an HTTP 404 response.
+func IsNotFound(err error) bool {
+	return hasStatusCode(err, http.StatusNotFound)
+}
+
+// IsForbidden returns true if err wraps an HTTP 403 response.
+func IsForbidden(err error) bool {
+	return hasStatusCode(err, http.StatusForbidden)
+}
+
+func hasStatusCode(err error, code int) bool {
+	httpErr := &HttpError{}
+	return errors.As(err, &httpErr) && httpErr.StatusCode == code
 }

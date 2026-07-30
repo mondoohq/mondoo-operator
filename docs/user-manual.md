@@ -224,6 +224,61 @@ spec:
         - ...
 ```
 
+## GitOps installs: let the operator create its Console integration
+
+A Kubernetes integration in the Mondoo Console gives you health check-ins, an integration status card, pause/resume scanning from the Console, and integration-scoped asset grouping. Normally a human creates the integration in the Console and pastes its long-lived token into the cluster.
+
+For fully automated deployments (Argo CD, Flux, Terraform, Helm pipelines) the operator can create the integration itself. Provide a credential that is allowed to manage integrations in your space and enable console integration:
+
+1. Create the credential. Either of these works:
+
+   - A **registration token carrying the deployment-manager role** (via the Mondoo API or Terraform provider), stored as the token Secret:
+
+     ```bash
+     kubectl create secret generic mondoo-token --namespace mondoo-operator --from-literal=token=<TOKEN>
+     ```
+
+   - A **service account with the deployment-manager (or editor) role**, stored as the token Secret:
+
+     ```bash
+     kubectl create secret generic mondoo-token --namespace mondoo-operator --from-file=token=creds.json
+     ```
+
+   The default agent role is not sufficient to create integrations.
+
+2. Reference it from the `MondooAuditConfig` and enable the integration:
+
+   ```yaml
+   apiVersion: k8s.mondoo.com/v1alpha2
+   kind: MondooAuditConfig
+   metadata:
+     name: mondoo-client
+     namespace: mondoo-operator
+   spec:
+     mondooCredsSecretRef:
+       name: mondoo-client # created by the operator
+     mondooTokenSecretRef:
+       name: mondoo-token
+     consoleIntegration:
+       enable: true
+       # autoCreate: true          # default; set to false to require a pre-created integration
+       # name: "my-prod-cluster"   # display name in the Console; defaults to mondoo-operator-<cluster UID prefix>
+       # deletionPolicy: Delete    # default; Retain keeps the integration when this CR is deleted
+     kubernetesResources:
+       enable: true
+     nodes:
+       enable: true
+   ```
+
+On first reconcile the operator creates a Kubernetes integration in the credential's space (or the space set via `spec.spaceId` for org-scoped credentials), registers a least-privilege runtime service account with it, and stores everything in the Secret referenced by `mondooCredsSecretRef`. Tokens that already carry an integration MRN keep working exactly as before; `autoCreate` only applies when the token is not bound to an integration.
+
+Details worth knowing:
+
+- **Idempotency**: the integration is tagged with the cluster UID and the `MondooAuditConfig` namespace/name. If the creds Secret is lost (e.g. reinstall), the operator re-attaches to the existing integration instead of creating a duplicate.
+- **Deleting the integration in the Console** does not make the operator recreate it. The operator reports a degraded `MondooIntegrationDegraded` condition explaining the state; scanning continues. To re-provision, delete the Secret referenced by `mondooCredsSecretRef`.
+- **Deleting the MondooAuditConfig** reports the integration as deleted in the Console and, with `deletionPolicy: Delete` (the default), removes operator-created integrations entirely. Assets and their history are kept. Integrations you created manually in the Console are never deleted.
+- The credential from step 1 is kept in a companion Secret (`<creds secret name>-provisioner`) so the operator can clean up the integration later. Delete it if you prefer; the integration then stays in the Console when the CR is deleted.
+
 ## Scanning External Clusters
 
 The Mondoo Operator can scan remote Kubernetes clusters from a central installation. This is useful for:
