@@ -111,7 +111,7 @@ func ApplyJobOverrides(cj *batchv1.CronJob, o v1alpha2.JobOverrides) {
 	// Node scan pods are pinned via nodeName. The kubelet rejects pinned pods whose
 	// nodeSelector doesn't match the node, so the selector is only applied to pods
 	// that go through the scheduler.
-	if len(o.NodeSelector) > 0 && podSpec.NodeName == "" {
+	if len(o.NodeSelector) > 0 && podSpec.NodeName == "" && len(podSpec.NodeSelector) == 0 {
 		podSpec.NodeSelector = o.NodeSelector
 	}
 

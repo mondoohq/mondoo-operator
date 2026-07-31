@@ -149,16 +149,18 @@ type JobOverrides struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// NodeSelector constrains the scan pods to nodes with matching labels. It is ignored for
-	// node scan pods because those are pinned to a specific node.
+	// node scan pods because those are pinned to a specific node. A NodeSelector configured
+	// through the component's PodScheduling field takes precedence.
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
-	// Tolerations are appended to the tolerations of the scan pods.
+	// Tolerations are merged with PodScheduling tolerations without duplicates.
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
-// PodScheduling defines pod placement settings for scanner workloads.
+// PodScheduling defines pod placement settings for scanner workloads. Its NodeSelector takes
+// precedence over JobOverrides.NodeSelector when both are configured.
 type PodScheduling struct {
 	// NodeSelector selects nodes where scanner pods may run.
 	// +optional

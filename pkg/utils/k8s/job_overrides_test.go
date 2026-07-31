@@ -116,6 +116,17 @@ func TestApplyJobOverrides_NodeSelectorSkippedForPinnedPods(t *testing.T) {
 	assert.Nil(t, cj.Spec.JobTemplate.Spec.Template.Spec.NodeSelector)
 }
 
+func TestApplyJobOverrides_PreservesPodSchedulingNodeSelector(t *testing.T) {
+	cj := &batchv1.CronJob{}
+	cj.Spec.JobTemplate.Spec.Template.Spec.NodeSelector = map[string]string{"nodepool": "scanner"}
+
+	ApplyJobOverrides(cj, v1alpha2.JobOverrides{
+		NodeSelector: map[string]string{"nodepool": "job-override"},
+	})
+
+	assert.Equal(t, map[string]string{"nodepool": "scanner"}, cj.Spec.JobTemplate.Spec.Template.Spec.NodeSelector)
+}
+
 func TestApplyJobOverrides_Tolerations(t *testing.T) {
 	existing := corev1.Toleration{Key: "node.kubernetes.io/unreachable", Operator: corev1.TolerationOpExists}
 	user := corev1.Toleration{Key: "workload-type", Operator: corev1.TolerationOpEqual, Value: "mondoo-scan", Effect: corev1.TaintEffectNoSchedule}
