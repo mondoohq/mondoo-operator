@@ -316,24 +316,31 @@ func provisionConsoleIntegration(
 	if err != nil {
 		return fmt.Errorf("failed to register with console integration %s: %w", integrationMrn, err)
 	}
+	if registerResp.Creds == nil {
+		return fmt.Errorf("registering with console integration %s returned no credentials", integrationMrn)
+	}
 
 	credsBytes, err := json.Marshal(*registerResp.Creds) //nolint:gosec
 	if err != nil {
 		return fmt.Errorf("failed to marshal service account creds from IntegrationRegister(): %w", err)
 	}
 
+	// CreateOrUpdate (instead of create-if-not-exists) so leftovers from a partially failed
+	// earlier attempt cannot pin stale credentials or a stale integration MRN.
 	credsSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceAccountSecret.Name,
 			Namespace: serviceAccountSecret.Namespace,
 		},
-		Data: map[string][]byte{
+	}
+	if _, err := controllerutil.CreateOrUpdate(ctx, kubeClient, credsSecret, func() error {
+		credsSecret.Data = map[string][]byte{
 			constants.MondooCredsSecretServiceAccountKey:  credsBytes,
 			constants.MondooCredsSecretIntegrationMRNKey:  []byte(integrationMrn),
 			constants.MondooCredsSecretOperatorManagedKey: []byte("true"),
-		},
-	}
-	if _, err := k8s.CreateIfNotExist(ctx, kubeClient, credsSecret, credsSecret); err != nil {
+		}
+		return nil
+	}); err != nil {
 		return fmt.Errorf("error while trying to save Mondoo service account into secret: %w", err)
 	}
 

@@ -51,25 +51,37 @@ func CleanupConsoleIntegration(
 		return
 	}
 
-	// Mark the integration DELETED in the console. This needs no extra permissions and
-	// matters even when we do not delete the integration: K8s integrations are otherwise
-	// shown as ACTIVE indefinitely once check-ins stop.
+	// The provisioner credential is shared by the status-report fallback and the deletion
+	// step; resolving it can involve a network round trip, so do it lazily and only once.
+	var cred *provisionerCredential
+	credResolved := false
+	provisionerCred := func() *provisionerCredential {
+		if !credResolved {
+			cred = resolveProvisionerCredential(ctx, kubeClient, mondooClientBuilder, m, httpProxy, httpsProxy, noProxy, log)
+			credResolved = true
+		}
+		return cred
+	}
+
+	// Mark the integration DELETED in the console. This matters even when we do not delete
+	// the integration: K8s integrations are otherwise shown as ACTIVE indefinitely once
+	// check-ins stop. The runtime (agent-role) service account is entitled to ReportStatus;
+	// should it fail anyway (revoked, or user-provided creds with a different role), retry
+	// with the provisioner credential.
+	reported := false
 	if sa, err := k8s.GetServiceAccountFromSecret(*secret); err == nil {
-		if token, err := GenerateTokenFromServiceAccount(*sa, log); err == nil {
-			runtimeClient, err := mondooClientBuilder(mondooclient.MondooClientOptions{
-				ApiEndpoint: sa.ApiEndpoint,
-				Token:       token,
-				HttpProxy:   httpProxy,
-				HttpsProxy:  httpsProxy,
-				NoProxy:     noProxy,
-			})
-			if err == nil {
-				if err := runtimeClient.IntegrationReportStatus(ctx, &mondooclient.ReportStatusRequest{
-					Mrn:    integrationMrn,
-					Status: mondooclient.Status_DELETED,
-				}); err != nil && !common.IsNotFound(err) {
-					log.Error(err, "failed to report console integration as deleted", "integrationMRN", integrationMrn)
-				}
+		err := reportIntegrationDeleted(ctx, mondooClientBuilder, *sa, integrationMrn, httpProxy, httpsProxy, noProxy, log)
+		if err == nil || common.IsNotFound(err) {
+			reported = true
+		} else {
+			log.Error(err, "failed to report console integration as deleted with runtime credentials, retrying with provisioner credentials",
+				"integrationMRN", integrationMrn)
+		}
+	}
+	if !reported {
+		if c := provisionerCred(); c != nil {
+			if err := reportIntegrationDeleted(ctx, mondooClientBuilder, c.sa, integrationMrn, httpProxy, httpsProxy, noProxy, log); err != nil && !common.IsNotFound(err) {
+				log.Error(err, "failed to report console integration as deleted", "integrationMRN", integrationMrn)
 			}
 		}
 	}
@@ -83,20 +95,20 @@ func CleanupConsoleIntegration(
 		return
 	}
 
-	cred := resolveProvisionerCredential(ctx, kubeClient, mondooClientBuilder, m, httpProxy, httpsProxy, noProxy, log)
-	if cred == nil {
+	c := provisionerCred()
+	if c == nil {
 		log.Info("no provisioner credential available, leaving console integration in place",
 			"integrationMRN", integrationMrn)
 		return
 	}
 
-	token, err := GenerateTokenFromServiceAccount(cred.sa, log)
+	token, err := GenerateTokenFromServiceAccount(c.sa, log)
 	if err != nil {
 		log.Error(err, "unable to generate token from provisioner credential for integration cleanup")
 		return
 	}
 	provisionerClient, err := mondooClientBuilder(mondooclient.MondooClientOptions{
-		ApiEndpoint: cred.sa.ApiEndpoint,
+		ApiEndpoint: c.sa.ApiEndpoint,
 		Token:       token,
 		HttpProxy:   httpProxy,
 		HttpsProxy:  httpsProxy,
@@ -117,6 +129,37 @@ func CleanupConsoleIntegration(
 		return
 	}
 	log.Info("deleted operator-created console integration", "integrationMRN", integrationMrn)
+}
+
+// reportIntegrationDeleted reports the integration as DELETED with the given credential.
+func reportIntegrationDeleted(
+	ctx context.Context,
+	mondooClientBuilder MondooClientBuilder,
+	sa mondooclient.ServiceAccountCredentials,
+	integrationMrn string,
+	httpProxy *string,
+	httpsProxy *string,
+	noProxy *string,
+	log logr.Logger,
+) error {
+	token, err := GenerateTokenFromServiceAccount(sa, log)
+	if err != nil {
+		return err
+	}
+	client, err := mondooClientBuilder(mondooclient.MondooClientOptions{
+		ApiEndpoint: sa.ApiEndpoint,
+		Token:       token,
+		HttpProxy:   httpProxy,
+		HttpsProxy:  httpsProxy,
+		NoProxy:     noProxy,
+	})
+	if err != nil {
+		return err
+	}
+	return client.IntegrationReportStatus(ctx, &mondooclient.ReportStatusRequest{
+		Mrn:    integrationMrn,
+		Status: mondooclient.Status_DELETED,
+	})
 }
 
 // resolveProvisionerCredential loads the provisioner service account persisted during

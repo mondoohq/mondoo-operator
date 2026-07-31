@@ -29,7 +29,7 @@ func testProvisionerCredential(scopeMrn string) *provisionerCredential {
 		Certificate: "CERT",
 		ApiEndpoint: "http://127.0.0.2:8989",
 	}
-	raw, _ := json.Marshal(sa)
+	raw, _ := json.Marshal(sa) //nolint:gosec
 	return &provisionerCredential{sa: sa, raw: string(raw)}
 }
 

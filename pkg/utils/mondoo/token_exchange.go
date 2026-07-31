@@ -129,6 +129,12 @@ func CreateServiceAccountFromToken(ctx context.Context, kubeClient client.Client
 			return err
 		}
 
+		if resp.Creds == nil {
+			err := fmt.Errorf("registering with console integration %s returned no credentials", tokenOwner)
+			log.Error(err, "invalid IntegrationRegister response")
+			return err
+		}
+
 		integrationMrn := resp.Mrn
 		credsBytes, err := json.Marshal(*resp.Creds) //nolint:gosec
 		if err != nil {

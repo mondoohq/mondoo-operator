@@ -447,6 +447,38 @@ func TestTokenRegistration(t *testing.T) {
 			},
 		},
 		{
+			name: "auto-create errors when registration returns no credentials",
+			existingObjects: []client.Object{
+				testTokenSecret(),
+				testMondooAuditConfigWithIntegration(),
+				testKubeSystemNamespace(),
+			},
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+
+				mClient.EXPECT().ExchangeRegistrationToken(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.ExchangeRegistrationTokenOutput{
+					ServiceAccount: string(testMondooServiceAccountDataBytes),
+				}, nil)
+
+				mClient.EXPECT().IntegrationList(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationListOutput{}, nil)
+
+				mClient.EXPECT().IntegrationCreate(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationCreateOutput{
+					Integration: &mondooclient.Integration{
+						Mrn:   testIntegrationMRN,
+						Token: testIntegrationTokenData,
+					},
+				}, nil)
+
+				// a response without credentials must not panic and must fail provisioning
+				mClient.EXPECT().IntegrationRegister(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationRegisterOutput{
+					Mrn: testIntegrationMRN,
+				}, nil)
+
+				return mClient
+			},
+			expectError: true,
+		},
+		{
 			name: "auto-create errors on empty adoption token",
 			existingObjects: []client.Object{
 				testTokenSecret(),

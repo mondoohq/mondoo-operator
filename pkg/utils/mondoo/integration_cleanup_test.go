@@ -39,7 +39,7 @@ func cleanupTestServiceAccount(t *testing.T) (mondooclient.ServiceAccountCredent
 		Certificate: "CERT",
 		ApiEndpoint: "http://127.0.0.2:8989",
 	}
-	data, err := json.Marshal(sa)
+	data, err := json.Marshal(sa) //nolint:gosec
 	require.NoError(t, err)
 	return sa, data
 }
@@ -178,6 +178,30 @@ func TestCleanupConsoleIntegration(t *testing.T) {
 			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
 				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
 				mClient.EXPECT().IntegrationReportStatus(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+				mClient.EXPECT().IntegrationDelete(gomock.Any(), &mondooclient.IntegrationDeleteInput{
+					Mrn: testIntegrationMrn,
+				}).Times(1).Return(nil)
+				return mClient
+			},
+		},
+		{
+			name:        "retries the deleted report with the provisioner credential",
+			auditConfig: cleanupTestAuditConfig(),
+			existingObjects: func() []client.Object {
+				return []client.Object{
+					cleanupTestCredsSecret(saData, true),
+					cleanupTestProvisionerSecret(saData),
+				}
+			},
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+				forbidden := &common.HttpError{StatusCode: http.StatusForbidden, Body: "permission denied"}
+				gomock.InOrder(
+					// runtime credentials are rejected → the report is retried with the
+					// provisioner credential
+					mClient.EXPECT().IntegrationReportStatus(gomock.Any(), gomock.Any()).Times(1).Return(forbidden),
+					mClient.EXPECT().IntegrationReportStatus(gomock.Any(), gomock.Any()).Times(1).Return(nil),
+				)
 				mClient.EXPECT().IntegrationDelete(gomock.Any(), &mondooclient.IntegrationDeleteInput{
 					Mrn: testIntegrationMrn,
 				}).Times(1).Return(nil)
