@@ -257,6 +257,7 @@ func TestCronJob_JobOverrides(t *testing.T) {
 	mac := testMondooAuditConfig()
 	mac.Spec.Nodes.JobOverrides = v1alpha2.JobOverrides{
 		TTLSecondsAfterFinished: ptr.To(int32(300)),
+		Labels:                  map[string]string{"team": "security"},
 		Annotations:             map[string]string{"karpenter.sh/do-not-disrupt": "true"},
 		NodeSelector:            map[string]string{"workload-type": "mondoo-scan"},
 		Tolerations: []corev1.Toleration{
@@ -266,6 +267,10 @@ func TestCronJob_JobOverrides(t *testing.T) {
 
 	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 	assert.Equal(t, ptr.To(int32(300)), cj.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
+
+	// User labels are applied
+	assert.Equal(t, "security", cj.Spec.JobTemplate.Labels["team"])
+	assert.Equal(t, "security", cj.Spec.JobTemplate.Spec.Template.Labels["team"])
 
 	// User annotations are merged; operator-managed annotations are kept
 	assert.Equal(t, "true", cj.Spec.JobTemplate.Annotations["karpenter.sh/do-not-disrupt"])
@@ -281,6 +286,26 @@ func TestCronJob_JobOverrides(t *testing.T) {
 	require.Len(t, tolerations, 2)
 	assert.Equal(t, "node-taint", tolerations[0].Key)
 	assert.Equal(t, mac.Spec.Nodes.JobOverrides.Tolerations[0], tolerations[1])
+}
+
+func TestCronJob_GlobalJobOverrides(t *testing.T) {
+	testNode := corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-node-name"},
+	}
+	mac := testMondooAuditConfig()
+	mac.Spec.JobOverrides = v1alpha2.JobOverrides{
+		TTLSecondsAfterFinished: ptr.To(int32(3600)),
+		Labels:                  map[string]string{"team": "security", "env": "prod"},
+	}
+	mac.Spec.Nodes.JobOverrides = v1alpha2.JobOverrides{
+		TTLSecondsAfterFinished: ptr.To(int32(300)),
+		Labels:                  map[string]string{"team": "platform"},
+	}
+
+	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	assert.Equal(t, ptr.To(int32(300)), cj.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
+	assert.Equal(t, "platform", cj.Spec.JobTemplate.Labels["team"])
+	assert.Equal(t, "prod", cj.Spec.JobTemplate.Labels["env"])
 }
 
 func TestDaemonSet_Capabilities(t *testing.T) {

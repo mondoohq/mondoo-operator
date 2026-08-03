@@ -237,7 +237,7 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 		)
 	}
 
-	k8s.ApplyJobOverrides(cronjob, m.Spec.Containers.JobOverrides)
+	k8s.ApplyJobOverrides(cronjob, k8s.MergeJobOverrides(m.Spec.JobOverrides, m.Spec.Containers.JobOverrides))
 
 	return cronjob
 }

@@ -277,6 +277,13 @@ func (in *JobOverrides) DeepCopyInto(out *JobOverrides) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.Labels != nil {
+		in, out := &in.Labels, &out.Labels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Annotations != nil {
 		in, out := &in.Annotations, &out.Annotations
 		*out = make(map[string]string, len(*in))
@@ -460,6 +467,7 @@ func (in *MondooAuditConfigSpec) DeepCopyInto(out *MondooAuditConfigSpec) {
 			(*out)[key] = val
 		}
 	}
+	in.JobOverrides.DeepCopyInto(&out.JobOverrides)
 	if in.Admission != nil {
 		in, out := &in.Admission, &out.Admission
 		*out = new(DeprecatedAdmission)

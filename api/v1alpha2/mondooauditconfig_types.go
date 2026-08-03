@@ -41,6 +41,12 @@ type MondooAuditConfigSpec struct {
 	// and filterable in the Mondoo Console.
 	Annotations map[string]string `json:"annotations,omitempty"`
 
+	// JobOverrides provides global defaults for all operator-generated scan Jobs.
+	// Per-scan-type overrides (e.g. spec.containers.jobOverrides) are deep-merged
+	// with this global config; per-type values take precedence on key conflicts.
+	// +optional
+	JobOverrides JobOverrides `json:"jobOverrides,omitempty"`
+
 	// Admission is DEPRECATED and ignored. Admission webhooks were removed in v12.1.0.
 	// The operator will automatically clean up any orphaned admission resources.
 	// See docs/admission-migration-guide.md for migration instructions.
@@ -77,6 +83,11 @@ type JobOverrides struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
+
+	// Labels are added to the Jobs and their pod templates. Operator-managed
+	// labels take precedence and cannot be overwritten.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
 
 	// Annotations are added to the Jobs and their pod templates (e.g.
 	// "karpenter.sh/do-not-disrupt": "true"). Operator-managed annotations take precedence

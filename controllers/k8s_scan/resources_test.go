@@ -338,6 +338,7 @@ func TestCronJob_JobOverrides(t *testing.T) {
 	m := testAuditConfig()
 	m.Spec.KubernetesResources.JobOverrides = v1alpha2.JobOverrides{
 		TTLSecondsAfterFinished: ptr.To(int32(300)),
+		Labels:                  map[string]string{"team": "security"},
 		Annotations:             map[string]string{"karpenter.sh/do-not-disrupt": "true"},
 		NodeSelector:            map[string]string{"workload-type": "mondoo-scan"},
 		Tolerations: []corev1.Toleration{
@@ -348,16 +349,36 @@ func TestCronJob_JobOverrides(t *testing.T) {
 
 	cj := CronJob("test-image:latest", m, cfg)
 	assert.Equal(t, ptr.To(int32(300)), cj.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
+	assert.Equal(t, "security", cj.Spec.JobTemplate.Labels["team"])
 	assert.Equal(t, "true", cj.Spec.JobTemplate.Annotations["karpenter.sh/do-not-disrupt"])
 	assert.Equal(t, "true", cj.Spec.JobTemplate.Spec.Template.Annotations["karpenter.sh/do-not-disrupt"])
 	assert.Equal(t, map[string]string{"workload-type": "mondoo-scan"}, cj.Spec.JobTemplate.Spec.Template.Spec.NodeSelector)
 	assert.Equal(t, m.Spec.KubernetesResources.JobOverrides.Tolerations, cj.Spec.JobTemplate.Spec.Template.Spec.Tolerations)
 }
 
+func TestCronJob_GlobalJobOverrides(t *testing.T) {
+	m := testAuditConfig()
+	m.Spec.JobOverrides = v1alpha2.JobOverrides{
+		TTLSecondsAfterFinished: ptr.To(int32(3600)),
+		Labels:                  map[string]string{"team": "security", "env": "prod"},
+	}
+	m.Spec.KubernetesResources.JobOverrides = v1alpha2.JobOverrides{
+		TTLSecondsAfterFinished: ptr.To(int32(300)),
+		Labels:                  map[string]string{"team": "platform"},
+	}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", m, cfg)
+	assert.Equal(t, ptr.To(int32(300)), cj.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
+	assert.Equal(t, "platform", cj.Spec.JobTemplate.Labels["team"])
+	assert.Equal(t, "prod", cj.Spec.JobTemplate.Labels["env"])
+}
+
 func TestExternalClusterCronJob_JobOverrides(t *testing.T) {
 	m := testAuditConfig()
 	m.Spec.KubernetesResources.JobOverrides = v1alpha2.JobOverrides{
 		TTLSecondsAfterFinished: ptr.To(int32(300)),
+		Labels:                  map[string]string{"team": "security"},
 		Annotations:             map[string]string{"karpenter.sh/do-not-disrupt": "true"},
 		NodeSelector:            map[string]string{"workload-type": "mondoo-scan"},
 		Tolerations: []corev1.Toleration{
@@ -372,6 +393,7 @@ func TestExternalClusterCronJob_JobOverrides(t *testing.T) {
 
 	cj := ExternalClusterCronJob("test-image:latest", cluster, m, cfg)
 	assert.Equal(t, ptr.To(int32(300)), cj.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
+	assert.Equal(t, "security", cj.Spec.JobTemplate.Labels["team"])
 	assert.Equal(t, "true", cj.Spec.JobTemplate.Annotations["karpenter.sh/do-not-disrupt"])
 	assert.Equal(t, "true", cj.Spec.JobTemplate.Spec.Template.Annotations["karpenter.sh/do-not-disrupt"])
 	assert.Equal(t, map[string]string{"workload-type": "mondoo-scan"}, cj.Spec.JobTemplate.Spec.Template.Spec.NodeSelector)
