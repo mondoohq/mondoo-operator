@@ -125,6 +125,13 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 			return err
 		}
 
+		if limit, allocatable, unsafe := UnsafeNodeScanMemoryLimit(
+			k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources),
+			node,
+		); unsafe {
+			n.log().Info(nodeScanMemoryLimitWarning(limit, allocatable), "node", node.Name)
+		}
+
 		desired := CronJob(mondooClientImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
 		cronJob := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
 		op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, cronJob, n.Mondoo, n.log(), func() error {
