@@ -627,6 +627,127 @@ func TestTokenRegistration(t *testing.T) {
 				assert.Equal(t, testIntegrationMRN, string(credsSecret.Data["integrationmrn"]))
 			},
 		},
+		{
+			name: "auto-create from existing creds secret without enable",
+			existingObjects: func() []client.Object {
+				mac := testMondooAuditConfig()
+				mac.Spec.ConsoleIntegration.AutoCreate = boolPtr(true)
+				return []client.Object{
+					mac,
+					&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      testMondooCredsSecretName,
+							Namespace: testNamespace,
+						},
+						Data: map[string][]byte{
+							"config": testMondooServiceAccountDataBytes,
+						},
+					},
+					testKubeSystemNamespace(),
+				}
+			}(),
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+
+				mClient.EXPECT().IntegrationList(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationListOutput{}, nil)
+
+				mClient.EXPECT().IntegrationCreate(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationCreateOutput{
+					Integration: &mondooclient.Integration{
+						Mrn:   testIntegrationMRN,
+						Token: testIntegrationTokenData,
+					},
+				}, nil)
+
+				mClient.EXPECT().IntegrationRegister(gomock.Any(), gomock.Any()).Times(1).Return(&mondooclient.IntegrationRegisterOutput{
+					Mrn:   testIntegrationMRN,
+					Creds: testMondooServiceAccount,
+				}, nil)
+
+				expectInitialCheckIn(mClient)
+				mClient.EXPECT().IntegrationReportStatus(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+				return mClient
+			},
+			verify: func(t *testing.T, kubeClient client.Client) {
+				credsSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testMondooCredsSecretName,
+						Namespace: testNamespace,
+					},
+				}
+				err := kubeClient.Get(context.TODO(), client.ObjectKeyFromObject(credsSecret), credsSecret)
+				assert.NoError(t, err, "error getting creds secret")
+				assert.Equal(t, testIntegrationMRN, string(credsSecret.Data["integrationmrn"]))
+				assert.Equal(t, "true", string(credsSecret.Data["operator-managed"]))
+
+				mac := &v1alpha2.MondooAuditConfig{}
+				err = kubeClient.Get(context.TODO(), types.NamespacedName{Name: testMondooAuditConfigName, Namespace: testNamespace}, mac)
+				assert.NoError(t, err, "error getting MondooAuditConfig")
+				assert.False(t, mac.Spec.ConsoleIntegration.Enable, "spec.enable should remain false")
+				assert.Equal(t, testIntegrationMRN, mac.Status.IntegrationMRN, "status.integrationMRN should be set after auto-create")
+			},
+		},
+		{
+			name: "auto-create records MRN in status when creds already have integration MRN",
+			existingObjects: func() []client.Object {
+				mac := testMondooAuditConfig()
+				mac.Spec.ConsoleIntegration.AutoCreate = boolPtr(true)
+				return []client.Object{
+					mac,
+					&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      testMondooCredsSecretName,
+							Namespace: testNamespace,
+						},
+						Data: map[string][]byte{
+							"config":         testMondooServiceAccountDataBytes,
+							"integrationmrn": []byte(testIntegrationMRN),
+						},
+					},
+				}
+			}(),
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+				mClient.EXPECT().IntegrationReportStatus(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+				return mClient
+			},
+			verify: func(t *testing.T, kubeClient client.Client) {
+				mac := &v1alpha2.MondooAuditConfig{}
+				err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: testMondooAuditConfigName, Namespace: testNamespace}, mac)
+				assert.NoError(t, err)
+				assert.False(t, mac.Spec.ConsoleIntegration.Enable, "spec.enable should remain false")
+				assert.Equal(t, testIntegrationMRN, mac.Status.IntegrationMRN, "status.integrationMRN should be set from creds secret")
+			},
+		},
+		{
+			name: "auto-create skipped when autoCreate is disabled",
+			existingObjects: func() []client.Object {
+				mac := testMondooAuditConfig()
+				mac.Spec.ConsoleIntegration.AutoCreate = boolPtr(false)
+				return []client.Object{
+					mac,
+					&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      testMondooCredsSecretName,
+							Namespace: testNamespace,
+						},
+						Data: map[string][]byte{
+							"config": testMondooServiceAccountDataBytes,
+						},
+					},
+				}
+			}(),
+			mockMondooClient: func(mockCtrl *gomock.Controller) *mockmondoo.MockMondooClient {
+				mClient := mockmondoo.NewMockMondooClient(mockCtrl)
+				return mClient
+			},
+			verify: func(t *testing.T, kubeClient client.Client) {
+				mac := &v1alpha2.MondooAuditConfig{}
+				err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: testMondooAuditConfigName, Namespace: testNamespace}, mac)
+				assert.NoError(t, err)
+				assert.False(t, mac.Spec.ConsoleIntegration.Enable, "enable should remain false when autoCreate is disabled")
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1139,3 +1260,5 @@ func TestIsCronJobScanPod(t *testing.T) {
 		})
 	}
 }
+
+func boolPtr(b bool) *bool { return &b }

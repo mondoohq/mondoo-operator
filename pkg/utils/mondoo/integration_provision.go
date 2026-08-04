@@ -158,6 +158,26 @@ func k8sConfigurationOptions(m *v1alpha2.MondooAuditConfig) *mondooclient.K8sCon
 	return opts
 }
 
+// ProvisionIntegrationFromServiceAccount creates the console integration using an existing
+// service account as the provisioner credential. This is the entry point for the autoCreate
+// path when the creds Secret already exists but has no integration MRN yet.
+func ProvisionIntegrationFromServiceAccount(
+	ctx context.Context,
+	kubeClient client.Client,
+	mondooClientBuilder MondooClientBuilder,
+	m *v1alpha2.MondooAuditConfig,
+	sa mondooclient.ServiceAccountCredentials,
+	saRaw string,
+	serviceAccountSecret types.NamespacedName,
+	httpProxy *string,
+	httpsProxy *string,
+	noProxy *string,
+	log logr.Logger,
+) error {
+	cred := &provisionerCredential{sa: sa, raw: saRaw}
+	return provisionConsoleIntegration(ctx, kubeClient, mondooClientBuilder, m, cred, serviceAccountSecret, httpProxy, httpsProxy, noProxy, log)
+}
+
 // provisionConsoleIntegration creates the console integration for the MondooAuditConfig (or
 // re-attaches to one created earlier, found via its audit-config identifier), registers a
 // runtime service account with the integration's own registration token and persists it to
@@ -229,9 +249,10 @@ func provisionConsoleIntegration(
 	identifier := AuditConfigIdentifier(clusterUID, client.ObjectKeyFromObject(m))
 
 	list, err := provisionerClient.IntegrationList(ctx, &mondooclient.IntegrationListInput{
-		ScopeMrn:    scopeMrn,
-		Types:       []string{mondooclient.IntegrationTypeK8s},
-		Identifiers: []string{identifier},
+		ScopeMrn:        scopeMrn,
+		Types:           []string{mondooclient.IntegrationTypeK8s},
+		ExcludeStatuses: []mondooclient.Status{mondooclient.Status_DELETED},
+		Identifiers:     []string{identifier},
 	})
 	if err != nil {
 		if common.IsForbidden(err) {

@@ -1945,6 +1945,12 @@ spec:
                   - type
                   type: object
                 type: array
+              integrationMRN:
+                description: |-
+                  IntegrationMRN is the MRN of the console integration created by the autoCreate flow.
+                  Stored in status (not spec) so the operator can track auto-created integrations without
+                  mutating the spec, which would conflict with GitOps orchestrators like ArgoCD.
+                type: string
               lastContainerImageGarbageCollectionTime:
                 description: |-
                   LastContainerImageGarbageCollectionTime tracks the last time the operator performed

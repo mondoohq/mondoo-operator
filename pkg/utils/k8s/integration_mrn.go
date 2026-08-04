@@ -21,7 +21,7 @@ import (
 // integration-mrn is returned but also no error. If the secret does not exist yet or is missing the integrationmrn key
 // (token exchange has not completed), an empty string is returned without error so the operator can continue reconciling.
 func TryGetIntegrationMrnForAuditConfig(ctx context.Context, kubeClient client.Client, auditConfig v1alpha2.MondooAuditConfig) (string, error) {
-	if !auditConfig.Spec.ConsoleIntegration.Enable {
+	if !auditConfig.ConsoleIntegrationActive() {
 		return "", nil
 	}
 

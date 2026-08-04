@@ -88,7 +88,7 @@ func (r *IntegrationReconciler) integrationLoop() {
 	}
 
 	for _, mac := range mondooAuditConfigs.Items {
-		if mac.Spec.ConsoleIntegration.Enable {
+		if mac.ConsoleIntegrationActive() {
 			if err := r.processMondooAuditConfig(mac); err != nil {
 				logger.Error(err, "failed to process MondooAuditconfig", "mondooAuditConfig", fmt.Sprintf("%s/%s", mac.Namespace, mac.Name))
 			}
@@ -205,7 +205,7 @@ func updateIntegrationCondition(config *v1alpha2.MondooAuditConfig, degradedStat
 	reason := "IntegrationAvailable"
 	status := corev1.ConditionFalse
 	updateCheck := mondoo.UpdateConditionIfReasonOrMessageChange
-	if !config.Spec.ConsoleIntegration.Enable {
+	if !config.ConsoleIntegrationActive() {
 		msg = "Mondoo integration is disabled"
 		reason = "IntegrationDisabled"
 		status = corev1.ConditionFalse

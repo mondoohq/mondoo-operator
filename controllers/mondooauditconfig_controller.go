@@ -298,6 +298,13 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, reconcileError
 	}
 
+	// When autoCreate is true but enable is not yet set, try to create the console integration
+	// from the existing service account credential and flip enable on success.
+	if reconcileError = r.autoCreateIntegration(ctx, mondooAuditConfig, config, log); reconcileError != nil {
+		log.Error(reconcileError, "errors during auto-create integration")
+		return ctrl.Result{}, reconcileError
+	}
+
 	// When spaceId is set, create a derived Secret with scope_mrn injected so cnspec
 	// routes assets to the specified space instead of the SA's default space.
 	if reconcileError = k8s.SyncConfigOverrideSecret(ctx, r.Client, mondooAuditConfig); reconcileError != nil {
@@ -518,7 +525,6 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 	}
 
 	if mondooCredsExists {
-		// Nothing to do as we already have creds
 		return nil
 	}
 
@@ -553,6 +559,84 @@ func (r *MondooAuditConfigReconciler) exchangeTokenForServiceAccount(ctx context
 		cfg.Spec.HttpsProxy,
 		cfg.Spec.NoProxy,
 		log)
+}
+
+// autoCreateIntegration provisions a console integration when autoCreate is true but no
+// integration exists yet. It uses the existing service account from the creds Secret as the
+// provisioner credential. On success it records the integration MRN in status (not spec) so
+// GitOps orchestrators like ArgoCD don't see drift.
+func (r *MondooAuditConfigReconciler) autoCreateIntegration(ctx context.Context, auditConfig *v1alpha2.MondooAuditConfig, cfg *v1alpha2.MondooOperatorConfig, log logr.Logger) error {
+	if !auditConfig.Spec.ConsoleIntegration.AutoCreateIntegration() {
+		return nil
+	}
+
+	// Already resolved — either explicitly enabled or auto-created on a previous reconcile.
+	if auditConfig.ConsoleIntegrationActive() {
+		return nil
+	}
+
+	if auditConfig.Spec.MondooCredsSecretRef.Name == "" {
+		return nil
+	}
+
+	secret, err := k8s.GetIntegrationSecretForAuditConfig(ctx, r.Client, *auditConfig)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	// If the creds secret already has an integration MRN (e.g. from the token exchange path),
+	// record it in status and we're done.
+	if mrn, ok := secret.Data[constants.MondooCredsSecretIntegrationMRNKey]; ok && len(mrn) > 0 {
+		auditConfig.Status.IntegrationMRN = string(mrn)
+		if err := r.Status().Update(ctx, auditConfig); err != nil {
+			return fmt.Errorf("failed to record integration MRN in status: %w", err)
+		}
+		log.Info("recorded existing integration MRN in status", "integrationMRN", string(mrn))
+		return nil
+	}
+
+	saRaw, ok := secret.Data[constants.MondooCredsSecretServiceAccountKey]
+	if !ok {
+		return nil
+	}
+
+	sa, err := k8s.GetServiceAccountFromSecret(*secret)
+	if err != nil {
+		return err
+	}
+
+	log.Info("auto-creating console integration from existing service account")
+	if err := mondoo.ProvisionIntegrationFromServiceAccount(
+		ctx,
+		r.Client,
+		r.MondooClientBuilder,
+		auditConfig,
+		*sa,
+		string(saRaw),
+		client.ObjectKeyFromObject(secret),
+		cfg.Spec.HttpProxy,
+		cfg.Spec.HttpsProxy,
+		cfg.Spec.NoProxy,
+		log,
+	); err != nil {
+		return err
+	}
+
+	// Re-read the creds secret to get the integration MRN written by provisioning.
+	if err := r.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+		return fmt.Errorf("failed to re-read creds secret after auto-create: %w", err)
+	}
+	integrationMRN := string(secret.Data[constants.MondooCredsSecretIntegrationMRNKey])
+	auditConfig.Status.IntegrationMRN = integrationMRN
+	if err := r.Status().Update(ctx, auditConfig); err != nil {
+		return fmt.Errorf("failed to record integration MRN in status after auto-create: %w", err)
+	}
+	log.Info("auto-created console integration", "integrationMRN", integrationMRN)
+
+	return nil
 }
 
 // operatorConfigRequestMapper maps MondooOperatorConfig changes to enqueue all MondooAuditConfigs

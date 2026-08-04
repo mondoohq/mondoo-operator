@@ -169,8 +169,9 @@ type Integration struct {
 // IntegrationListInput matches the server-side Query proto for IntegrationsManager/List.
 // Note: the proto field is literally named "scopeMrn" (camelCase) in the .proto file.
 type IntegrationListInput struct {
-	ScopeMrn string   `protobuf:"bytes,1,opt,name=scopeMrn,proto3" json:"scopeMrn,omitempty"`
-	Types    []string `protobuf:"varint,2,rep,name=types,proto3,enum=mondoo.integrations.v1.Type" json:"types,omitempty"`
+	ScopeMrn        string   `protobuf:"bytes,1,opt,name=scopeMrn,proto3" json:"scopeMrn,omitempty"`
+	Types           []string `protobuf:"varint,2,rep,name=types,proto3,enum=mondoo.integrations.v1.Type" json:"types,omitempty"`
+	ExcludeStatuses []Status `protobuf:"varint,3,rep,packed,name=exclude_statuses,json=excludeStatuses,proto3,enum=mondoo.integrations.v1.Status" json:"exclude_statuses,omitempty"`
 	// Identifiers filters to integrations that contain any of these identifiers.
 	Identifiers []string `protobuf:"bytes,6,rep,name=identifiers,proto3" json:"identifiers,omitempty"`
 }

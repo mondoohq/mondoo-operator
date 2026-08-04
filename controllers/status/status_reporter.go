@@ -39,8 +39,8 @@ func NewStatusReporter(kubeClient client.Client, mondooClientBuilder func(mondoo
 }
 
 func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) error {
-	if !m.Spec.ConsoleIntegration.Enable {
-		return nil // If ConsoleIntegration is not enabled, we cannot report status
+	if !m.ConsoleIntegrationActive() {
+		return nil // If ConsoleIntegration is not active, we cannot report status
 	}
 	if !m.DeletionTimestamp.IsZero() {
 		// The MondooAuditConfig is being deleted; the deletion flow reports the integration
