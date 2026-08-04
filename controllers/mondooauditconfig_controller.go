@@ -298,8 +298,8 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, reconcileError
 	}
 
-	// When autoCreate is true but enable is not yet set, try to create the console integration
-	// from the existing service account credential and flip enable on success.
+	// When autoCreate is true but no integration exists yet, try to create the console integration
+	// from the existing service account credential and record the MRN in status on success.
 	if reconcileError = r.autoCreateIntegration(ctx, mondooAuditConfig, config, log); reconcileError != nil {
 		log.Error(reconcileError, "errors during auto-create integration")
 		return ctrl.Result{}, reconcileError

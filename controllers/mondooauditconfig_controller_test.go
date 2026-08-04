@@ -326,9 +326,10 @@ func TestTokenRegistration(t *testing.T) {
 				}, nil)
 
 				mClient.EXPECT().IntegrationList(gomock.Any(), &mondooclient.IntegrationListInput{
-					ScopeMrn:    testMondooServiceAccount.SpaceMrn,
-					Types:       []string{mondooclient.IntegrationTypeK8s},
-					Identifiers: []string{testAuditConfigIdentifier()},
+					ScopeMrn:        testMondooServiceAccount.SpaceMrn,
+					Types:           []string{mondooclient.IntegrationTypeK8s},
+					ExcludeStatuses: []mondooclient.Status{mondooclient.Status_DELETED},
+					Identifiers:     []string{testAuditConfigIdentifier()},
 				}).Times(1).Return(&mondooclient.IntegrationListOutput{}, nil)
 
 				mClient.EXPECT().IntegrationCreate(gomock.Any(), &mondooclient.IntegrationCreateInput{
