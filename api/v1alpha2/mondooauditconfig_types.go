@@ -47,6 +47,12 @@ type MondooAuditConfigSpec struct {
 	// +optional
 	JobOverrides JobOverrides `json:"jobOverrides,omitempty"`
 
+	// RemoteManaged indicates that the scan configuration is managed by the
+	// Mondoo Console. When true, the operator fetches config from the server
+	// and uses it as the authoritative source instead of the local spec.
+	// +optional
+	RemoteManaged bool `json:"remoteManaged,omitempty"`
+
 	// Admission is DEPRECATED and ignored. Admission webhooks were removed in v12.1.0.
 	// The operator will automatically clean up any orphaned admission resources.
 	// See docs/admission-migration-guide.md for migration instructions.
@@ -717,6 +723,21 @@ type MondooAuditConfigStatus struct {
 	// mutating the spec, which would conflict with GitOps orchestrators like ArgoCD.
 	// +optional
 	IntegrationMRN string `json:"integrationMRN,omitempty"`
+
+	// RemoteConfig holds the raw JSON configuration blob received from the server.
+	// Used as last-known-good when the server is unreachable.
+	// +optional
+	RemoteConfig string `json:"remoteConfig,omitempty"`
+
+	// RemoteConfigHash is the SHA-256 hex digest of RemoteConfig. Sent to the
+	// server on CheckIn to detect configuration changes.
+	// +optional
+	RemoteConfigHash string `json:"remoteConfigHash,omitempty"`
+
+	// LastRemoteConfigTime is the timestamp of the last successful remote
+	// configuration fetch.
+	// +optional
+	LastRemoteConfigTime *metav1.Time `json:"lastRemoteConfigTime,omitempty"`
 }
 
 type MondooAuditConfigCondition struct {
@@ -816,6 +837,8 @@ const (
 	MondooIntegrationDegraded MondooAuditConfigConditionType = "IntegrationDegraded"
 	// ScanningPausedCondition indicates that scanning has been paused from the Mondoo console
 	ScanningPausedCondition MondooAuditConfigConditionType = "ScanningPaused"
+	// RemoteConfigDegradedCondition indicates a failure fetching or parsing remote config
+	RemoteConfigDegradedCondition MondooAuditConfigConditionType = "RemoteConfigDegraded"
 )
 
 //+kubebuilder:object:root=true

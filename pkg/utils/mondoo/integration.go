@@ -13,10 +13,10 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 )
 
-// IntegrationCheckInResult carries the pause-state change information returned by IntegrationCheckIn.
+// IntegrationCheckInResult carries the configuration returned by IntegrationCheckIn.
 type IntegrationCheckInResult struct {
 	// ConfigFetched is true when the server signalled a configuration mismatch and Configure was
-	// successfully fetched. When false, Paused should be ignored.
+	// successfully fetched. When false, Paused and Config should be ignored.
 	ConfigFetched bool
 	// Paused is the desired scanning-paused value from the server, valid only when ConfigFetched is true.
 	Paused bool
@@ -24,6 +24,18 @@ type IntegrationCheckInResult struct {
 	// server's Configure endpoint. The caller should persist this and pass it back on the next
 	// CheckIn so the server can detect configuration changes.
 	ConfigurationHash string
+	// RawConfig is the raw JSON configuration blob from the server, for persistence in CR status.
+	RawConfig string
+	// Config is the parsed configuration, valid only when ConfigFetched is true.
+	Config *mondooclient.K8sIntegrationConfig
+}
+
+func ParseK8sIntegrationConfig(raw []byte) (*mondooclient.K8sIntegrationConfig, error) {
+	var cfg mondooclient.K8sIntegrationConfig
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		return nil, fmt.Errorf("parsing K8s integration config: %w", err)
+	}
+	return &cfg, nil
 }
 
 func IntegrationCheckIn(
@@ -90,6 +102,8 @@ func IntegrationCheckIn(
 			}
 			result.ConfigFetched = true
 			result.Paused = k8sCfg.PauseScanning
+			result.RawConfig = configResp.Details.Config
+			result.Config = &k8sCfg
 			h := sha256.Sum256([]byte(configResp.Details.Config))
 			result.ConfigurationHash = fmt.Sprintf("%x", h[:])
 			logger.Info("parsed integration config", "pauseScanning", k8sCfg.PauseScanning, "newHash", result.ConfigurationHash)

@@ -88,7 +88,160 @@ type IntegrationConfigureDetails struct {
 }
 
 type K8sIntegrationConfig struct {
+	ScanNodes        bool   `json:"scanNodes,omitempty"`
+	ScanNodesStyle   string `json:"scanNodesStyle,omitempty"`
+	ScanWorkloads    bool   `json:"scanWorkloads,omitempty"`
+	ScanDeploys      bool   `json:"scanDeploys,omitempty"`
+	ScanPublicImages bool   `json:"scanPublicImages,omitempty"`
+	ScanLocalCluster bool   `json:"scanLocalCluster,omitempty"`
+
+	NamespaceAllowList []string `json:"namespaceAllowList,omitempty"`
+	NamespaceDenyList  []string `json:"namespaceDenyList,omitempty"`
+
+	Schedule           string `json:"schedule,omitempty"`
+	NodesSchedule      string `json:"nodesSchedule,omitempty"`
+	ContainersSchedule string `json:"containersSchedule,omitempty"`
+
+	ExternalClusters               []K8sExternalClusterConfig `json:"externalClusters,omitempty"`
+	PrivateRegistriesPullSecretRefs []string                  `json:"privateRegistriesPullSecretRefs,omitempty"`
+	ContainersWif                  *K8sContainersWifConfig    `json:"containersWif,omitempty"`
+
 	PauseScanning bool `json:"pauseScanning,omitempty"`
+
+	ScannerReplicas     int32                          `json:"scannerReplicas,omitempty"`
+	ScannerResources    *K8sResourceRequirementsConfig `json:"scannerResources,omitempty"`
+	NodesResources      *K8sResourceRequirementsConfig `json:"nodesResources,omitempty"`
+	ContainersResources *K8sResourceRequirementsConfig `json:"containersResources,omitempty"`
+
+	ResourceWatcher *K8sResourceWatcherConfig `json:"resourceWatcher,omitempty"`
+
+	ContainerRepositoriesAllowList []string `json:"containerRepositoriesAllowList,omitempty"`
+	ContainerRepositoriesDenyList  []string `json:"containerRepositoriesDenyList,omitempty"`
+
+	ScanCacheEnabled bool   `json:"scanCacheEnabled,omitempty"`
+	ScanCacheTTL     string `json:"scanCacheTtl,omitempty"`
+
+	K8sActiveDeadline        int64 `json:"k8sActiveDeadline,omitempty"`
+	ContainersActiveDeadline int64 `json:"containersActiveDeadline,omitempty"`
+
+	JobOverrides           *K8sJobOverridesConfig `json:"jobOverrides,omitempty"`
+	ScannerJobOverrides    *K8sJobOverridesConfig `json:"scannerJobOverrides,omitempty"`
+	NodesJobOverrides      *K8sJobOverridesConfig `json:"nodesJobOverrides,omitempty"`
+	ContainersJobOverrides *K8sJobOverridesConfig `json:"containersJobOverrides,omitempty"`
+
+	AssetAnnotations map[string]string `json:"assetAnnotations,omitempty"`
+	SpaceID          string            `json:"spaceId,omitempty"`
+
+	NodesPriorityClassName string `json:"nodesPriorityClassName,omitempty"`
+	NodesIntervalTimer     int32  `json:"nodesIntervalTimer,omitempty"`
+
+	ScannerEnv    []K8sEnvVarConfig `json:"scannerEnv,omitempty"`
+	NodesEnv      []K8sEnvVarConfig `json:"nodesEnv,omitempty"`
+	ContainersEnv []K8sEnvVarConfig `json:"containersEnv,omitempty"`
+}
+
+type K8sResourceRequirementsConfig struct {
+	CPURequest string `json:"cpuRequest,omitempty"`
+	CPULimit   string `json:"cpuLimit,omitempty"`
+	MemRequest string `json:"memRequest,omitempty"`
+	MemLimit   string `json:"memLimit,omitempty"`
+}
+
+type K8sResourceWatcherConfig struct {
+	Enable              bool     `json:"enable,omitempty"`
+	DebounceInterval    string   `json:"debounceInterval,omitempty"`
+	MinimumScanInterval string   `json:"minimumScanInterval,omitempty"`
+	WatchAllResources   bool     `json:"watchAllResources,omitempty"`
+	ResourceTypes       []string `json:"resourceTypes,omitempty"`
+}
+
+type K8sJobOverridesConfig struct {
+	TTLSecondsAfterFinished int32                 `json:"ttlSecondsAfterFinished,omitempty"`
+	Annotations             map[string]string     `json:"annotations,omitempty"`
+	NodeSelector            map[string]string     `json:"nodeSelector,omitempty"`
+	Tolerations             []K8sTolerationConfig `json:"tolerations,omitempty"`
+	Labels                  map[string]string     `json:"labels,omitempty"`
+}
+
+type K8sTolerationConfig struct {
+	Key      string `json:"key,omitempty"`
+	Operator string `json:"operator,omitempty"`
+	Value    string `json:"value,omitempty"`
+	Effect   string `json:"effect,omitempty"`
+}
+
+type K8sEnvVarConfig struct {
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
+}
+
+type K8sExternalClusterConfig struct {
+	Name                   string                      `json:"name,omitempty"`
+	KubeconfigSecret       string                      `json:"kubeconfigSecret,omitempty"`
+	Server                 string                      `json:"server,omitempty"`
+	CredentialsSecret      string                      `json:"credentialsSecret,omitempty"`
+	SkipTlsVerify          bool                        `json:"skipTlsVerify,omitempty"`
+	NamespaceAllowList     []string                    `json:"namespaceAllowList,omitempty"`
+	NamespaceDenyList      []string                    `json:"namespaceDenyList,omitempty"`
+	ContainerImageScanning bool                        `json:"containerImageScanning,omitempty"`
+	WifProvider            string                      `json:"wifProvider,omitempty"`
+	Gke                    *K8sGkeWifConfig            `json:"gke,omitempty"`
+	Eks                    *K8sEksWifConfig            `json:"eks,omitempty"`
+	Aks                    *K8sAksWifConfig            `json:"aks,omitempty"`
+	Spiffe                 *K8sSpiffeConfig            `json:"spiffe,omitempty"`
+	Vault                  *K8sVaultConfig             `json:"vault,omitempty"`
+}
+
+type K8sContainersWifConfig struct {
+	Provider string           `json:"provider,omitempty"`
+	Gke      *K8sGkeWifConfig `json:"gke,omitempty"`
+	Eks      *K8sEksWifConfig `json:"eks,omitempty"`
+	Aks      *K8sAksWifConfig `json:"aks,omitempty"`
+}
+
+type K8sGkeWifConfig struct {
+	ProjectID            string `json:"projectId,omitempty"`
+	ClusterName          string `json:"clusterName,omitempty"`
+	ClusterLocation      string `json:"clusterLocation,omitempty"`
+	GoogleServiceAccount string `json:"googleServiceAccount,omitempty"`
+	Endpoint             string `json:"endpoint,omitempty"`
+}
+
+type K8sEksWifConfig struct {
+	Region      string `json:"region,omitempty"`
+	ClusterName string `json:"clusterName,omitempty"`
+	RoleARN     string `json:"roleArn,omitempty"`
+	Endpoint    string `json:"endpoint,omitempty"`
+}
+
+type K8sAksWifConfig struct {
+	SubscriptionID string `json:"subscriptionId,omitempty"`
+	ResourceGroup  string `json:"resourceGroup,omitempty"`
+	ClusterName    string `json:"clusterName,omitempty"`
+	ClientID       string `json:"clientId,omitempty"`
+	TenantID       string `json:"tenantId,omitempty"`
+	LoginServer    string `json:"loginServer,omitempty"`
+	Endpoint       string `json:"endpoint,omitempty"`
+}
+
+type K8sSpiffeConfig struct {
+	Server             string `json:"server,omitempty"`
+	TrustBundleSecret  string `json:"trustBundleSecret,omitempty"`
+	SocketPath         string `json:"socketPath,omitempty"`
+	Audience           string `json:"audience,omitempty"`
+}
+
+type K8sVaultConfig struct {
+	Server              string `json:"server,omitempty"`
+	VaultAddr           string `json:"vaultAddr,omitempty"`
+	AuthRole            string `json:"authRole,omitempty"`
+	CredsRole           string `json:"credsRole,omitempty"`
+	AuthPath            string `json:"authPath,omitempty"`
+	SecretsPath         string `json:"secretsPath,omitempty"`
+	KubernetesNamespace string `json:"kubernetesNamespace,omitempty"`
+	TTL                 string `json:"ttl,omitempty"`
+	CaCertSecret        string `json:"caCertSecret,omitempty"`
+	TargetCaCertSecret  string `json:"targetCaCertSecret,omitempty"`
 }
 
 // IntegrationTypeK8s is the IntegrationsManager Type enum value name for Kubernetes client

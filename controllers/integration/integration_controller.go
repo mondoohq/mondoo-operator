@@ -11,6 +11,7 @@ import (
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	corev1 "k8s.io/api/core/v1"
@@ -45,7 +46,6 @@ func Add(mgr manager.Manager) error {
 		Client:              mgr.GetClient(),
 		Interval:            interval,
 		MondooClientBuilder: mondooclient.NewClient,
-		configHashes:        make(map[string]string),
 	}
 	if err := mgr.Add(mc); err != nil {
 		logger.Error(err, "failed to add integration controller to manager")
@@ -61,9 +61,6 @@ type IntegrationReconciler struct {
 	Interval            time.Duration
 	MondooClientBuilder func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
 	ctx                 context.Context
-	// configHashes tracks the last-known configuration hash per integration MRN so CheckIn can
-	// detect server-side configuration changes (e.g. pause/unpause).
-	configHashes map[string]string
 }
 
 // Start begins the integration status loop.
@@ -128,7 +125,9 @@ func (r *IntegrationReconciler) processMondooAuditConfig(m v1alpha2.MondooAuditC
 		}
 	}
 
-	result, err := mondoo.IntegrationCheckIn(r.ctx, integrationMrn, r.configHashes[integrationMrn], *serviceAccount, r.MondooClientBuilder, config.Spec.HttpProxy, config.Spec.HttpsProxy, config.Spec.NoProxy, logger)
+	existingHash := m.Status.RemoteConfigHash
+
+	result, err := mondoo.IntegrationCheckIn(r.ctx, integrationMrn, existingHash, *serviceAccount, r.MondooClientBuilder, config.Spec.HttpProxy, config.Spec.HttpsProxy, config.Spec.NoProxy, logger)
 	if err != nil {
 		// A 404 means the integration was deleted in the Mondoo console. The operator does
 		// not recreate it on its own: re-provisioning only happens when the creds Secret is
@@ -139,23 +138,39 @@ func (r *IntegrationReconciler) processMondooAuditConfig(m v1alpha2.MondooAuditC
 					"Delete the Secret %s/%s to re-provision, or disable .spec.consoleIntegration", integrationMrn, secret.Namespace, secret.Name)
 		}
 		logger.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
+		if m.Spec.RemoteManaged {
+			r.setRemoteConfigDegradedCondition(&m, true, "FetchFailed", err.Error())
+		}
 		return err
 	}
 
-	if result != nil && result.ConfigurationHash != "" {
-		if r.configHashes == nil {
-			r.configHashes = make(map[string]string)
+	statusChanged := false
+
+	if result != nil && result.ConfigFetched {
+		if result.Paused != m.Status.ScanningPaused {
+			m.Status.ScanningPaused = result.Paused
+			statusChanged = true
 		}
-		r.configHashes[integrationMrn] = result.ConfigurationHash
+
+		if result.RawConfig != "" && result.ConfigurationHash != existingHash {
+			m.Status.RemoteConfig = result.RawConfig
+			m.Status.RemoteConfigHash = result.ConfigurationHash
+			now := metav1.Now()
+			m.Status.LastRemoteConfigTime = &now
+			statusChanged = true
+			logger.Info("persisted remote config to status", "newHash", result.ConfigurationHash)
+		}
+
+		if m.Spec.RemoteManaged {
+			r.setRemoteConfigDegradedCondition(&m, false, "", "")
+		}
 	}
 
-	if result != nil && result.ConfigFetched && result.Paused != m.Status.ScanningPaused {
-		m.Status.ScanningPaused = result.Paused
+	if statusChanged {
 		if updateErr := r.Client.Status().Update(r.ctx, &m); updateErr != nil {
-			logger.Error(updateErr, "failed to update ScanningPaused status")
+			logger.Error(updateErr, "failed to update status")
 			return updateErr
 		}
-		logger.Info("updated ScanningPaused status", "paused", result.Paused)
 	}
 
 	return r.setScanningPausedCondition(&m)
@@ -221,4 +236,27 @@ func updateIntegrationCondition(config *v1alpha2.MondooAuditConfig, degradedStat
 	}
 
 	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, v1alpha2.MondooIntegrationDegraded, status, reason, msg, updateCheck, []string{}, "")
+}
+
+func (r *IntegrationReconciler) setRemoteConfigDegradedCondition(config *v1alpha2.MondooAuditConfig, degraded bool, reason, message string) {
+	originalConfig := config.DeepCopy()
+
+	status := corev1.ConditionFalse
+	if degraded {
+		status = corev1.ConditionTrue
+	} else {
+		reason = "ConfigFetched"
+		message = "Remote configuration successfully fetched"
+	}
+
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(
+		config.Status.Conditions, v1alpha2.RemoteConfigDegradedCondition, status,
+		reason, message, mondoo.UpdateConditionIfReasonOrMessageChange, nil, "",
+	)
+
+	if !reflect.DeepEqual(originalConfig.Status.Conditions, config.Status.Conditions) {
+		if err := r.Client.Status().Update(r.ctx, config); err != nil {
+			logger.Error(err, "failed to update RemoteConfigDegraded condition")
+		}
+	}
 }
