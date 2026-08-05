@@ -17,8 +17,20 @@
 #
 # Usage:
 #   ./run-asset-routing.sh <cloud>    (gke|eks|aks)
+#   ./run-asset-routing.sh <cloud> --audit-config-only
 
 set -euo pipefail
+
+AUDIT_CONFIG_ONLY=false
+POSITIONAL=()
+for arg in "$@"; do
+  case "${arg}" in
+    --audit-config-only) AUDIT_CONFIG_ONLY=true ;;
+    *) POSITIONAL+=("${arg}") ;;
+  esac
+done
+set -- "${POSITIONAL[@]+"${POSITIONAL[@]}"}"
+export AUDIT_CONFIG_ONLY
 
 CLOUD="${1:?Usage: $0 <cloud> (gke|eks|aks)}"
 export CLOUD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/${CLOUD}" && pwd)"
@@ -38,25 +50,29 @@ if [[ "${ENABLE_TARGET_CLUSTER}" != "true" ]]; then
   die "Target cluster not enabled. Run terraform with enable_target_cluster=true"
 fi
 
-# Step 2: Build and push operator image
-info "--- Step: Build and Push ---"
-source "${E2E_DIR}/scripts/build-and-push.sh"
+if [[ "${AUDIT_CONFIG_ONLY}" != "true" ]]; then
+  # Step 2: Build and push operator image
+  info "--- Step: Build and Push ---"
+  source "${E2E_DIR}/scripts/build-and-push.sh"
 
-# Step 3: Deploy test workload on scanner cluster
-info "--- Step: Deploy Test Workload (scanner cluster) ---"
-source "${E2E_DIR}/scripts/deploy-test-workload.sh"
+  # Step 3: Deploy test workload on scanner cluster
+  info "--- Step: Deploy Test Workload (scanner cluster) ---"
+  source "${E2E_DIR}/scripts/deploy-test-workload.sh"
 
-# Step 4: Deploy workload in developers namespace (for routing test)
-info "--- Step: Deploy Developers Workload ---"
-source "${E2E_DIR}/scripts/deploy-developers-workload.sh"
+  # Step 4: Deploy workload in developers namespace (for routing test)
+  info "--- Step: Deploy Developers Workload ---"
+  source "${E2E_DIR}/scripts/deploy-developers-workload.sh"
 
-# Step 5: Deploy operator on scanner cluster (single instance)
-info "--- Step: Deploy Operator ---"
-source "${E2E_DIR}/scripts/deploy-operator.sh"
+  # Step 5: Deploy operator on scanner cluster (single instance)
+  info "--- Step: Deploy Operator ---"
+  source "${E2E_DIR}/scripts/deploy-operator.sh"
 
-# Step 6: Deploy workload on target cluster and create kubeconfig Secret
-info "--- Step: Deploy Target Workload + Kubeconfig Secret ---"
-source "${E2E_DIR}/scripts/deploy-target-workload.sh"
+  # Step 6: Deploy workload on target cluster and create kubeconfig Secret
+  info "--- Step: Deploy Target Workload + Kubeconfig Secret ---"
+  source "${E2E_DIR}/scripts/deploy-target-workload.sh"
+else
+  info "--- --audit-config-only: skipping build/deploy ---"
+fi
 
 # Step 7: Apply MondooAuditConfigs with org-level SA (no spaceId, no annotations)
 info "--- Step: Apply Mondoo Configs (asset routing) ---"

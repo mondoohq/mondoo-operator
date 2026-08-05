@@ -24,10 +24,22 @@
 #
 # Usage:
 #   ./run-scan-cache.sh <cloud>
+#   ./run-scan-cache.sh <cloud> --audit-config-only
 #   CNSPEC_REPO=~/repos/cnspec ./run-scan-cache.sh <cloud>
 #   MQL_REPO=~/repos/mql CNSPEC_REPO=~/repos/cnspec ./run-scan-cache.sh <cloud>
 
 set -euo pipefail
+
+AUDIT_CONFIG_ONLY=false
+POSITIONAL=()
+for arg in "$@"; do
+  case "${arg}" in
+    --audit-config-only) AUDIT_CONFIG_ONLY=true ;;
+    *) POSITIONAL+=("${arg}") ;;
+  esac
+done
+set -- "${POSITIONAL[@]+"${POSITIONAL[@]}"}"
+export AUDIT_CONFIG_ONLY
 
 CLOUD="${1:?Usage: $0 <cloud> (gke|eks|aks)}"
 export CLOUD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/${CLOUD}" && pwd)"
@@ -40,44 +52,48 @@ info "=========================================="
 # Step 1: Load Terraform outputs
 load_tf_outputs
 
-# Step 2: Build and push operator image
-info "--- Step: Build and Push Operator ---"
-source "${E2E_DIR}/scripts/build-and-push.sh"
+if [[ "${AUDIT_CONFIG_ONLY}" != "true" ]]; then
+  # Step 2: Build and push operator image
+  info "--- Step: Build and Push Operator ---"
+  source "${E2E_DIR}/scripts/build-and-push.sh"
 
-# Step 3: Build and push dev cnspec image (if CNSPEC_REPO is set)
-if [[ -n "${CNSPEC_REPO:-}" ]]; then
-  info "--- Step: Build and Push Dev cnspec ---"
-  source "${E2E_DIR}/scripts/build-and-push-cnspec.sh"
+  # Step 3: Build and push dev cnspec image (if CNSPEC_REPO is set)
+  if [[ -n "${CNSPEC_REPO:-}" ]]; then
+    info "--- Step: Build and Push Dev cnspec ---"
+    source "${E2E_DIR}/scripts/build-and-push-cnspec.sh"
+  else
+    info "--- Step: Using official cnspec image (no CNSPEC_REPO set) ---"
+    export CNSPEC_IMAGE_NAME=""
+    export CNSPEC_IMAGE_TAG=""
+  fi
+
+  # Step 4: Build and push mutable-tag test image
+  info "--- Step: Build Cache Test Image ---"
+  source "${E2E_DIR}/scripts/build-cache-test-image.sh"
+
+  # Step 5: Deploy test workload
+  info "--- Step: Deploy Scan Cache Workload ---"
+  source "${E2E_DIR}/scripts/deploy-scan-cache-workload.sh"
+
+  # Step 5b: Create pull secret for private Artifact Registry
+  info "--- Step: Setup Pull Secret ---"
+  source "${E2E_DIR}/scripts/setup-scan-cache-pull-secret.sh"
+
+  # Step 5c: Deploy workloads on target cluster (if enabled)
+  if [[ "${ENABLE_TARGET_CLUSTER:-}" == "true" ]]; then
+    info "--- Step: Deploy Cache Test Workloads on Target Cluster ---"
+    source "${E2E_DIR}/scripts/deploy-scan-cache-target-workload.sh"
+  fi
+
+  # Step 6: Deploy operator
+  info "--- Step: Deploy Operator ---"
+  if [[ -n "${CNSPEC_IMAGE_NAME:-}" ]]; then
+    source "${E2E_DIR}/scripts/deploy-operator-scan-cache.sh"
+  else
+    source "${E2E_DIR}/scripts/deploy-operator.sh"
+  fi
 else
-  info "--- Step: Using official cnspec image (no CNSPEC_REPO set) ---"
-  export CNSPEC_IMAGE_NAME=""
-  export CNSPEC_IMAGE_TAG=""
-fi
-
-# Step 4: Build and push mutable-tag test image
-info "--- Step: Build Cache Test Image ---"
-source "${E2E_DIR}/scripts/build-cache-test-image.sh"
-
-# Step 5: Deploy test workload
-info "--- Step: Deploy Scan Cache Workload ---"
-source "${E2E_DIR}/scripts/deploy-scan-cache-workload.sh"
-
-# Step 5b: Create pull secret for private Artifact Registry
-info "--- Step: Setup Pull Secret ---"
-source "${E2E_DIR}/scripts/setup-scan-cache-pull-secret.sh"
-
-# Step 5c: Deploy workloads on target cluster (if enabled)
-if [[ "${ENABLE_TARGET_CLUSTER:-}" == "true" ]]; then
-  info "--- Step: Deploy Cache Test Workloads on Target Cluster ---"
-  source "${E2E_DIR}/scripts/deploy-scan-cache-target-workload.sh"
-fi
-
-# Step 6: Deploy operator
-info "--- Step: Deploy Operator ---"
-if [[ -n "${CNSPEC_IMAGE_NAME:-}" ]]; then
-  source "${E2E_DIR}/scripts/deploy-operator-scan-cache.sh"
-else
-  source "${E2E_DIR}/scripts/deploy-operator.sh"
+  info "--- --audit-config-only: skipping build/deploy ---"
 fi
 
 # Step 7: Apply scan cache MondooAuditConfig

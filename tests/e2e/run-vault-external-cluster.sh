@@ -12,8 +12,20 @@
 #
 # Usage:
 #   ./run-vault-external-cluster.sh <cloud>    (gke|eks|aks)
+#   ./run-vault-external-cluster.sh <cloud> --audit-config-only
 
 set -euo pipefail
+
+AUDIT_CONFIG_ONLY=false
+POSITIONAL=()
+for arg in "$@"; do
+  case "${arg}" in
+    --audit-config-only) AUDIT_CONFIG_ONLY=true ;;
+    *) POSITIONAL+=("${arg}") ;;
+  esac
+done
+set -- "${POSITIONAL[@]+"${POSITIONAL[@]}"}"
+export AUDIT_CONFIG_ONLY
 
 CLOUD="${1:?Usage: $0 <cloud> (gke|eks|aks)}"
 export CLOUD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/${CLOUD}" && pwd)"
@@ -30,29 +42,33 @@ if [[ "${ENABLE_TARGET_CLUSTER}" != "true" ]]; then
   die "Target cluster is not enabled. Run: terraform apply -var='enable_target_cluster=true'"
 fi
 
-# Step 2: Build and push operator image
-info "--- Step: Build and Push ---"
-source "${E2E_DIR}/scripts/build-and-push.sh"
+if [[ "${AUDIT_CONFIG_ONLY}" != "true" ]]; then
+  # Step 2: Build and push operator image
+  info "--- Step: Build and Push ---"
+  source "${E2E_DIR}/scripts/build-and-push.sh"
 
-# Step 3: Deploy test workload to scanner cluster
-info "--- Step: Deploy Test Workload (scanner cluster) ---"
-source "${E2E_DIR}/scripts/deploy-test-workload.sh"
+  # Step 3: Deploy test workload to scanner cluster
+  info "--- Step: Deploy Test Workload (scanner cluster) ---"
+  source "${E2E_DIR}/scripts/deploy-test-workload.sh"
 
-# Step 4: Deploy operator from local chart
-info "--- Step: Deploy Operator ---"
-source "${E2E_DIR}/scripts/deploy-operator.sh"
+  # Step 4: Deploy operator from local chart
+  info "--- Step: Deploy Operator ---"
+  source "${E2E_DIR}/scripts/deploy-operator.sh"
 
-# Step 5: Ensure CRDs include vaultAuth field (Helm doesn't upgrade CRDs)
-info "--- Step: Update CRDs ---"
-kubectl apply --server-side --force-conflicts -f "${REPO_ROOT}/config/crd/bases/"
+  # Step 5: Ensure CRDs include vaultAuth field (Helm doesn't upgrade CRDs)
+  info "--- Step: Update CRDs ---"
+  kubectl apply --server-side --force-conflicts -f "${REPO_ROOT}/config/crd/bases/"
 
-# Step 6: Deploy test workload to target cluster (no kubeconfig Secret — Vault handles auth)
-info "--- Step: Deploy Target Workload ---"
-source "${E2E_DIR}/scripts/deploy-target-workload-only.sh"
+  # Step 6: Deploy test workload to target cluster (no kubeconfig Secret — Vault handles auth)
+  info "--- Step: Deploy Target Workload ---"
+  source "${E2E_DIR}/scripts/deploy-target-workload-only.sh"
 
-# Step 7: Deploy and configure Vault
-info "--- Step: Deploy and Configure Vault ---"
-source "${E2E_DIR}/scripts/deploy-vault.sh"
+  # Step 7: Deploy and configure Vault
+  info "--- Step: Deploy and Configure Vault ---"
+  source "${E2E_DIR}/scripts/deploy-vault.sh"
+else
+  info "--- --audit-config-only: skipping build/deploy ---"
+fi
 
 # Step 8: Apply MondooAuditConfig with Vault auth
 info "--- Step: Apply Mondoo Config (with Vault auth) ---"

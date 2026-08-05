@@ -95,6 +95,12 @@ if [[ "${ENABLE_INTEGRATION:-false}" == "true" ]]; then
     enable: true')
 fi
 
+if [[ "${AUDIT_CONFIG_ONLY:-false}" == "true" ]]; then
+  info "--- Rendered MondooAuditConfig (--audit-config-only) ---"
+  echo "${RENDERED}"
+  info "---"
+fi
+
 echo "${RENDERED}" | kubectl apply -f -
 
 info "MondooAuditConfig applied."

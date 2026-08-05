@@ -14,8 +14,20 @@
 #
 # Usage:
 #   ./run-registry-mirroring.sh <cloud>    (gke|eks|aks)
+#   ./run-registry-mirroring.sh <cloud> --audit-config-only
 
 set -euo pipefail
+
+AUDIT_CONFIG_ONLY=false
+POSITIONAL=()
+for arg in "$@"; do
+  case "${arg}" in
+    --audit-config-only) AUDIT_CONFIG_ONLY=true ;;
+    *) POSITIONAL+=("${arg}") ;;
+  esac
+done
+set -- "${POSITIONAL[@]+"${POSITIONAL[@]}"}"
+export AUDIT_CONFIG_ONLY
 
 CLOUD="${1:?Usage: $0 <cloud> (gke|eks|aks)}"
 export CLOUD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/${CLOUD}" && pwd)"
@@ -33,32 +45,36 @@ if [[ "${ENABLE_MIRROR_TEST}" != "true" ]]; then
   die "This test requires enable_mirror_test=true in Terraform. Run: terraform apply -var='enable_mirror_test=true'"
 fi
 
-# Step 2: Build and push operator image
-info "--- Step: Build and Push ---"
-source "${E2E_DIR}/scripts/build-and-push.sh"
+if [[ "${AUDIT_CONFIG_ONLY}" != "true" ]]; then
+  # Step 2: Build and push operator image
+  info "--- Step: Build and Push ---"
+  source "${E2E_DIR}/scripts/build-and-push.sh"
 
-# Step 3: Create imagePullSecret for mirror repo
-info "--- Step: Setup Mirror Registry Credentials ---"
-source "${E2E_DIR}/scripts/setup-mirror-registry.sh"
+  # Step 3: Create imagePullSecret for mirror repo
+  info "--- Step: Setup Mirror Registry Credentials ---"
+  source "${E2E_DIR}/scripts/setup-mirror-registry.sh"
 
-# Step 4: Populate mirror repo with cnspec image
-info "--- Step: Populate Mirror Registry ---"
-source "${E2E_DIR}/scripts/populate-mirror-registry.sh"
+  # Step 4: Populate mirror repo with cnspec image
+  info "--- Step: Populate Mirror Registry ---"
+  source "${E2E_DIR}/scripts/populate-mirror-registry.sh"
 
-# Step 5: Deploy test workload
-info "--- Step: Deploy Test Workload ---"
-source "${E2E_DIR}/scripts/deploy-test-workload.sh"
+  # Step 5: Deploy test workload
+  info "--- Step: Deploy Test Workload ---"
+  source "${E2E_DIR}/scripts/deploy-test-workload.sh"
 
-# Step 6: Set proxy env vars from Terraform if enabled
-if [[ "${ENABLE_PROXY_TEST}" == "true" ]]; then
-  info "Proxy testing enabled — Squid proxy at ${SQUID_PROXY_IP}"
+  # Step 6: Set proxy env vars from Terraform if enabled
+  if [[ "${ENABLE_PROXY_TEST}" == "true" ]]; then
+    info "Proxy testing enabled — Squid proxy at ${SQUID_PROXY_IP}"
+  else
+    info "Proxy testing disabled — skipping proxy configuration"
+  fi
+
+  # Step 7: Deploy operator with mirroring/proxy configuration
+  info "--- Step: Deploy Operator with Mirroring ---"
+  source "${E2E_DIR}/scripts/deploy-operator-mirroring.sh"
 else
-  info "Proxy testing disabled — skipping proxy configuration"
+  info "--- --audit-config-only: skipping build/deploy ---"
 fi
-
-# Step 7: Deploy operator with mirroring/proxy configuration
-info "--- Step: Deploy Operator with Mirroring ---"
-source "${E2E_DIR}/scripts/deploy-operator-mirroring.sh"
 
 # Step 8: Apply MondooAuditConfig
 info "--- Step: Apply Mondoo Config ---"

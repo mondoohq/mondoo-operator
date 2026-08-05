@@ -21,8 +21,20 @@
 #
 # Usage:
 #   ./run-wif-endpoint-override.sh <cloud>    (eks|aks)
+#   ./run-wif-endpoint-override.sh <cloud> --audit-config-only
 
 set -euo pipefail
+
+AUDIT_CONFIG_ONLY=false
+POSITIONAL=()
+for arg in "$@"; do
+  case "${arg}" in
+    --audit-config-only) AUDIT_CONFIG_ONLY=true ;;
+    *) POSITIONAL+=("${arg}") ;;
+  esac
+done
+set -- "${POSITIONAL[@]+"${POSITIONAL[@]}"}"
+export AUDIT_CONFIG_ONLY
 
 CLOUD="${1:?Usage: $0 <cloud> (eks|aks)}"
 export CLOUD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/${CLOUD}" && pwd)"
@@ -53,26 +65,30 @@ fi
 
 info "Target cluster endpoint: ${TARGET_CLUSTER_ENDPOINT}"
 
-# Step 2: Build and push operator image
-info "--- Step: Build and Push ---"
-source "${E2E_DIR}/scripts/build-and-push.sh"
+if [[ "${AUDIT_CONFIG_ONLY}" != "true" ]]; then
+  # Step 2: Build and push operator image
+  info "--- Step: Build and Push ---"
+  source "${E2E_DIR}/scripts/build-and-push.sh"
 
-# Step 3: Deploy test workloads to scanner cluster (public + private-registry)
-info "--- Step: Deploy Test Workloads (scanner cluster) ---"
-source "${E2E_DIR}/scripts/deploy-test-workload.sh"
-source "${E2E_DIR}/scripts/deploy-private-test-workload.sh"
+  # Step 3: Deploy test workloads to scanner cluster (public + private-registry)
+  info "--- Step: Deploy Test Workloads (scanner cluster) ---"
+  source "${E2E_DIR}/scripts/deploy-test-workload.sh"
+  source "${E2E_DIR}/scripts/deploy-private-test-workload.sh"
 
-# Step 4: Deploy operator from local chart
-info "--- Step: Deploy Operator ---"
-source "${E2E_DIR}/scripts/deploy-operator.sh"
+  # Step 4: Deploy operator from local chart
+  info "--- Step: Deploy Operator ---"
+  source "${E2E_DIR}/scripts/deploy-operator.sh"
 
-# Step 5: Deploy workload to target cluster (no kubeconfig Secret — WIF handles auth)
-info "--- Step: Deploy Target Workload ---"
-source "${E2E_DIR}/scripts/deploy-target-workload-only.sh"
+  # Step 5: Deploy workload to target cluster (no kubeconfig Secret — WIF handles auth)
+  info "--- Step: Deploy Target Workload ---"
+  source "${E2E_DIR}/scripts/deploy-target-workload-only.sh"
 
-# Step 6: Setup WIF (cloud-specific RBAC)
-info "--- Step: Setup WIF ---"
-source "${E2E_DIR}/scripts/setup-wif.sh"
+  # Step 6: Setup WIF (cloud-specific RBAC)
+  info "--- Step: Setup WIF ---"
+  source "${E2E_DIR}/scripts/setup-wif.sh"
+else
+  info "--- --audit-config-only: skipping build/deploy ---"
+fi
 
 # Step 7: Apply MondooAuditConfig with endpoint override
 info "--- Step: Apply Mondoo Config (with WIF + endpoint override) ---"

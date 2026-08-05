@@ -12,6 +12,11 @@ warn()  { echo "[WARN]  $(date '+%H:%M:%S') $*" >&2; }
 err()   { echo "[ERROR] $(date '+%H:%M:%S') $*" >&2; }
 die()   { err "$@"; exit 1; }
 
+# AUDIT_CONFIG_ONLY: when true, run scripts skip build/push/deploy steps and
+# only apply the MondooAuditConfig + verify. Set by run scripts that parse
+# --audit-config-only from their args.
+export AUDIT_CONFIG_ONLY="${AUDIT_CONFIG_ONLY:-false}"
+
 # Resolve paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 E2E_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
