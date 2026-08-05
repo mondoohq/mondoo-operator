@@ -145,6 +145,7 @@ func k8sConfigurationOptions(m *v1alpha2.MondooAuditConfig) *mondooclient.K8sCon
 		NodesSchedule:      m.Spec.Nodes.Schedule,
 		ContainersSchedule: m.Spec.Containers.Schedule,
 	}
+
 	if m.Spec.Nodes.Enable {
 		switch m.Spec.Nodes.Style {
 		case v1alpha2.NodeScanStyle_Deployment:
@@ -155,7 +156,212 @@ func k8sConfigurationOptions(m *v1alpha2.MondooAuditConfig) *mondooclient.K8sCon
 			opts.ScanNodesStyle = mondooclient.ScanNodesStyleCronJob
 		}
 	}
+
+	if m.Spec.Scanner.Replicas != nil {
+		opts.ScannerReplicas = *m.Spec.Scanner.Replicas
+	}
+
+	opts.ScannerResources = mapResourceRequirementsToInput(m.Spec.Scanner.Resources)
+	opts.NodesResources = mapResourceRequirementsToInput(m.Spec.Nodes.Resources)
+	opts.ContainersResources = mapResourceRequirementsToInput(m.Spec.Containers.Resources)
+
+	if m.Spec.KubernetesResources.ResourceWatcher.Enable {
+		opts.ResourceWatcher = &mondooclient.K8sResourceWatcherConfig{
+			Enable:              true,
+			WatchAllResources:   m.Spec.KubernetesResources.ResourceWatcher.WatchAllResources,
+			ResourceTypes:       m.Spec.KubernetesResources.ResourceWatcher.ResourceTypes,
+			DebounceInterval:    durationToString(m.Spec.KubernetesResources.ResourceWatcher.DebounceInterval),
+			MinimumScanInterval: durationToString(m.Spec.KubernetesResources.ResourceWatcher.MinimumScanInterval),
+		}
+	}
+
+	opts.ContainerRepositoriesAllowList = m.Spec.Containers.Repositories.Include
+	opts.ContainerRepositoriesDenyList = m.Spec.Containers.Repositories.Exclude
+
+	if m.Spec.Containers.ScanCache != nil && m.Spec.Containers.ScanCache.Enable {
+		opts.ScanCacheEnabled = true
+		if m.Spec.Containers.ScanCache.CacheTTL != nil {
+			opts.ScanCacheTTL = m.Spec.Containers.ScanCache.CacheTTL.Duration.String()
+		}
+	}
+
+	if m.Spec.KubernetesResources.ActiveDeadline != nil {
+		opts.K8sActiveDeadline = int64(m.Spec.KubernetesResources.ActiveDeadline.Seconds())
+	}
+	if m.Spec.Containers.ActiveDeadline != nil {
+		opts.ContainersActiveDeadline = int64(m.Spec.Containers.ActiveDeadline.Seconds())
+	}
+
+	opts.JobOverrides = mapJobOverridesToInput(m.Spec.JobOverrides)
+	opts.ScannerJobOverrides = mapJobOverridesToInput(m.Spec.KubernetesResources.JobOverrides)
+	opts.NodesJobOverrides = mapJobOverridesToInput(m.Spec.Nodes.JobOverrides)
+	opts.ContainersJobOverrides = mapJobOverridesToInput(m.Spec.Containers.JobOverrides)
+
+	opts.AssetAnnotations = m.Spec.Annotations
+	opts.SpaceID = m.Spec.SpaceID
+
+	opts.NodesPriorityClassName = m.Spec.Nodes.PriorityClassName
+	opts.NodesIntervalTimer = int32(m.Spec.Nodes.IntervalTimer) //nolint:gosec // IntervalTimer is minutes, never overflows int32
+
+	opts.ScannerEnv = mapEnvVarsToInput(m.Spec.Scanner.Env)
+	opts.NodesEnv = mapEnvVarsToInput(m.Spec.Nodes.Env)
+	opts.ContainersEnv = mapEnvVarsToInput(m.Spec.Containers.Env)
+
+	opts.ContainersWif = mapContainersWifToInput(m.Spec.Containers.WorkloadIdentity)
+	opts.ExternalClusters = mapExternalClustersToInput(m.Spec.KubernetesResources.ExternalClusters)
+
 	return opts
+}
+
+func mapResourceRequirementsToInput(r corev1.ResourceRequirements) *mondooclient.K8sResourceRequirementsConfig {
+	cfg := &mondooclient.K8sResourceRequirementsConfig{}
+	empty := true
+	if q, ok := r.Requests[corev1.ResourceCPU]; ok {
+		cfg.CPURequest = q.String()
+		empty = false
+	}
+	if q, ok := r.Limits[corev1.ResourceCPU]; ok {
+		cfg.CPULimit = q.String()
+		empty = false
+	}
+	if q, ok := r.Requests[corev1.ResourceMemory]; ok {
+		cfg.MemRequest = q.String()
+		empty = false
+	}
+	if q, ok := r.Limits[corev1.ResourceMemory]; ok {
+		cfg.MemLimit = q.String()
+		empty = false
+	}
+	if empty {
+		return nil
+	}
+	return cfg
+}
+
+func mapJobOverridesToInput(jo v1alpha2.JobOverrides) *mondooclient.K8sJobOverridesConfig {
+	if len(jo.Annotations) == 0 && len(jo.NodeSelector) == 0 && len(jo.Labels) == 0 &&
+		len(jo.Tolerations) == 0 && jo.TTLSecondsAfterFinished == nil {
+		return nil
+	}
+	cfg := &mondooclient.K8sJobOverridesConfig{
+		Annotations:  jo.Annotations,
+		NodeSelector: jo.NodeSelector,
+		Labels:       jo.Labels,
+	}
+	if jo.TTLSecondsAfterFinished != nil {
+		cfg.TTLSecondsAfterFinished = *jo.TTLSecondsAfterFinished
+	}
+	for _, t := range jo.Tolerations {
+		cfg.Tolerations = append(cfg.Tolerations, mondooclient.K8sTolerationConfig{
+			Key:      t.Key,
+			Operator: string(t.Operator),
+			Value:    t.Value,
+			Effect:   string(t.Effect),
+		})
+	}
+	return cfg
+}
+
+func mapEnvVarsToInput(envs []corev1.EnvVar) []mondooclient.K8sEnvVarConfig {
+	if len(envs) == 0 {
+		return nil
+	}
+	result := make([]mondooclient.K8sEnvVarConfig, 0, len(envs))
+	for _, e := range envs {
+		result = append(result, mondooclient.K8sEnvVarConfig{Name: e.Name, Value: e.Value})
+	}
+	return result
+}
+
+func mapContainersWifToInput(wif *v1alpha2.WorkloadIdentityConfig) *mondooclient.K8sContainersWifConfig {
+	if wif == nil {
+		return nil
+	}
+	cfg := &mondooclient.K8sContainersWifConfig{
+		Provider: string(wif.Provider),
+	}
+	if wif.GKE != nil {
+		cfg.Gke = &mondooclient.K8sGkeWifConfig{
+			ProjectID:            wif.GKE.ProjectID,
+			ClusterName:          wif.GKE.ClusterName,
+			ClusterLocation:      wif.GKE.ClusterLocation,
+			GoogleServiceAccount: wif.GKE.GoogleServiceAccount,
+		}
+	}
+	if wif.EKS != nil {
+		cfg.Eks = &mondooclient.K8sEksWifConfig{
+			Region:      wif.EKS.Region,
+			ClusterName: wif.EKS.ClusterName,
+			RoleARN:     wif.EKS.RoleARN,
+		}
+	}
+	if wif.AKS != nil {
+		cfg.Aks = &mondooclient.K8sAksWifConfig{
+			SubscriptionID: wif.AKS.SubscriptionID,
+			ResourceGroup:  wif.AKS.ResourceGroup,
+			ClusterName:    wif.AKS.ClusterName,
+			ClientID:       wif.AKS.ClientID,
+			TenantID:       wif.AKS.TenantID,
+		}
+	}
+	return cfg
+}
+
+func mapExternalClustersToInput(clusters []v1alpha2.ExternalCluster) []mondooclient.K8sExternalClusterConfig {
+	if len(clusters) == 0 {
+		return nil
+	}
+	result := make([]mondooclient.K8sExternalClusterConfig, 0, len(clusters))
+	for _, c := range clusters {
+		ec := mondooclient.K8sExternalClusterConfig{
+			Name:                   c.Name,
+			ContainerImageScanning: c.ContainerImageScanning,
+		}
+		if c.Filtering != nil {
+			ec.NamespaceAllowList = c.Filtering.Namespaces.Include
+			ec.NamespaceDenyList = c.Filtering.Namespaces.Exclude
+		}
+		if c.ServiceAccountAuth != nil {
+			ec.Server = c.ServiceAccountAuth.Server
+			ec.SkipTlsVerify = c.ServiceAccountAuth.SkipTLSVerify
+		}
+		if c.WorkloadIdentity != nil {
+			ec.WifProvider = string(c.WorkloadIdentity.Provider)
+			if c.WorkloadIdentity.GKE != nil {
+				ec.Gke = &mondooclient.K8sGkeWifConfig{
+					ProjectID:            c.WorkloadIdentity.GKE.ProjectID,
+					ClusterName:          c.WorkloadIdentity.GKE.ClusterName,
+					ClusterLocation:      c.WorkloadIdentity.GKE.ClusterLocation,
+					GoogleServiceAccount: c.WorkloadIdentity.GKE.GoogleServiceAccount,
+				}
+			}
+			if c.WorkloadIdentity.EKS != nil {
+				ec.Eks = &mondooclient.K8sEksWifConfig{
+					Region:      c.WorkloadIdentity.EKS.Region,
+					ClusterName: c.WorkloadIdentity.EKS.ClusterName,
+					RoleARN:     c.WorkloadIdentity.EKS.RoleARN,
+				}
+			}
+			if c.WorkloadIdentity.AKS != nil {
+				ec.Aks = &mondooclient.K8sAksWifConfig{
+					SubscriptionID: c.WorkloadIdentity.AKS.SubscriptionID,
+					ResourceGroup:  c.WorkloadIdentity.AKS.ResourceGroup,
+					ClusterName:    c.WorkloadIdentity.AKS.ClusterName,
+					ClientID:       c.WorkloadIdentity.AKS.ClientID,
+					TenantID:       c.WorkloadIdentity.AKS.TenantID,
+				}
+			}
+		}
+		result = append(result, ec)
+	}
+	return result
+}
+
+func durationToString(d metav1.Duration) string {
+	if d.Duration == 0 {
+		return ""
+	}
+	return d.Duration.String()
 }
 
 // ProvisionIntegrationFromServiceAccount creates the console integration using an existing

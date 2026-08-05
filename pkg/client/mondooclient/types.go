@@ -102,9 +102,9 @@ type K8sIntegrationConfig struct {
 	NodesSchedule      string `json:"nodesSchedule,omitempty"`
 	ContainersSchedule string `json:"containersSchedule,omitempty"`
 
-	ExternalClusters               []K8sExternalClusterConfig `json:"externalClusters,omitempty"`
-	PrivateRegistriesPullSecretRefs []string                  `json:"privateRegistriesPullSecretRefs,omitempty"`
-	ContainersWif                  *K8sContainersWifConfig    `json:"containersWif,omitempty"`
+	ExternalClusters                []K8sExternalClusterConfig `json:"externalClusters,omitempty"`
+	PrivateRegistriesPullSecretRefs []string                   `json:"privateRegistriesPullSecretRefs,omitempty"`
+	ContainersWif                   *K8sContainersWifConfig    `json:"containersWif,omitempty"`
 
 	PauseScanning bool `json:"pauseScanning,omitempty"`
 
@@ -176,20 +176,20 @@ type K8sEnvVarConfig struct {
 }
 
 type K8sExternalClusterConfig struct {
-	Name                   string                      `json:"name,omitempty"`
-	KubeconfigSecret       string                      `json:"kubeconfigSecret,omitempty"`
-	Server                 string                      `json:"server,omitempty"`
-	CredentialsSecret      string                      `json:"credentialsSecret,omitempty"`
-	SkipTlsVerify          bool                        `json:"skipTlsVerify,omitempty"`
-	NamespaceAllowList     []string                    `json:"namespaceAllowList,omitempty"`
-	NamespaceDenyList      []string                    `json:"namespaceDenyList,omitempty"`
-	ContainerImageScanning bool                        `json:"containerImageScanning,omitempty"`
-	WifProvider            string                      `json:"wifProvider,omitempty"`
-	Gke                    *K8sGkeWifConfig            `json:"gke,omitempty"`
-	Eks                    *K8sEksWifConfig            `json:"eks,omitempty"`
-	Aks                    *K8sAksWifConfig            `json:"aks,omitempty"`
-	Spiffe                 *K8sSpiffeConfig            `json:"spiffe,omitempty"`
-	Vault                  *K8sVaultConfig             `json:"vault,omitempty"`
+	Name                   string           `json:"name,omitempty"`
+	KubeconfigSecret       string           `json:"kubeconfigSecret,omitempty"`
+	Server                 string           `json:"server,omitempty"`
+	CredentialsSecret      string           `json:"credentialsSecret,omitempty"`
+	SkipTlsVerify          bool             `json:"skipTlsVerify,omitempty"`
+	NamespaceAllowList     []string         `json:"namespaceAllowList,omitempty"`
+	NamespaceDenyList      []string         `json:"namespaceDenyList,omitempty"`
+	ContainerImageScanning bool             `json:"containerImageScanning,omitempty"`
+	WifProvider            string           `json:"wifProvider,omitempty"`
+	Gke                    *K8sGkeWifConfig `json:"gke,omitempty"`
+	Eks                    *K8sEksWifConfig `json:"eks,omitempty"`
+	Aks                    *K8sAksWifConfig `json:"aks,omitempty"`
+	Spiffe                 *K8sSpiffeConfig `json:"spiffe,omitempty"`
+	Vault                  *K8sVaultConfig  `json:"vault,omitempty"`
 }
 
 type K8sContainersWifConfig struct {
@@ -225,10 +225,10 @@ type K8sAksWifConfig struct {
 }
 
 type K8sSpiffeConfig struct {
-	Server             string `json:"server,omitempty"`
-	TrustBundleSecret  string `json:"trustBundleSecret,omitempty"`
-	SocketPath         string `json:"socketPath,omitempty"`
-	Audience           string `json:"audience,omitempty"`
+	Server            string `json:"server,omitempty"`
+	TrustBundleSecret string `json:"trustBundleSecret,omitempty"`
+	SocketPath        string `json:"socketPath,omitempty"`
+	Audience          string `json:"audience,omitempty"`
 }
 
 type K8sVaultConfig struct {
@@ -286,17 +286,49 @@ type IntegrationConfigurationInput struct {
 // K8sConfigurationOptionsInput matches mondoo.integrations.v1.K8sConfigurationOptionsInput.
 // pause_scanning is deliberately omitted: it is server-managed and force-cleared on create.
 type K8sConfigurationOptionsInput struct {
-	ScanNodes          bool     `protobuf:"varint,1,opt,name=scan_nodes,json=scanNodes,proto3" json:"scan_nodes,omitempty"`
-	ScanNodesStyle     string   `protobuf:"varint,8,opt,name=scan_nodes_style,json=scanNodesStyle,proto3,enum=mondoo.integrations.v1.ScanNodesStyle" json:"scan_nodes_style,omitempty"`
-	ScanWorkloads      bool     `protobuf:"varint,2,opt,name=scan_workloads,json=scanWorkloads,proto3" json:"scan_workloads,omitempty"`
-	ScanDeploys        bool     `protobuf:"varint,3,opt,name=scan_deploys,json=scanDeploys,proto3" json:"scan_deploys,omitempty"`
-	ScanPublicImages   bool     `protobuf:"varint,5,opt,name=scan_public_images,json=scanPublicImages,proto3" json:"scan_public_images,omitempty"`
-	NamespaceAllowList []string `protobuf:"bytes,6,rep,name=namespace_allow_list,json=namespaceAllowList,proto3" json:"namespace_allow_list,omitempty"`
-	NamespaceDenyList  []string `protobuf:"bytes,7,rep,name=namespace_deny_list,json=namespaceDenyList,proto3" json:"namespace_deny_list,omitempty"`
-	ScanLocalCluster   bool     `protobuf:"varint,10,opt,name=scan_local_cluster,json=scanLocalCluster,proto3" json:"scan_local_cluster,omitempty"`
-	Schedule           string   `protobuf:"bytes,13,opt,name=schedule,proto3" json:"schedule,omitempty"`
-	NodesSchedule      string   `protobuf:"bytes,14,opt,name=nodes_schedule,json=nodesSchedule,proto3" json:"nodes_schedule,omitempty"`
-	ContainersSchedule string   `protobuf:"bytes,15,opt,name=containers_schedule,json=containersSchedule,proto3" json:"containers_schedule,omitempty"`
+	ScanNodes          bool                       `protobuf:"varint,1,opt,name=scan_nodes,json=scanNodes,proto3" json:"scan_nodes,omitempty"`
+	ScanNodesStyle     string                     `protobuf:"varint,8,opt,name=scan_nodes_style,json=scanNodesStyle,proto3,enum=mondoo.integrations.v1.ScanNodesStyle" json:"scan_nodes_style,omitempty"`
+	ScanWorkloads      bool                       `protobuf:"varint,2,opt,name=scan_workloads,json=scanWorkloads,proto3" json:"scan_workloads,omitempty"`
+	ScanDeploys        bool                       `protobuf:"varint,3,opt,name=scan_deploys,json=scanDeploys,proto3" json:"scan_deploys,omitempty"`
+	ScanPublicImages   bool                       `protobuf:"varint,5,opt,name=scan_public_images,json=scanPublicImages,proto3" json:"scan_public_images,omitempty"`
+	NamespaceAllowList []string                   `protobuf:"bytes,6,rep,name=namespace_allow_list,json=namespaceAllowList,proto3" json:"namespace_allow_list,omitempty"`
+	NamespaceDenyList  []string                   `protobuf:"bytes,7,rep,name=namespace_deny_list,json=namespaceDenyList,proto3" json:"namespace_deny_list,omitempty"`
+	ExternalClusters   []K8sExternalClusterConfig `protobuf:"bytes,9,rep,name=external_clusters,json=externalClusters,proto3" json:"external_clusters,omitempty"`
+	ScanLocalCluster   bool                       `protobuf:"varint,10,opt,name=scan_local_cluster,json=scanLocalCluster,proto3" json:"scan_local_cluster,omitempty"`
+	Schedule           string                     `protobuf:"bytes,13,opt,name=schedule,proto3" json:"schedule,omitempty"`
+	NodesSchedule      string                     `protobuf:"bytes,14,opt,name=nodes_schedule,json=nodesSchedule,proto3" json:"nodes_schedule,omitempty"`
+	ContainersSchedule string                     `protobuf:"bytes,15,opt,name=containers_schedule,json=containersSchedule,proto3" json:"containers_schedule,omitempty"`
+	ContainersWif      *K8sContainersWifConfig    `protobuf:"bytes,16,opt,name=containers_wif,json=containersWif,proto3" json:"containers_wif,omitempty"`
+
+	ScannerReplicas     int32                          `protobuf:"varint,18,opt,name=scanner_replicas,json=scannerReplicas,proto3" json:"scanner_replicas,omitempty"`
+	ScannerResources    *K8sResourceRequirementsConfig `protobuf:"bytes,19,opt,name=scanner_resources,json=scannerResources,proto3" json:"scanner_resources,omitempty"`
+	NodesResources      *K8sResourceRequirementsConfig `protobuf:"bytes,20,opt,name=nodes_resources,json=nodesResources,proto3" json:"nodes_resources,omitempty"`
+	ContainersResources *K8sResourceRequirementsConfig `protobuf:"bytes,21,opt,name=containers_resources,json=containersResources,proto3" json:"containers_resources,omitempty"`
+	ResourceWatcher     *K8sResourceWatcherConfig      `protobuf:"bytes,22,opt,name=resource_watcher,json=resourceWatcher,proto3" json:"resource_watcher,omitempty"`
+
+	ContainerRepositoriesAllowList []string `protobuf:"bytes,23,rep,name=container_repositories_allow_list,json=containerRepositoriesAllowList,proto3" json:"container_repositories_allow_list,omitempty"`
+	ContainerRepositoriesDenyList  []string `protobuf:"bytes,24,rep,name=container_repositories_deny_list,json=containerRepositoriesDenyList,proto3" json:"container_repositories_deny_list,omitempty"`
+
+	ScanCacheEnabled bool   `protobuf:"varint,25,opt,name=scan_cache_enabled,json=scanCacheEnabled,proto3" json:"scan_cache_enabled,omitempty"`
+	ScanCacheTTL     string `protobuf:"bytes,26,opt,name=scan_cache_ttl,json=scanCacheTtl,proto3" json:"scan_cache_ttl,omitempty"`
+
+	K8sActiveDeadline        int64 `protobuf:"varint,27,opt,name=k8s_active_deadline,json=k8sActiveDeadline,proto3" json:"k8s_active_deadline,omitempty"`
+	ContainersActiveDeadline int64 `protobuf:"varint,28,opt,name=containers_active_deadline,json=containersActiveDeadline,proto3" json:"containers_active_deadline,omitempty"`
+
+	JobOverrides           *K8sJobOverridesConfig `protobuf:"bytes,29,opt,name=job_overrides,json=jobOverrides,proto3" json:"job_overrides,omitempty"`
+	ScannerJobOverrides    *K8sJobOverridesConfig `protobuf:"bytes,30,opt,name=scanner_job_overrides,json=scannerJobOverrides,proto3" json:"scanner_job_overrides,omitempty"`
+	NodesJobOverrides      *K8sJobOverridesConfig `protobuf:"bytes,31,opt,name=nodes_job_overrides,json=nodesJobOverrides,proto3" json:"nodes_job_overrides,omitempty"`
+	ContainersJobOverrides *K8sJobOverridesConfig `protobuf:"bytes,32,opt,name=containers_job_overrides,json=containersJobOverrides,proto3" json:"containers_job_overrides,omitempty"`
+
+	AssetAnnotations map[string]string `protobuf:"bytes,33,rep,name=asset_annotations,json=assetAnnotations,proto3" json:"asset_annotations,omitempty"`
+	SpaceID          string            `protobuf:"bytes,34,opt,name=space_id,json=spaceId,proto3" json:"space_id,omitempty"`
+
+	NodesPriorityClassName string `protobuf:"bytes,35,opt,name=nodes_priority_class_name,json=nodesPriorityClassName,proto3" json:"nodes_priority_class_name,omitempty"`
+	NodesIntervalTimer     int32  `protobuf:"varint,36,opt,name=nodes_interval_timer,json=nodesIntervalTimer,proto3" json:"nodes_interval_timer,omitempty"`
+
+	ScannerEnv    []K8sEnvVarConfig `protobuf:"bytes,37,rep,name=scanner_env,json=scannerEnv,proto3" json:"scanner_env,omitempty"`
+	NodesEnv      []K8sEnvVarConfig `protobuf:"bytes,38,rep,name=nodes_env,json=nodesEnv,proto3" json:"nodes_env,omitempty"`
+	ContainersEnv []K8sEnvVarConfig `protobuf:"bytes,39,rep,name=containers_env,json=containersEnv,proto3" json:"containers_env,omitempty"`
 }
 
 type IntegrationCreateOutput struct {
