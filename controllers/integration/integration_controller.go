@@ -139,7 +139,10 @@ func (r *IntegrationReconciler) processMondooAuditConfig(m v1alpha2.MondooAuditC
 		}
 		logger.Error(err, "failed to CheckIn() for integration", "integrationMRN", string(integrationMrn))
 		if m.Spec.RemoteManaged {
-			r.setRemoteConfigDegradedCondition(&m, true, "FetchFailed", err.Error())
+			setRemoteConfigDegradedCondition(&m, true, "FetchFailed", err.Error())
+			if updateErr := r.Client.Status().Update(r.ctx, &m); updateErr != nil {
+				logger.Error(updateErr, "failed to update RemoteConfigDegraded condition")
+			}
 		}
 		return err
 	}
@@ -162,7 +165,11 @@ func (r *IntegrationReconciler) processMondooAuditConfig(m v1alpha2.MondooAuditC
 		}
 
 		if m.Spec.RemoteManaged {
-			r.setRemoteConfigDegradedCondition(&m, false, "", "")
+			origConditions := m.DeepCopy().Status.Conditions
+			setRemoteConfigDegradedCondition(&m, false, "", "")
+			if !reflect.DeepEqual(origConditions, m.Status.Conditions) {
+				statusChanged = true
+			}
 		}
 	}
 
@@ -238,9 +245,7 @@ func updateIntegrationCondition(config *v1alpha2.MondooAuditConfig, degradedStat
 	config.Status.Conditions = mondoo.SetMondooAuditCondition(config.Status.Conditions, v1alpha2.MondooIntegrationDegraded, status, reason, msg, updateCheck, []string{}, "")
 }
 
-func (r *IntegrationReconciler) setRemoteConfigDegradedCondition(config *v1alpha2.MondooAuditConfig, degraded bool, reason, message string) {
-	originalConfig := config.DeepCopy()
-
+func setRemoteConfigDegradedCondition(config *v1alpha2.MondooAuditConfig, degraded bool, reason, message string) {
 	status := corev1.ConditionFalse
 	if degraded {
 		status = corev1.ConditionTrue
@@ -253,10 +258,4 @@ func (r *IntegrationReconciler) setRemoteConfigDegradedCondition(config *v1alpha
 		config.Status.Conditions, v1alpha2.RemoteConfigDegradedCondition, status,
 		reason, message, mondoo.UpdateConditionIfReasonOrMessageChange, nil, "",
 	)
-
-	if !reflect.DeepEqual(originalConfig.Status.Conditions, config.Status.Conditions) {
-		if err := r.Client.Status().Update(r.ctx, config); err != nil {
-			logger.Error(err, "failed to update RemoteConfigDegraded condition")
-		}
-	}
 }
