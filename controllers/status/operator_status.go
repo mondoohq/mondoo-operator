@@ -23,6 +23,7 @@ const (
 	NodeScanningIdentifier           = "node-scanning"
 	NamespaceFilteringIdentifier     = "namespace-filtering"
 	MondooOperatorIdentifier         = "mondoo-operator"
+	RemoteConfigIdentifier           = "remote-config"
 	noStatusMessage                  = "No status reported yet"
 )
 
@@ -157,6 +158,20 @@ func ReportStatusRequestFromAuditConfig(
 	} else {
 		messages[3].Status = mondooclient.MessageStatus_MESSAGE_UNKNOWN
 		messages[3].Message = noStatusMessage
+	}
+
+	// Remote config status (only when remote-managed)
+	if m.Spec.RemoteManaged {
+		rcMsg := mondooclient.IntegrationMessage{Identifier: RemoteConfigIdentifier}
+		remoteConfig := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.RemoteConfigDegradedCondition)
+		if remoteConfig != nil && remoteConfig.Status == v1.ConditionTrue {
+			rcMsg.Status = mondooclient.MessageStatus_MESSAGE_WARNING
+			rcMsg.Message = remoteConfig.Message
+		} else {
+			rcMsg.Status = mondooclient.MessageStatus_MESSAGE_INFO
+			rcMsg.Message = "Remote configuration applied successfully"
+		}
+		messages = append(messages, rcMsg)
 	}
 
 	// If there were any error messages, the overall status is error

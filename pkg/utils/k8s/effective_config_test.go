@@ -21,7 +21,7 @@ func TestEffectiveSpec_RemoteManagedFalse(t *testing.T) {
 	spec := v1alpha2.MondooAuditConfigSpec{
 		KubernetesResources: v1alpha2.KubernetesResources{Enable: true},
 	}
-	result, err := EffectiveSpec(spec, "", types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, "", types.UID("test-uid"))
 	require.NoError(t, err)
 	assert.True(t, result.KubernetesResources.Enable)
 }
@@ -31,7 +31,7 @@ func TestEffectiveSpec_EmptyRemoteConfig(t *testing.T) {
 		RemoteManaged:       true,
 		KubernetesResources: v1alpha2.KubernetesResources{Enable: true},
 	}
-	result, err := EffectiveSpec(spec, "", types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, "", types.UID("test-uid"))
 	require.NoError(t, err)
 	assert.True(t, result.KubernetesResources.Enable)
 }
@@ -75,7 +75,7 @@ func TestEffectiveSpec_FullMapping(t *testing.T) {
 		"nodesEnv": [{"name": "NO_PROXY", "value": "localhost"}]
 	}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 
 	assert.True(t, result.KubernetesResources.Enable)
@@ -129,7 +129,7 @@ func TestEffectiveSpec_FullMapping(t *testing.T) {
 func TestEffectiveSpec_DefaultReplicas(t *testing.T) {
 	spec := v1alpha2.MondooAuditConfigSpec{RemoteManaged: true}
 	remoteConfig := `{"scanWorkloads": true, "scanLocalCluster": true, "scannerReplicas": 0}`
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 	require.NotNil(t, result.Scanner.Replicas)
 	assert.Equal(t, int32(1), *result.Scanner.Replicas)
@@ -138,7 +138,7 @@ func TestEffectiveSpec_DefaultReplicas(t *testing.T) {
 func TestEffectiveSpec_DefaultNodesStyle(t *testing.T) {
 	spec := v1alpha2.MondooAuditConfigSpec{RemoteManaged: true}
 	remoteConfig := `{"scanNodes": true, "scanLocalCluster": true, "scanNodesStyle": ""}`
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 	assert.Equal(t, v1alpha2.NodeScanStyle_CronJob, result.Nodes.Style)
 }
@@ -146,7 +146,7 @@ func TestEffectiveSpec_DefaultNodesStyle(t *testing.T) {
 func TestEffectiveSpec_ScanLocalClusterFalse(t *testing.T) {
 	spec := v1alpha2.MondooAuditConfigSpec{RemoteManaged: true}
 	remoteConfig := `{"scanWorkloads": true, "scanNodes": true, "scanLocalCluster": false}`
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 	assert.False(t, result.KubernetesResources.Enable)
 	assert.False(t, result.Nodes.Enable)
@@ -157,9 +157,9 @@ func TestEffectiveSpec_DeterministicScheduleFromUID(t *testing.T) {
 	remoteConfig := `{"scanWorkloads": true, "scanNodes": true, "scanPublicImages": true, "scanLocalCluster": true}`
 	uid := types.UID("550e8400-e29b-41d4-a716-446655440000")
 
-	result1, err := EffectiveSpec(spec, remoteConfig, uid)
+	result1, _, err := EffectiveSpec(spec, remoteConfig, uid)
 	require.NoError(t, err)
-	result2, err := EffectiveSpec(spec, remoteConfig, uid)
+	result2, _, err := EffectiveSpec(spec, remoteConfig, uid)
 	require.NoError(t, err)
 
 	assert.Equal(t, result1.KubernetesResources.Schedule, result2.KubernetesResources.Schedule)
@@ -173,7 +173,7 @@ func TestEffectiveSpec_DeterministicScheduleFromUID(t *testing.T) {
 
 func TestEffectiveSpec_InvalidRemoteConfig(t *testing.T) {
 	spec := v1alpha2.MondooAuditConfigSpec{RemoteManaged: true}
-	_, err := EffectiveSpec(spec, `{invalid`, types.UID("test-uid"))
+	_, _, err := EffectiveSpec(spec, `{invalid`, types.UID("test-uid"))
 	assert.Error(t, err)
 }
 
@@ -192,7 +192,7 @@ func TestEffectiveSpec_ExternalClusters(t *testing.T) {
 		]
 	}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 	require.Len(t, result.KubernetesResources.ExternalClusters, 1)
 	assert.Equal(t, "prod-east", result.KubernetesResources.ExternalClusters[0].Name)
@@ -219,7 +219,7 @@ func TestEffectiveSpec_ContainersWif(t *testing.T) {
 		}
 	}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 	require.NotNil(t, result.Containers.WorkloadIdentity)
 	assert.Equal(t, v1alpha2.CloudProviderGKE, result.Containers.WorkloadIdentity.Provider)
@@ -262,7 +262,7 @@ func TestEffectiveSpec_D3_ServerOverridesLocalSpec(t *testing.T) {
 		"namespaceDenyList": ["kube-system"]
 	}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 
 	// Server values win, not local
@@ -289,7 +289,7 @@ func TestEffectiveSpec_D4_DenylistFieldsAlwaysLocal(t *testing.T) {
 	// Even a full config cannot override D4 fields
 	remoteConfig := `{"scanWorkloads": true, "scanLocalCluster": true, "scannerReplicas": 1}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 
 	assert.Equal(t, "prod-creds", result.MondooCredsSecretRef.Name)
@@ -315,7 +315,7 @@ func TestEffectiveSpec_RemoteManagedFlippedOff(t *testing.T) {
 	// Remote config exists in status but should be ignored
 	remoteConfig := `{"scanWorkloads": true, "scannerReplicas": 1, "schedule": "30 * * * *"}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 
 	// Local spec used entirely
@@ -337,7 +337,7 @@ func TestEffectiveSpec_D8_ExplicitScheduleWinsOverJitter(t *testing.T) {
 		"nodesSchedule": "30 3 * * *"
 	}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 
 	assert.Equal(t, "0 2 * * *", result.KubernetesResources.Schedule)
@@ -351,9 +351,9 @@ func TestEffectiveSpec_D8_DifferentUIDsDifferentSchedules(t *testing.T) {
 	spec := v1alpha2.MondooAuditConfigSpec{RemoteManaged: true}
 	remoteConfig := `{"scanWorkloads": true, "scanLocalCluster": true}`
 
-	result1, err := EffectiveSpec(spec, remoteConfig, types.UID("uid-aaa"))
+	result1, _, err := EffectiveSpec(spec, remoteConfig, types.UID("uid-aaa"))
 	require.NoError(t, err)
-	result2, err := EffectiveSpec(spec, remoteConfig, types.UID("uid-zzz"))
+	result2, _, err := EffectiveSpec(spec, remoteConfig, types.UID("uid-zzz"))
 	require.NoError(t, err)
 
 	assert.NotEqual(t, result1.KubernetesResources.Schedule, result2.KubernetesResources.Schedule)
@@ -369,7 +369,7 @@ func TestEffectiveSpec_ScanLocalClusterGatingBehavior(t *testing.T) {
 		"scanLocalCluster": false
 	}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 
 	assert.False(t, result.KubernetesResources.Enable, "scanLocalCluster=false disables k8s resources")
@@ -382,7 +382,7 @@ func TestEffectiveSpec_PartialConfig(t *testing.T) {
 	spec := v1alpha2.MondooAuditConfigSpec{RemoteManaged: true}
 	remoteConfig := `{"scanNodes": true, "scanLocalCluster": true}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 
 	assert.True(t, result.Nodes.Enable)
@@ -410,7 +410,7 @@ func TestEffectiveSpec_PerScanTypeJobOverrides(t *testing.T) {
 		"containersJobOverrides": {"nodeSelector": {"pool": "scan"}}
 	}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 
 	assert.Equal(t, map[string]string{"global": "true"}, result.JobOverrides.Annotations)
@@ -424,7 +424,7 @@ func TestEffectiveSpec_UnknownNodesScanStyleDefaultsToCronJob(t *testing.T) {
 	spec := v1alpha2.MondooAuditConfigSpec{RemoteManaged: true}
 	remoteConfig := `{"scanNodes": true, "scanLocalCluster": true, "scanNodesStyle": "UNKNOWN_FUTURE_STYLE"}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 	assert.Equal(t, v1alpha2.NodeScanStyle_CronJob, result.Nodes.Style)
 }
@@ -438,7 +438,7 @@ func TestEffectiveSpec_PrivateRegistries(t *testing.T) {
 		"privateRegistriesPullSecretRefs": ["registry-creds-1", "registry-creds-2"]
 	}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 	require.Len(t, result.Scanner.PrivateRegistriesPullSecretRefs, 2)
 	assert.Equal(t, "registry-creds-1", result.Scanner.PrivateRegistriesPullSecretRefs[0].Name)
@@ -458,7 +458,7 @@ func TestEffectiveSpec_AllEnvVars(t *testing.T) {
 		"containersEnv": [{"name": "CONTAINERS_VAR", "value": "c"}]
 	}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 
 	require.Len(t, result.Scanner.Env, 1)
@@ -475,7 +475,7 @@ func TestEffectiveSpec_ScanCacheDisabled(t *testing.T) {
 	spec := v1alpha2.MondooAuditConfigSpec{RemoteManaged: true}
 	remoteConfig := `{"scanPublicImages": true, "scanLocalCluster": true, "scanCacheEnabled": false}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 	assert.Nil(t, result.Containers.ScanCache)
 }
@@ -485,7 +485,7 @@ func TestEffectiveSpec_ScanCacheEnabledNoTTL(t *testing.T) {
 	spec := v1alpha2.MondooAuditConfigSpec{RemoteManaged: true}
 	remoteConfig := `{"scanPublicImages": true, "scanLocalCluster": true, "scanCacheEnabled": true}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 	require.NotNil(t, result.Containers.ScanCache)
 	assert.True(t, result.Containers.ScanCache.Enable)
@@ -505,7 +505,7 @@ func TestEffectiveSpec_AllResourceTypes(t *testing.T) {
 		"containersResources": {"memLimit": "1Gi"}
 	}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 
 	assert.Equal(t, resource.MustParse("100m"), result.Scanner.Resources.Requests[corev1.ResourceCPU])
@@ -533,7 +533,7 @@ func TestEffectiveSpec_ContainersWifEKS(t *testing.T) {
 		}
 	}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 	require.NotNil(t, result.Containers.WorkloadIdentity)
 	assert.Equal(t, v1alpha2.CloudProviderEKS, result.Containers.WorkloadIdentity.Provider)
@@ -554,10 +554,31 @@ func TestEffectiveSpec_JobOverridesTolerations(t *testing.T) {
 		}
 	}`
 
-	result, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
 	require.NoError(t, err)
 	require.Len(t, result.JobOverrides.Tolerations, 1)
 	assert.Equal(t, "node.kubernetes.io/not-ready", result.JobOverrides.Tolerations[0].Key)
 	assert.Equal(t, corev1.TolerationOpExists, result.JobOverrides.Tolerations[0].Operator)
 	assert.Equal(t, corev1.TaintEffectNoSchedule, result.JobOverrides.Tolerations[0].Effect)
+}
+
+func TestEffectiveSpec_InvalidResourceQuantityWarning(t *testing.T) {
+	spec := v1alpha2.MondooAuditConfigSpec{RemoteManaged: true}
+	remoteConfig := `{
+		"scanWorkloads": true,
+		"scanLocalCluster": true,
+		"scannerResources": {"cpuRequest": "500m", "cpuLimit": "1", "memLimit": "1Bs"}
+	}`
+
+	result, warnings, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	require.NoError(t, err)
+
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], "scannerResources.memLimit")
+	assert.Contains(t, warnings[0], "1Bs")
+
+	assert.Equal(t, resource.MustParse("500m"), result.Scanner.Resources.Requests[corev1.ResourceCPU])
+	assert.Equal(t, resource.MustParse("1"), result.Scanner.Resources.Limits[corev1.ResourceCPU])
+	_, hasMemLimit := result.Scanner.Resources.Limits[corev1.ResourceMemory]
+	assert.False(t, hasMemLimit, "invalid memLimit should be skipped")
 }

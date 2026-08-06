@@ -19,24 +19,25 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 )
 
-func EffectiveSpec(spec v1alpha2.MondooAuditConfigSpec, remoteConfig string, uid types.UID) (v1alpha2.MondooAuditConfigSpec, error) {
+func EffectiveSpec(spec v1alpha2.MondooAuditConfigSpec, remoteConfig string, uid types.UID) (v1alpha2.MondooAuditConfigSpec, []string, error) {
 	if !spec.RemoteManaged || remoteConfig == "" {
-		return spec, nil
+		return spec, nil, nil
 	}
 
 	var cfg mondooclient.K8sIntegrationConfig
 	if err := json.Unmarshal([]byte(remoteConfig), &cfg); err != nil {
-		return v1alpha2.MondooAuditConfigSpec{}, fmt.Errorf("parsing remote config: %w", err)
+		return v1alpha2.MondooAuditConfigSpec{}, nil, fmt.Errorf("parsing remote config: %w", err)
 	}
 
-	effective := mapRemoteConfig(&cfg, uid)
+	var warnings []string
+	effective := mapRemoteConfig(&cfg, uid, &warnings)
 	preserveLocalFields(&effective, &spec)
 	applyDefaults(&effective)
 
-	return effective, nil
+	return effective, warnings, nil
 }
 
-func mapRemoteConfig(cfg *mondooclient.K8sIntegrationConfig, uid types.UID) v1alpha2.MondooAuditConfigSpec {
+func mapRemoteConfig(cfg *mondooclient.K8sIntegrationConfig, uid types.UID, warnings *[]string) v1alpha2.MondooAuditConfigSpec {
 	spec := v1alpha2.MondooAuditConfigSpec{}
 
 	spec.KubernetesResources.Enable = cfg.ScanWorkloads
@@ -66,9 +67,9 @@ func mapRemoteConfig(cfg *mondooclient.K8sIntegrationConfig, uid types.UID) v1al
 	replicas := cfg.ScannerReplicas
 	spec.Scanner.Replicas = &replicas
 
-	spec.Scanner.Resources = mapResources(cfg.ScannerResources)
-	spec.Nodes.Resources = mapResources(cfg.NodesResources)
-	spec.Containers.Resources = mapResources(cfg.ContainersResources)
+	spec.Scanner.Resources = mapResources(cfg.ScannerResources, "scannerResources", warnings)
+	spec.Nodes.Resources = mapResources(cfg.NodesResources, "nodesResources", warnings)
+	spec.Containers.Resources = mapResources(cfg.ContainersResources, "containersResources", warnings)
 
 	if cfg.ResourceWatcher != nil {
 		spec.KubernetesResources.ResourceWatcher = v1alpha2.ResourceWatcherSpec{
@@ -162,7 +163,7 @@ func scheduleOrDefault(schedule string, uid types.UID, index int) string {
 	return fmt.Sprintf("%d * * * *", minute)
 }
 
-func mapResources(cfg *mondooclient.K8sResourceRequirementsConfig) corev1.ResourceRequirements {
+func mapResources(cfg *mondooclient.K8sResourceRequirementsConfig, field string, warnings *[]string) corev1.ResourceRequirements {
 	if cfg == nil {
 		return corev1.ResourceRequirements{}
 	}
@@ -170,18 +171,21 @@ func mapResources(cfg *mondooclient.K8sResourceRequirementsConfig) corev1.Resour
 		Requests: corev1.ResourceList{},
 		Limits:   corev1.ResourceList{},
 	}
-	if cfg.CPURequest != "" {
-		reqs.Requests[corev1.ResourceCPU] = resource.MustParse(cfg.CPURequest)
+	parseField := func(val, subfield string, list corev1.ResourceList, key corev1.ResourceName) {
+		if val == "" {
+			return
+		}
+		q, err := resource.ParseQuantity(val)
+		if err != nil {
+			*warnings = append(*warnings, fmt.Sprintf("invalid %s.%s %q: %v", field, subfield, val, err))
+			return
+		}
+		list[key] = q
 	}
-	if cfg.CPULimit != "" {
-		reqs.Limits[corev1.ResourceCPU] = resource.MustParse(cfg.CPULimit)
-	}
-	if cfg.MemRequest != "" {
-		reqs.Requests[corev1.ResourceMemory] = resource.MustParse(cfg.MemRequest)
-	}
-	if cfg.MemLimit != "" {
-		reqs.Limits[corev1.ResourceMemory] = resource.MustParse(cfg.MemLimit)
-	}
+	parseField(cfg.CPURequest, "cpuRequest", reqs.Requests, corev1.ResourceCPU)
+	parseField(cfg.CPULimit, "cpuLimit", reqs.Limits, corev1.ResourceCPU)
+	parseField(cfg.MemRequest, "memRequest", reqs.Requests, corev1.ResourceMemory)
+	parseField(cfg.MemLimit, "memLimit", reqs.Limits, corev1.ResourceMemory)
 	return reqs
 }
 
