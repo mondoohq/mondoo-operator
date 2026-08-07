@@ -1589,6 +1589,12 @@ spec:
                     - daemonset
                     type: string
                 type: object
+              remoteManaged:
+                description: |-
+                  RemoteManaged indicates that the scan configuration is managed by the
+                  Mondoo Console. When true, the operator fetches config from the server
+                  and uses it as the authoritative source instead of the local spec.
+                type: boolean
               scanner:
                 description: |-
                   Scanner defines the settings for the Mondoo scanner that will be running in the cluster. The same scanner
@@ -1945,6 +1951,12 @@ spec:
                   - type
                   type: object
                 type: array
+              integrationMRN:
+                description: |-
+                  IntegrationMRN is the MRN of the console integration created by the autoCreate flow.
+                  Stored in status (not spec) so the operator can track auto-created integrations without
+                  mutating the spec, which would conflict with GitOps orchestrators like ArgoCD.
+                type: string
               lastContainerImageGarbageCollectionTime:
                 description: |-
                   LastContainerImageGarbageCollectionTime tracks the last time the operator performed
@@ -1963,6 +1975,12 @@ spec:
                   garbage collection of stale node scan assets.
                 format: date-time
                 type: string
+              lastRemoteConfigTime:
+                description: |-
+                  LastRemoteConfigTime is the timestamp of the last successful remote
+                  configuration fetch.
+                format: date-time
+                type: string
               pods:
                 description: Pods store the name of the pods which are running mondoo
                   instances
@@ -1972,6 +1990,16 @@ spec:
               reconciledByOperatorVersion:
                 description: ReconciledByOperatorVersion contains the version of the
                   operator which reconciled this MondooAuditConfig
+                type: string
+              remoteConfig:
+                description: |-
+                  RemoteConfig holds the raw JSON configuration blob received from the server.
+                  Used as last-known-good when the server is unreachable.
+                type: string
+              remoteConfigHash:
+                description: |-
+                  RemoteConfigHash is the SHA-256 hex digest of RemoteConfig. Sent to the
+                  server on CheckIn to detect configuration changes.
                 type: string
               scanningPaused:
                 description: |-
