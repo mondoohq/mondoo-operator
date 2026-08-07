@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
@@ -234,4 +236,151 @@ func TestMergeJobOverrides_PerTypeOnlyTTL(t *testing.T) {
 
 	result := MergeJobOverrides(global, perType)
 	assert.Equal(t, ptr.To(int32(0)), result.TTLSecondsAfterFinished)
+}
+
+// ApplyDeploymentOverrides tests
+
+func TestApplyDeploymentOverrides_Empty(t *testing.T) {
+	d := &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "test"},
+				},
+			},
+		},
+	}
+	ApplyDeploymentOverrides(d, v1alpha2.JobOverrides{})
+
+	assert.Equal(t, map[string]string{"app": "test"}, d.Spec.Template.Labels)
+	assert.Nil(t, d.Spec.Template.Annotations)
+	assert.Nil(t, d.Spec.Template.Spec.NodeSelector)
+	assert.Nil(t, d.Spec.Template.Spec.Tolerations)
+}
+
+func TestApplyDeploymentOverrides_AllFields(t *testing.T) {
+	d := &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "test"},
+				},
+			},
+		},
+	}
+	overrides := v1alpha2.JobOverrides{
+		Labels:       map[string]string{"team": "security"},
+		Annotations:  map[string]string{"karpenter.sh/do-not-disrupt": "true"},
+		NodeSelector: map[string]string{"workload-type": "mondoo-scan"},
+		Tolerations: []corev1.Toleration{
+			{Key: "dedicated", Operator: corev1.TolerationOpEqual, Value: "mondoo", Effect: corev1.TaintEffectNoSchedule},
+		},
+	}
+	ApplyDeploymentOverrides(d, overrides)
+
+	assert.Equal(t, map[string]string{"app": "test", "team": "security"}, d.Spec.Template.Labels)
+	assert.Equal(t, map[string]string{"karpenter.sh/do-not-disrupt": "true"}, d.Spec.Template.Annotations)
+	assert.Equal(t, map[string]string{"workload-type": "mondoo-scan"}, d.Spec.Template.Spec.NodeSelector)
+	assert.Len(t, d.Spec.Template.Spec.Tolerations, 1)
+}
+
+func TestApplyDeploymentOverrides_OperatorLabelsPreserved(t *testing.T) {
+	d := &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "mondoo-resource-watcher", "mondoo_cr": "config"},
+				},
+			},
+		},
+	}
+	ApplyDeploymentOverrides(d, v1alpha2.JobOverrides{
+		Labels: map[string]string{"app": "overwritten", "team": "security"},
+	})
+
+	assert.Equal(t, "mondoo-resource-watcher", d.Spec.Template.Labels["app"])
+	assert.Equal(t, "security", d.Spec.Template.Labels["team"])
+}
+
+func TestApplyDeploymentOverrides_TolerationsMerged(t *testing.T) {
+	existing := corev1.Toleration{Key: "existing", Operator: corev1.TolerationOpExists}
+	d := &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Tolerations: []corev1.Toleration{existing},
+				},
+			},
+		},
+	}
+	additional := corev1.Toleration{Key: "new", Operator: corev1.TolerationOpExists}
+	ApplyDeploymentOverrides(d, v1alpha2.JobOverrides{
+		Tolerations: []corev1.Toleration{additional},
+	})
+
+	assert.Len(t, d.Spec.Template.Spec.Tolerations, 2)
+}
+
+// ApplyDaemonSetOverrides tests
+
+func TestApplyDaemonSetOverrides_Empty(t *testing.T) {
+	ds := &appsv1.DaemonSet{
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "mondoo"},
+				},
+			},
+		},
+	}
+	ApplyDaemonSetOverrides(ds, v1alpha2.JobOverrides{})
+
+	assert.Equal(t, map[string]string{"app": "mondoo"}, ds.Spec.Template.Labels)
+	assert.Nil(t, ds.Spec.Template.Spec.NodeSelector)
+	assert.Nil(t, ds.Spec.Template.Spec.Tolerations)
+}
+
+func TestApplyDaemonSetOverrides_AllFields(t *testing.T) {
+	ds := &appsv1.DaemonSet{
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "mondoo"},
+				},
+			},
+		},
+	}
+	overrides := v1alpha2.JobOverrides{
+		Labels:       map[string]string{"team": "security"},
+		Annotations:  map[string]string{"karpenter.sh/do-not-disrupt": "true"},
+		NodeSelector: map[string]string{"node-role": "scan"},
+		Tolerations: []corev1.Toleration{
+			{Key: "dedicated", Operator: corev1.TolerationOpEqual, Value: "mondoo", Effect: corev1.TaintEffectNoSchedule},
+		},
+	}
+	ApplyDaemonSetOverrides(ds, overrides)
+
+	assert.Equal(t, map[string]string{"app": "mondoo", "team": "security"}, ds.Spec.Template.Labels)
+	assert.Equal(t, map[string]string{"karpenter.sh/do-not-disrupt": "true"}, ds.Spec.Template.Annotations)
+	assert.Equal(t, map[string]string{"node-role": "scan"}, ds.Spec.Template.Spec.NodeSelector)
+	assert.Len(t, ds.Spec.Template.Spec.Tolerations, 1)
+}
+
+func TestApplyDaemonSetOverrides_TolerationsMergedWithExisting(t *testing.T) {
+	existing := corev1.Toleration{Key: "node.kubernetes.io/not-ready", Operator: corev1.TolerationOpExists}
+	ds := &appsv1.DaemonSet{
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Tolerations: []corev1.Toleration{existing},
+				},
+			},
+		},
+	}
+	additional := corev1.Toleration{Key: "dedicated", Operator: corev1.TolerationOpEqual, Value: "mondoo", Effect: corev1.TaintEffectNoSchedule}
+	ApplyDaemonSetOverrides(ds, v1alpha2.JobOverrides{
+		Tolerations: []corev1.Toleration{additional, existing},
+	})
+
+	assert.Len(t, ds.Spec.Template.Spec.Tolerations, 2)
 }

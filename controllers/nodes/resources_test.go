@@ -483,6 +483,45 @@ func TestDaemonSet_WithImagePullSecrets(t *testing.T) {
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
 }
 
+func TestDaemonSet_WithJobOverrides(t *testing.T) {
+	mac := *testMondooAuditConfig()
+	mac.Spec.JobOverrides = v1alpha2.JobOverrides{
+		NodeSelector: map[string]string{"workload-type": "mondoo-scan"},
+		Tolerations: []corev1.Toleration{
+			{Key: "dedicated", Operator: corev1.TolerationOpEqual, Value: "mondoo", Effect: corev1.TaintEffectNoSchedule},
+		},
+		Labels:      map[string]string{"team": "security"},
+		Annotations: map[string]string{"karpenter.sh/do-not-disrupt": "true"},
+	}
+
+	existingTolerations := []corev1.Toleration{
+		{Key: "node.kubernetes.io/not-ready", Operator: corev1.TolerationOpExists},
+	}
+
+	ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, existingTolerations)
+
+	assert.Equal(t, map[string]string{"workload-type": "mondoo-scan"}, ds.Spec.Template.Spec.NodeSelector)
+	assert.Len(t, ds.Spec.Template.Spec.Tolerations, 2)
+	assert.Equal(t, "security", ds.Spec.Template.Labels["team"])
+	assert.Equal(t, "true", ds.Spec.Template.Annotations["karpenter.sh/do-not-disrupt"])
+	// Operator-managed labels must survive
+	assert.Equal(t, "mondoo", ds.Spec.Template.Labels["app"])
+}
+
+func TestDaemonSet_PerTypeJobOverridesOverrideGlobal(t *testing.T) {
+	mac := *testMondooAuditConfig()
+	mac.Spec.JobOverrides = v1alpha2.JobOverrides{
+		NodeSelector: map[string]string{"workload-type": "global"},
+	}
+	mac.Spec.Nodes.JobOverrides = v1alpha2.JobOverrides{
+		NodeSelector: map[string]string{"workload-type": "node-scan"},
+	}
+
+	ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
+
+	assert.Equal(t, map[string]string{"workload-type": "node-scan"}, ds.Spec.Template.Spec.NodeSelector)
+}
+
 // envToMap converts a slice of EnvVar to a map for easy lookup.
 func envToMap(envVars []corev1.EnvVar) map[string]string {
 	m := make(map[string]string, len(envVars))

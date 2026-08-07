@@ -501,6 +501,71 @@ func TestDeployment_WithImagePullSecrets(t *testing.T) {
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
 }
 
+func TestDeployment_WithJobOverrides(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-config",
+			Namespace: "mondoo-operator",
+		},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable: true,
+				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
+					Enable: true,
+				},
+			},
+			JobOverrides: v1alpha2.JobOverrides{
+				NodeSelector: map[string]string{"workload-type": "mondoo-scan"},
+				Tolerations: []corev1.Toleration{
+					{Key: "dedicated", Operator: corev1.TolerationOpEqual, Value: "mondoo", Effect: corev1.TaintEffectNoSchedule},
+				},
+				Labels:      map[string]string{"team": "security"},
+				Annotations: map[string]string{"karpenter.sh/do-not-disrupt": "true"},
+			},
+		},
+	}
+
+	operatorConfig := v1alpha2.MondooOperatorConfig{}
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
+
+	assert.Equal(t, map[string]string{"workload-type": "mondoo-scan"}, deployment.Spec.Template.Spec.NodeSelector)
+	assert.Len(t, deployment.Spec.Template.Spec.Tolerations, 1)
+	assert.Equal(t, "dedicated", deployment.Spec.Template.Spec.Tolerations[0].Key)
+	assert.Equal(t, "security", deployment.Spec.Template.Labels["team"])
+	assert.Equal(t, "true", deployment.Spec.Template.Annotations["karpenter.sh/do-not-disrupt"])
+	// Operator-managed labels must survive
+	assert.Equal(t, "mondoo-resource-watcher", deployment.Spec.Template.Labels["app"])
+	assert.Equal(t, "my-config", deployment.Spec.Template.Labels["mondoo_cr"])
+}
+
+func TestDeployment_PerTypeJobOverridesOverrideGlobal(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-config",
+			Namespace: "mondoo-operator",
+		},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable: true,
+				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
+					Enable: true,
+				},
+				JobOverrides: v1alpha2.JobOverrides{
+					NodeSelector: map[string]string{"workload-type": "k8s-scan"},
+				},
+			},
+			JobOverrides: v1alpha2.JobOverrides{
+				NodeSelector: map[string]string{"workload-type": "global"},
+			},
+		},
+	}
+
+	operatorConfig := v1alpha2.MondooOperatorConfig{}
+	deployment := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, operatorConfig)
+
+	assert.Equal(t, map[string]string{"workload-type": "k8s-scan"}, deployment.Spec.Template.Spec.NodeSelector)
+}
+
 // envToMap converts a slice of EnvVar to a map for easy lookup.
 func envToMap(envVars []corev1.EnvVar) map[string]string {
 	m := make(map[string]string, len(envVars))

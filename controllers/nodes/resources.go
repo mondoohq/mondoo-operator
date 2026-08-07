@@ -313,6 +313,8 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 			cfg.Spec.ImagePullSecrets...)
 	}
 
+	k8s.ApplyDaemonSetOverrides(ds, k8s.MergeJobOverrides(m.Spec.JobOverrides, m.Spec.Nodes.JobOverrides))
+
 	return ds
 }
 

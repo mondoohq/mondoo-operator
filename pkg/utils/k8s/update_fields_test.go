@@ -139,6 +139,27 @@ func TestUpdateDeploymentFields_ImagePullSecrets(t *testing.T) {
 	assert.Equal(t, desired.Spec.Template.Spec.Containers, obj.Spec.Template.Spec.Containers)
 }
 
+func TestUpdateDeploymentFields_NodeSelectorAndTolerations(t *testing.T) {
+	desired := &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					NodeSelector: map[string]string{"workload-type": "mondoo-scan"},
+					Tolerations: []corev1.Toleration{
+						{Key: "dedicated", Operator: corev1.TolerationOpEqual, Value: "mondoo", Effect: corev1.TaintEffectNoSchedule},
+					},
+				},
+			},
+		},
+	}
+
+	obj := &appsv1.Deployment{}
+	UpdateDeploymentFields(obj, desired)
+
+	assert.Equal(t, desired.Spec.Template.Spec.NodeSelector, obj.Spec.Template.Spec.NodeSelector)
+	assert.Equal(t, desired.Spec.Template.Spec.Tolerations, obj.Spec.Template.Spec.Tolerations)
+}
+
 func TestUpdateDaemonSetFields_ImagePullSecrets(t *testing.T) {
 	desired := &appsv1.DaemonSet{
 		Spec: appsv1.DaemonSetSpec{
@@ -158,4 +179,21 @@ func TestUpdateDaemonSetFields_ImagePullSecrets(t *testing.T) {
 
 	assert.Equal(t, desired.Spec.Template.Spec.ImagePullSecrets, obj.Spec.Template.Spec.ImagePullSecrets)
 	assert.Equal(t, desired.Spec.Template.Spec.Containers, obj.Spec.Template.Spec.Containers)
+}
+
+func TestUpdateDaemonSetFields_NodeSelector(t *testing.T) {
+	desired := &appsv1.DaemonSet{
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					NodeSelector: map[string]string{"workload-type": "mondoo-scan"},
+				},
+			},
+		},
+	}
+
+	obj := &appsv1.DaemonSet{}
+	UpdateDaemonSetFields(obj, desired)
+
+	assert.Equal(t, desired.Spec.Template.Spec.NodeSelector, obj.Spec.Template.Spec.NodeSelector)
 }

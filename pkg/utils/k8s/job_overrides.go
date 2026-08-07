@@ -6,6 +6,7 @@ package k8s
 import (
 	"maps"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
@@ -111,6 +112,42 @@ func ApplyJobOverrides(cj *batchv1.CronJob, o v1alpha2.JobOverrides) {
 	// nodeSelector doesn't match the node, so the selector is only applied to pods
 	// that go through the scheduler.
 	if len(o.NodeSelector) > 0 && podSpec.NodeName == "" {
+		podSpec.NodeSelector = o.NodeSelector
+	}
+
+	podSpec.Tolerations = MergeTolerations(podSpec.Tolerations, o.Tolerations)
+}
+
+// ApplyDeploymentOverrides applies user-configured overrides to a generated Deployment.
+func ApplyDeploymentOverrides(d *appsv1.Deployment, o v1alpha2.JobOverrides) {
+	if len(o.Labels) > 0 {
+		d.Spec.Template.Labels = mergeUserMetadata(d.Spec.Template.Labels, o.Labels)
+	}
+
+	if len(o.Annotations) > 0 {
+		d.Spec.Template.Annotations = mergeUserMetadata(d.Spec.Template.Annotations, o.Annotations)
+	}
+
+	podSpec := &d.Spec.Template.Spec
+	if len(o.NodeSelector) > 0 {
+		podSpec.NodeSelector = o.NodeSelector
+	}
+
+	podSpec.Tolerations = MergeTolerations(podSpec.Tolerations, o.Tolerations)
+}
+
+// ApplyDaemonSetOverrides applies user-configured overrides to a generated DaemonSet.
+func ApplyDaemonSetOverrides(ds *appsv1.DaemonSet, o v1alpha2.JobOverrides) {
+	if len(o.Labels) > 0 {
+		ds.Spec.Template.Labels = mergeUserMetadata(ds.Spec.Template.Labels, o.Labels)
+	}
+
+	if len(o.Annotations) > 0 {
+		ds.Spec.Template.Annotations = mergeUserMetadata(ds.Spec.Template.Annotations, o.Annotations)
+	}
+
+	podSpec := &ds.Spec.Template.Spec
+	if len(o.NodeSelector) > 0 {
 		podSpec.NodeSelector = o.NodeSelector
 	}
 

@@ -202,5 +202,7 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 			cfg.Spec.ImagePullSecrets...)
 	}
 
+	k8s.ApplyDeploymentOverrides(deployment, k8s.MergeJobOverrides(m.Spec.JobOverrides, m.Spec.KubernetesResources.JobOverrides))
+
 	return deployment
 }
