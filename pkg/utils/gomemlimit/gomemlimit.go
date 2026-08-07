@@ -9,6 +9,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+const (
+	nodeScanLowMemoryLimitBytes  int64 = 512 * 1024 * 1024
+	nodeScanHighMemoryLimitBytes int64 = 1024 * 1024 * 1024
+)
+
 func CalculateGoMemLimit(containerResources v1.ResourceRequirements) string {
 	// https://cs.opensource.google/go/go/+/master:src/runtime/mgcpacer.go;l=96?q=GOMEMLIMIT&ss=go%2Fgo
 	// Initialized from GOMEMLIMIT. GOMEMLIMIT=off is equivalent to MaxInt64
@@ -27,4 +32,22 @@ func CalculateGoMemLimit(containerResources v1.ResourceRequirements) string {
 	}
 
 	return gcLimit
+}
+
+func CalculateNodeScanGoGC(containerResources v1.ResourceRequirements) string {
+	// Lower GOGC targets reduce peak heap size at the cost of more frequent GC cycles.
+	// This is useful for memory-constrained node scans where taking longer is acceptable.
+	memoryLimit := containerResources.Limits.Memory()
+	if memoryLimit == nil || memoryLimit.IsZero() {
+		return "100"
+	}
+
+	switch {
+	case memoryLimit.Value() <= nodeScanLowMemoryLimitBytes:
+		return "50"
+	case memoryLimit.Value() <= nodeScanHighMemoryLimitBytes:
+		return "75"
+	default:
+		return "100"
+	}
 }
