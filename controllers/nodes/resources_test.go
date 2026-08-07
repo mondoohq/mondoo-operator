@@ -471,7 +471,7 @@ func TestCronJob_GlobalJobOverrides(t *testing.T) {
 		Labels:                  map[string]string{"team": "platform"},
 	}
 
-	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 	assert.Equal(t, ptr.To(int32(300)), cj.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
 	assert.Equal(t, "platform", cj.Spec.JobTemplate.Labels["team"])
 	assert.Equal(t, "prod", cj.Spec.JobTemplate.Labels["env"])
@@ -868,7 +868,7 @@ func TestDaemonSet_WithJobOverrides(t *testing.T) {
 		{Key: "node.kubernetes.io/not-ready", Operator: corev1.TolerationOpExists},
 	}
 
-	ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, existingTolerations)
+	ds := DaemonSet(mac, false, "test123", constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{}, existingTolerations)
 
 	assert.Equal(t, map[string]string{"workload-type": "mondoo-scan"}, ds.Spec.Template.Spec.NodeSelector)
 	assert.Len(t, ds.Spec.Template.Spec.Tolerations, 2)
@@ -887,7 +887,7 @@ func TestDaemonSet_PerTypeJobOverridesOverrideGlobal(t *testing.T) {
 		NodeSelector: map[string]string{"workload-type": "node-scan"},
 	}
 
-	ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
+	ds := DaemonSet(mac, false, "test123", constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{}, nil)
 
 	assert.Equal(t, map[string]string{"workload-type": "node-scan"}, ds.Spec.Template.Spec.NodeSelector)
 }
