@@ -864,6 +864,7 @@ func (in *Nodes) DeepCopyInto(out *Nodes) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	out.ScheduleSpread = in.ScheduleSpread
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
 		*out = make([]corev1.EnvVar, len(*in))
