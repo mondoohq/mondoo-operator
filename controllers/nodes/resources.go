@@ -69,6 +69,7 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 	containerResources := k8s.ResourcesRequirementsWithDefaults(
 		ProfileResources(m.Spec.Nodes, profile), k8s.DefaultNodeScanningResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
+	gcPercent := gomemlimit.CalculateNodeScanGoGC(containerResources)
 
 	cj := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -136,6 +137,7 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 										{Name: "MONDOO_AUTO_UPDATE", Value: "false"},
 										{Name: constants.MondooParallelismEnv, Value: constants.DefaultMondooParallelism},
 										{Name: "NODE_NAME", Value: node.Name},
+										{Name: "GOGC", Value: gcPercent},
 										{Name: "GOMEMLIMIT", Value: gcLimit},
 									}, proxyEnvVars...), m.Spec.Nodes.Env),
 									TerminationMessagePath:   "/dev/termination-log",
@@ -219,6 +221,7 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 
 	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
+	gcPercent := gomemlimit.CalculateNodeScanGoGC(containerResources)
 
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -272,6 +275,7 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 								{Name: "MONDOO_PROCFS", Value: "on"},
 								{Name: "MONDOO_AUTO_UPDATE", Value: "false"},
 								{Name: constants.MondooParallelismEnv, Value: constants.DefaultMondooParallelism},
+								{Name: "GOGC", Value: gcPercent},
 								{Name: "GOMEMLIMIT", Value: gcLimit},
 								{Name: "NODE_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"}}},
 							}, proxyEnvVars...), m.Spec.Nodes.Env),
