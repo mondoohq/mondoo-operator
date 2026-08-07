@@ -1522,7 +1522,7 @@ spec:
         memory: 200Mi
 ```
 
-Node scan pods automatically set `GOMEMLIMIT` from `nodes.resources.limits.memory` (90% headroom) and apply adaptive `GOGC` values (`50` up to `512Mi`, `75` up to `1Gi`, `100` above `1Gi`). This is intended to reduce peak memory on tighter limits by triggering more frequent GC cycles, so scans can take longer. Exact impact depends on workload and should be validated in your cluster. You can still override either variable via `spec.nodes.env` when needed.
+Node scan pods automatically set `GOMEMLIMIT` from `nodes.resources.limits.memory` (90% headroom) and apply adaptive `GOGC` values (`50` up to `512Mi`, `75` above `512Mi` when a memory limit is set, and `100` when no memory limit is configured). This is intended to reduce peak memory under finite cgroup limits by triggering more frequent GC cycles, so scans can take longer and use more CPU. Exact impact depends on workload and should be validated in your cluster. You can still override either variable via `spec.nodes.env` when needed.
 
 ### How can I trigger a new scan?
 

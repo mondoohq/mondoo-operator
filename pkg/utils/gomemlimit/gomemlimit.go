@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	nodeScanLowMemoryLimitBytes  int64 = 512 * 1024 * 1024
-	nodeScanHighMemoryLimitBytes int64 = 1024 * 1024 * 1024
+	nodeScanLowMemoryLimitBytes int64 = 512 * 1024 * 1024
 )
 
 func CalculateGoMemLimit(containerResources v1.ResourceRequirements) string {
@@ -42,12 +41,10 @@ func CalculateNodeScanGoGC(containerResources v1.ResourceRequirements) string {
 		return "100"
 	}
 
-	switch {
-	case memoryLimit.Value() <= nodeScanLowMemoryLimitBytes:
+	if memoryLimit.Value() <= nodeScanLowMemoryLimitBytes {
 		return "50"
-	case memoryLimit.Value() <= nodeScanHighMemoryLimitBytes:
-		return "75"
-	default:
-		return "100"
 	}
+	// For finite limits above 512Mi, keep a moderate GC target to lower peak heap
+	// without the larger CPU/throughput tradeoff from very aggressive values.
+	return "75"
 }
