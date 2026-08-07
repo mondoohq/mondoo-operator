@@ -253,6 +253,20 @@ func TestResources_GOMemoryTuning(t *testing.T) {
 			expectedGoGC:       "75",
 		},
 		{
+			name: "resources should use moderate gc for larger finite limits",
+			mondooauditconfig: func() *v1alpha2.MondooAuditConfig {
+				mac := testMondooAuditConfig()
+				mac.Spec.Nodes.Resources = corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+				}
+				return mac
+			},
+			expectedGoMemLimit: "1932735283",
+			expectedGoGC:       "75",
+		},
+		{
 			name: "resources should match off",
 			mondooauditconfig: func() *v1alpha2.MondooAuditConfig {
 				mac := testMondooAuditConfig()

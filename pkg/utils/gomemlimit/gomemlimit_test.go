@@ -78,13 +78,13 @@ func TestCalculateNodeScanGoGC(t *testing.T) {
 			expectedGoGC: "75",
 		},
 		{
-			name: "uses default gc for larger memory limits",
+			name: "uses moderate gc for larger finite memory limits",
 			resources: v1.ResourceRequirements{
 				Limits: v1.ResourceList{
 					v1.ResourceMemory: resource.MustParse("2Gi"),
 				},
 			},
-			expectedGoGC: "100",
+			expectedGoGC: "75",
 		},
 		{
 			name: "uses default gc when no memory limit is set",
