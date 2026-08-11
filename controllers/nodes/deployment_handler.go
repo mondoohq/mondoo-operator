@@ -246,7 +246,11 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		}
 	}
 
-	desired := DaemonSet(*n.Mondoo, n.IsOpenshift, mondooClientImage, *n.MondooOperatorConfig, slices.Collect(maps.Keys(tolerations)))
+	// maps.Keys iterates in random order, so sort to avoid a spurious update on every reconcile.
+	tolerationList := slices.Collect(maps.Keys(tolerations))
+	k8s.SortTolerations(tolerationList)
+
+	desired := DaemonSet(*n.Mondoo, n.IsOpenshift, mondooClientImage, *n.MondooOperatorConfig, tolerationList)
 	ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
 	op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, ds, n.Mondoo, n.log(), func() error {
 		k8s.UpdateDaemonSetFields(ds, desired)
