@@ -426,6 +426,41 @@ func TestCronJob_WithImagePullSecrets(t *testing.T) {
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
 }
 
+func TestCronJob_ImagePullPolicy(t *testing.T) {
+	testNode := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-name"}}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	t.Run("defaults to IfNotPresent", func(t *testing.T) {
+		cj := CronJob("test123", testNode, testMondooAuditConfig(), false, cfg)
+		assert.Equal(t, corev1.PullIfNotPresent, cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+
+	t.Run("honors the configured policy", func(t *testing.T) {
+		mac := testMondooAuditConfig()
+		mac.Spec.Scanner.Image.PullPolicy = corev1.PullNever
+
+		cj := CronJob("test123", testNode, mac, false, cfg)
+		assert.Equal(t, corev1.PullNever, cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+}
+
+func TestDaemonSet_ImagePullPolicy(t *testing.T) {
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	t.Run("defaults to IfNotPresent", func(t *testing.T) {
+		ds := DaemonSet(*testMondooAuditConfig(), false, "test123", cfg, nil)
+		assert.Equal(t, corev1.PullIfNotPresent, ds.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+
+	t.Run("honors the configured policy", func(t *testing.T) {
+		mac := *testMondooAuditConfig()
+		mac.Spec.Scanner.Image.PullPolicy = corev1.PullAlways
+
+		ds := DaemonSet(mac, false, "test123", cfg, nil)
+		assert.Equal(t, corev1.PullAlways, ds.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+}
+
 func TestDaemonSet_WithProxy(t *testing.T) {
 	mac := *testMondooAuditConfig()
 	cfg := v1alpha2.MondooOperatorConfig{

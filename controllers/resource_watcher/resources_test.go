@@ -471,6 +471,39 @@ func TestDeployment_ProxyEnvVars(t *testing.T) {
 	assert.Equal(t, "localhost,10.0.0.0/8", envMap["no_proxy"])
 }
 
+func TestDeployment_ImagePullPolicy(t *testing.T) {
+	newConfig := func() *v1alpha2.MondooAuditConfig {
+		return &v1alpha2.MondooAuditConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-config",
+				Namespace: "mondoo-operator",
+			},
+			Spec: v1alpha2.MondooAuditConfigSpec{
+				KubernetesResources: v1alpha2.KubernetesResources{
+					Enable: true,
+					ResourceWatcher: v1alpha2.ResourceWatcherSpec{
+						Enable: true,
+					},
+				},
+			},
+		}
+	}
+	operatorConfig := v1alpha2.MondooOperatorConfig{}
+
+	t.Run("defaults to IfNotPresent", func(t *testing.T) {
+		d := Deployment("test-image:latest", "", "", newConfig(), operatorConfig)
+		assert.Equal(t, corev1.PullIfNotPresent, d.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+
+	t.Run("honors the configured policy", func(t *testing.T) {
+		config := newConfig()
+		config.Spec.Scanner.Image.PullPolicy = corev1.PullAlways
+
+		d := Deployment("test-image:latest", "", "", config, operatorConfig)
+		assert.Equal(t, corev1.PullAlways, d.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+}
+
 func TestDeployment_WithImagePullSecrets(t *testing.T) {
 	config := &v1alpha2.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{

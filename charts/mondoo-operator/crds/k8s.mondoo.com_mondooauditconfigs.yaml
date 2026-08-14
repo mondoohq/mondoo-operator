@@ -66,6 +66,16 @@ spec:
                         type: string
                       name:
                         type: string
+                      pullPolicy:
+                        description: |-
+                          PullPolicy is the image pull policy applied to every container and init container
+                          the operator creates, including the cloud CLI and SPIFFE helper init containers.
+                          Defaults to IfNotPresent.
+                        enum:
+                        - Always
+                        - IfNotPresent
+                        - Never
+                        type: string
                       tag:
                         type: string
                     type: object
@@ -1768,6 +1778,16 @@ spec:
                           When specified, this takes precedence over Tag.
                         type: string
                       name:
+                        type: string
+                      pullPolicy:
+                        description: |-
+                          PullPolicy is the image pull policy applied to every container and init container
+                          the operator creates, including the cloud CLI and SPIFFE helper init containers.
+                          Defaults to IfNotPresent.
+                        enum:
+                        - Always
+                        - IfNotPresent
+                        - Never
                         type: string
                       tag:
                         type: string

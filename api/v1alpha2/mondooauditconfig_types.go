@@ -669,6 +669,21 @@ type Image struct {
 	// When specified, this takes precedence over Tag.
 	// +optional
 	Digest string `json:"digest,omitempty"`
+	// PullPolicy is the image pull policy applied to every container and init container
+	// the operator creates, including the cloud CLI and SPIFFE helper init containers.
+	// Defaults to IfNotPresent.
+	// +kubebuilder:validation:Enum=Always;IfNotPresent;Never
+	// +optional
+	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
+}
+
+// PullPolicyOrDefault returns the configured image pull policy, falling back to
+// IfNotPresent when none is set.
+func (i Image) PullPolicyOrDefault() corev1.PullPolicy {
+	if i.PullPolicy != "" {
+		return i.PullPolicy
+	}
+	return corev1.PullIfNotPresent
 }
 
 // MondooAuditConfigStatus defines the observed state of MondooAuditConfig

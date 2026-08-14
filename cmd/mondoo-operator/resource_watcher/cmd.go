@@ -22,6 +22,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/controllers/resource_watcher"
 	annot "go.mondoo.com/mondoo-operator/pkg/annotations"
+	"go.mondoo.com/mondoo-operator/pkg/utils"
 	"go.mondoo.com/mondoo-operator/pkg/utils/logger"
 )
 
@@ -153,8 +154,18 @@ func init() {
 			Scheme: scheme,
 		}
 
-		// If specific namespaces are provided, configure cache to only watch those
-		if len(namespacesList) > 0 {
+		// If specific namespaces are provided, configure cache to only watch those.
+		// Cache keys must be literal namespace names, so this is only possible when
+		// every include entry is a literal. A glob such as "prod-*" cannot be
+		// expanded up front: namespaces matching it may be created after startup.
+		// In that case watch cluster-wide and let the watcher's namespace filter
+		// drop events from namespaces that are out of scope.
+		switch {
+		case len(namespacesList) == 0:
+		case utils.HasGlobPattern(namespacesList):
+			logger.Info("Namespace include list contains glob patterns; watching all namespaces and filtering events per namespace",
+				"namespaces", namespacesList)
+		default:
 			byNamespace := make(map[string]cache.Config)
 			for _, ns := range namespacesList {
 				byNamespace[ns] = cache.Config{}
@@ -183,12 +194,15 @@ func init() {
 		debouncer := resource_watcher.NewDebouncer(*debounceInterval, *minimumScanInterval, scanner.ScanResourcesFunc())
 
 		// Create watcher
-		watcher := resource_watcher.NewResourceWatcher(c, debouncer, resource_watcher.WatcherConfig{
+		watcher, err := resource_watcher.NewResourceWatcher(c, debouncer, resource_watcher.WatcherConfig{
 			Namespaces:        namespacesList,
 			NamespacesExclude: namespacesExcludeList,
 			ResourceTypes:     resourceTypesList,
 			WatchAllResources: *watchAllResources,
 		})
+		if err != nil {
+			return fmt.Errorf("failed to create resource watcher: %w", err)
+		}
 
 		// Start components
 		errChan := make(chan error, 3)
