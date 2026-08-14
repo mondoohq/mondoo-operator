@@ -45,7 +45,7 @@ func UnsafeNodeScanMemoryLimit(resources corev1.ResourceRequirements, node corev
 		return resource.Quantity{}, resource.Quantity{}, false
 	}
 
-	if float64(memLimit.Value()) <= nodeScanMemoryLimitWarnRatio*float64(memAllocatable.Value()) {
+	if memLimit.AsApproximateFloat64() <= nodeScanMemoryLimitWarnRatio*memAllocatable.AsApproximateFloat64() {
 		return *memLimit, memAllocatable, false
 	}
 
