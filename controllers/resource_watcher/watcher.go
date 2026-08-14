@@ -6,9 +6,9 @@ package resource_watcher
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 
+	"go.mondoo.com/mondoo-operator/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -74,10 +74,12 @@ type ResourceWatcher struct {
 	namespaceReader client.Reader
 	debouncer       *Debouncer
 	config          WatcherConfig
+	nsFilter        *utils.NamespaceFilter
 }
 
-// NewResourceWatcher creates a new ResourceWatcher.
-func NewResourceWatcher(c ctrlcache.Cache, debouncer *Debouncer, config WatcherConfig) *ResourceWatcher {
+// NewResourceWatcher creates a new ResourceWatcher. It returns an error if the
+// configured namespace include/exclude patterns are not valid glob syntax.
+func NewResourceWatcher(c ctrlcache.Cache, debouncer *Debouncer, config WatcherConfig) (*ResourceWatcher, error) {
 	if len(config.ResourceTypes) == 0 {
 		// Use high-priority resources by default (stable workload resources).
 		// Only use all resources if explicitly requested via WatchAllResources.
@@ -87,12 +89,19 @@ func NewResourceWatcher(c ctrlcache.Cache, debouncer *Debouncer, config WatcherC
 			config.ResourceTypes = HighPriorityResourceTypes
 		}
 	}
+
+	nsFilter, err := utils.NewNamespaceFilter(config.Namespaces, config.NamespacesExclude)
+	if err != nil {
+		return nil, err
+	}
+
 	return &ResourceWatcher{
 		cache:           c,
 		namespaceReader: c,
 		debouncer:       debouncer,
 		config:          config,
-	}
+		nsFilter:        nsFilter,
+	}, nil
 }
 
 // Start begins watching resources and processing events.
@@ -182,15 +191,10 @@ func (w *ResourceWatcher) getObjectForResourceType(resourceType string) (client.
 	}
 }
 
-// shouldWatchNamespace returns true if the namespace should be watched.
+// shouldWatchNamespace returns true if the namespace should be watched. Include
+// and exclude entries may be literal names or glob patterns such as "prod-*".
 func (w *ResourceWatcher) shouldWatchNamespace(namespace string) bool {
-	// If include list is specified, only watch those namespaces
-	if len(w.config.Namespaces) > 0 {
-		return slices.Contains(w.config.Namespaces, namespace)
-	}
-
-	// Check exclude list
-	return !slices.Contains(w.config.NamespacesExclude, namespace)
+	return w.nsFilter.Allow(namespace)
 }
 
 func (w *ResourceWatcher) shouldWatchNamespaceLabels(ctx context.Context, namespace string) bool {

@@ -101,7 +101,7 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 							Containers: []corev1.Container{
 								{
 									Image:           image,
-									ImagePullPolicy: corev1.PullIfNotPresent,
+									ImagePullPolicy: m.Spec.Scanner.Image.PullPolicyOrDefault(),
 									Name:            "mondoo-k8s-scan",
 									Command:         cmd,
 									Resources:       containerResources,
@@ -359,7 +359,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 			}
 		}
 
-		initContainers = append(initContainers, wifInitContainer(cluster))
+		initContainers = append(initContainers, wifInitContainer(cluster, m.Spec.Scanner.Image.PullPolicyOrDefault()))
 
 		// AKS Workload Identity webhook uses a pod-level objectSelector matching
 		// the label "azure.workload.identity/use: true" to inject federated token
@@ -432,7 +432,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 			}
 		}
 
-		initContainers = append(initContainers, spiffeInitContainer(cluster))
+		initContainers = append(initContainers, spiffeInitContainer(cluster, m.Spec.Scanner.Image.PullPolicyOrDefault()))
 
 	case cluster.VaultAuth != nil:
 		// Vault auth: operator fetches credentials and writes a kubeconfig Secret
@@ -473,7 +473,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 							Containers: []corev1.Container{
 								{
 									Image:           image,
-									ImagePullPolicy: corev1.PullIfNotPresent,
+									ImagePullPolicy: m.Spec.Scanner.Image.PullPolicyOrDefault(),
 									Name:            "mondoo-k8s-scan",
 									Command:         cmd,
 									Resources:       extContainerResources,
@@ -589,7 +589,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 			corev1.EnvVar{Name: "DOCKER_CONFIG", Value: "/etc/opt/mondoo/docker"},
 		)
 
-		podSpec.InitContainers = append(podSpec.InitContainers, k8s.RegistryWIFInitContainer(m.Spec.Containers.WorkloadIdentity))
+		podSpec.InitContainers = append(podSpec.InitContainers, k8s.RegistryWIFInitContainer(m.Spec.Containers.WorkloadIdentity, m.Spec.Scanner.Image.PullPolicyOrDefault()))
 
 		// AKS Workload Identity webhook requires this label
 		if m.Spec.Containers.WorkloadIdentity.Provider == v1alpha2.CloudProviderAKS {
@@ -720,7 +720,7 @@ func WIFServiceAccount(cluster v1alpha2.ExternalCluster, m *v1alpha2.MondooAudit
 }
 
 // wifInitContainer creates an init container that generates kubeconfig using cloud CLI tools
-func wifInitContainer(cluster v1alpha2.ExternalCluster) corev1.Container {
+func wifInitContainer(cluster v1alpha2.ExternalCluster, pullPolicy corev1.PullPolicy) corev1.Container {
 	var image, shell, script string
 	var env []corev1.EnvVar
 
@@ -856,7 +856,7 @@ fi
 	return corev1.Container{
 		Name:            "generate-kubeconfig",
 		Image:           image,
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: pullPolicy,
 		Command:         []string{shell, "-c", script},
 		Env:             env,
 		VolumeMounts: []corev1.VolumeMount{
@@ -897,7 +897,7 @@ fi
 // If scans consistently exceed your SVID TTL, consider:
 // - Increasing the SVID TTL in your SPIRE server configuration
 // - Using a different authentication method (kubeconfig, service account token)
-func spiffeInitContainer(cluster v1alpha2.ExternalCluster) corev1.Container {
+func spiffeInitContainer(cluster v1alpha2.ExternalCluster, pullPolicy corev1.PullPolicy) corev1.Container {
 	socketPath := cluster.SPIFFEAuth.SocketPath
 	if socketPath == "" {
 		socketPath = "/run/spire/sockets/agent.sock"
@@ -979,7 +979,7 @@ kill $HELPER_PID 2>/dev/null || true
 	return corev1.Container{
 		Name:            "fetch-spiffe-certs",
 		Image:           constants.SPIFFEHelperImage,
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: pullPolicy,
 		Command:         []string{"/bin/sh", "-c", script},
 		Env: []corev1.EnvVar{
 			{Name: "SOCKET_FILE", Value: socketFile},

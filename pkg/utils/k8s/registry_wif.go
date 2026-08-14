@@ -13,7 +13,7 @@ import (
 
 // RegistryWIFInitContainer creates an init container that generates docker config credentials
 // using cloud-native Workload Identity Federation for container registry authentication.
-func RegistryWIFInitContainer(wif *v1alpha2.WorkloadIdentityConfig) corev1.Container {
+func RegistryWIFInitContainer(wif *v1alpha2.WorkloadIdentityConfig, pullPolicy corev1.PullPolicy) corev1.Container {
 	var image, shell, script string
 	var env []corev1.EnvVar
 
@@ -151,7 +151,7 @@ echo "Docker config generated for ACR: ${ACR_LOGIN_SERVER}"
 	return corev1.Container{
 		Name:            "generate-registry-creds",
 		Image:           image,
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: pullPolicy,
 		Command:         []string{shell, "-c", script},
 		Env:             env,
 		VolumeMounts: []corev1.VolumeMount{

@@ -1425,7 +1425,7 @@ func TestWIFInitContainer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			container := wifInitContainer(tt.cluster)
+			container := wifInitContainer(tt.cluster, corev1.PullIfNotPresent)
 
 			// Verify container name
 			if container.Name != "generate-kubeconfig" {
@@ -1512,7 +1512,7 @@ func TestSpiffeInitContainer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			container := spiffeInitContainer(tt.cluster)
+			container := spiffeInitContainer(tt.cluster, corev1.PullIfNotPresent)
 
 			// Verify container name
 			if container.Name != "fetch-spiffe-certs" {
