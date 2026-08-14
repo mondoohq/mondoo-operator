@@ -12,6 +12,7 @@ This user manual describes how to install and use the Mondoo Operator.
   - [Configuring the Mondoo Secret](#configuring-the-mondoo-secret)
   - [Creating a MondooAuditConfig](#creating-a-mondooauditconfig)
     - [Filter Kubernetes objects based on namespace](#filter-kubernetes-objects-based-on-namespace)
+      - [Wildcards](#wildcards)
   - [Scanning External Clusters](#scanning-external-clusters)
     - [Creating a kubeconfig Secret](#creating-a-kubeconfig-secret)
     - [Configuring external cluster scanning](#configuring-external-cluster-scanning)
@@ -23,6 +24,7 @@ This user manual describes how to install and use the Mondoo Operator.
   - [Installing Mondoo into multiple namespaces](#installing-mondoo-into-multiple-namespaces)
   - [Adjust the scan interval](#adjust-the-scan-interval)
   - [Customize the generated scan Jobs](#customize-the-generated-scan-jobs)
+  - [Set the image pull policy](#set-the-image-pull-policy)
   - [Real-time Resource Watcher (Opt-in)](#real-time-resource-watcher-opt-in)
   - [Configure resources for the operator and its components](#configure-resources-for-the-operator-and-its-components)
     - [Configure resources for the operator-controller](#configure-resources-for-the-operator-controller)
@@ -223,6 +225,35 @@ spec:
         - backend2
         - ...
 ```
+
+`include` takes precedence over `exclude`: when `include` is non-empty only the namespaces it matches are scanned, and `exclude` is not consulted at all.
+
+#### Wildcards
+
+Both lists accept glob patterns as well as literal namespace names:
+
+```
+...
+spec:
+...
+  filtering:
+    namespaces:
+      exclude:
+        - kube-*        # kube-system, kube-public, kube-node-lease
+        - '*-canary'    # any namespace ending in -canary
+```
+
+| Pattern | Matches |
+|---------|---------|
+| `prod-*` | `prod-api`, `prod-web`, but not `staging-api` |
+| `*-canary` | `api-canary`, `web-canary` |
+| `team-?` | `team-a`, `team-b`, but not `team-payments` |
+| `{frontend,backend}` | `frontend`, `backend` |
+| `*` | every namespace |
+
+Quote any pattern that starts with `*`, otherwise YAML parses it as an alias.
+
+> **Note:** When `include` contains a wildcard, the resource watcher watches all namespaces and filters events as they arrive, because the set of matching namespaces can change while it is running. This needs cluster-wide list/watch permission on the resource types being watched, which the operator's default RBAC already grants. With only literal names, the watch is scoped to those namespaces.
 
 ## GitOps installs: let the operator create its Console integration
 
@@ -1024,6 +1055,45 @@ Notes:
   the operator take precedence and cannot be overwritten.
 - `nodeSelector` is ignored for node scan pods because they are pinned to a specific node.
 - `nodes.jobOverrides` only applies to the `cronjob` node scanning style.
+
+## Set the image pull policy
+
+By default every container the operator creates uses `IfNotPresent`. Set
+`spec.scanner.image.pullPolicy` to change it:
+
+```yaml
+apiVersion: k8s.mondoo.com/v1alpha2
+kind: MondooAuditConfig
+metadata:
+  name: mondoo-client
+  namespace: mondoo-operator
+spec:
+  scanner:
+    image:
+      pullPolicy: Always
+```
+
+Valid values are `Always`, `IfNotPresent`, and `Never`.
+
+The policy applies to every container and init container the operator generates:
+
+- the Kubernetes resource scan CronJobs, including those for [external clusters](#scanning-external-clusters)
+- the container image scan CronJob
+- the node scan CronJobs and DaemonSet
+- the [resource watcher](#real-time-resource-watcher-opt-in) Deployment
+- the cloud CLI (`gcloud`/`aws`/`az`), SPIFFE helper, and registry credential init containers
+
+Two cases where this matters:
+
+- **`Always`** — you publish a moving tag such as `13-rootless` and want each scan to pick up the
+  newest push. Prefer pinning `spec.scanner.image.digest` when you need reproducibility instead.
+- **`Never`** — an air-gapped cluster where images are preloaded onto the nodes and any registry
+  round trip would fail. Note that the third-party init container images
+  (`gcloud`, `aws`, `az`, the SPIFFE helper, `busybox`) are not rewritten by
+  `imageRegistry`/`registryMirrors`, so preload those under their original names.
+
+This setting does not affect the operator's own Deployment. Configure that through the Helm value
+`controllerManager.manager.imagePullPolicy`.
 
 ## Real-time Resource Watcher (Opt-in)
 

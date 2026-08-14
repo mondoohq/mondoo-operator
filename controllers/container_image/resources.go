@@ -98,7 +98,7 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 							Containers: []corev1.Container{
 								{
 									Image:           image,
-									ImagePullPolicy: corev1.PullIfNotPresent,
+									ImagePullPolicy: m.Spec.Scanner.Image.PullPolicyOrDefault(),
 									Name:            "mondoo-containers-scan",
 									Command:         cmd,
 									Resources:       containerResources,
@@ -214,7 +214,7 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 		)
 
 		// Add init container for registry credential generation
-		podSpec.InitContainers = append(podSpec.InitContainers, k8s.RegistryWIFInitContainer(wif))
+		podSpec.InitContainers = append(podSpec.InitContainers, k8s.RegistryWIFInitContainer(wif, m.Spec.Scanner.Image.PullPolicyOrDefault()))
 
 		// AKS Workload Identity webhook requires this label on the pod template only.
 		// Copy labels so we don't mutate the CronJob/Job metadata.

@@ -133,7 +133,7 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 						{
 							Name:            "mondoo-resource-watcher",
 							Image:           image,
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: m.Spec.Scanner.Image.PullPolicyOrDefault(),
 							Command:         cmd,
 							Resources:       k8s.ResourcesRequirementsWithDefaults(m.Spec.Scanner.Resources, k8s.DefaultK8sResourceScanningResources),
 							SecurityContext: &corev1.SecurityContext{

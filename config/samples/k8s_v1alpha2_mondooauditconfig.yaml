@@ -32,6 +32,9 @@ spec:
     image:
       name: ghcr.io/mondoohq/mondoo-operator
       tag: latest
+      # Pull policy for every container the operator creates.
+      # One of Always, IfNotPresent (default), or Never.
+      # pullPolicy: IfNotPresent
     resources:
       requests:
         cpu: 100m
@@ -171,7 +174,9 @@ spec:
         cpu: 500m
         memory: 500Mi
 
-  # Namespace filtering (applies to K8s resources and container scanning)
+  # Namespace filtering (applies to K8s resources and container scanning).
+  # Entries may be literal namespace names or glob patterns, e.g. "prod-*",
+  # "*-canary", "team-?", "{frontend,backend}".
   filtering:
     namespaces:
       # Exclude specific namespaces
@@ -181,3 +186,4 @@ spec:
       # include:
       #   - default
       #   - production
+      #   - 'prod-*'

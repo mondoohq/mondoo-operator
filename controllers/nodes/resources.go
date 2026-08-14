@@ -131,7 +131,7 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 									}, proxyEnvVars...), m.Spec.Nodes.Env),
 									TerminationMessagePath:   "/dev/termination-log",
 									TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-									ImagePullPolicy:          corev1.PullIfNotPresent,
+									ImagePullPolicy:          m.Spec.Scanner.Image.PullPolicyOrDefault(),
 								},
 							},
 							Volumes: []corev1.Volume{
@@ -252,7 +252,7 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 							},
 							TerminationMessagePath:   "/dev/termination-log",
 							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-							ImagePullPolicy:          corev1.PullIfNotPresent,
+							ImagePullPolicy:          m.Spec.Scanner.Image.PullPolicyOrDefault(),
 							VolumeMounts: []corev1.VolumeMount{
 								{Name: "root", ReadOnly: true, MountPath: "/mnt/host/"},
 								{Name: "config", ReadOnly: true, MountPath: "/etc/opt/"},
