@@ -80,6 +80,7 @@ func UpdateDaemonSetFields(obj, desired *appsv1.DaemonSet) {
 	ps.PriorityClassName = dps.PriorityClassName
 	ps.AutomountServiceAccountToken = dps.AutomountServiceAccountToken
 	ps.NodeSelector = dps.NodeSelector
+	ps.Affinity = dps.Affinity
 	ps.Tolerations = dps.Tolerations
 	ps.Containers = dps.Containers
 	ps.Volumes = dps.Volumes

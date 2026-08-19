@@ -171,6 +171,10 @@ spec:
     # suspend: true
     # Interval in minutes (only for deployment style)
     # intervalTimer: 60
+    # Select which nodes to scan. Omit to scan all nodes.
+    # labelSelector:
+    #   matchLabels:
+    #     pool: platform
     resources:
       requests:
         cpu: 100m
