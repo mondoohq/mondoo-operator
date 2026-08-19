@@ -205,6 +205,9 @@ type Scanner struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
+// KubernetesResources configures resources scanned in the operator's cluster.
+// External cluster CronJobs intentionally inherit Scanner.Scheduling; there is
+// no separate scheduling override under KubernetesResources.
 type KubernetesResources struct {
 	Enable bool `json:"enable,omitempty"`
 
