@@ -38,6 +38,19 @@ var DefaultContainerScanningResources corev1.ResourceRequirements = corev1.Resou
 	},
 }
 
+// DefaultRuntimeCacheScanningResources for node-local runtime cache image scanning.
+var DefaultRuntimeCacheScanningResources corev1.ResourceRequirements = corev1.ResourceRequirements{
+	Limits: corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("256Mi"),
+		corev1.ResourceCPU:    resource.MustParse("500m"),
+	},
+
+	Requests: corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("128Mi"),
+		corev1.ResourceCPU:    resource.MustParse("25m"),
+	},
+}
+
 // DefaultNodeScanningResources for cnspec container when scanning nodes
 var DefaultNodeScanningResources corev1.ResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{

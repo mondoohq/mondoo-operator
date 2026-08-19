@@ -15,7 +15,14 @@ import (
 )
 
 const (
+	// ResourceNameMaxLength is the 52-char safety bound used for CronJob names so
+	// generated Job names stay within the Kubernetes 63-char limit.
 	ResourceNameMaxLength = 52
+
+	// DaemonSetNameChildResourceSafeMaxLength keeps DaemonSet names within the
+	// DNS-1123 label limit (63) while leaving room for child Pod generated names
+	// (<daemonset-name>-<5 random chars>).
+	DaemonSetNameChildResourceSafeMaxLength = 57
 )
 
 // VerifyAPI will query the underlying k8s cluster for the existence

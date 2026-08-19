@@ -222,6 +222,10 @@ func (m *mockContainerImageResolver) MondooOperatorImage(_ context.Context, _, _
 	return "ghcr.io/mondoohq/mondoo-operator@sha256:def456", nil
 }
 
+func (m *mockContainerImageResolver) ContainerImage(_ context.Context, image string, _ bool) (string, error) {
+	return image, nil
+}
+
 func (m *mockContainerImageResolver) WithImageRegistry(_ string) mondooutils.ContainerImageResolver {
 	return m
 }

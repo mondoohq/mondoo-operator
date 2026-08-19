@@ -11,6 +11,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/robfig/cron/v3"
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/controllers/container_image/runtime_cache"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	logutils "go.mondoo.com/mondoo-operator/pkg/utils/logger"
@@ -19,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -36,6 +38,7 @@ type DeploymentHandler struct {
 	MondooOperatorConfig   *v1alpha2.MondooOperatorConfig
 	MondooClientBuilder    func(mondooclient.MondooClientOptions) (mondooclient.MondooClient, error)
 	RefreshDigests         RefreshDigestsFunc
+	EventRecorder          record.EventRecorder
 }
 
 func (n *DeploymentHandler) log() logr.Logger {
@@ -48,9 +51,27 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		return ctrl.Result{}, err
 	}
 
+	runtimeCache := runtime_cache.DeploymentHandler{
+		Mondoo:                 n.Mondoo,
+		KubeClient:             n.KubeClient,
+		ContainerImageResolver: n.ContainerImageResolver,
+		MondooOperatorConfig:   n.MondooOperatorConfig,
+		EventRecorder:          n.EventRecorder,
+	}
+	runtimeResult, runtimeErr := runtimeCache.Reconcile(ctx)
+	if runtimeErr != nil {
+		logger.Error(runtimeErr, "failed to reconcile runtime cache scanner, continuing with Kubernetes container image scanner")
+	}
+	if runtimeResult.RequeueAfter > 0 {
+		return runtimeResult, runtimeErr
+	}
+
 	// TODO: KubernetesResources.ContainerImageScanning is a deprecated setting
 	if !n.Mondoo.Spec.KubernetesResources.ContainerImageScanning && !n.Mondoo.Spec.Containers.Enable {
-		return ctrl.Result{}, n.down(ctx)
+		if downErr := n.down(ctx); downErr != nil {
+			return ctrl.Result{}, downErr
+		}
+		return ctrl.Result{}, runtimeErr
 	}
 
 	// Validate container registry WIF configuration
@@ -83,7 +104,7 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 
 	n.garbageCollectIfNeeded(ctx, clusterUid)
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, runtimeErr
 }
 
 func (n *DeploymentHandler) syncCronJob(ctx context.Context, clusterUid string) error {
