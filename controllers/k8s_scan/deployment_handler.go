@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -16,6 +17,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -46,6 +48,9 @@ func validateExternalClusterAuth(cluster v1alpha2.ExternalCluster) error {
 	if cluster.WorkloadIdentity != nil {
 		authMethods++
 	}
+	if cluster.OIDCAuth != nil {
+		authMethods++
+	}
 	if cluster.SPIFFEAuth != nil {
 		authMethods++
 	}
@@ -54,10 +59,10 @@ func validateExternalClusterAuth(cluster v1alpha2.ExternalCluster) error {
 	}
 
 	if authMethods == 0 {
-		return fmt.Errorf("externalCluster %q: must specify one of kubeconfigSecretRef, serviceAccountAuth, workloadIdentity, spiffeAuth, or vaultAuth", cluster.Name)
+		return fmt.Errorf("externalCluster %q: must specify one of kubeconfigSecretRef, serviceAccountAuth, workloadIdentity, oidcAuth, spiffeAuth, or vaultAuth", cluster.Name)
 	}
 	if authMethods > 1 {
-		return fmt.Errorf("externalCluster %q: kubeconfigSecretRef, serviceAccountAuth, workloadIdentity, spiffeAuth, and vaultAuth are mutually exclusive", cluster.Name)
+		return fmt.Errorf("externalCluster %q: kubeconfigSecretRef, serviceAccountAuth, workloadIdentity, oidcAuth, spiffeAuth, and vaultAuth are mutually exclusive", cluster.Name)
 	}
 
 	// Provider-specific validation for WorkloadIdentity
@@ -95,6 +100,43 @@ func validateExternalClusterAuth(cluster v1alpha2.ExternalCluster) error {
 		}
 	}
 
+	// Validation for OIDCAuth
+	if cluster.OIDCAuth != nil {
+		if cluster.OIDCAuth.Server == "" {
+			return fmt.Errorf("externalCluster %q: server is required for oidcAuth", cluster.Name)
+		}
+		if !strings.HasPrefix(cluster.OIDCAuth.Server, "https://") {
+			return fmt.Errorf("externalCluster %q: server must start with https:// for oidcAuth", cluster.Name)
+		}
+		if cluster.OIDCAuth.IssuerURL == "" {
+			return fmt.Errorf("externalCluster %q: issuerURL is required for oidcAuth", cluster.Name)
+		}
+		if !strings.HasPrefix(cluster.OIDCAuth.IssuerURL, "https://") {
+			return fmt.Errorf("externalCluster %q: issuerURL must start with https:// for oidcAuth", cluster.Name)
+		}
+		if cluster.OIDCAuth.ClientID == "" {
+			return fmt.Errorf("externalCluster %q: clientID is required for oidcAuth", cluster.Name)
+		}
+		if cluster.OIDCAuth.CredentialsSecretRef.Name == "" {
+			return fmt.Errorf("externalCluster %q: credentialsSecretRef.name is required for oidcAuth", cluster.Name)
+		}
+		keyChecks := []struct {
+			field string
+			key   string
+		}{
+			{field: "refreshTokenKey", key: oidcKeyOrDefault(cluster.OIDCAuth.RefreshTokenKey, "refresh-token")},
+			{field: "clientSecretKey", key: oidcKeyOrDefault(cluster.OIDCAuth.ClientSecretKey, "client-secret")},
+			{field: "idTokenKey", key: oidcKeyOrDefault(cluster.OIDCAuth.IDTokenKey, "id-token")},
+			{field: "clusterCAKey", key: oidcKeyOrDefault(cluster.OIDCAuth.ClusterCAKey, "ca.crt")},
+			{field: "issuerCAKey", key: oidcKeyOrDefault(cluster.OIDCAuth.IssuerCAKey, "oidc-ca.crt")},
+		}
+		for _, check := range keyChecks {
+			if err := validateOIDCSecretKey(check.field, check.key); err != nil {
+				return fmt.Errorf("externalCluster %q: %w", cluster.Name, err)
+			}
+		}
+	}
+
 	// Validation for SPIFFEAuth
 	if cluster.SPIFFEAuth != nil {
 		if cluster.SPIFFEAuth.Server == "" {
@@ -125,6 +167,19 @@ func validateExternalClusterAuth(cluster v1alpha2.ExternalCluster) error {
 		if cluster.VaultAuth.TargetCACertSecretRef != nil && cluster.VaultAuth.TargetCACertSecretRef.Name == "" {
 			return fmt.Errorf("externalCluster %q: targetCACertSecretRef.name is required when targetCACertSecretRef is specified for vaultAuth", cluster.Name)
 		}
+	}
+	return nil
+}
+
+func validateOIDCSecretKey(field, key string) error {
+	if key == "" {
+		return fmt.Errorf("%s must not be empty for oidcAuth", field)
+	}
+	if key == "." || key == ".." || strings.ContainsAny(key, `/\`) {
+		return fmt.Errorf("%s must be a valid Secret key for oidcAuth", field)
+	}
+	if errs := k8svalidation.IsConfigMapKey(key); len(errs) > 0 {
+		return fmt.Errorf("%s must be a valid Secret key for oidcAuth: %s", field, strings.Join(errs, "; "))
 	}
 	return nil
 }
@@ -324,10 +379,18 @@ func (n *DeploymentHandler) reconcileExternalClusters(ctx context.Context) error
 
 	for _, cluster := range n.Mondoo.Spec.KubernetesResources.ExternalClusters {
 		configuredClusters[cluster.Name] = true
+		log := n.externalClusterLog(cluster.Name)
 
 		// Validate authentication configuration
 		if err := validateExternalClusterAuth(cluster); err != nil {
-			n.externalClusterLog(cluster.Name).Error(err, "invalid external cluster authentication configuration")
+			log.Error(err, "invalid external cluster authentication configuration")
+			markExternalClusterAuthDegraded(n.Mondoo, err)
+			return err
+		}
+
+		if err := n.preflightOIDCCredentials(ctx, cluster); err != nil {
+			log.Error(err, "invalid external cluster OIDC credentials")
+			markExternalClusterAuthDegraded(n.Mondoo, err)
 			return err
 		}
 
@@ -422,6 +485,32 @@ func (n *DeploymentHandler) updateExternalClusterScanStatuses(configuredClusters
 	}
 
 	mondoo.ReplaceScanStatuses(n.Mondoo, v1alpha2.MondooAuditConfigScanTypeExternalKubernetesResources, statuses...)
+}
+
+func markExternalClusterAuthDegraded(config *v1alpha2.MondooAuditConfig, err error) {
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(
+		config.Status.Conditions,
+		v1alpha2.K8sResourcesScanningDegraded,
+		corev1.ConditionTrue,
+		"ExternalClusterAuthInvalid",
+		err.Error(),
+		mondoo.UpdateConditionIfReasonOrMessageChange,
+		nil,
+		"",
+	)
+}
+
+func (n *DeploymentHandler) preflightOIDCCredentials(ctx context.Context, cluster v1alpha2.ExternalCluster) error {
+	if cluster.OIDCAuth == nil {
+		return nil
+	}
+	secret := &metav1.PartialObjectMetadata{}
+	secret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+	key := client.ObjectKey{Name: cluster.OIDCAuth.CredentialsSecretRef.Name, Namespace: n.Mondoo.Namespace}
+	if err := n.KubeClient.Get(ctx, key, secret); err != nil {
+		return fmt.Errorf("externalCluster %q: failed to find oidcAuth credentials Secret %q: %w", cluster.Name, key.Name, err)
+	}
+	return nil
 }
 
 func (n *DeploymentHandler) syncExternalClusterConfigMap(ctx context.Context, integrationMrn, clusterUid string, cluster v1alpha2.ExternalCluster) error {
