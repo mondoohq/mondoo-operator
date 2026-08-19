@@ -1094,6 +1094,9 @@ not reshuffle the schedule. It defaults to `0s` and applies only to CronJob
 style node scanning. The CronJob schedule itself is unchanged; the scanner
 waits before starting its scan. This smooths cluster-wide concurrent starts
 (and aggregate memory/IO peaks); it does not reduce per-pod scan memory.
+Keep `scheduleSpread` shorter than the cron interval. With
+`ConcurrencyPolicy: Forbid`, a delayed scan that is still running when the
+next cron trigger fires can cause that run to be skipped.
 
 You can adjust the schedule for the following components:
 - Kubernetes Resources Scanning
