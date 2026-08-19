@@ -169,6 +169,8 @@ spec:
     # schedule: "0 * * * *"
     # Pause scheduled node scan CronJobs without deleting them.
     # suspend: true
+    # Optional deterministic startup spread for node scan CronJobs
+    # scheduleSpread: 30m
     # Interval in minutes (only for deployment style)
     # intervalTimer: 60
     resources:

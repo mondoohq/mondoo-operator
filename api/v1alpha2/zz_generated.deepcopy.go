@@ -723,6 +723,7 @@ func (in *MondooOperatorConfigStatus) DeepCopy() *MondooOperatorConfigStatus {
 func (in *Nodes) DeepCopyInto(out *Nodes) {
 	*out = *in
 	in.Resources.DeepCopyInto(&out.Resources)
+	out.ScheduleSpread = in.ScheduleSpread
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
 		*out = make([]v1.EnvVar, len(*in))
