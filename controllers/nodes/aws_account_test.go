@@ -56,6 +56,17 @@ func TestAccountFromRoleARN(t *testing.T) {
 			want: "123456789012",
 		},
 		{
+			name: "iso partition",
+			arn:  "arn:aws-iso-b:iam::123456789012:role/example",
+			want: "123456789012",
+		},
+		{
+			// Starts with the right letters but is not a partition.
+			name: "made-up partition",
+			arn:  "arn:awsxyz:iam::123456789012:role/example",
+			want: "",
+		},
+		{
 			name: "not an ARN",
 			arn:  "ecr-image-pull",
 			want: "",

@@ -46,9 +46,14 @@ const stsTimeout = 5 * time.Second
 const failedResolveBackoff = 10 * time.Minute
 
 // iamRoleARNRegex extracts the account ID from an IAM role ARN, e.g.
-// arn:aws:iam::123456789012:role/some-role. It accepts every partition, so
-// aws-cn and aws-us-gov ARNs work too.
-var iamRoleARNRegex = regexp.MustCompile(`^arn:aws[a-z-]*:iam::(\d{12}):`)
+// arn:aws:iam::123456789012:role/some-role.
+//
+// The partition is matched as "aws" followed by whole dash-separated words, so
+// every real one is accepted -- aws, aws-cn, aws-us-gov, aws-iso, aws-iso-b --
+// while a string that merely starts with those letters, like "awsxyz", is not.
+// The ARN comes from a trusted place either way, but a regex that accepts
+// nonsense makes it harder to see what the code actually relies on.
+var iamRoleARNRegex = regexp.MustCompile(`^arn:aws(?:-[a-z]+)*:iam::(\d{12}):`)
 
 // awsAccountResolver finds the AWS account the cluster runs in, without going
 // through the instance metadata service.
