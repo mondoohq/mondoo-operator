@@ -120,7 +120,7 @@ func TestResources(t *testing.T) {
 				},
 			}
 			mac := test.mondooauditconfig()
-			cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+			cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{}, "")
 			assert.Equal(t, test.expectedResources, cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Resources)
 		})
 	}
@@ -131,7 +131,7 @@ func TestCronJob_HasReportTypeNone(t *testing.T) {
 	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
 	cfg := v1alpha2.MondooOperatorConfig{}
 
-	cj := CronJob("test-image:latest", node, m, false, cfg)
+	cj := CronJob("test-image:latest", node, m, false, cfg, "")
 	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
 
 	cmd := strings.Join(container.Command, " ")
@@ -187,7 +187,7 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 				},
 			}
 			mac := test.mondooauditconfig()
-			cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+			cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{}, "")
 			goMemLimitEnv := corev1.EnvVar{}
 			for _, env := range cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
 				if env.Name == "GOMEMLIMIT" {
@@ -222,7 +222,7 @@ func TestCronJob_PrivilegedOpenshift(t *testing.T) {
 		},
 	}
 	mac := testMondooAuditConfig()
-	cj := CronJob("test123", testNode, mac, true, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test123", testNode, mac, true, v1alpha2.MondooOperatorConfig{}, "")
 	sc := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext
 	assert.True(t, *sc.Privileged)
 	assert.True(t, *sc.AllowPrivilegeEscalation)
@@ -236,7 +236,7 @@ func TestCronJob_Privileged(t *testing.T) {
 		},
 	}
 	mac := testMondooAuditConfig()
-	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{}, "")
 	sc := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext
 	assert.False(t, *sc.Privileged)
 	assert.False(t, *sc.AllowPrivilegeEscalation)
@@ -265,7 +265,7 @@ func TestCronJob_JobOverrides(t *testing.T) {
 		},
 	}
 
-	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{}, "")
 	assert.Equal(t, ptr.To(int32(300)), cj.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
 
 	// User labels are applied
@@ -302,7 +302,7 @@ func TestCronJob_GlobalJobOverrides(t *testing.T) {
 		Labels:                  map[string]string{"team": "platform"},
 	}
 
-	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{}, "")
 	assert.Equal(t, ptr.To(int32(300)), cj.Spec.JobTemplate.Spec.TTLSecondsAfterFinished)
 	assert.Equal(t, "platform", cj.Spec.JobTemplate.Labels["team"])
 	assert.Equal(t, "prod", cj.Spec.JobTemplate.Labels["env"])
@@ -337,7 +337,7 @@ func TestCronJob_Suspend(t *testing.T) {
 	mac := testMondooAuditConfig()
 	mac.Spec.Nodes.Suspend = true
 
-	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{}, "")
 
 	require.NotNil(t, cj.Spec.Suspend)
 	assert.True(t, *cj.Spec.Suspend)
@@ -355,13 +355,13 @@ func TestCronJob_SuspendMatrix(t *testing.T) {
 		mac := testMondooAuditConfig()
 		mac.Spec.Nodes.Suspend = true
 
-		current := CronJob("test123", testNode, mac, false, cfg)
+		current := CronJob("test123", testNode, mac, false, cfg, "")
 		require.NotNil(t, current.Spec.Suspend)
 		assert.True(t, *current.Spec.Suspend)
 
 		mac.Spec.Nodes.Suspend = false
 		mac.Status.ScanningPaused = false
-		desired := CronJob("test123", testNode, mac, false, cfg)
+		desired := CronJob("test123", testNode, mac, false, cfg, "")
 		k8s.UpdateCronJobFields(current, desired)
 
 		require.NotNil(t, current.Spec.Suspend)
@@ -373,7 +373,7 @@ func TestCronJob_SuspendMatrix(t *testing.T) {
 		mac.Spec.Nodes.Suspend = false
 		mac.Status.ScanningPaused = true
 
-		cj := CronJob("test123", testNode, mac, false, cfg)
+		cj := CronJob("test123", testNode, mac, false, cfg, "")
 		require.NotNil(t, cj.Spec.Suspend)
 		assert.True(t, *cj.Spec.Suspend)
 	})
@@ -383,7 +383,7 @@ func TestCronJob_SuspendMatrix(t *testing.T) {
 		mac.Spec.Nodes.Suspend = false
 		mac.Status.ScanningPaused = false
 
-		cj := CronJob("test123", testNode, mac, false, cfg)
+		cj := CronJob("test123", testNode, mac, false, cfg, "")
 		require.NotNil(t, cj.Spec.Suspend)
 		assert.False(t, *cj.Spec.Suspend)
 	})
@@ -398,12 +398,12 @@ func TestCronJob_UnsuspendWhenScanningResumed(t *testing.T) {
 	mac := testMondooAuditConfig()
 	mac.Status.ScanningPaused = true
 
-	current := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	current := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{}, "")
 	require.NotNil(t, current.Spec.Suspend)
 	assert.True(t, *current.Spec.Suspend)
 
 	mac.Status.ScanningPaused = false
-	desired := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	desired := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{}, "")
 	k8s.UpdateCronJobFields(current, desired)
 
 	require.NotNil(t, current.Spec.Suspend)
@@ -458,7 +458,7 @@ func TestCronJob_WithProxy(t *testing.T) {
 		},
 	}
 
-	cj := CronJob("test123", testNode, mac, false, cfg)
+	cj := CronJob("test123", testNode, mac, false, cfg, "")
 	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
 
 	cmdStr := strings.Join(container.Command, " ")
@@ -480,7 +480,7 @@ func TestCronJob_SkipProxyForCnspec(t *testing.T) {
 		},
 	}
 
-	cj := CronJob("test123", testNode, mac, false, cfg)
+	cj := CronJob("test123", testNode, mac, false, cfg, "")
 	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
 
 	cmdStr := strings.Join(container.Command, " ")
@@ -502,7 +502,7 @@ func TestCronJob_WithImagePullSecrets(t *testing.T) {
 		},
 	}
 
-	cj := CronJob("test123", testNode, mac, false, cfg)
+	cj := CronJob("test123", testNode, mac, false, cfg, "")
 	secrets := cj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets
 	require.Len(t, secrets, 1)
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)

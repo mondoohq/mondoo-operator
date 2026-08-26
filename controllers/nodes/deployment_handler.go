@@ -104,6 +104,12 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
+	// Resolved once per process and cached, including a negative answer. An
+	// empty account is normal -- a cluster outside AWS, or one whose operator
+	// has no cloud identity -- and simply leaves the cloud platform ID off the
+	// node assets, which is how they are scanned today.
+	awsAccountID := awsAccountResolverFor(n.Mondoo.Namespace).Resolve(ctx, n.KubeClient)
+
 	// Delete DaemonSet if it exists
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(n.Mondoo.Name), Namespace: n.Mondoo.Namespace},
@@ -125,7 +131,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 			return err
 		}
 
-		desired := CronJob(mondooClientImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
+		desired := CronJob(mondooClientImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig, awsAccountID)
 		cronJob := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
 		op, err := k8s.CreateOrUpdate(ctx, n.KubeClient, cronJob, n.Mondoo, n.log(), func() error {
 			k8s.UpdateCronJobFields(cronJob, desired)

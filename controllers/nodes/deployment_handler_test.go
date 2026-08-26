@@ -242,7 +242,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{}, "")
 		// Make sure the env vars for both are sorted
 		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
@@ -276,7 +276,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_CustomEnvVars() {
 		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{}, "")
 		// Make sure the env vars for both are sorted
 		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
@@ -309,7 +309,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_Switch() {
 		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{}, "")
 		// Make sure the env vars for both are sorted
 		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
@@ -349,7 +349,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 	s.NoError(err)
 
 	// Make sure a cron job exists for one of the nodes
-	cj := CronJob(image, nodes.Items[1], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob(image, nodes.Items[1], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{}, "")
 	cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"test-command"}
 	s.NoError(d.KubeClient.Create(s.ctx, cj))
 
@@ -361,7 +361,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateCronJobs() {
 		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, n.Name), Namespace: s.auditConfig.Namespace}}
 		s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+		cjExpected := CronJob(image, n, &s.auditConfig, false, v1alpha2.MondooOperatorConfig{}, "")
 		// Make sure the env vars for both are sorted
 		utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 		utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
@@ -407,7 +407,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: CronJobName(s.auditConfig.Name, nodes.Items[0].Name), Namespace: s.auditConfig.Namespace}}
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(cj), cj))
 
-	cjExpected := CronJob(image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{})
+	cjExpected := CronJob(image, nodes.Items[0], &s.auditConfig, false, v1alpha2.MondooOperatorConfig{}, "")
 	// Make sure the env vars for both are sorted
 	utils.SortEnvVars(cjExpected.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
 	utils.SortEnvVars(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
