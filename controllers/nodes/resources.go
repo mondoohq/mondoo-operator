@@ -39,7 +39,7 @@ const (
 )
 
 // CronJob creates a CronJob for node scanning
-func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
+func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOpenshift bool, cfg v1alpha2.MondooOperatorConfig, awsAccountID string) *batchv1.CronJob {
 	ls := NodeScanningLabels(*m)
 	cmd := []string{
 		"cnspec", "scan", "local",
@@ -122,13 +122,13 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 										{Name: "config", ReadOnly: true, MountPath: "/etc/opt/"},
 										{Name: "temp", MountPath: "/tmp"},
 									},
-									Env: k8s.MergeEnv(append([]corev1.EnvVar{
+									Env: k8s.MergeEnv(append(append([]corev1.EnvVar{
 										{Name: "DEBUG", Value: "false"},
 										{Name: "MONDOO_PROCFS", Value: "on"},
 										{Name: "MONDOO_AUTO_UPDATE", Value: "false"},
 										{Name: "NODE_NAME", Value: node.Name},
 										{Name: "GOMEMLIMIT", Value: gcLimit},
-									}, proxyEnvVars...), m.Spec.Nodes.Env),
+									}, awsPlatformIDEnv(node, awsAccountID)...), proxyEnvVars...), m.Spec.Nodes.Env),
 									TerminationMessagePath:   "/dev/termination-log",
 									TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 									ImagePullPolicy:          corev1.PullIfNotPresent,
@@ -318,6 +318,19 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 	return ds
 }
 
+// awsPlatformIDEnv returns the environment variable carrying the node's EC2
+// platform identifier, or nothing when the node is not an EC2 instance or its
+// identity could not be established. Nothing is deliberate: an unset variable
+// makes the inventory template resolve to an empty string, which the provider
+// ignores, leaving the node exactly as it is scanned today.
+func awsPlatformIDEnv(node corev1.Node, awsAccountID string) []corev1.EnvVar {
+	platformID := AWSPlatformID(node, awsAccountID)
+	if platformID == "" {
+		return nil
+	}
+	return []corev1.EnvVar{{Name: AWSPlatformIDEnvVar, Value: platformID}}
+}
+
 func nodeScanCapabilities(isOpenshift bool) *corev1.Capabilities {
 	caps := &corev1.Capabilities{
 		Drop: []corev1.Capability{"ALL"},
@@ -397,6 +410,15 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 							Type:       "filesystem",
 							Host:       "/mnt/host",
 							PlatformId: fmt.Sprintf(`{{ printf "//platformid.api.mondoo.app/runtime/k8s/uid/%%s/node/%%s" "%s" (getenv "NODE_NAME")}}`, clusterUID),
+							// The node's cloud instance identifier, added alongside
+							// the Kubernetes one rather than replacing it, so the
+							// node resolves to the same asset the cloud integration
+							// already discovered. Resolves to an empty string on a
+							// node whose cloud identity we could not establish, and
+							// the provider skips empty entries.
+							Options: map[string]string{
+								"inject-platform-ids": fmt.Sprintf(`{{ getenv "%s" }}`, AWSPlatformIDEnvVar),
+							},
 						},
 					},
 					Labels: map[string]string{
