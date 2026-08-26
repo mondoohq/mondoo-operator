@@ -19,6 +19,7 @@ package nodes
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -145,4 +146,27 @@ func TestAWSAccountResolverCachesTheAnswer(t *testing.T) {
 	// -- including after the environment that produced the first answer is gone.
 	t.Setenv("AWS_ROLE_ARN", "arn:aws:iam::111111111111:role/other")
 	assert.Equal(t, "959975882244", r.Resolve(context.Background(), nil))
+}
+
+func TestAWSAccountResolverRetriesAfterAFailure(t *testing.T) {
+	// A failed resolution must not be cached the way a successful one is: a
+	// cancelled reconcile, or credentials that arrive a moment later, would
+	// otherwise leave every node without its cloud identity until the operator
+	// pod restarted.
+	t.Setenv("AWS_ROLE_ARN", "")
+
+	r := &awsAccountResolver{Namespace: "mondoo-operator"}
+	require.Equal(t, "", r.Resolve(context.Background(), nil))
+	require.False(t, r.resolved)
+	require.False(t, r.retryAfter.IsZero(), "a failure should schedule a retry")
+
+	// Within the backoff the resolver holds off, so a cluster that really is
+	// not on AWS does not pay for a lookup on every reconcile.
+	t.Setenv("AWS_ROLE_ARN", "arn:aws:iam::959975882244:role/ecr-image-pull")
+	assert.Equal(t, "", r.Resolve(context.Background(), nil))
+
+	// Once it expires the answer is picked up.
+	r.retryAfter = time.Now().Add(-time.Second)
+	assert.Equal(t, "959975882244", r.Resolve(context.Background(), nil))
+	assert.True(t, r.resolved)
 }

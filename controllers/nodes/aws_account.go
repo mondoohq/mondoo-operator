@@ -24,6 +24,7 @@ import (
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,6 +38,12 @@ const irsaRoleAnnotation = "eks.amazonaws.com/role-arn"
 // life of the process, so this runs at most once; a cluster with no route to
 // STS should not stall a reconcile waiting for it.
 const stsTimeout = 5 * time.Second
+
+// failedResolveBackoff is how long a failed resolution is left alone before it
+// is attempted again. Long enough that a cluster outside AWS is not paying for
+// a lookup on every reconcile, short enough that a cluster that is on AWS
+// recovers on its own rather than needing the operator restarted.
+const failedResolveBackoff = 10 * time.Minute
 
 // iamRoleARNRegex extracts the account ID from an IAM role ARN, e.g.
 // arn:aws:iam::123456789012:role/some-role. It accepts every partition, so
@@ -60,8 +67,21 @@ type awsAccountResolver struct {
 	// fallback looks for IRSA annotations.
 	Namespace string
 
-	once    sync.Once
+	mu      sync.Mutex
 	account string
+	// resolved records that account holds a real answer. A successful
+	// resolution is kept for the life of the process -- a cluster's account
+	// does not change.
+	resolved bool
+	// retryAfter holds off the next attempt once one has failed. Failures are
+	// deliberately NOT cached the way successes are: a resolution can come back
+	// empty for reasons that pass, most obviously the STS call being cut short
+	// when the reconcile it inherited its context from is cancelled. Caching
+	// that permanently would leave every node in an AWS cluster without its
+	// cloud identity until the operator pod restarted, with nothing to indicate
+	// why. The backoff keeps the retries cheap for a cluster that is genuinely
+	// not on AWS, where the answer really is "nothing" every time.
+	retryAfter time.Time
 }
 
 // awsAccountResolvers caches one resolver per operator namespace. The account
@@ -86,10 +106,25 @@ func awsAccountResolverFor(namespace string) *awsAccountResolver {
 // operator has no cloud identity -- and callers must treat it as "skip the AWS
 // platform ID", never as an error worth failing a reconcile over.
 func (r *awsAccountResolver) Resolve(ctx context.Context, c client.Client) string {
-	r.once.Do(func() {
-		r.account = r.resolve(ctx, c)
-	})
-	return r.account
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.resolved {
+		return r.account
+	}
+	if time.Now().Before(r.retryAfter) {
+		return ""
+	}
+
+	account := r.resolve(ctx, c)
+	if account == "" {
+		r.retryAfter = time.Now().Add(failedResolveBackoff)
+		return ""
+	}
+
+	r.account = account
+	r.resolved = true
+	return account
 }
 
 func (r *awsAccountResolver) resolve(ctx context.Context, c client.Client) string {
@@ -135,7 +170,15 @@ func accountFromSTS(ctx context.Context) string {
 	ctx, cancel := context.WithTimeout(ctx, stsTimeout)
 	defer cancel()
 
-	cfg, err := awsconfig.LoadDefaultConfig(ctx)
+	// Disable the SDK's own EC2 metadata lookup. Without this the credential
+	// and region chains reach for IMDS, which is precisely what this resolver
+	// exists to avoid: on a node with a metadata hop limit of 1 the operator
+	// pod cannot reach it, so the probe does not fail, it hangs until the
+	// timeout below -- turning a lookup that should be instant into a stalled
+	// reconcile. Every credential source that can actually work here (IRSA,
+	// Pod Identity, a static configuration) is unaffected by the switch.
+	cfg, err := awsconfig.LoadDefaultConfig(ctx,
+		awsconfig.WithEC2IMDSClientEnableState(imds.ClientDisabled))
 	if err != nil {
 		logger.V(1).Info("could not load an AWS configuration; skipping STS", "error", err.Error())
 		return ""
