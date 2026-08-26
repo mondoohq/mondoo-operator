@@ -416,6 +416,18 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 							// already discovered. Resolves to an empty string on a
 							// node whose cloud identity we could not establish, and
 							// the provider skips empty entries.
+							//
+							// Only CronJob() sets this variable. This ConfigMap is
+							// shared by both scan styles, and DaemonSet() builds one
+							// pod spec for every node, so there is no per-node value
+							// it could put here -- a daemonset-style scan resolves
+							// this to nothing and is scanned as it was before.
+							//
+							// Resolving it in the pod instead is not open to us: the
+							// downward API exposes spec.nodeName but not
+							// spec.providerID, and reading the node object would need
+							// a service account token, which node scan pods
+							// deliberately do not mount.
 							Options: map[string]string{
 								"inject-platform-ids": fmt.Sprintf(`{{ getenv "%s" }}`, AWSPlatformIDEnvVar),
 							},
