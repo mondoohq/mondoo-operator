@@ -77,6 +77,7 @@ func NewResourceWatcher(c cache.Cache, debouncer *Debouncer, config WatcherConfi
 			config.ResourceTypes = HighPriorityResourceTypes
 		}
 	}
+	config.ResourceTypes = normalizeResourceTypes(config.ResourceTypes)
 	return &ResourceWatcher{
 		cache:     c,
 		debouncer: debouncer,
@@ -127,35 +128,86 @@ func (w *ResourceWatcher) Start(ctx context.Context) error {
 
 // getObjectForResourceType returns the client.Object for a resource type string.
 func (w *ResourceWatcher) getObjectForResourceType(resourceType string) (client.Object, error) {
-	switch strings.ToLower(resourceType) {
-	case "pods", "pod":
+	switch normalizeResourceType(resourceType) {
+	case "pods":
 		return &corev1.Pod{}, nil
-	case "deployments", "deployment":
+	case "deployments":
 		return &appsv1.Deployment{}, nil
-	case "daemonsets", "daemonset":
+	case "daemonsets":
 		return &appsv1.DaemonSet{}, nil
-	case "statefulsets", "statefulset":
+	case "statefulsets":
 		return &appsv1.StatefulSet{}, nil
-	case "replicasets", "replicaset":
+	case "replicasets":
 		return &appsv1.ReplicaSet{}, nil
-	case "jobs", "job":
+	case "jobs":
 		return &batchv1.Job{}, nil
-	case "cronjobs", "cronjob":
+	case "cronjobs":
 		return &batchv1.CronJob{}, nil
-	case "services", "service":
+	case "services":
 		return &corev1.Service{}, nil
-	case "ingresses", "ingress":
+	case "ingresses":
 		return &networkingv1.Ingress{}, nil
-	case "namespaces", "namespace":
+	case "namespaces":
 		return &corev1.Namespace{}, nil
-	case "configmaps", "configmap":
+	case "configmaps":
 		return &corev1.ConfigMap{}, nil
-	case "secrets", "secret":
+	case "secrets":
 		return &corev1.Secret{}, nil
-	case "serviceaccounts", "serviceaccount":
+	case "serviceaccounts":
 		return &corev1.ServiceAccount{}, nil
 	default:
 		return nil, fmt.Errorf("unknown resource type: %s", resourceType)
+	}
+}
+
+func normalizeResourceTypes(resourceTypes []string) []string {
+	normalized := make([]string, 0, len(resourceTypes))
+	seen := make(map[string]struct{}, len(resourceTypes))
+	for _, resourceType := range resourceTypes {
+		canonical := normalizeResourceType(resourceType)
+		if canonical == "" {
+			continue
+		}
+		if _, exists := seen[canonical]; exists {
+			continue
+		}
+		seen[canonical] = struct{}{}
+		normalized = append(normalized, canonical)
+	}
+	return normalized
+}
+
+func normalizeResourceType(resourceType string) string {
+	canonical := strings.ToLower(strings.TrimSpace(resourceType))
+	switch canonical {
+	case "pod":
+		return "pods"
+	case "deployment":
+		return "deployments"
+	case "daemonset":
+		return "daemonsets"
+	case "statefulset":
+		return "statefulsets"
+	case "replicaset":
+		return "replicasets"
+	case "job":
+		return "jobs"
+	case "cronjob":
+		return "cronjobs"
+	case "service":
+		return "services"
+	case "ingress":
+		return "ingresses"
+	case "namespace":
+		return "namespaces"
+	case "configmap":
+		return "configmaps"
+	case "secret":
+		return "secrets"
+	case "serviceaccount":
+		return "serviceaccounts"
+	default:
+		return canonical
 	}
 }
 
