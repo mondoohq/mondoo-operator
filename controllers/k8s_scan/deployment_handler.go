@@ -282,6 +282,7 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, integrationMrn, c
 	desired, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo, *n.MondooOperatorConfig)
 	if err != nil {
 		n.log().Error(err, "failed to generate desired ConfigMap with inventory")
+		updateWorkloadsConfigErrorCondition(n.Mondoo, err)
 		return err
 	}
 
@@ -429,6 +430,7 @@ func (n *DeploymentHandler) syncExternalClusterConfigMap(ctx context.Context, in
 	desired, err := ExternalClusterConfigMap(integrationMrn, clusterUid, cluster, *n.Mondoo, *n.MondooOperatorConfig)
 	if err != nil {
 		log.Error(err, "failed to generate desired ConfigMap for external cluster")
+		updateWorkloadsConfigErrorCondition(n.Mondoo, err)
 		return err
 	}
 
