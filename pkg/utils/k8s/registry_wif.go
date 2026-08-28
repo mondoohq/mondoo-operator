@@ -142,7 +142,7 @@ echo "Docker config generated for ACR: ${ACR_LOGIN_SERVER}"
 		}
 
 	default:
-		image = "busybox:1.36"
+		image = constants.BusyBoxImage
 		shell = "/bin/sh"
 		script = `echo "ERROR: Unknown workload identity provider"; exit 1`
 		env = []corev1.EnvVar{}
