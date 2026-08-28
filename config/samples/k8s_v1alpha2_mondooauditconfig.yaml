@@ -178,6 +178,25 @@ spec:
       limits:
         cpu: 500m
         memory: 500Mi
+    # Profiles give groups of nodes their own resources and tolerations (cronjob style only).
+    # The first profile whose nodeSelector matches the node wins. A node that matches no
+    # profile uses the resources above.
+    # profiles:
+    #   - name: memory-optimized
+    #     nodeSelector:
+    #       node.kubernetes.io/instance-type: r5.4xlarge
+    #     resources:
+    #       requests:
+    #         cpu: 300m
+    #         memory: 500Mi
+    #       limits:
+    #         cpu: 1
+    #         memory: 2Gi
+    #     tolerations:
+    #       - key: workload
+    #         operator: Equal
+    #         value: memory
+    #         effect: NoSchedule
 
   # Namespace filtering (applies to K8s resources and container scanning)
   filtering:

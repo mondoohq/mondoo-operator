@@ -1223,6 +1223,72 @@ spec:
 ```
 After you saved the changes, the `mondoo-operator-controller-manager` will adjust the corresponding Deployment or CronJob.
 
+### Give groups of nodes their own node scanner settings
+
+`spec.nodes.resources` sets one limit for every node. A cluster with nodes of different sizes then
+has to use one limit sized for the largest node. Node scan pods are pinned with `spec.nodeName`, so
+a limit near the memory of a small node can starve that node instead of stopping the scan.
+
+Use `spec.nodes.profiles` to give groups of nodes their own settings. Each profile has a name, a
+node selector, resources and tolerations:
+
+```yaml
+spec:
+  nodes:
+    enable: true
+    style: cronjob
+    # Nodes that match no profile use these settings.
+    resources:
+      limits:
+        cpu: 300m
+        memory: 250M
+      requests:
+        cpu: 100m
+        memory: 150M
+    profiles:
+      - name: memory-optimized
+        nodeSelector:
+          node.kubernetes.io/instance-type: r5.4xlarge
+        resources:
+          limits:
+            cpu: 1
+            memory: 2G
+          requests:
+            cpu: 300m
+            memory: 500M
+        tolerations:
+          - key: workload
+            operator: Equal
+            value: memory
+            effect: NoSchedule
+      - name: small
+        nodeSelector:
+          node.kubernetes.io/instance-type: t3.small
+        resources:
+          limits:
+            cpu: 200m
+            memory: 200M
+          requests:
+            cpu: 50m
+            memory: 100M
+```
+
+Rules:
+
+* A node matches a profile when it carries every label of the `nodeSelector`.
+* The operator uses the first profile in the list that matches. Put the most specific profile first.
+* A profile with an empty `nodeSelector` matches every node. Put such a profile last.
+* A node that matches no profile uses `spec.nodes.resources` and `spec.nodes.jobOverrides`.
+* A profile without `resources` falls back to `spec.nodes.resources`.
+* Profile tolerations are added after the tolerations that the operator derives from the taints of
+  the node. The operator always tolerates the taints of the node it scans.
+* `GOMEMLIMIT` follows the memory limit of the matched profile.
+
+Profiles apply to the `cronjob` style only, because one DaemonSet cannot set per-node resources.
+The CRD rejects a config that sets `profiles` together with the `deployment` or `daemonset` style.
+
+A config without `profiles` behaves exactly as before.
+
 ## Uninstalling the Mondoo operator
 
 Before uninstalling the Mondoo operator, be sure to delete all `MondooAuditConfig` and `MondooOperatorConfig` objects. You can find any in your cluster by running:

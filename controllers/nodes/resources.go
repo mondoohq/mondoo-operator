@@ -60,7 +60,11 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 		proxyEnvVars = k8s.ProxyEnvVars(cfg)
 	}
 
-	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
+	// A node scan profile gives a group of nodes its own resources and tolerations. Nodes
+	// without a matching profile keep the settings of spec.nodes.
+	profile := ProfileForNode(m.Spec.Nodes, node)
+	containerResources := k8s.ResourcesRequirementsWithDefaults(
+		ProfileResources(m.Spec.Nodes, profile), k8s.DefaultNodeScanningResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
 
 	cj := &batchv1.CronJob{
@@ -98,7 +102,7 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 						Spec: corev1.PodSpec{
 							NodeName:      node.Name,
 							RestartPolicy: corev1.RestartPolicyOnFailure,
-							Tolerations:   k8s.TaintsToTolerations(node.Spec.Taints),
+							Tolerations:   ProfileTolerations(node, profile),
 							// The node scanning does not use the Kubernetes API at all, therefore the service account token
 							// should not be mounted at all.
 							AutomountServiceAccountToken: ptr.To(false),
