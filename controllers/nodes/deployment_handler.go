@@ -8,6 +8,7 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -20,6 +21,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -113,6 +115,15 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		return err
 	}
 
+	// Collected across all nodes so the warning is emitted once per reconcile
+	// instead of once per affected node.
+	var (
+		unsafeMemoryNodes       []string
+		unsafeMemoryLimit       resource.Quantity
+		unsafeMemoryAllocatable resource.Quantity
+		haveUnsafeMemory        bool
+	)
+
 	// Create/update CronJobs for nodes
 	for _, node := range nodes.Items {
 		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ConfigMapNameWithNode(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace}}
@@ -123,6 +134,20 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 
 		if err := n.syncConfigMap(ctx, clusterUid); err != nil {
 			return err
+		}
+
+		if limit, allocatable, unsafe := UnsafeNodeScanMemoryLimit(
+			k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources),
+			node,
+		); unsafe {
+			unsafeMemoryNodes = append(unsafeMemoryNodes, node.Name)
+			// Report the node with the least allocatable memory, which is the
+			// worst case for the configured limit.
+			if !haveUnsafeMemory || allocatable.Cmp(unsafeMemoryAllocatable) < 0 {
+				unsafeMemoryLimit = limit
+				unsafeMemoryAllocatable = allocatable
+				haveUnsafeMemory = true
+			}
 		}
 
 		desired := CronJob(mondooClientImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
@@ -148,6 +173,13 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 				return err
 			}
 		}
+	}
+
+	if haveUnsafeMemory {
+		n.log().Info(
+			nodeScanMemoryLimitWarning(unsafeMemoryLimit, unsafeMemoryAllocatable),
+			"nodes", strings.Join(unsafeMemoryNodes, ","),
+		)
 	}
 
 	// Delete dangling CronJobs for nodes that have been deleted from the cluster.
