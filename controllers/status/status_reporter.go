@@ -48,8 +48,10 @@ func (r *StatusReporter) Report(ctx context.Context, m v1alpha2.MondooAuditConfi
 		return nil
 	}
 
+	// The report only reads the node names, so skip the deep copy of every
+	// cached Node. The returned items must stay read only.
 	nodes := v1.NodeList{}
-	if err := r.kubeClient.List(ctx, &nodes); err != nil {
+	if err := r.kubeClient.List(ctx, &nodes, client.UnsafeDisableDeepCopy); err != nil {
 		return err
 	}
 
