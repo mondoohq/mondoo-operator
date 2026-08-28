@@ -1048,6 +1048,15 @@ func ExternalClusterConfigMap(integrationMRN, operatorClusterUID string, cluster
 }
 
 func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (string, error) {
+	options := map[string]string{
+		"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
+		"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
+	}
+	if err := addNetworkInventoryOptions(options, m.Spec.KubernetesResources.NetworkInventory); err != nil {
+		return "", err
+	}
+	targets := discoveryTargets(m.Spec.KubernetesResources.NetworkInventory, false)
+
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-k8s-resources-inventory",
@@ -1057,13 +1066,10 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 				{
 					Connections: []*inventory.Config{
 						{
-							Type: "k8s",
-							Options: map[string]string{
-								"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
-								"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
-							},
+							Type:    "k8s",
+							Options: options,
 							Discover: &inventory.Discovery{
-								Targets: K8sDiscoveryTargets,
+								Targets: targets,
 							},
 						},
 					},
@@ -1109,29 +1115,25 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 
 func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster v1alpha2.ExternalCluster, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (string, error) {
 	filtering := externalClusterFiltering(cluster, m)
-
-	// Determine discovery targets based on whether container image scanning is enabled
-	// Make a copy to avoid mutating the shared slice
-	targets := make([]string, len(K8sDiscoveryTargets))
-	copy(targets, K8sDiscoveryTargets)
-	if cluster.ContainerImageScanning {
-		targets = append(targets, "container-images")
-	}
-
-	opts := map[string]string{
+	options := map[string]string{
 		"namespaces":         strings.Join(filtering.Namespaces.Include, ","),
 		"namespaces-exclude": strings.Join(filtering.Namespaces.Exclude, ","),
 		"disable-cache":      "false",
 	}
+	if err := addNetworkInventoryOptions(options, m.Spec.KubernetesResources.NetworkInventory); err != nil {
+		return "", err
+	}
 	if cluster.ContainerImageScanning {
 		repos := externalClusterRepositories(cluster, m)
 		if len(repos.Include) > 0 {
-			opts["images"] = strings.Join(repos.Include, ",")
+			options["images"] = strings.Join(repos.Include, ",")
 		}
 		if len(repos.Exclude) > 0 {
-			opts["images-exclude"] = strings.Join(repos.Exclude, ",")
+			options["images-exclude"] = strings.Join(repos.Exclude, ",")
 		}
 	}
+
+	targets := discoveryTargets(m.Spec.KubernetesResources.NetworkInventory, cluster.ContainerImageScanning)
 
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
@@ -1143,7 +1145,7 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 					Connections: []*inventory.Config{
 						{
 							Type:    "k8s",
-							Options: opts,
+							Options: options,
 							Discover: &inventory.Discovery{
 								Targets: targets,
 							},
@@ -1205,6 +1207,30 @@ func externalClusterRepositories(cluster v1alpha2.ExternalCluster, m v1alpha2.Mo
 		return *cluster.Repositories
 	}
 	return m.Spec.Containers.Repositories
+}
+
+func discoveryTargets(networkInventory v1alpha2.NetworkInventorySpec, includeContainerImages bool) []string {
+	targets := append([]string{}, K8sDiscoveryTargets...)
+	if networkInventory.Enable {
+		// Network inventory is exposed by the k8s provider on the cluster asset via
+		// the kubernetesNetworkInventory connection option. Keep discovery on the
+		// provider-supported cluster target instead of inventing scanner targets for
+		// optional CRDs.
+		targets = appendDiscoveryTarget(targets, "clusters")
+	}
+	if includeContainerImages {
+		targets = appendDiscoveryTarget(targets, "container-images")
+	}
+	return targets
+}
+
+func appendDiscoveryTarget(targets []string, target string) []string {
+	for _, existing := range targets {
+		if existing == target {
+			return targets
+		}
+	}
+	return append(targets, target)
 }
 
 func buildEnvVars(cfg v1alpha2.MondooOperatorConfig) []corev1.EnvVar {
