@@ -102,12 +102,12 @@ func updateOperatorConditions(config *k8sv1alpha2.MondooAuditConfig, degradedSta
 	memoryLimit := ""
 	if degradedStatus {
 		msg = "Mondoo Operator controller is unavailable"
-		for i, containerStatus := range pod.Status.ContainerStatuses {
+		for _, containerStatus := range pod.Status.ContainerStatuses {
 			if (containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 137) ||
 				(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
 				msg = "Mondoo Operator controller is unavailable due to OOM"
 				affectedPods = append(affectedPods, pod.Name)
-				memoryLimit = pod.Spec.Containers[i].Resources.Limits.Memory().String()
+				memoryLimit = k8s.ContainerMemoryLimit(pod, containerStatus.Name)
 				break
 			}
 		}

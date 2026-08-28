@@ -36,7 +36,7 @@ func updateWorkloadsConditions(config *v1alpha2.MondooAuditConfig, degradedStatu
 	}
 
 	currentPod := k8s.GetNewestPodFromList(pods.Items)
-	for i, containerStatus := range currentPod.Status.ContainerStatuses {
+	for _, containerStatus := range currentPod.Status.ContainerStatuses {
 		if containerStatus.Name != "mondoo-k8s-scan" {
 			continue
 		}
@@ -44,7 +44,7 @@ func updateWorkloadsConditions(config *v1alpha2.MondooAuditConfig, degradedStatu
 			(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
 			msg = oomMessage
 			affectedPods = append(affectedPods, currentPod.Name)
-			memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
+			memoryLimit = k8s.ContainerMemoryLimit(&currentPod, containerStatus.Name)
 			reason = "KubernetesResourcesScanningUnavailable"
 			status = corev1.ConditionTrue
 		}
