@@ -220,7 +220,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_CleanConfigMapsForDeleted
 func (s *DeploymentHandlerSuite) TestReconcile_Deployment_CleanConfigMapsForDeletedNodes() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
 	mondooAuditConfig := &s.auditConfig
 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
