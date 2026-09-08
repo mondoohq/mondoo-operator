@@ -146,6 +146,40 @@ func (s *DeploymentHandlerSuite) TestReconcile_UpdateConfigMap() {
 	s.Equal(cfgMapExpected.Data, cfgMap.Data)
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_CronJob_SyncsSharedConfigMapOnce() {
+	s.seedNodes()
+	countingClient := &countingClient{
+		Client:        s.fakeClientBuilder.Build(),
+		configMapGets: map[string]int{},
+	}
+	d := s.createDeploymentHandlerWithClient(countingClient)
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	s.Equal(1, countingClient.configMapGetCount(s.auditConfig.Namespace, ConfigMapName(s.auditConfig.Name)))
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_Deployment_SyncsSharedConfigMapOnce() {
+	s.seedNodes()
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
+
+	countingClient := &countingClient{
+		Client:        s.fakeClientBuilder.Build(),
+		configMapGets: map[string]int{},
+	}
+	d := s.createDeploymentHandlerWithClient(countingClient)
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	s.Equal(1, countingClient.configMapGetCount(s.auditConfig.Namespace, ConfigMapName(s.auditConfig.Name)))
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_CronJob_CleanConfigMapsForDeletedNodes() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
@@ -186,7 +220,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_CleanConfigMapsForDeleted
 func (s *DeploymentHandlerSuite) TestReconcile_Deployment_CleanConfigMapsForDeletedNodes() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
 	mondooAuditConfig := &s.auditConfig
 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
@@ -316,7 +350,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_Switch() {
 		s.Equal(cjExpected.Spec, cj.Spec)
 	}
 
-	mondooAuditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	mondooAuditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
 	result, err = d.Reconcile(s.ctx)
 	s.NoError(err)
 	s.True(result.IsZero())
@@ -417,7 +451,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
 	mondooAuditConfig := &s.auditConfig
 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
@@ -450,7 +484,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets() {
 func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_Switch() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
 	mondooAuditConfig := &s.auditConfig
 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
@@ -494,7 +528,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_Switch() {
 func (s *DeploymentHandlerSuite) TestReconcile_UpdateDaemonSets() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
 	mondooAuditConfig := &s.auditConfig
 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
@@ -837,7 +871,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_CustomSchedule() {
 func (s *DeploymentHandlerSuite) TestReconcile_Deployment_CustomInterval() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
 	mondooAuditConfig := &s.auditConfig
 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
@@ -972,8 +1006,12 @@ func (s *DeploymentHandlerSuite) TestGarbageCollection_FailureStillUpdatesTimest
 }
 
 func (s *DeploymentHandlerSuite) createDeploymentHandler() DeploymentHandler {
+	return s.createDeploymentHandlerWithClient(s.fakeClientBuilder.Build())
+}
+
+func (s *DeploymentHandlerSuite) createDeploymentHandlerWithClient(kubeClient client.Client) DeploymentHandler {
 	return DeploymentHandler{
-		KubeClient:             s.fakeClientBuilder.Build(),
+		KubeClient:             kubeClient,
 		Mondoo:                 &s.auditConfig,
 		ContainerImageResolver: s.containerImageResolver,
 		MondooOperatorConfig:   &v1alpha2.MondooOperatorConfig{},
@@ -1019,6 +1057,26 @@ func (s *DeploymentHandlerSuite) createDeploymentHandlerWithGCMock(gcFunc func(c
 type fakeMondooClient struct {
 	mondooclient.MondooClient
 	gcFunc func(context.Context, *mondooclient.GarbageCollectAssetsRequest) error
+}
+
+type countingClient struct {
+	client.Client
+	configMapGets map[string]int
+}
+
+func (c *countingClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if _, ok := obj.(*corev1.ConfigMap); ok {
+		c.configMapGets[c.configMapKey(key.Namespace, key.Name)]++
+	}
+	return c.Client.Get(ctx, key, obj, opts...)
+}
+
+func (c *countingClient) configMapGetCount(namespace, name string) int {
+	return c.configMapGets[c.configMapKey(namespace, name)]
+}
+
+func (c *countingClient) configMapKey(namespace, name string) string {
+	return namespace + "/" + name
 }
 
 func (f *fakeMondooClient) GarbageCollectAssets(ctx context.Context, req *mondooclient.GarbageCollectAssetsRequest) error {
