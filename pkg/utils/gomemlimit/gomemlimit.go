@@ -37,7 +37,7 @@ func CalculateNodeScanGoGC(containerResources v1.ResourceRequirements) string {
 	// Lower GOGC targets reduce peak heap size at the cost of more frequent GC cycles.
 	// This is useful for memory-constrained node scans where taking longer is acceptable.
 	memoryLimit := containerResources.Limits.Memory()
-	if memoryLimit == nil || memoryLimit.IsZero() {
+	if memoryLimit.IsZero() {
 		return "100"
 	}
 
