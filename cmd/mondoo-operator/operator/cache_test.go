@@ -43,6 +43,11 @@ func TestTransformPod_KeepsFieldsTheOperatorReads(t *testing.T) {
 			ContainerStatuses: []corev1.ContainerStatus{
 				{
 					Name:                 "cnspec",
+					RestartCount:         3,
+					State:                corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Reason: "OOMKilled"}},
+					Image:                "docker.io/mondoo/cnspec:latest",
+					ImageID:              "sha256:unused",
+					ContainerID:          "containerd://unused",
 					LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 137}},
 				},
 			},
@@ -69,6 +74,8 @@ func TestTransformPod_KeepsFieldsTheOperatorReads(t *testing.T) {
 	assert.Len(t, got.Status.Conditions, 1)
 	require.Len(t, got.Status.ContainerStatuses, 1)
 	assert.Equal(t, int32(137), got.Status.ContainerStatuses[0].LastTerminationState.Terminated.ExitCode)
+	assert.Equal(t, int32(3), got.Status.ContainerStatuses[0].RestartCount)
+	assert.Equal(t, "OOMKilled", got.Status.ContainerStatuses[0].State.Terminated.Reason)
 
 	// Dropped.
 	assert.Nil(t, got.ManagedFields)
@@ -77,6 +84,9 @@ func TestTransformPod_KeepsFieldsTheOperatorReads(t *testing.T) {
 	assert.Nil(t, got.Spec.Volumes)
 	assert.Nil(t, got.Spec.Tolerations)
 	assert.Empty(t, got.Status.PodIP)
+	assert.Empty(t, got.Status.ContainerStatuses[0].Image)
+	assert.Empty(t, got.Status.ContainerStatuses[0].ImageID)
+	assert.Empty(t, got.Status.ContainerStatuses[0].ContainerID)
 }
 
 func TestTransformPod_KeepsContainerIndexes(t *testing.T) {
