@@ -49,10 +49,20 @@ func transformPod(obj any) (any, error) {
 	}
 	pod.Spec = corev1.PodSpec{NodeName: pod.Spec.NodeName, Containers: containers}
 
+	statuses := make([]corev1.ContainerStatus, len(pod.Status.ContainerStatuses))
+	for i, status := range pod.Status.ContainerStatuses {
+		statuses[i] = corev1.ContainerStatus{
+			Name:                 status.Name,
+			State:                status.State,
+			LastTerminationState: status.LastTerminationState,
+			RestartCount:         status.RestartCount,
+		}
+	}
+
 	pod.Status = corev1.PodStatus{
 		Phase:             pod.Status.Phase,
 		Conditions:        pod.Status.Conditions,
-		ContainerStatuses: pod.Status.ContainerStatuses,
+		ContainerStatuses: statuses,
 	}
 
 	return pod, nil
