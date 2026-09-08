@@ -295,6 +295,13 @@ func TestApplyDeploymentOverrides_AllFields(t *testing.T) {
 	assert.Len(t, d.Spec.Template.Spec.Tolerations, 1)
 }
 
+func TestApplyDeploymentOverrides_PreservesPodSchedulingNodeSelector(t *testing.T) {
+	d := &appsv1.Deployment{}
+	d.Spec.Template.Spec.NodeSelector = map[string]string{"nodepool": "scanner"}
+	ApplyDeploymentOverrides(d, v1alpha2.JobOverrides{NodeSelector: map[string]string{"nodepool": "job-override"}})
+	assert.Equal(t, map[string]string{"nodepool": "scanner"}, d.Spec.Template.Spec.NodeSelector)
+}
+
 func TestApplyDeploymentOverrides_OperatorLabelsPreserved(t *testing.T) {
 	d := &appsv1.Deployment{
 		Spec: appsv1.DeploymentSpec{
@@ -375,6 +382,13 @@ func TestApplyDaemonSetOverrides_AllFields(t *testing.T) {
 	assert.Equal(t, map[string]string{"karpenter.sh/do-not-disrupt": "true"}, ds.Spec.Template.Annotations)
 	assert.Equal(t, map[string]string{"node-role": "scan"}, ds.Spec.Template.Spec.NodeSelector)
 	assert.Len(t, ds.Spec.Template.Spec.Tolerations, 1)
+}
+
+func TestApplyDaemonSetOverrides_PreservesPodSchedulingNodeSelector(t *testing.T) {
+	ds := &appsv1.DaemonSet{}
+	ds.Spec.Template.Spec.NodeSelector = map[string]string{"nodepool": "scanner"}
+	ApplyDaemonSetOverrides(ds, v1alpha2.JobOverrides{NodeSelector: map[string]string{"nodepool": "job-override"}})
+	assert.Equal(t, map[string]string{"nodepool": "scanner"}, ds.Spec.Template.Spec.NodeSelector)
 }
 
 func TestApplyDaemonSetOverrides_TolerationsMergedWithExisting(t *testing.T) {
