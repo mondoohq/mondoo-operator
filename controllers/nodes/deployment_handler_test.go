@@ -164,7 +164,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_SyncsSharedConfigMapOnce(
 
 func (s *DeploymentHandlerSuite) TestReconcile_Deployment_SyncsSharedConfigMapOnce() {
 	s.seedNodes()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
 
 	countingClient := &countingClient{
 		Client:        s.fakeClientBuilder.Build(),
@@ -350,7 +350,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_Switch() {
 		s.Equal(cjExpected.Spec, cj.Spec)
 	}
 
-	mondooAuditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	mondooAuditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
 	result, err = d.Reconcile(s.ctx)
 	s.NoError(err)
 	s.True(result.IsZero())
@@ -451,7 +451,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CleanCronJobsForDeletedNodes() {
 func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
 	mondooAuditConfig := &s.auditConfig
 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
@@ -484,7 +484,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets() {
 func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_Switch() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
 	mondooAuditConfig := &s.auditConfig
 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
@@ -528,7 +528,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateDaemonSets_Switch() {
 func (s *DeploymentHandlerSuite) TestReconcile_UpdateDaemonSets() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
 	mondooAuditConfig := &s.auditConfig
 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
@@ -871,7 +871,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_CronJob_CustomSchedule() {
 func (s *DeploymentHandlerSuite) TestReconcile_Deployment_CustomInterval() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()
-	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconsile logic)
+	s.auditConfig.Spec.Nodes.Style = v1alpha2.NodeScanStyle_Deployment // TODO: Change to DaemonSet (no effect on reconcile logic)
 	mondooAuditConfig := &s.auditConfig
 	s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
 
