@@ -149,11 +149,24 @@ type JobOverrides struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// NodeSelector constrains the scan pods to nodes with matching labels. It is ignored for
-	// node scan pods because those are pinned to a specific node.
+	// node scan pods because those are pinned to a specific node. A NodeSelector configured
+	// through the component's PodScheduling field takes precedence.
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
-	// Tolerations are appended to the tolerations of the scan pods.
+	// Tolerations are merged with PodScheduling tolerations without duplicates.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+}
+
+// PodScheduling defines pod placement settings for scanner workloads. Its NodeSelector takes
+// precedence over JobOverrides.NodeSelector when both are configured.
+type PodScheduling struct {
+	// NodeSelector selects nodes where scanner pods may run.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Tolerations allows scanner pods to schedule onto nodes with matching taints.
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
@@ -165,6 +178,8 @@ type Scanner struct {
 	ServiceAccountName string                      `json:"serviceAccountName,omitempty"`
 	Image              Image                       `json:"image,omitempty"`
 	Resources          corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Scheduling configures pod placement for Kubernetes resource scanner workloads, including the resource watcher.
+	Scheduling PodScheduling `json:"scheduling,omitempty"`
 	// Number of replicas for the scanner.
 	// For enforcing mode, the minimum should be two to prevent problems during Pod failures,
 	// e.g. node failure, node scaling, etc.
@@ -190,6 +205,9 @@ type Scanner struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
+// KubernetesResources configures resources scanned in the operator's cluster.
+// External cluster CronJobs intentionally inherit Scanner.Scheduling; there is
+// no separate scheduling override under KubernetesResources.
 type KubernetesResources struct {
 	Enable bool `json:"enable,omitempty"`
 
@@ -558,6 +576,9 @@ const (
 type Nodes struct {
 	Enable    bool                        `json:"enable,omitempty"`
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Scheduling configures pod placement for node scanner workloads.
+	// CronJob style pins each scanner pod to a target node by nodeName, so nodeSelector only applies to DaemonSet style.
+	Scheduling PodScheduling `json:"scheduling,omitempty"`
 	// Schedule specifies a custom crontab schedule for the node scanning job. If not specified, the default schedule is
 	// used. Only applicable for CronJob style
 	Schedule string `json:"schedule,omitempty"`
@@ -585,6 +606,8 @@ type Nodes struct {
 type Containers struct {
 	Enable    bool                        `json:"enable,omitempty"`
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Scheduling configures pod placement for container image scanner workloads.
+	Scheduling PodScheduling `json:"scheduling,omitempty"`
 	// Specify a custom crontab schedule for the container image scanning job. If not specified, the default schedule is used.
 	Schedule string `json:"schedule,omitempty"`
 	// Suspend pauses scheduled container image scan CronJobs without deleting generated resources.

@@ -195,6 +195,12 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 		},
 	}
 
+	k8s.AddPodSchedulingToSpec(
+		&deployment.Spec.Template.Spec,
+		m.Spec.Scanner.Scheduling.NodeSelector,
+		m.Spec.Scanner.Scheduling.Tolerations,
+	)
+
 	// Add imagePullSecrets from MondooOperatorConfig
 	if len(cfg.Spec.ImagePullSecrets) > 0 {
 		deployment.Spec.Template.Spec.ImagePullSecrets = append(

@@ -250,7 +250,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 				log.Error(err, "failed to update MondooAuditConfig with default schedule")
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{Requeue: true}, nil //nolint:staticcheck // Requeue preserves rate-limited semantics; RequeueAfter calls Queue.Forget.
 		}
 	}
 
@@ -364,7 +364,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// Reconcile each scan type independently. A transient failure in one
 	// (e.g. image resolution timeout) must not block the others.
 	var firstError error
-	finalResult := ctrl.Result{Requeue: true, RequeueAfter: time.Hour * 24 * 7}
+	finalResult := ctrl.Result{RequeueAfter: time.Hour * 24 * 7}
 	collect := func(result ctrl.Result, err error, msg, scanType string) {
 		if err != nil {
 			log.Error(err, msg+", continuing with other scan types", "scanType", scanType)

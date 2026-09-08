@@ -52,7 +52,7 @@ func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.C
 			return ctrl.Result{}, err
 		}
 
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{Requeue: true}, err //nolint:staticcheck // Requeue preserves rate-limited semantics; RequeueAfter calls Queue.Forget.
 
 	} else if err == nil {
 
