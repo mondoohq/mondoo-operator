@@ -66,7 +66,7 @@ func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.C
 				return ctrl.Result{}, err
 			}
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 
 	} else if err != nil {
 		log.Error(err, "Failed to get ServiceMonitor")
