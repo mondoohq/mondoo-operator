@@ -52,7 +52,8 @@ func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.C
 			return ctrl.Result{}, err
 		}
 
-		return ctrl.Result{Requeue: true}, err
+		// No requeue: callers only act on RequeueAfter.
+		return ctrl.Result{}, nil
 
 	} else if err == nil {
 
@@ -65,7 +66,7 @@ func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.C
 				return ctrl.Result{}, err
 			}
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 
 	} else if err != nil {
 		log.Error(err, "Failed to get ServiceMonitor")
@@ -196,5 +197,6 @@ func (s *ServiceMonitor) down(ctx context.Context, clt client.Client) (ctrl.Resu
 			return ctrl.Result{}, err
 		}
 	}
-	return ctrl.Result{Requeue: true}, err
+	// No requeue: the caller only acts on RequeueAfter.
+	return ctrl.Result{}, nil
 }
