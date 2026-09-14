@@ -52,7 +52,7 @@ func (s *ServiceMonitor) declareServiceMonitor(ctx context.Context, clt client.C
 			return ctrl.Result{}, err
 		}
 
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 
 	} else if err == nil {
 
@@ -196,5 +196,5 @@ func (s *ServiceMonitor) down(ctx context.Context, clt client.Client) (ctrl.Resu
 			return ctrl.Result{}, err
 		}
 	}
-	return ctrl.Result{Requeue: true}, err
+	return ctrl.Result{}, err
 }
