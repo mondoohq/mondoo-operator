@@ -6,7 +6,7 @@ replace go.mondoo.com/mql/v13/providers/k8s => github.com/mondoohq/mql/providers
 
 require (
 	github.com/cert-manager/cert-manager v1.21.2
-	github.com/gobwas/glob v0.2.3
+	github.com/gobwas/glob v1.0.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang/mock v1.6.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.94.0
