@@ -77,6 +77,8 @@ func NewResourceWatcher(c cache.Cache, debouncer *Debouncer, config WatcherConfi
 			config.ResourceTypes = HighPriorityResourceTypes
 		}
 	}
+	// Normalize defaults too, returning an independent slice without mutating
+	// the shared lists if aliases or duplicates are added later.
 	config.ResourceTypes = normalizeResourceTypes(config.ResourceTypes)
 	return &ResourceWatcher{
 		cache:     c,
@@ -207,6 +209,8 @@ func normalizeResourceType(resourceType string) string {
 	case "serviceaccount":
 		return "serviceaccounts"
 	default:
+		// Preserve unknown types so Start reports them through the existing
+		// getObjectForResourceType error instead of silently dropping typos.
 		return canonical
 	}
 }

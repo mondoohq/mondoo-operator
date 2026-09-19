@@ -4,6 +4,7 @@
 package resource_watcher
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,9 +21,12 @@ func TestNewResourceWatcher_NormalizesAndDeduplicatesResourceTypes(t *testing.T)
 }
 
 func TestNewResourceWatcher_DefaultHighPriorityResourceTypes(t *testing.T) {
+	before := slices.Clone(HighPriorityResourceTypes)
 	w := NewResourceWatcher(nil, nil, WatcherConfig{})
 
-	assert.Equal(t, HighPriorityResourceTypes, w.config.ResourceTypes)
+	assert.Equal(t, before, w.config.ResourceTypes)
+	w.config.ResourceTypes[0] = "changed"
+	assert.Equal(t, before, HighPriorityResourceTypes)
 }
 
 func TestGetObjectForResourceType_AcceptsSingularAndPlural(t *testing.T) {
@@ -47,4 +51,11 @@ func BenchmarkNormalizeResourceTypes_WithDuplicates(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = normalizeResourceTypes(resourceTypes)
 	}
+}
+
+func TestNewResourceWatcher_PreservesUnknownTypesForStartupError(t *testing.T) {
+	w := NewResourceWatcher(nil, nil, WatcherConfig{ResourceTypes: []string{"deplyoments"}})
+	assert.Equal(t, []string{"deplyoments"}, w.config.ResourceTypes)
+	_, err := w.getObjectForResourceType(w.config.ResourceTypes[0])
+	assert.EqualError(t, err, "unknown resource type: deplyoments")
 }
