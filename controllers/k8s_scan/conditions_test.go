@@ -55,6 +55,40 @@ func TestConditions_Degraded(t *testing.T) {
 	assert.Equal(t, v1alpha2.K8sResourcesScanningDegraded, cond.Type)
 }
 
+func TestConditions_ConfigError(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{Enable: true},
+		},
+	}
+	err := newNetworkInventoryValidationError(
+		networkInventoryInvalidCIDRReason,
+		assert.AnError,
+	)
+	updateWorkloadsConfigErrorCondition(config, err)
+
+	cond := config.Status.Conditions[0]
+	assert.Equal(t, assert.AnError.Error(), cond.Message)
+	assert.Equal(t, networkInventoryInvalidCIDRReason, cond.Reason)
+	assert.Equal(t, corev1.ConditionTrue, cond.Status)
+	assert.Equal(t, v1alpha2.K8sResourcesScanningDegraded, cond.Type)
+}
+
+func TestConditions_ConfigErrorFallbackReason(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{Enable: true},
+		},
+	}
+	updateWorkloadsConfigErrorCondition(config, assert.AnError)
+
+	cond := config.Status.Conditions[0]
+	assert.Equal(t, assert.AnError.Error(), cond.Message)
+	assert.Equal(t, "KubernetesResourcesScanConfigInvalid", cond.Reason)
+	assert.Equal(t, corev1.ConditionTrue, cond.Status)
+	assert.Equal(t, v1alpha2.K8sResourcesScanningDegraded, cond.Type)
+}
+
 func TestConditions_OOM(t *testing.T) {
 	config := &v1alpha2.MondooAuditConfig{
 		Spec: v1alpha2.MondooAuditConfigSpec{
