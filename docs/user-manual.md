@@ -969,6 +969,27 @@ kubectl -n mondoo-operator edit mondooauditconfigs.k8s.mondoo.com mondoo-client
     schedule: 41 * * * *
 ```
 
+Node scan CronJobs can be spread across a bounded startup window to avoid
+starting every node scan at the same time:
+
+```yaml
+spec:
+  nodes:
+    enable: true
+    style: cronjob
+    schedule: "0 */3 * * *"
+    scheduleSpread: 30m
+```
+
+`scheduleSpread` derives a stable delay from each node name, so reconciles do
+not reshuffle the schedule. It defaults to `0s` and applies only to CronJob
+style node scanning. The CronJob schedule itself is unchanged; the scanner
+waits before starting its scan. This smooths cluster-wide concurrent starts
+(and aggregate memory/IO peaks); it does not reduce per-pod scan memory.
+Keep `scheduleSpread` shorter than the cron interval. With
+`ConcurrencyPolicy: Forbid`, a delayed scan that is still running when the
+next cron trigger fires can cause that run to be skipped.
+
 You can adjust the schedule for the following components:
 - Kubernetes Resources Scanning
 - Container Image Scanning
@@ -1357,6 +1378,8 @@ Search for the `nodes:` section and specify the new limits there. It should look
 spec:
   nodes:
     enable: true
+    # Optional: spread node CronJob startup within this window
+    scheduleSpread: 30m
     resources:
       limits:
         cpu: 200m

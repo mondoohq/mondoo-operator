@@ -1592,6 +1592,12 @@ spec:
                       Schedule specifies a custom crontab schedule for the node scanning job. If not specified, the default schedule is
                       used. Only applicable for CronJob style
                     type: string
+                  scheduleSpread:
+                    description: |-
+                      ScheduleSpread adds a deterministic startup delay to node scan CronJobs.
+                      The delay is derived from the node name and is bounded by this duration.
+                      A zero value preserves the existing behavior. Only applicable for CronJob style.
+                    type: string
                   style:
                     default: cronjob
                     description: Style specifies how node scanning is deployed. The

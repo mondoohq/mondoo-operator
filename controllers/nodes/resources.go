@@ -62,6 +62,10 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 
 	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
+	scanCommand, scanArgs := nodeScanCommand(
+		cmd,
+		nodeScanStartDelay(node.Name, m.Spec.Nodes.ScheduleSpread.Duration),
+	)
 
 	cj := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -106,7 +110,8 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 								{
 									Image:     image,
 									Name:      "cnspec",
-									Command:   cmd,
+									Command:   scanCommand,
+									Args:      scanArgs,
 									Resources: containerResources,
 									SecurityContext: &corev1.SecurityContext{
 										AllowPrivilegeEscalation: ptr.To(isOpenshift),

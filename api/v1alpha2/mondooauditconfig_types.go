@@ -563,6 +563,11 @@ type Nodes struct {
 	Schedule string `json:"schedule,omitempty"`
 	// Suspend pauses scheduled node scan CronJobs without deleting generated resources. Only applicable for CronJob style.
 	Suspend bool `json:"suspend,omitempty"`
+	// ScheduleSpread adds a deterministic startup delay to node scan CronJobs.
+	// The delay is derived from the node name and is bounded by this duration.
+	// A zero value preserves the existing behavior. Only applicable for CronJob style.
+	// +optional
+	ScheduleSpread metav1.Duration `json:"scheduleSpread,omitempty"`
 	// IntervalTimer is the interval (in minutes) for the node scanning. The default is "60". Only applicable for Deployment
 	// style.
 	// +kubebuilder:default=60

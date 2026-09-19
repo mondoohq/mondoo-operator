@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -136,6 +137,81 @@ func TestCronJob_HasReportTypeNone(t *testing.T) {
 
 	cmd := strings.Join(container.Command, " ")
 	assert.Contains(t, cmd, "--report-type none")
+}
+
+func TestNodeScanStartDelay(t *testing.T) {
+	const nodeName = "test-node"
+	spread := 10 * time.Minute
+
+	delay := nodeScanStartDelay(nodeName, spread)
+	assert.GreaterOrEqual(t, delay, time.Duration(0))
+	assert.LessOrEqual(t, delay, spread)
+	assert.Equal(t, delay, nodeScanStartDelay(nodeName, spread))
+	assert.Zero(t, nodeScanStartDelay(nodeName, 0))
+	assert.Zero(t, nodeScanStartDelay(nodeName, -time.Minute))
+}
+
+func TestCronJob_ScheduleSpreadDelaysScanner(t *testing.T) {
+	m := testMondooAuditConfig()
+	m.Spec.Nodes.ScheduleSpread = metav1.Duration{Duration: time.Minute}
+	nodeName := firstNodeNameWithDelay(t, m.Spec.Nodes.ScheduleSpread.Duration)
+	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", node, m, false, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+	delay := nodeScanStartDelay(node.Name, m.Spec.Nodes.ScheduleSpread.Duration)
+
+	assert.Equal(t, []string{"/bin/sh", "-c", nodeScanDelayScript}, container.Command)
+	assert.Equal(t, fmt.Sprintf("%d", int64(delay/time.Second)), container.Args[0])
+	assert.Equal(t, []string{
+		"cnspec", "scan", "local",
+		"--config", "/etc/opt/mondoo/mondoo.yml",
+		"--inventory-template", "/etc/opt/mondoo/inventory_template.yml",
+		"--report-type", "none",
+	}, container.Args[1:])
+}
+
+func TestCronJob_ScheduleSpreadDisabledKeepsDirectCommand(t *testing.T) {
+	m := testMondooAuditConfig()
+	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", node, m, false, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	assert.Equal(t, "cnspec", container.Command[0])
+	assert.Empty(t, container.Args)
+}
+
+func TestCronJob_ScheduleSpreadKeepsProxyArgSafe(t *testing.T) {
+	m := testMondooAuditConfig()
+	m.Spec.Nodes.ScheduleSpread = metav1.Duration{Duration: 10 * time.Minute}
+	nodeName := firstNodeNameWithDelay(t, m.Spec.Nodes.ScheduleSpread.Duration)
+	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+	const proxyValue = "https://proxy.example:8443; echo injected"
+	cfg := v1alpha2.MondooOperatorConfig{
+		Spec: v1alpha2.MondooOperatorConfigSpec{
+			HttpsProxy: ptr.To(proxyValue),
+		},
+	}
+
+	cj := CronJob("test-image:latest", node, m, false, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	require.Equal(t, []string{"/bin/sh", "-c", nodeScanDelayScript}, container.Command)
+	require.GreaterOrEqual(t, len(container.Args), 2)
+
+	proxyFlagIndex := -1
+	for i, arg := range container.Args {
+		if arg == "--api-proxy" {
+			proxyFlagIndex = i
+			break
+		}
+	}
+	require.NotEqual(t, -1, proxyFlagIndex, "expected --api-proxy argument")
+	require.Greater(t, len(container.Args), proxyFlagIndex+1, "expected proxy value after --api-proxy")
+	assert.Equal(t, proxyValue, container.Args[proxyFlagIndex+1])
 }
 
 func TestResources_GOMEMLIMIT(t *testing.T) {
@@ -611,6 +687,18 @@ func envToMap(envVars []corev1.EnvVar) map[string]string {
 		m[e.Name] = e.Value
 	}
 	return m
+}
+
+func firstNodeNameWithDelay(t *testing.T, spread time.Duration) string {
+	t.Helper()
+	for i := 0; i < 1024; i++ {
+		nodeName := fmt.Sprintf("test-node-%d", i)
+		if nodeScanStartDelay(nodeName, spread) > 0 {
+			return nodeName
+		}
+	}
+	t.Fatalf("could not find node name with non-zero delay for spread %s", spread)
+	return ""
 }
 
 func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {
