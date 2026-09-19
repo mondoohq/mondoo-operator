@@ -31,6 +31,10 @@ func cacheOptions() cache.Options {
 //     to report the memory limit of an OOM killed scan container,
 //   - status phase, conditions and container statuses, to detect OOM kills.
 //
+// Init containers and their statuses are intentionally excluded: production
+// controllers do not read them. Integration helpers use a separate uncached
+// client (tests/framework/utils.CreateK8sHelper), so they still receive those fields.
+//
 // Everything else (managed fields, annotations, env vars, volumes, tolerations,
 // affinity, security context) is dropped. Container order and count stay intact
 // because the condition code indexes spec.containers by container status index.
