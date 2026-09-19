@@ -151,6 +151,9 @@ func init() {
 		// Create cache
 		cacheOpts := cache.Options{
 			Scheme: scheme,
+			// The cache only feeds change events, so keep metadata and drop
+			// the specs and statuses that dominate the retained heap.
+			DefaultTransform: resource_watcher.CacheTransform,
 		}
 
 		// If specific namespaces are provided, configure cache to only watch those
