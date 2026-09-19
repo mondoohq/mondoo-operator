@@ -246,7 +246,7 @@ spec:
 
 The operator passes these selectors to cnspec Kubernetes discovery as
 `namespace-label-selector` and `object-label-selector` scan options. Use an
-operator build with a cnspec Kubernetes provider that supports those options;
+operator built with a cnspec Kubernetes provider that supports those options;
 older scanner images ignore them and will scan the broader configured scope.
 
 ## GitOps installs: let the operator create its Console integration

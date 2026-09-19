@@ -58,7 +58,7 @@ func updateWorkloadsConditions(config *v1alpha2.MondooAuditConfig, degradedStatu
 
 func updateWorkloadsConfigErrorCondition(config *v1alpha2.MondooAuditConfig, err error) {
 	reason := "KubernetesResourcesScanConfigInvalid"
-	var labelSelectorErr invalidLabelSelectorError
+	var labelSelectorErr k8s.InvalidLabelSelectorError
 	if errors.As(err, &labelSelectorErr) {
 		reason = "InvalidLabelSelector"
 	}

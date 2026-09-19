@@ -43,19 +43,6 @@ const (
 	k8sOptionObjectLabelSelector    = "object-label-selector"
 )
 
-type invalidLabelSelectorError struct {
-	field string
-	err   error
-}
-
-func (e invalidLabelSelectorError) Error() string {
-	return e.err.Error()
-}
-
-func (e invalidLabelSelectorError) Unwrap() error {
-	return e.err
-}
-
 func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := CronJobLabels(*m)
 
@@ -373,31 +360,13 @@ func inventoryOptions(filtering v1alpha2.Filtering) (map[string]string, error) {
 		"namespaces":         strings.Join(filtering.Namespaces.Include, ","),
 		"namespaces-exclude": strings.Join(filtering.Namespaces.Exclude, ","),
 	}
-	if err := addLabelSelectorOption(options, k8sOptionNamespaceLabelSelector, "namespaceLabelSelector", filtering.NamespaceLabelSelector); err != nil {
+	if err := k8s.AddLabelSelectorOption(options, k8sOptionNamespaceLabelSelector, "namespaceLabelSelector", filtering.NamespaceLabelSelector); err != nil {
 		return nil, err
 	}
-	if err := addLabelSelectorOption(options, k8sOptionObjectLabelSelector, "objectLabelSelector", filtering.ObjectLabelSelector); err != nil {
+	if err := k8s.AddLabelSelectorOption(options, k8sOptionObjectLabelSelector, "objectLabelSelector", filtering.ObjectLabelSelector); err != nil {
 		return nil, err
 	}
 	return options, nil
-}
-
-func addLabelSelectorOption(options map[string]string, optionName, fieldName string, selector *metav1.LabelSelector) error {
-	if selector == nil {
-		return nil
-	}
-	parsed, err := metav1.LabelSelectorAsSelector(selector)
-	if err != nil {
-		return invalidLabelSelectorError{
-			field: fieldName,
-			err:   fmt.Errorf("invalid filtering.%s: %w", fieldName, err),
-		}
-	}
-	if parsed.Empty() {
-		return nil
-	}
-	options[optionName] = parsed.String()
-	return nil
 }
 
 // WIFServiceAccountName returns the name for the container registry WIF ServiceAccount

@@ -33,19 +33,6 @@ const (
 	k8sOptionObjectLabelSelector    = "object-label-selector"
 )
 
-type invalidLabelSelectorError struct {
-	field string
-	err   error
-}
-
-func (e invalidLabelSelectorError) Error() string {
-	return e.err.Error()
-}
-
-func (e invalidLabelSelectorError) Unwrap() error {
-	return e.err
-}
-
 // K8sDiscoveryTargets defines explicit targets for K8s resource scanning
 // (excludes container-images which is handled by the separate containers controller)
 var K8sDiscoveryTargets = []string{
@@ -1230,33 +1217,14 @@ func inventoryOptions(filtering v1alpha2.Filtering) (map[string]string, error) {
 		"namespaces-exclude": strings.Join(filtering.Namespaces.Exclude, ","),
 	}
 
-	if err := addLabelSelectorOption(options, k8sOptionNamespaceLabelSelector, "namespaceLabelSelector", filtering.NamespaceLabelSelector); err != nil {
+	if err := k8s.AddLabelSelectorOption(options, k8sOptionNamespaceLabelSelector, "namespaceLabelSelector", filtering.NamespaceLabelSelector); err != nil {
 		return nil, err
 	}
-	if err := addLabelSelectorOption(options, k8sOptionObjectLabelSelector, "objectLabelSelector", filtering.ObjectLabelSelector); err != nil {
+	if err := k8s.AddLabelSelectorOption(options, k8sOptionObjectLabelSelector, "objectLabelSelector", filtering.ObjectLabelSelector); err != nil {
 		return nil, err
 	}
 
 	return options, nil
-}
-
-func addLabelSelectorOption(options map[string]string, optionName, fieldName string, selector *metav1.LabelSelector) error {
-	if selector == nil {
-		return nil
-	}
-
-	parsedSelector, err := metav1.LabelSelectorAsSelector(selector)
-	if err != nil {
-		return invalidLabelSelectorError{
-			field: fieldName,
-			err:   fmt.Errorf("invalid filtering.%s: %w", fieldName, err),
-		}
-	}
-	if !parsedSelector.Empty() {
-		options[optionName] = parsedSelector.String()
-	}
-
-	return nil
 }
 
 func buildEnvVars(cfg v1alpha2.MondooOperatorConfig) []corev1.EnvVar {
