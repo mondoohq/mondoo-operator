@@ -189,9 +189,10 @@ func daemonSet(image, renderImage, integrationMRN, clusterUID string, m *v1alpha
 							SecurityContext: &corev1.SecurityContext{
 								AllowPrivilegeEscalation: ptr.To(false),
 								ReadOnlyRootFilesystem:   ptr.To(true),
-								RunAsNonRoot:             ptr.To(false),
-								RunAsUser:                ptr.To(int64(0)),
-								Privileged:               ptr.To(false),
+								// Root is required to access the host containerd sockets.
+								RunAsNonRoot: ptr.To(false),
+								RunAsUser:    ptr.To(int64(0)),
+								Privileged:   ptr.To(false),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
@@ -333,6 +334,7 @@ func DelegateConfig(cache v1alpha2.RuntimeCacheScanner) (string, error) {
 }
 
 func renderRuntimeCacheConfigInitContainer(image string) corev1.Container {
+	// The sed pattern and paths are constants without #; NODE_NAME is a DNS name.
 	render := fmt.Sprintf(
 		"mkdir -p %s && sed \"s#%s#${NODE_NAME}#g\" %s > %s && sed \"s#%s#${NODE_NAME}#g\" %s > %s",
 		shellQuote(path.Dir(runtimeCacheDelegatesRenderedPath)),
