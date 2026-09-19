@@ -58,7 +58,7 @@ func updateImageScanningConditions(config *v1alpha2.MondooAuditConfig, degradedS
 
 func updateImageScanningConfigErrorCondition(config *v1alpha2.MondooAuditConfig, err error) {
 	reason := "KubernetesContainerImageScanConfigInvalid"
-	var labelSelectorErr invalidLabelSelectorError
+	var labelSelectorErr k8s.InvalidLabelSelectorError
 	if errors.As(err, &labelSelectorErr) {
 		reason = "InvalidLabelSelector"
 	}
