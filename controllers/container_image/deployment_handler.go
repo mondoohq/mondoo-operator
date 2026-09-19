@@ -77,39 +77,40 @@ func (n *DeploymentHandler) Reconcile(ctx context.Context) (ctrl.Result, error) 
 		return ctrl.Result{}, err
 	}
 
-	if err := n.syncCronJob(ctx, clusterUid); err != nil {
+	cronJobs, err := n.syncCronJob(ctx, clusterUid)
+	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	n.garbageCollectIfNeeded(ctx, clusterUid)
+	n.garbageCollectIfNeeded(ctx, clusterUid, cronJobs)
 
 	return ctrl.Result{}, nil
 }
 
-func (n *DeploymentHandler) syncCronJob(ctx context.Context, clusterUid string) error {
+func (n *DeploymentHandler) syncCronJob(ctx context.Context, clusterUid string) ([]batchv1.CronJob, error) {
 	mondooClientImage, err := n.ContainerImageResolver.CnspecImage(
 		n.Mondoo.Spec.Scanner.Image.Name, n.Mondoo.Spec.Scanner.Image.Tag, n.Mondoo.Spec.Scanner.Image.Digest, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
 		n.log().Error(err, "Failed to resolve mondoo-client container image")
-		return err
+		return nil, err
 	}
 
 	integrationMrn, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
 	if err != nil {
 		n.log().Error(err,
 			"failed to retrieve integration-mrn for MondooAuditConfig", "namespace", n.Mondoo.Namespace, "name", n.Mondoo.Name)
-		return err
+		return nil, err
 	}
 
 	if err := n.syncConfigMap(ctx, clusterUid); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Reconcile private registry secrets (merges multiple secrets if needed)
 	privateRegistrySecretName, err := k8s.ReconcilePrivateRegistriesSecret(ctx, n.KubeClient, n.Mondoo)
 	if err != nil {
 		n.log().Error(err, "Failed to reconcile private registry secrets")
-		return err
+		return nil, err
 	}
 
 	desired := CronJob(mondooClientImage, integrationMrn, clusterUid, privateRegistrySecretName, n.Mondoo, *n.MondooOperatorConfig)
@@ -119,20 +120,20 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context, clusterUid string) 
 		return nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// When a CronJob is updated, remove completed Jobs so they don't linger with stale config
 	if op == controllerutil.OperationResultUpdated {
 		if err := k8s.DeleteCompletedJobs(ctx, n.KubeClient, n.Mondoo.Namespace, CronJobLabels(*n.Mondoo), n.log()); err != nil {
 			n.log().Error(err, "Failed to clean up completed Jobs after CronJob update")
-			return err
+			return nil, err
 		}
 	}
 
 	cronJobs, err := n.getCronJobsForAuditConfig(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Get Pods for this CronJob
@@ -142,7 +143,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context, clusterUid string) 
 		selector, err := metav1.LabelSelectorAsSelector(lSelector)
 		if err != nil {
 			n.log().Error(err, "Failed to create label selector for Kubernetes Container Image Scanning")
-			return err
+			return nil, err
 		}
 		opts := []client.ListOption{
 			client.InNamespace(n.Mondoo.Namespace),
@@ -151,13 +152,13 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context, clusterUid string) 
 		err = n.KubeClient.List(ctx, pods, opts...)
 		if err != nil {
 			n.log().Error(err, "Failed to list Pods for Kubernetes Container Image Scanning")
-			return err
+			return nil, err
 		}
 	}
 
 	updateImageScanningConditions(n.Mondoo, !k8s.AreCronJobsSuccessful(cronJobs), pods)
 	n.updateScanStatus(cronJobs)
-	return nil
+	return cronJobs, nil
 }
 
 func (n *DeploymentHandler) updateScanStatus(cronJobs []batchv1.CronJob) {
@@ -228,13 +229,7 @@ func (n *DeploymentHandler) getCronJobsForAuditConfig(ctx context.Context) ([]ba
 
 // garbageCollectIfNeeded checks whether a new successful container image scan has completed
 // since the last GC run, and if so, performs garbage collection of stale assets via the Mondoo API.
-func (n *DeploymentHandler) garbageCollectIfNeeded(ctx context.Context, clusterUid string) {
-	cronJobs, err := n.getCronJobsForAuditConfig(ctx)
-	if err != nil {
-		logger.Error(err, "Failed to list CronJobs for container image garbage collection")
-		return
-	}
-
+func (n *DeploymentHandler) garbageCollectIfNeeded(ctx context.Context, clusterUid string, cronJobs []batchv1.CronJob) {
 	var latestSuccess *metav1.Time
 	for i := range cronJobs {
 		t := cronJobs[i].Status.LastSuccessfulTime
