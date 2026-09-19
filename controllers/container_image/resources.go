@@ -38,6 +38,9 @@ const (
 	// Not applied to k8s-resource or node scanning — those scan API objects or a
 	// single local filesystem, not container images.
 	defaultMaxProviderConnections = "10"
+
+	k8sOptionNamespaceLabelSelector = "namespace-label-selector"
+	k8sOptionObjectLabelSelector    = "object-label-selector"
 )
 
 func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
@@ -279,6 +282,18 @@ func ConfigMapName(prefix string) string {
 }
 
 func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig, platformIdsExclude []string, scanTime *time.Time) (string, error) {
+	options, err := inventoryOptions(m.Spec.Filtering)
+	if err != nil {
+		return "", err
+	}
+	options["disable-cache"] = "false"
+	if len(m.Spec.Containers.Repositories.Include) > 0 {
+		options["images"] = strings.Join(m.Spec.Containers.Repositories.Include, ",")
+	}
+	if len(m.Spec.Containers.Repositories.Exclude) > 0 {
+		options["images-exclude"] = strings.Join(m.Spec.Containers.Repositories.Exclude, ",")
+	}
+
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-k8s-containers-inventory",
@@ -289,7 +304,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 					Connections: []*inventory.Config{
 						{
 							Type:    "k8s",
-							Options: containerImageOptions(m),
+							Options: options,
 							Discover: &inventory.Discovery{
 								Targets: []string{"container-images"},
 							},
@@ -338,6 +353,20 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 	}
 
 	return string(invBytes), nil
+}
+
+func inventoryOptions(filtering v1alpha2.Filtering) (map[string]string, error) {
+	options := map[string]string{
+		"namespaces":         strings.Join(filtering.Namespaces.Include, ","),
+		"namespaces-exclude": strings.Join(filtering.Namespaces.Exclude, ","),
+	}
+	if err := k8s.AddLabelSelectorOption(options, k8sOptionNamespaceLabelSelector, "namespaceLabelSelector", filtering.NamespaceLabelSelector); err != nil {
+		return nil, err
+	}
+	if err := k8s.AddLabelSelectorOption(options, k8sOptionObjectLabelSelector, "objectLabelSelector", filtering.ObjectLabelSelector); err != nil {
+		return nil, err
+	}
+	return options, nil
 }
 
 // WIFServiceAccountName returns the name for the container registry WIF ServiceAccount
@@ -405,7 +434,6 @@ func validateContainerRegistryWIF(wif *v1alpha2.WorkloadIdentityConfig) error {
 
 	return nil
 }
-
 func containerImageLabels(m *v1alpha2.MondooAuditConfig, scanTime *time.Time) map[string]string {
 	labels := map[string]string{
 		"k8s.mondoo.com/kind": "container-image",
@@ -414,19 +442,4 @@ func containerImageLabels(m *v1alpha2.MondooAuditConfig, scanTime *time.Time) ma
 		labels["mondoo.com/sbom-requested"] = scanTime.UTC().Format(time.RFC3339)
 	}
 	return labels
-}
-
-func containerImageOptions(m v1alpha2.MondooAuditConfig) map[string]string {
-	opts := map[string]string{
-		"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
-		"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
-		"disable-cache":      "false",
-	}
-	if len(m.Spec.Containers.Repositories.Include) > 0 {
-		opts["images"] = strings.Join(m.Spec.Containers.Repositories.Include, ",")
-	}
-	if len(m.Spec.Containers.Repositories.Exclude) > 0 {
-		opts["images-exclude"] = strings.Join(m.Spec.Containers.Repositories.Exclude, ",")
-	}
-	return opts
 }

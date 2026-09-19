@@ -198,6 +198,7 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string
 	desired, err := ConfigMap(integrationMrn, clusterUid, *n.Mondoo, *n.MondooOperatorConfig, platformIdsExclude, scanTime)
 	if err != nil {
 		n.log().Error(err, "failed to generate desired ConfigMap with inventory")
+		updateImageScanningConfigErrorCondition(n.Mondoo, err)
 		return err
 	}
 
