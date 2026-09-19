@@ -18,6 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/imagecache"
 )
 
@@ -181,6 +182,32 @@ func (s *ContainerImageResolverSuite) TestMondooOperatorImage_SkipImageResolutio
 	s.Equal(fmt.Sprintf("%s:%s", image, tag), res)
 	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
 	s.Equal("ghcr.io/mondoo/testimage:testtag", res)
+}
+
+func (s *ContainerImageResolverSuite) TestContainerImageUsesRegistryMirror() {
+	resolver := s.containerImageResolver()
+	resolver.registryMirrors = map[string]string{
+		"docker.io": "registry.example.com/dockerhub",
+	}
+
+	res, err := resolver.ContainerImage(context.Background(), "docker.io/library/busybox:1.36", true)
+	s.NoError(err)
+
+	s.Equal("registry.example.com/dockerhub/library/busybox:1.36", res)
+	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
+}
+
+func (s *ContainerImageResolverSuite) TestBusyBoxImageUsesRegistryMirror() {
+	resolver := s.containerImageResolver()
+	resolver.registryMirrors = map[string]string{
+		"docker.io": "registry.example.com/dockerhub",
+	}
+
+	res, err := resolver.ContainerImage(context.Background(), constants.BusyBoxImage, true)
+	s.NoError(err)
+
+	s.Equal("registry.example.com/dockerhub/library/busybox:1.36", res)
+	s.Equalf(0, s.remoteCallsCount, "remote call has been performed")
 }
 
 func (s *ContainerImageResolverSuite) TestCnspecImage_DigestOnly() {
