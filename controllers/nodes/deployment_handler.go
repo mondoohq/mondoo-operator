@@ -126,11 +126,6 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 
 	// Create/update CronJobs for nodes
 	for _, node := range nodes.Items {
-		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ConfigMapNameWithNode(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace}}
-		if err := k8s.DeleteIfExists(ctx, n.KubeClient, cm); err != nil {
-			n.log().Error(err, "Failed to clean up old ConfigMap for node scanning", "namespace", cm.Namespace, "name", cm.Name)
-			return err
-		}
 
 		desired := CronJob(mondooClientImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
 		cronJob := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
@@ -317,21 +312,14 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 }
 
 func nodeListOptions(m *v1alpha2.MondooAuditConfig) ([]client.ListOption, error) {
-	selector, err := nodeLabelSelector(m)
+	if m.Spec.Nodes.LabelSelector == nil {
+		return nil, nil
+	}
+	selector, err := metav1.LabelSelectorAsSelector(m.Spec.Nodes.LabelSelector)
 	if err != nil {
 		return nil, err
 	}
-	if selector.Empty() {
-		return nil, nil
-	}
 	return []client.ListOption{client.MatchingLabelsSelector{Selector: selector}}, nil
-}
-
-func nodeLabelSelector(m *v1alpha2.MondooAuditConfig) (labels.Selector, error) {
-	if m.Spec.Nodes.LabelSelector == nil {
-		return labels.Everything(), nil
-	}
-	return metav1.LabelSelectorAsSelector(m.Spec.Nodes.LabelSelector)
 }
 
 func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string) error {
