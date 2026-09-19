@@ -138,11 +138,12 @@ func TestCronJob_HasReportTypeNone(t *testing.T) {
 	assert.Contains(t, cmd, "--report-type none")
 }
 
-func TestResources_GOMEMLIMIT(t *testing.T) {
+func TestResources_GOMemoryTuning(t *testing.T) {
 	tests := []struct {
 		name               string
 		mondooauditconfig  func() *v1alpha2.MondooAuditConfig
 		expectedGoMemLimit string
+		expectedGoGC       string
 	}{
 		{
 			name: "resources should match default",
@@ -150,6 +151,7 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 				return testMondooAuditConfig()
 			},
 			expectedGoMemLimit: "225000000",
+			expectedGoGC:       "50",
 		},
 		{
 			name: "resources should match spec",
@@ -163,6 +165,35 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 				return mac
 			},
 			expectedGoMemLimit: "94371840",
+			expectedGoGC:       "50",
+		},
+		{
+			name: "resources should use moderate gc in middle range",
+			mondooauditconfig: func() *v1alpha2.MondooAuditConfig {
+				mac := testMondooAuditConfig()
+				mac.Spec.Nodes.Resources = corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("768Mi"),
+					},
+				}
+				return mac
+			},
+			expectedGoMemLimit: "724775731",
+			expectedGoGC:       "75",
+		},
+		{
+			name: "resources should use moderate gc for larger finite limits",
+			mondooauditconfig: func() *v1alpha2.MondooAuditConfig {
+				mac := testMondooAuditConfig()
+				mac.Spec.Nodes.Resources = corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+				}
+				return mac
+			},
+			expectedGoMemLimit: "1932735283",
+			expectedGoGC:       "75",
 		},
 		{
 			name: "resources should match off",
@@ -176,6 +207,7 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 				return mac
 			},
 			expectedGoMemLimit: "off",
+			expectedGoGC:       "100",
 		},
 	}
 
@@ -188,14 +220,9 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 			}
 			mac := test.mondooauditconfig()
 			cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
-			goMemLimitEnv := corev1.EnvVar{}
-			for _, env := range cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
-				if env.Name == "GOMEMLIMIT" {
-					goMemLimitEnv = env
-					break
-				}
-			}
-			assert.Equal(t, test.expectedGoMemLimit, goMemLimitEnv.Value)
+			envMap := envToMap(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+			assert.Equal(t, test.expectedGoMemLimit, envMap["GOMEMLIMIT"])
+			assert.Equal(t, test.expectedGoGC, envMap["GOGC"])
 		})
 	}
 
@@ -203,14 +230,9 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mac := *test.mondooauditconfig()
 			ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
-			goMemLimitEnv := corev1.EnvVar{}
-			for _, env := range ds.Spec.Template.Spec.Containers[0].Env {
-				if env.Name == "GOMEMLIMIT" {
-					goMemLimitEnv = env
-					break
-				}
-			}
-			assert.Equal(t, test.expectedGoMemLimit, goMemLimitEnv.Value)
+			envMap := envToMap(ds.Spec.Template.Spec.Containers[0].Env)
+			assert.Equal(t, test.expectedGoMemLimit, envMap["GOMEMLIMIT"])
+			assert.Equal(t, test.expectedGoGC, envMap["GOGC"])
 		})
 	}
 }
