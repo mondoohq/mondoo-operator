@@ -56,6 +56,26 @@ spec:
     # Pause scheduled Kubernetes resource scan CronJobs without deleting them.
     # suspend: true
 
+    # Kyverno policy, report, and PolicyException collection.
+    # Disabled by default. Set enable: true to read Kyverno resources through
+    # cnspec without installing or running admission webhooks.
+    # Requires a scanner image with cnspec Kubernetes provider support for the
+    # kyverno discovery target and options.
+    # kyverno:
+    #   enable: true
+    #   defaultMappings: true
+    #   mirrorPolicyExceptions: false
+    #   mirroredExceptionApproval: externally-approved
+    #   mirroredExceptionAction: RISK_ACCEPTED
+    #   failExpiredPolicyExceptions: true
+    #   reportUnmappedPolicyExceptions: true
+    #   mappingAnnotations:
+    #     checkUids:
+    #       - mondoo.com/check-uid
+    #   exceptionAnnotations:
+    #     validUntil:
+    #       - mondoo.com/valid-until
+
     # Real-time resource watching (alternative to CronJob scheduling)
     # When enabled, resources are scanned immediately when they change
     # resourceWatcher:
