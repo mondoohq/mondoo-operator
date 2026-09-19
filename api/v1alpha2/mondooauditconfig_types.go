@@ -555,9 +555,45 @@ const (
 	NodeScanStyle_DaemonSet  NodeScanStyle = "daemonset"
 )
 
+// NodeScanProfile gives a group of nodes its own node scanner settings. Use profiles when
+// one cluster holds nodes of different sizes. A small node and a large node then get their
+// own memory limit, instead of sharing one limit sized for the largest node.
+type NodeScanProfile struct {
+	// Name identifies the profile. Names must be unique within the list.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// NodeSelector selects the nodes of this profile. A node matches when it carries every
+	// label in the map. An empty selector matches every node.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Resources sets the resource requirements for the scan pods on the matched nodes.
+	// An empty value falls back to spec.nodes.resources.
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Tolerations are appended to the tolerations of the scan pods on the matched nodes.
+	// The operator always adds a toleration for each taint of the node itself.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!has(self.profiles) || size(self.profiles) == 0 || !has(self.style) || self.style == 'cronjob'",message="spec.nodes.profiles is supported for style cronjob only"
 type Nodes struct {
 	Enable    bool                        `json:"enable,omitempty"`
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Profiles gives groups of nodes their own resources and tolerations. The operator uses
+	// the first profile in the list whose nodeSelector matches the node. A node that matches
+	// no profile uses spec.nodes.resources and spec.nodes.jobOverrides, so an existing config
+	// without profiles keeps its behaviour. Profiles apply to the "cronjob" style only,
+	// because a single DaemonSet cannot set per-node resources.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	Profiles []NodeScanProfile `json:"profiles,omitempty"`
 	// Schedule specifies a custom crontab schedule for the node scanning job. If not specified, the default schedule is
 	// used. Only applicable for CronJob style
 	Schedule string `json:"schedule,omitempty"`
