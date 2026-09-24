@@ -250,8 +250,7 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 				log.Error(err, "failed to update MondooAuditConfig with default schedule")
 				return ctrl.Result{}, err
 			}
-			// No requeue needed: the Update's watch event re-enqueues this object.
-			return ctrl.Result{}, nil
+			return ctrl.Result{Requeue: true}, nil //nolint:staticcheck // Requeue preserves rate-limited semantics; RequeueAfter calls Queue.Forget.
 		}
 	}
 
