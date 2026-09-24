@@ -572,6 +572,9 @@ type Nodes struct {
 	// +kubebuilder:default=cronjob
 	Style NodeScanStyle `json:"style,omitempty"`
 	// PriorityClassName specifies the name of the PriorityClass for the node scanning workloads.
+	// Applies to all styles. CronJob-style scan pods are bound directly to their node and skip the
+	// scheduler, so they can only evict other pods on a full node when the PriorityClass is
+	// critical (e.g. "system-node-critical").
 	PriorityClassName string `json:"priorityClassName,omitempty"`
 	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.

@@ -163,7 +163,9 @@ spec:
                               description: Selects a key of a ConfigMap.
                               properties:
                                 key:
-                                  description: The key to select.
+                                  description: |-
+                                    The key to select from the ConfigMap's Data field.
+                                    Keys in the BinaryData field are not currently propagated to container env vars.
                                   type: string
                                 name:
                                   default: ""
@@ -1313,7 +1315,9 @@ spec:
                               description: Selects a key of a ConfigMap.
                               properties:
                                 key:
-                                  description: The key to select.
+                                  description: |-
+                                    The key to select from the ConfigMap's Data field.
+                                    Keys in the BinaryData field are not currently propagated to container env vars.
                                   type: string
                                 name:
                                   default: ""
@@ -1524,8 +1528,11 @@ spec:
                         type: integer
                     type: object
                   priorityClassName:
-                    description: PriorityClassName specifies the name of the PriorityClass
-                      for the node scanning workloads.
+                    description: |-
+                      PriorityClassName specifies the name of the PriorityClass for the node scanning workloads.
+                      Applies to all styles. CronJob-style scan pods are bound directly to their node and skip the
+                      scheduler, so they can only evict other pods on a full node when the PriorityClass is
+                      critical (e.g. "system-node-critical").
                     type: string
                   resources:
                     description: ResourceRequirements describes the compute resource
@@ -1651,7 +1658,9 @@ spec:
                               description: Selects a key of a ConfigMap.
                               properties:
                                 key:
-                                  description: The key to select.
+                                  description: |-
+                                    The key to select from the ConfigMap's Data field.
+                                    Keys in the BinaryData field are not currently propagated to container env vars.
                                   type: string
                                 name:
                                   default: ""
