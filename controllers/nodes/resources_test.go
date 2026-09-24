@@ -308,6 +308,28 @@ func TestCronJob_GlobalJobOverrides(t *testing.T) {
 	assert.Equal(t, "prod", cj.Spec.JobTemplate.Labels["env"])
 }
 
+func TestCronJob_PriorityClassName(t *testing.T) {
+	testNode := corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-node-name"},
+	}
+	mac := testMondooAuditConfig()
+
+	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	assert.Empty(t, cj.Spec.JobTemplate.Spec.Template.Spec.PriorityClassName)
+
+	mac.Spec.Nodes.PriorityClassName = "mondoo-node-critical"
+	cj = CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	assert.Equal(t, "mondoo-node-critical", cj.Spec.JobTemplate.Spec.Template.Spec.PriorityClassName)
+}
+
+func TestDaemonSet_PriorityClassName(t *testing.T) {
+	mac := *testMondooAuditConfig()
+	mac.Spec.Nodes.PriorityClassName = "mondoo-node-critical"
+
+	ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
+	assert.Equal(t, "mondoo-node-critical", ds.Spec.Template.Spec.PriorityClassName)
+}
+
 func TestDaemonSet_Capabilities(t *testing.T) {
 	mac := testMondooAuditConfig()
 
