@@ -163,6 +163,10 @@ spec:
     style: cronjob # or "deployment" or "daemonset"
     # Optional: pause scheduled node scan CronJobs without deleting them
     # suspend: true
+    # Optional: select which nodes to scan
+    # labelSelector:
+    #   matchLabels:
+    #     pool: platform
     # Optional: set priority class for node scanning workloads
     # priorityClassName: high-priority
 ```

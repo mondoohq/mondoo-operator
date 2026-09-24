@@ -576,6 +576,9 @@ type Nodes struct {
 	// scheduler, so they can only evict other pods on a full node when the PriorityClass is
 	// critical (e.g. "system-node-critical").
 	PriorityClassName string `json:"priorityClassName,omitempty"`
+	// LabelSelector selects nodes to scan. When unset, all nodes are scanned.
+	// +optional
+	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 	// Env allows setting extra environment variables for the node scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.
 	Env []corev1.EnvVar `json:"env,omitempty"`
