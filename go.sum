@@ -530,8 +530,8 @@ github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 go.mondoo.com/mondoo-go v0.0.0-20260808001139-ef2a665833b7 h1:4XvjK+Hng0qCDb2i4LkniOgjS/vioUUxl9wnHDU5RFc=
 go.mondoo.com/mondoo-go v0.0.0-20260808001139-ef2a665833b7/go.mod h1:hESCStkuJqvuw0cWwVKrorQJJnGdxUnSdR4Zs1/W1W4=
-go.mondoo.com/mql/v13 v13.38.1 h1:8uG7T23ddpSroIe+qqkhv+6uJmBZe34obMfjiXH+80I=
-go.mondoo.com/mql/v13 v13.38.1/go.mod h1:dIY++p3yGZOSelst6pQNNdKEBAco8k14Lo9Kemoymt4=
+go.mondoo.com/mql/v13 v13.39.0 h1:zn/e6GSEVBt5B7YGiT99ZFT9uofMxP8xBoG77CpZ9So=
+go.mondoo.com/mql/v13 v13.39.0/go.mod h1:dIY++p3yGZOSelst6pQNNdKEBAco8k14Lo9Kemoymt4=
 go.mondoo.com/ranger-rpc v0.8.1 h1:DynUWByDnxI4wMHbFpXUMw+lndYJ21BAHOxrhGyVCD4=
 go.mondoo.com/ranger-rpc v0.8.1/go.mod h1:HP3hjWjgRFxCFAnY86YLMiY0bU7eqhKuP8Qm+QlFBbI=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
