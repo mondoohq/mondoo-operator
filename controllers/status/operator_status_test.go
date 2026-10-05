@@ -197,6 +197,56 @@ func TestReportStatusRequestFromAuditConfig_AllError(t *testing.T) {
 	assert.ElementsMatch(t, messages, reportStatus.Messages.Messages)
 }
 
+func TestReportStatusRequestFromAuditConfig_ConsoleIntegration(t *testing.T) {
+	tests := []struct {
+		name      string
+		condition *v1alpha2.MondooAuditConfigCondition
+		want      *mondooclient.IntegrationMessage
+	}{
+		{
+			name: "no check-in attempted yet",
+		},
+		{
+			name: "check-in works",
+			condition: &v1alpha2.MondooAuditConfigCondition{
+				Type: v1alpha2.MondooIntegrationDegraded, Status: v1.ConditionFalse, Message: "Mondoo integration is working",
+			},
+			want: &mondooclient.IntegrationMessage{
+				Identifier: ConsoleIntegrationIdentifier, Status: mondooclient.MessageStatus_MESSAGE_INFO, Message: "Mondoo integration is working",
+			},
+		},
+		{
+			name: "check-in fails",
+			condition: &v1alpha2.MondooAuditConfigCondition{
+				Type: v1alpha2.MondooIntegrationDegraded, Status: v1.ConditionTrue, Message: "failed to CheckIn() to Mondoo API: 401 Unauthorized",
+			},
+			want: &mondooclient.IntegrationMessage{
+				Identifier: ConsoleIntegrationIdentifier, Status: mondooclient.MessageStatus_MESSAGE_WARNING, Message: "failed to CheckIn() to Mondoo API: 401 Unauthorized",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := testMondooAuditConfig()
+			if tt.condition != nil {
+				m.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{*tt.condition}
+			}
+
+			reportStatus := ReportStatusRequestFromAuditConfig(context.Background(), "mrn", m, nil, &k8sversion.Info{}, nil, false, logr.Logger{})
+
+			var got *mondooclient.IntegrationMessage
+			for i := range reportStatus.Messages.Messages {
+				if reportStatus.Messages.Messages[i].Identifier == ConsoleIntegrationIdentifier {
+					got = &reportStatus.Messages.Messages[i]
+				}
+			}
+			assert.Equal(t, tt.want, got)
+			// A failing check-in does not stop scanning, so it must not mark the integration as errored.
+			assert.Equal(t, mondooclient.Status_ACTIVE, reportStatus.Status)
+		})
+	}
+}
+
 type mockContainerImageResolver struct {
 	cnspecSkipValues   []bool
 	operatorSkipValues []bool

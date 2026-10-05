@@ -24,6 +24,7 @@ const (
 	NamespaceFilteringIdentifier     = "namespace-filtering"
 	MondooOperatorIdentifier         = "mondoo-operator"
 	RemoteConfigIdentifier           = "remote-config"
+	ConsoleIntegrationIdentifier     = "console-integration"
 	noStatusMessage                  = "No status reported yet"
 )
 
@@ -172,6 +173,22 @@ func ReportStatusRequestFromAuditConfig(
 			rcMsg.Message = "Remote configuration applied successfully"
 		}
 		messages = append(messages, rcMsg)
+	}
+
+	// Console integration (CheckIn) status. Without this, a failing CheckIn only shows up in the
+	// operator logs, and the console just sees the integration go MISSING. It is a warning, not an
+	// error: scanning keeps working when CheckIn fails.
+	consoleIntegration := mondoo.FindMondooAuditConditions(m.Status.Conditions, v1alpha2.MondooIntegrationDegraded)
+	if consoleIntegration != nil {
+		ciMsg := mondooclient.IntegrationMessage{
+			Identifier: ConsoleIntegrationIdentifier,
+			Status:     mondooclient.MessageStatus_MESSAGE_INFO,
+			Message:    consoleIntegration.Message,
+		}
+		if consoleIntegration.Status == v1.ConditionTrue {
+			ciMsg.Status = mondooclient.MessageStatus_MESSAGE_WARNING
+		}
+		messages = append(messages, ciMsg)
 	}
 
 	// If there were any error messages, the overall status is error
