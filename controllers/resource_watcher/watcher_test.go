@@ -5,6 +5,7 @@ package resource_watcher
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,6 +13,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -149,4 +152,25 @@ func TestResourceWatcherSelectorsDefaultToAll(t *testing.T) {
 
 	assert.True(t, watcher.shouldWatchObjectLabels(&corev1.Pod{}))
 	assert.True(t, watcher.shouldWatchNamespaceResource(&corev1.Namespace{}))
+}
+
+// failingInformerCache is a cache whose GetInformer always fails. Other methods are
+// unimplemented and panic if called.
+type failingInformerCache struct {
+	ctrlcache.Cache
+}
+
+func (c *failingInformerCache) GetInformer(context.Context, client.Object, ...ctrlcache.InformerGetOption) (ctrlcache.Informer, error) {
+	return nil, errors.New("namespaces is forbidden")
+}
+
+func TestResourceWatcherStartFailsWithoutNamespaceInformer(t *testing.T) {
+	watcher := NewResourceWatcher(&failingInformerCache{}, nil, WatcherConfig{
+		NamespaceSelector: labels.SelectorFromSet(labels.Set{"tenant": "team-a"}),
+	})
+
+	err := watcher.Start(context.Background())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "namespaces is forbidden")
 }

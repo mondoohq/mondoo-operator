@@ -106,9 +106,10 @@ func (w *ResourceWatcher) Start(ctx context.Context) error {
 
 	if selectorConfigured(w.config.NamespaceSelector) {
 		// Start the Namespace informer up front so namespace selector lookups in event
-		// handlers are served from a synced cache.
+		// handlers are served from a synced cache. Without it every namespaced event would
+		// be dropped, so fail instead of running in a degraded state.
 		if _, err := w.cache.GetInformer(ctx, &corev1.Namespace{}); err != nil {
-			watcherLogger.Error(err, "Failed to get informer for namespaces")
+			return fmt.Errorf("failed to get informer for namespaces: %w", err)
 		}
 	}
 
@@ -197,8 +198,9 @@ func (w *ResourceWatcher) shouldWatchNamespaceLabels(ctx context.Context, namesp
 		return true
 	}
 
-	// The Namespace cache is already restricted to matching namespaces (see the cache
-	// options in the resource-watcher command), so NotFound means "not selected".
+	// The resource-watcher command restricts the Namespace cache to matching namespaces,
+	// so NotFound means "not selected". The labels are still matched below so this
+	// doesn't depend on how the reader was configured.
 	ns := &corev1.Namespace{}
 	if err := w.namespaceReader.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -242,8 +244,9 @@ func selectorString(selector labels.Selector) string {
 type resourceEventHandler struct {
 	watcher      *ResourceWatcher
 	resourceType string
-	// client-go ResourceEventHandler callbacks don't receive a context, but
-	// namespace selector cache misses need one for namespace reads.
+	// client-go ResourceEventHandler callbacks don't receive a context, but namespace
+	// selector lookups need one. This is the Start() context, so once the watcher shuts
+	// down, lookups fail and late events are dropped, which is intended.
 	ctx context.Context
 }
 
