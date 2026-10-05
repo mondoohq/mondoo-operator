@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"go.mondoo.com/mondoo-operator/pkg/annotations"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	mondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 )
 
@@ -36,6 +37,10 @@ type ScannerConfig struct {
 	Namespaces []string
 	// NamespacesExclude are namespaces to exclude from scanning.
 	NamespacesExclude []string
+	// NamespaceLabelSelector is a label selector for namespaces to include in scanning.
+	NamespaceLabelSelector string
+	// ObjectLabelSelector is a label selector for objects to include in scanning.
+	ObjectLabelSelector string
 	// ClusterUID is the unique identifier of the cluster.
 	ClusterUID string
 	// IntegrationMRN is the integration MRN for asset labeling.
@@ -161,6 +166,12 @@ func (s *Scanner) generateInventory(resources []K8sResourceIdentifier) ([]byte, 
 	}
 	if len(s.config.NamespacesExclude) > 0 {
 		opts["namespaces-exclude"] = strings.Join(s.config.NamespacesExclude, ",")
+	}
+	if s.config.NamespaceLabelSelector != "" {
+		opts[k8s.NamespaceLabelSelectorOption] = s.config.NamespaceLabelSelector
+	}
+	if s.config.ObjectLabelSelector != "" {
+		opts[k8s.ObjectLabelSelectorOption] = s.config.ObjectLabelSelector
 	}
 
 	managedBy := mondoo.ManagedByLabel(s.config.ClusterUID)

@@ -13,8 +13,11 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
+	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -57,17 +60,24 @@ type WatcherConfig struct {
 	// When false (default), only HighPriorityResourceTypes are watched.
 	// When true, all DefaultResourceTypes are watched (including ephemeral resources like Pods).
 	WatchAllResources bool
+	// NamespaceSelector selects namespaces whose resources should be watched.
+	NamespaceSelector labels.Selector
+	// ObjectSelector selects watched objects by their own labels.
+	ObjectSelector labels.Selector
 }
 
 // ResourceWatcher watches Kubernetes resources and triggers scans when they change.
 type ResourceWatcher struct {
-	cache     cache.Cache
-	debouncer *Debouncer
-	config    WatcherConfig
+	cache ctrlcache.Cache
+	// namespaceReader reads Namespace objects for namespace selector evaluation. It is the
+	// informer-backed cache, so lookups are served from memory.
+	namespaceReader client.Reader
+	debouncer       *Debouncer
+	config          WatcherConfig
 }
 
 // NewResourceWatcher creates a new ResourceWatcher.
-func NewResourceWatcher(c cache.Cache, debouncer *Debouncer, config WatcherConfig) *ResourceWatcher {
+func NewResourceWatcher(c ctrlcache.Cache, debouncer *Debouncer, config WatcherConfig) *ResourceWatcher {
 	if len(config.ResourceTypes) == 0 {
 		// Use high-priority resources by default (stable workload resources).
 		// Only use all resources if explicitly requested via WatchAllResources.
@@ -78,9 +88,10 @@ func NewResourceWatcher(c cache.Cache, debouncer *Debouncer, config WatcherConfi
 		}
 	}
 	return &ResourceWatcher{
-		cache:     c,
-		debouncer: debouncer,
-		config:    config,
+		cache:           c,
+		namespaceReader: c,
+		debouncer:       debouncer,
+		config:          config,
 	}
 }
 
@@ -89,7 +100,18 @@ func (w *ResourceWatcher) Start(ctx context.Context) error {
 	watcherLogger.Info("Starting resource watcher",
 		"namespaces", w.config.Namespaces,
 		"namespacesExclude", w.config.NamespacesExclude,
+		"namespaceSelector", selectorString(w.config.NamespaceSelector),
+		"objectSelector", selectorString(w.config.ObjectSelector),
 		"resourceTypes", w.config.ResourceTypes)
+
+	if selectorConfigured(w.config.NamespaceSelector) {
+		// Start the Namespace informer up front so namespace selector lookups in event
+		// handlers are served from a synced cache. Without it every namespaced event would
+		// be dropped, so fail instead of running in a degraded state.
+		if _, err := w.cache.GetInformer(ctx, &corev1.Namespace{}); err != nil {
+			return fmt.Errorf("failed to get informer for namespaces: %w", err)
+		}
+	}
 
 	// Set up informers for each resource type
 	for _, resourceType := range w.config.ResourceTypes {
@@ -108,6 +130,7 @@ func (w *ResourceWatcher) Start(ctx context.Context) error {
 		handler := &resourceEventHandler{
 			watcher:      w,
 			resourceType: resourceType,
+			ctx:          ctx,
 		}
 
 		_, err = informer.AddEventHandler(handler)
@@ -170,10 +193,61 @@ func (w *ResourceWatcher) shouldWatchNamespace(namespace string) bool {
 	return !slices.Contains(w.config.NamespacesExclude, namespace)
 }
 
+func (w *ResourceWatcher) shouldWatchNamespaceLabels(ctx context.Context, namespace string) bool {
+	if !selectorConfigured(w.config.NamespaceSelector) {
+		return true
+	}
+
+	// The resource-watcher command restricts the Namespace cache to matching namespaces,
+	// so NotFound means "not selected". The labels are still matched below so this
+	// doesn't depend on how the reader was configured.
+	ns := &corev1.Namespace{}
+	if err := w.namespaceReader.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+		if !apierrors.IsNotFound(err) {
+			watcherLogger.Error(err, "Failed to read namespace labels", "namespace", namespace)
+		}
+		return false
+	}
+	return selectorMatches(w.config.NamespaceSelector, labels.Set(ns.GetLabels()))
+}
+
+func (w *ResourceWatcher) shouldWatchObjectLabels(obj client.Object) bool {
+	if _, ok := obj.(*corev1.Namespace); ok {
+		return true
+	}
+	return selectorMatches(w.config.ObjectSelector, labels.Set(obj.GetLabels()))
+}
+
+func (w *ResourceWatcher) shouldWatchNamespaceResource(obj client.Object) bool {
+	if _, ok := obj.(*corev1.Namespace); !ok {
+		return true
+	}
+	return selectorMatches(w.config.NamespaceSelector, labels.Set(obj.GetLabels()))
+}
+
+func selectorMatches(selector labels.Selector, labelSet labels.Set) bool {
+	return selector == nil || selector.Empty() || selector.Matches(labelSet)
+}
+
+func selectorConfigured(selector labels.Selector) bool {
+	return selector != nil && !selector.Empty()
+}
+
+func selectorString(selector labels.Selector) string {
+	if !selectorConfigured(selector) {
+		return ""
+	}
+	return selector.String()
+}
+
 // resourceEventHandler handles resource events from informers.
 type resourceEventHandler struct {
 	watcher      *ResourceWatcher
 	resourceType string
+	// client-go ResourceEventHandler callbacks don't receive a context, but namespace
+	// selector lookups need one. This is the Start() context, so once the watcher shuts
+	// down, lookups fail and late events are dropped, which is intended.
+	ctx context.Context
 }
 
 func (h *resourceEventHandler) OnAdd(obj any, isInInitialList bool) {
@@ -200,11 +274,38 @@ func (h *resourceEventHandler) handleEvent(obj any, eventType string) {
 		return
 	}
 
+	if !h.watcher.shouldWatchObjectLabels(clientObj) {
+		watcherLogger.V(2).Info("Skipping resource because object labels do not match selector",
+			"resourceType", h.resourceType,
+			"namespace", clientObj.GetNamespace(),
+			"name", clientObj.GetName())
+		return
+	}
+
+	// Namespace resources are cluster-scoped, so filter them by their own labels.
+	if !h.watcher.shouldWatchNamespaceResource(clientObj) {
+		watcherLogger.V(2).Info("Skipping namespace because labels do not match selector",
+			"resourceType", h.resourceType,
+			"name", clientObj.GetName())
+		return
+	}
+
 	namespace := clientObj.GetNamespace()
 
 	// Check namespace filtering (skip for cluster-scoped resources)
 	if namespace != "" && !h.watcher.shouldWatchNamespace(namespace) {
 		watcherLogger.V(2).Info("Skipping resource in excluded namespace",
+			"resourceType", h.resourceType,
+			"namespace", namespace,
+			"name", clientObj.GetName())
+		return
+	}
+	ctx := h.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if namespace != "" && !h.watcher.shouldWatchNamespaceLabels(ctx, namespace) {
+		watcherLogger.V(2).Info("Skipping resource because namespace labels do not match selector",
 			"resourceType", h.resourceType,
 			"namespace", namespace,
 			"name", clientObj.GetName())

@@ -40,7 +40,7 @@ func DeploymentLabels(m v1alpha2.MondooAuditConfig) map[string]string {
 }
 
 // Deployment creates a Deployment spec for the resource watcher.
-func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *appsv1.Deployment {
+func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (*appsv1.Deployment, error) {
 	ls := DeploymentLabels(*m)
 
 	// Build command arguments
@@ -89,6 +89,16 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 	}
 	if len(m.Spec.Filtering.Namespaces.Exclude) > 0 {
 		cmd = append(cmd, "--namespaces-exclude", strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","))
+	}
+	selectorOpts, err := k8s.LabelSelectorOptions(m.Spec.Filtering)
+	if err != nil {
+		return nil, fmt.Errorf("invalid filtering label selector: %w", err)
+	}
+	// Append in a fixed order so the generated Deployment is stable across reconciles.
+	for _, opt := range []string{k8s.NamespaceLabelSelectorOption, k8s.ObjectLabelSelectorOption} {
+		if v, ok := selectorOpts[opt]; ok {
+			cmd = append(cmd, "--"+opt, v)
+		}
 	}
 
 	// Add API proxy if configured (respect SkipProxyForCnspec since resource watcher uses cnspec)
@@ -204,5 +214,5 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 
 	k8s.ApplyDeploymentOverrides(deployment, k8s.MergeJobOverrides(m.Spec.JobOverrides, m.Spec.KubernetesResources.JobOverrides))
 
-	return deployment
+	return deployment, nil
 }

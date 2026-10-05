@@ -1048,6 +1048,11 @@ func ExternalClusterConfigMap(integrationMRN, operatorClusterUID string, cluster
 }
 
 func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) (string, error) {
+	selectorOpts, err := k8s.LabelSelectorOptions(m.Spec.Filtering)
+	if err != nil {
+		return "", err
+	}
+
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-k8s-resources-inventory",
@@ -1074,6 +1079,10 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 				},
 			},
 		},
+	}
+
+	for i := range inv.Spec.Assets {
+		maps.Copy(inv.Spec.Assets[i].Connections[0].Options, selectorOpts)
 	}
 
 	if integrationMRN != "" {
@@ -1123,6 +1132,11 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 		"namespaces-exclude": strings.Join(filtering.Namespaces.Exclude, ","),
 		"disable-cache":      "false",
 	}
+	selectorOpts, err := k8s.LabelSelectorOptions(filtering)
+	if err != nil {
+		return "", err
+	}
+	maps.Copy(opts, selectorOpts)
 	if cluster.ContainerImageScanning {
 		repos := externalClusterRepositories(cluster, m)
 		if len(repos.Include) > 0 {

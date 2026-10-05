@@ -157,6 +157,85 @@ func TestExternalClusterInventory_EmptyClusterNamespaceFilteringOverridesGlobal(
 	assert.Empty(t, options["namespaces-exclude"])
 }
 
+func TestInventory_WithLabelSelectors(t *testing.T) {
+	auditConfig := *testAuditConfig()
+	auditConfig.Spec.Filtering = v1alpha2.Filtering{
+		NamespaceLabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"tenant": "team-a"}},
+		ObjectLabelSelector:    &metav1.LabelSelector{MatchLabels: map[string]string{"scan": "enabled"}},
+	}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	options := inv.Spec.Assets[0].Connections[0].Options
+	assert.Equal(t, "tenant=team-a", options[k8s.NamespaceLabelSelectorOption])
+	assert.Equal(t, "scan=enabled", options[k8s.ObjectLabelSelectorOption])
+}
+
+func TestInventory_WithoutLabelSelectors(t *testing.T) {
+	invStr, err := Inventory("", testClusterUID, *testAuditConfig(), v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	options := inv.Spec.Assets[0].Connections[0].Options
+	assert.NotContains(t, options, k8s.NamespaceLabelSelectorOption)
+	assert.NotContains(t, options, k8s.ObjectLabelSelectorOption)
+}
+
+func TestInventory_WithInvalidLabelSelector(t *testing.T) {
+	auditConfig := *testAuditConfig()
+	auditConfig.Spec.Filtering.ObjectLabelSelector = &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{Key: "scan", Operator: metav1.LabelSelectorOperator("DefinitelyInvalid")},
+		},
+	}
+
+	_, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.Error(t, err)
+}
+
+func TestExternalClusterInventory_InheritsGlobalLabelSelectors(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Filtering: v1alpha2.Filtering{
+				NamespaceLabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"tenant": "team-a"}},
+			},
+		},
+	}
+	cluster := v1alpha2.ExternalCluster{Name: "remote-cluster"}
+
+	options := externalClusterInventoryOptions(t, auditConfig, cluster)
+
+	assert.Equal(t, "tenant=team-a", options[k8s.NamespaceLabelSelectorOption])
+	assert.NotContains(t, options, k8s.ObjectLabelSelectorOption)
+}
+
+func TestExternalClusterInventory_UsesClusterLabelSelectors(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Filtering: v1alpha2.Filtering{
+				NamespaceLabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"tenant": "team-a"}},
+			},
+		},
+	}
+	cluster := v1alpha2.ExternalCluster{
+		Name: "remote-cluster",
+		Filtering: &v1alpha2.Filtering{
+			ObjectLabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"scan": "enabled"}},
+		},
+	}
+
+	options := externalClusterInventoryOptions(t, auditConfig, cluster)
+
+	assert.NotContains(t, options, k8s.NamespaceLabelSelectorOption)
+	assert.Equal(t, "scan=enabled", options[k8s.ObjectLabelSelectorOption])
+}
+
 func TestCronJob_WithProxy(t *testing.T) {
 	m := testAuditConfig()
 	cfg := v1alpha2.MondooOperatorConfig{
