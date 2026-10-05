@@ -279,6 +279,11 @@ func ConfigMapName(prefix string) string {
 }
 
 func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig, platformIdsExclude []string, scanTime *time.Time) (string, error) {
+	opts, err := containerImageOptions(m)
+	if err != nil {
+		return "", err
+	}
+
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
 			Name: "mondoo-k8s-containers-inventory",
@@ -289,7 +294,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 					Connections: []*inventory.Config{
 						{
 							Type:    "k8s",
-							Options: containerImageOptions(m),
+							Options: opts,
 							Discover: &inventory.Discovery{
 								Targets: []string{"container-images"},
 							},
@@ -416,7 +421,7 @@ func containerImageLabels(m *v1alpha2.MondooAuditConfig, scanTime *time.Time) ma
 	return labels
 }
 
-func containerImageOptions(m v1alpha2.MondooAuditConfig) map[string]string {
+func containerImageOptions(m v1alpha2.MondooAuditConfig) (map[string]string, error) {
 	opts := map[string]string{
 		"namespaces":         strings.Join(m.Spec.Filtering.Namespaces.Include, ","),
 		"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
@@ -428,5 +433,10 @@ func containerImageOptions(m v1alpha2.MondooAuditConfig) map[string]string {
 	if len(m.Spec.Containers.Repositories.Exclude) > 0 {
 		opts["images-exclude"] = strings.Join(m.Spec.Containers.Repositories.Exclude, ",")
 	}
-	return opts
+	selectorOpts, err := k8s.LabelSelectorOptions(m.Spec.Filtering)
+	if err != nil {
+		return nil, err
+	}
+	maps.Copy(opts, selectorOpts)
+	return opts, nil
 }

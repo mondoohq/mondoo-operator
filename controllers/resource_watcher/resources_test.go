@@ -257,16 +257,18 @@ func TestDeployment_WithLabelSelectors(t *testing.T) {
 				Enable: true,
 				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
 					Enable: true,
-					NamespaceLabelSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"tenant": "team-a"},
-					},
-					ObjectLabelSelector: &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "scan",
-								Operator: metav1.LabelSelectorOpNotIn,
-								Values:   []string{"disabled"},
-							},
+				},
+			},
+			Filtering: v1alpha2.Filtering{
+				NamespaceLabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"tenant": "team-a"},
+				},
+				ObjectLabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "scan",
+							Operator: metav1.LabelSelectorOpNotIn,
+							Values:   []string{"disabled"},
 						},
 					},
 				},
@@ -294,12 +296,14 @@ func TestDeployment_WithInvalidLabelSelectorReturnsError(t *testing.T) {
 				Enable: true,
 				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
 					Enable: true,
-					ObjectLabelSelector: &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "scan",
-								Operator: metav1.LabelSelectorOperator("DefinitelyInvalid"),
-							},
+				},
+			},
+			Filtering: v1alpha2.Filtering{
+				ObjectLabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "scan",
+							Operator: metav1.LabelSelectorOperator("DefinitelyInvalid"),
 						},
 					},
 				},
@@ -311,7 +315,7 @@ func TestDeployment_WithInvalidLabelSelectorReturnsError(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Nil(t, deployment)
-	assert.Contains(t, err.Error(), "invalid resource watcher object label selector")
+	assert.Contains(t, err.Error(), "invalid object-label-selector")
 }
 
 func TestDeployment_WithoutLabelSelectorsOmitsSelectorArgs(t *testing.T) {

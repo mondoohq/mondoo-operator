@@ -224,6 +224,43 @@ spec:
         - ...
 ```
 
+### Filter Kubernetes objects based on labels
+
+Use label selectors to scope scanning by namespace labels and by the labels of
+the objects themselves. Both use the standard Kubernetes `matchLabels` /
+`matchExpressions` syntax and are evaluated in addition to the namespace
+include/exclude lists above.
+
+- `namespaceLabelSelector` only scans namespaces with matching labels, along with
+  all objects in those namespaces.
+- `objectLabelSelector` only scans non-Namespace objects with matching labels.
+  Namespace objects are gated by `namespaceLabelSelector` instead. For container
+  image scanning, the selector is matched against the Pod that references the image.
+
+```
+...
+spec:
+...
+  filtering:
+    namespaceLabelSelector:
+      matchLabels:
+        tenant: team-a
+    objectLabelSelector:
+      matchExpressions:
+        - key: mondoo.com/scan
+          operator: NotIn
+          values:
+            - disabled
+```
+
+The selectors apply to the scheduled Kubernetes resource and container image
+scans, external clusters (unless overridden by a per-cluster `filtering`
+block), and the resource watcher. They require cnspec v13.30.1 or later.
+
+> **Note:** The resource watcher only receives events for objects that match
+> `objectLabelSelector`. If an object's labels change so that it no longer
+> matches, no final scan is triggered for it.
+
 ## GitOps installs: let the operator create its Console integration
 
 A Kubernetes integration in the Mondoo Console gives you health check-ins, an integration status card, pause/resume scanning from the Console, and integration-scoped asset grouping. Normally a human creates the integration in the Console and pastes its long-lived token into the cluster.
@@ -1091,8 +1128,6 @@ When enabled with default settings, the resource watcher:
 | `debounceInterval` | `10s` | Time to wait after last change before triggering a scan |
 | `watchAllResources` | `false` | When `true`, watches all resources including Pods, Jobs, CronJobs |
 | `resourceTypes` | (auto) | Explicit list of resource types to watch (overrides `watchAllResources`) |
-| `namespaceLabelSelector` | unset | Select namespaces whose resources should be watched |
-| `objectLabelSelector` | unset | Select watched non-Namespace objects by their own labels |
 
 ### Example: Custom Configuration
 
@@ -1133,38 +1168,6 @@ spec:
         - deployments
         - services
         - ingresses
-```
-
-### Example: Watch Resources by Label Selector
-
-Resource watcher label selectors limit which changed Kubernetes objects are
-queued for immediate scans. `namespaceLabelSelector` selects namespaces whose
-resources should be watched. `objectLabelSelector` selects watched non-Namespace
-objects by their own labels; Namespace objects are gated by
-`namespaceLabelSelector` instead.
-
-```yaml
-apiVersion: k8s.mondoo.com/v1alpha2
-kind: MondooAuditConfig
-metadata:
-  name: mondoo-client
-  namespace: mondoo-operator
-spec:
-  mondooCredsSecretRef:
-    name: mondoo-client
-  kubernetesResources:
-    enable: true
-    resourceWatcher:
-      enable: true
-      namespaceLabelSelector:
-        matchLabels:
-          tenant: team-a
-      objectLabelSelector:
-        matchExpressions:
-          - key: mondoo.com/scan
-            operator: NotIn
-            values:
-              - disabled
 ```
 
 ### Why High-Priority Resources by Default?

@@ -209,14 +209,16 @@ func init() {
 
 		// Create scanner
 		scanner := resource_watcher.NewScanner(resource_watcher.ScannerConfig{
-			ConfigPath:        *configPath,
-			APIProxy:          *apiProxy,
-			Timeout:           *timeout,
-			Annotations:       *annotations,
-			Namespaces:        namespacesList,
-			NamespacesExclude: namespacesExcludeList,
-			ClusterUID:        *clusterUID,
-			IntegrationMRN:    *integrationMRN,
+			ConfigPath:             *configPath,
+			APIProxy:               *apiProxy,
+			Timeout:                *timeout,
+			Annotations:            *annotations,
+			Namespaces:             namespacesList,
+			NamespacesExclude:      namespacesExcludeList,
+			NamespaceLabelSelector: *namespaceLabelSelector,
+			ObjectLabelSelector:    *objectLabelSelector,
+			ClusterUID:             *clusterUID,
+			IntegrationMRN:         *integrationMRN,
 		})
 
 		// Create debouncer with rate limiting

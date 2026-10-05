@@ -62,6 +62,18 @@ type MondooAuditConfigSpec struct {
 
 type Filtering struct {
 	Namespaces FilteringSpec `json:"namespaces,omitempty"`
+
+	// NamespaceLabelSelector selects namespaces by their labels. Only resources in matching
+	// namespaces are scanned or watched. It is evaluated in addition to the Namespaces
+	// include/exclude lists.
+	// +optional
+	NamespaceLabelSelector *metav1.LabelSelector `json:"namespaceLabelSelector,omitempty"`
+
+	// ObjectLabelSelector selects non-Namespace Kubernetes objects by their own labels.
+	// Namespace objects are gated by NamespaceLabelSelector instead. For container image
+	// scanning, the selector is matched against the Pod that references the image.
+	// +optional
+	ObjectLabelSelector *metav1.LabelSelector `json:"objectLabelSelector,omitempty"`
 }
 
 type FilteringSpec struct {
@@ -254,16 +266,6 @@ type ResourceWatcherSpec struct {
 	// deployments, daemonsets, statefulsets, replicasets. When true, defaults to:
 	// pods, deployments, daemonsets, statefulsets, replicasets, jobs, cronjobs, services, ingresses, namespaces
 	ResourceTypes []string `json:"resourceTypes,omitempty"`
-
-	// NamespaceLabelSelector selects namespaces whose resources should be watched.
-	// It is evaluated in addition to namespace include/exclude filtering.
-	// +optional
-	NamespaceLabelSelector *metav1.LabelSelector `json:"namespaceLabelSelector,omitempty"`
-
-	// ObjectLabelSelector selects watched non-Namespace Kubernetes objects by their own labels.
-	// Namespace objects are gated by NamespaceLabelSelector instead.
-	// +optional
-	ObjectLabelSelector *metav1.LabelSelector `json:"objectLabelSelector,omitempty"`
 }
 
 // ExternalCluster defines configuration for scanning a remote K8s cluster
