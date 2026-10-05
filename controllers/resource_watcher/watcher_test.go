@@ -6,14 +6,12 @@ package resource_watcher
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -123,146 +121,6 @@ func TestResourceWatcherShouldWatchNamespaceLabelsWithNegativeSelector(t *testin
 			assert.Equal(t, tt.want, watcher.shouldWatchNamespaceLabels(ctx, "selected"))
 		})
 	}
-}
-
-func TestResourceWatcherShouldWatchNamespaceLabelsUsesCache(t *testing.T) {
-	ctx := context.Background()
-	namespaceSelector := labels.SelectorFromSet(labels.Set{"tenant": "team-a"})
-	reader := fake.NewClientBuilder().WithObjects(&corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "cached",
-			Labels: map[string]string{"tenant": "team-a"},
-		},
-	}).Build()
-	watcher := &ResourceWatcher{
-		namespaceReader:        reader,
-		namespaceLabelCacheTTL: time.Minute,
-		config: WatcherConfig{
-			NamespaceSelector: namespaceSelector,
-		},
-	}
-
-	assert.True(t, watcher.shouldWatchNamespaceLabels(ctx, "cached"))
-
-	updated := &corev1.Namespace{}
-	require.NoError(t, reader.Get(ctx, client.ObjectKey{Name: "cached"}, updated))
-	updated.Labels = map[string]string{"tenant": "team-b"}
-	require.NoError(t, reader.Update(ctx, updated))
-
-	assert.True(t, watcher.shouldWatchNamespaceLabels(ctx, "cached"))
-}
-
-func TestResourceWatcherShouldWatchNamespaceLabelsRefreshesExpiredCache(t *testing.T) {
-	ctx := context.Background()
-	namespaceSelector := labels.SelectorFromSet(labels.Set{"tenant": "team-a"})
-	reader := fake.NewClientBuilder().WithObjects(&corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "cached",
-			Labels: map[string]string{"tenant": "team-a"},
-		},
-	}).Build()
-	watcher := &ResourceWatcher{
-		namespaceReader:        reader,
-		namespaceLabelCacheTTL: time.Minute,
-		config: WatcherConfig{
-			NamespaceSelector: namespaceSelector,
-		},
-	}
-
-	assert.True(t, watcher.shouldWatchNamespaceLabels(ctx, "cached"))
-
-	updated := &corev1.Namespace{}
-	require.NoError(t, reader.Get(ctx, client.ObjectKey{Name: "cached"}, updated))
-	updated.Labels = map[string]string{"tenant": "team-b"}
-	require.NoError(t, reader.Update(ctx, updated))
-
-	watcher.namespaceLabelCacheMu.Lock()
-	entry := watcher.namespaceLabelCache["cached"]
-	entry.expiresAt = time.Now().Add(-time.Second)
-	watcher.namespaceLabelCache["cached"] = entry
-	watcher.namespaceLabelCacheMu.Unlock()
-
-	assert.False(t, watcher.shouldWatchNamespaceLabels(ctx, "cached"))
-}
-
-func TestResourceWatcherNamespaceLabelCacheUpdatesFromInformerEvents(t *testing.T) {
-	ctx := context.Background()
-	namespaceSelector := labels.SelectorFromSet(labels.Set{"tenant": "team-a"})
-	watcher := &ResourceWatcher{
-		config: WatcherConfig{
-			NamespaceSelector: namespaceSelector,
-		},
-	}
-	handler := &namespaceLabelEventHandler{watcher: watcher}
-
-	handler.OnAdd(&corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "tenant-ns",
-			Labels: map[string]string{"tenant": "team-a"},
-		},
-	}, true)
-	assert.True(t, watcher.shouldWatchNamespaceLabels(ctx, "tenant-ns"))
-
-	handler.OnUpdate(nil, &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "tenant-ns",
-			Labels: map[string]string{"tenant": "team-b"},
-		},
-	})
-	assert.False(t, watcher.shouldWatchNamespaceLabels(ctx, "tenant-ns"))
-
-	handler.OnDelete(&corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "tenant-ns"},
-	})
-	assert.False(t, watcher.shouldWatchNamespaceLabels(ctx, "tenant-ns"))
-}
-
-func TestResourceWatcherNamespaceLabelCachePrunesExpiredEntries(t *testing.T) {
-	watcher := &ResourceWatcher{
-		namespaceLabelCache: map[string]namespaceLabelCacheEntry{
-			"expired": {
-				labels:    labels.Set{"tenant": "team-a"},
-				found:     true,
-				expiresAt: time.Now().Add(-time.Minute),
-			},
-		},
-		namespaceLabelCacheTTL: time.Minute,
-	}
-
-	watcher.setCachedNamespaceLabels("fresh", labels.Set{"tenant": "team-b"}, true)
-
-	_, ok := watcher.namespaceLabelCache["expired"]
-	assert.False(t, ok)
-	_, ok = watcher.namespaceLabelCache["fresh"]
-	assert.True(t, ok)
-}
-
-func TestResourceWatcherNamespaceLabelCacheEvictsOldestEntryAtLimit(t *testing.T) {
-	watcher := &ResourceWatcher{
-		namespaceLabelCache: map[string]namespaceLabelCacheEntry{
-			"oldest": {
-				labels:    labels.Set{"tenant": "team-a"},
-				found:     true,
-				expiresAt: time.Now().Add(time.Minute),
-			},
-			"newest": {
-				labels:    labels.Set{"tenant": "team-b"},
-				found:     true,
-				expiresAt: time.Now().Add(2 * time.Minute),
-			},
-		},
-		namespaceLabelCacheTTL:        time.Minute,
-		namespaceLabelCacheMaxEntries: 2,
-	}
-
-	watcher.setCachedNamespaceLabels("fresh", labels.Set{"tenant": "team-c"}, true)
-
-	_, ok := watcher.namespaceLabelCache["oldest"]
-	assert.False(t, ok)
-	_, ok = watcher.namespaceLabelCache["newest"]
-	assert.True(t, ok)
-	_, ok = watcher.namespaceLabelCache["fresh"]
-	assert.True(t, ok)
 }
 
 func TestResourceWatcherShouldWatchNamespaceResource(t *testing.T) {

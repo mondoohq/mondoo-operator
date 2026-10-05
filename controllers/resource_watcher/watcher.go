@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"sync"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -18,18 +16,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	toolscache "k8s.io/client-go/tools/cache"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var watcherLogger = ctrl.Log.WithName("resource-watcher")
-
-const (
-	defaultNamespaceLabelCacheTTL        = 30 * time.Second
-	defaultNamespaceLabelCacheMaxEntries = 1024
-)
 
 // HighPriorityResourceTypes are stable resources that represent actual workloads.
 // These are preferred over ephemeral resources like Pods and Jobs which change frequently
@@ -76,14 +68,12 @@ type WatcherConfig struct {
 
 // ResourceWatcher watches Kubernetes resources and triggers scans when they change.
 type ResourceWatcher struct {
-	cache                         ctrlcache.Cache
-	namespaceReader               client.Reader
-	namespaceLabelCache           map[string]namespaceLabelCacheEntry
-	namespaceLabelCacheMu         sync.RWMutex
-	namespaceLabelCacheTTL        time.Duration
-	namespaceLabelCacheMaxEntries int
-	debouncer                     *Debouncer
-	config                        WatcherConfig
+	cache ctrlcache.Cache
+	// namespaceReader reads Namespace objects for namespace selector evaluation. It is the
+	// informer-backed cache, so lookups are served from memory.
+	namespaceReader client.Reader
+	debouncer       *Debouncer
+	config          WatcherConfig
 }
 
 // NewResourceWatcher creates a new ResourceWatcher.
@@ -98,13 +88,10 @@ func NewResourceWatcher(c ctrlcache.Cache, debouncer *Debouncer, config WatcherC
 		}
 	}
 	return &ResourceWatcher{
-		cache:                         c,
-		namespaceReader:               c,
-		namespaceLabelCache:           map[string]namespaceLabelCacheEntry{},
-		namespaceLabelCacheTTL:        defaultNamespaceLabelCacheTTL,
-		namespaceLabelCacheMaxEntries: defaultNamespaceLabelCacheMaxEntries,
-		debouncer:                     debouncer,
-		config:                        config,
+		cache:           c,
+		namespaceReader: c,
+		debouncer:       debouncer,
+		config:          config,
 	}
 }
 
@@ -118,8 +105,10 @@ func (w *ResourceWatcher) Start(ctx context.Context) error {
 		"resourceTypes", w.config.ResourceTypes)
 
 	if selectorConfigured(w.config.NamespaceSelector) {
-		if err := w.registerNamespaceLabelInformer(ctx); err != nil {
-			watcherLogger.Error(err, "Failed to add namespace label informer")
+		// Start the Namespace informer up front so namespace selector lookups in event
+		// handlers are served from a synced cache.
+		if _, err := w.cache.GetInformer(ctx, &corev1.Namespace{}); err != nil {
+			watcherLogger.Error(err, "Failed to get informer for namespaces")
 		}
 	}
 
@@ -156,16 +145,6 @@ func (w *ResourceWatcher) Start(ctx context.Context) error {
 	<-ctx.Done()
 	watcherLogger.Info("Resource watcher stopped")
 	return nil
-}
-
-func (w *ResourceWatcher) registerNamespaceLabelInformer(ctx context.Context) error {
-	informer, err := w.cache.GetInformer(ctx, &corev1.Namespace{})
-	if err != nil {
-		return err
-	}
-
-	_, err = informer.AddEventHandler(&namespaceLabelEventHandler{watcher: w})
-	return err
 }
 
 // getObjectForResourceType returns the client.Object for a resource type string.
@@ -217,26 +196,17 @@ func (w *ResourceWatcher) shouldWatchNamespaceLabels(ctx context.Context, namesp
 	if !selectorConfigured(w.config.NamespaceSelector) {
 		return true
 	}
-	if labelSet, found, ok := w.cachedNamespaceLabels(namespace); ok {
-		return found && selectorMatches(w.config.NamespaceSelector, labelSet)
-	}
-	if w.namespaceReader == nil {
-		watcherLogger.Error(nil, "Cannot evaluate namespace selector without a namespace reader", "namespace", namespace)
-		return false
-	}
 
+	// The Namespace cache is already restricted to matching namespaces (see the cache
+	// options in the resource-watcher command), so NotFound means "not selected".
 	ns := &corev1.Namespace{}
 	if err := w.namespaceReader.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
 		if !apierrors.IsNotFound(err) {
 			watcherLogger.Error(err, "Failed to read namespace labels", "namespace", namespace)
 		}
-		w.setCachedNamespaceLabels(namespace, nil, false)
 		return false
 	}
-
-	labelSet := labels.Set(ns.GetLabels())
-	w.setCachedNamespaceLabels(namespace, labelSet, true)
-	return selectorMatches(w.config.NamespaceSelector, labelSet)
+	return selectorMatches(w.config.NamespaceSelector, labels.Set(ns.GetLabels()))
 }
 
 func (w *ResourceWatcher) shouldWatchObjectLabels(obj client.Object) bool {
@@ -360,117 +330,4 @@ func (h *resourceEventHandler) handleEvent(obj any, eventType string) {
 
 	// Add to debouncer
 	h.watcher.debouncer.Add(key, resource)
-}
-
-type namespaceLabelCacheEntry struct {
-	labels    labels.Set
-	found     bool
-	expiresAt time.Time
-}
-
-func (w *ResourceWatcher) cachedNamespaceLabels(namespace string) (labels.Set, bool, bool) {
-	w.namespaceLabelCacheMu.RLock()
-	entry, ok := w.namespaceLabelCache[namespace]
-	w.namespaceLabelCacheMu.RUnlock()
-	if !ok || time.Now().After(entry.expiresAt) {
-		return nil, false, false
-	}
-	return entry.labels, entry.found, true
-}
-
-func (w *ResourceWatcher) setCachedNamespaceLabels(namespace string, labelSet labels.Set, found bool) {
-	ttl := w.namespaceLabelCacheTTL
-	if ttl <= 0 {
-		ttl = defaultNamespaceLabelCacheTTL
-	}
-	maxEntries := w.namespaceLabelCacheMaxEntries
-	if maxEntries <= 0 {
-		maxEntries = defaultNamespaceLabelCacheMaxEntries
-	}
-	now := time.Now()
-
-	w.namespaceLabelCacheMu.Lock()
-	defer w.namespaceLabelCacheMu.Unlock()
-	if w.namespaceLabelCache == nil {
-		w.namespaceLabelCache = map[string]namespaceLabelCacheEntry{}
-	}
-	w.pruneExpiredNamespaceLabelCacheLocked(now)
-	if _, exists := w.namespaceLabelCache[namespace]; !exists {
-		for len(w.namespaceLabelCache) >= maxEntries {
-			w.evictOldestNamespaceLabelCacheEntryLocked()
-		}
-	}
-	w.namespaceLabelCache[namespace] = namespaceLabelCacheEntry{
-		labels:    labelSet,
-		found:     found,
-		expiresAt: now.Add(ttl),
-	}
-}
-
-func (w *ResourceWatcher) pruneExpiredNamespaceLabelCacheLocked(now time.Time) {
-	for namespace, entry := range w.namespaceLabelCache {
-		if now.After(entry.expiresAt) {
-			delete(w.namespaceLabelCache, namespace)
-		}
-	}
-}
-
-func (w *ResourceWatcher) evictOldestNamespaceLabelCacheEntryLocked() {
-	var oldestNamespace string
-	var oldestExpiry time.Time
-	for namespace, entry := range w.namespaceLabelCache {
-		if oldestNamespace == "" || entry.expiresAt.Before(oldestExpiry) {
-			oldestNamespace = namespace
-			oldestExpiry = entry.expiresAt
-		}
-	}
-	if oldestNamespace != "" {
-		delete(w.namespaceLabelCache, oldestNamespace)
-	}
-}
-
-func (w *ResourceWatcher) deleteCachedNamespaceLabels(namespace string) {
-	w.namespaceLabelCacheMu.Lock()
-	defer w.namespaceLabelCacheMu.Unlock()
-	delete(w.namespaceLabelCache, namespace)
-}
-
-type namespaceLabelEventHandler struct {
-	watcher *ResourceWatcher
-}
-
-func (h *namespaceLabelEventHandler) OnAdd(obj any, isInInitialList bool) {
-	h.update(obj)
-}
-
-func (h *namespaceLabelEventHandler) OnUpdate(oldObj, newObj any) {
-	h.update(newObj)
-}
-
-func (h *namespaceLabelEventHandler) OnDelete(obj any) {
-	ns, ok := namespaceFromEvent(obj)
-	if !ok {
-		return
-	}
-	h.watcher.deleteCachedNamespaceLabels(ns.Name)
-}
-
-func (h *namespaceLabelEventHandler) update(obj any) {
-	ns, ok := namespaceFromEvent(obj)
-	if !ok {
-		return
-	}
-	h.watcher.setCachedNamespaceLabels(ns.Name, labels.Set(ns.GetLabels()), true)
-}
-
-func namespaceFromEvent(obj any) (*corev1.Namespace, bool) {
-	if ns, ok := obj.(*corev1.Namespace); ok {
-		return ns, true
-	}
-	tombstone, ok := obj.(toolscache.DeletedFinalStateUnknown)
-	if !ok {
-		return nil, false
-	}
-	ns, ok := tombstone.Obj.(*corev1.Namespace)
-	return ns, ok
 }
