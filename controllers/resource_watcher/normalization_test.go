@@ -43,6 +43,14 @@ func TestNormalizeResourceTypes(t *testing.T) {
 	}
 }
 
+func TestNewResourceWatcherCopiesDefaultResourceTypes(t *testing.T) {
+	watcher := NewResourceWatcher(nil, nil, WatcherConfig{WatchAllResources: true})
+	assert.Equal(t, DefaultResourceTypes, watcher.config.ResourceTypes)
+
+	watcher.config.ResourceTypes[0] = "changed"
+	assert.Equal(t, "pods", DefaultResourceTypes[0])
+}
+
 func TestResourceEventHandlerKeepsSameNameInDifferentNamespaces(t *testing.T) {
 	d := NewDebouncer(time.Hour, 0, func(_ context.Context, _ []K8sResourceIdentifier) error { return nil })
 	h := &resourceEventHandler{
