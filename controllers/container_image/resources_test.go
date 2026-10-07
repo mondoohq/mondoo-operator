@@ -343,8 +343,8 @@ func TestInventory_WithLabelSelectors(t *testing.T) {
 	require.NotEmpty(t, inv.Spec.Assets)
 
 	options := inv.Spec.Assets[0].Connections[0].Options
-	assert.Equal(t, "tenant=team-a", options[k8sOptionNamespaceLabelSelector])
-	assert.Equal(t, "app=api", options[k8sOptionObjectLabelSelector])
+	assert.Equal(t, "tenant=team-a", options[k8s.NamespaceLabelSelectorOption])
+	assert.Equal(t, "app=api", options[k8s.ObjectLabelSelectorOption])
 }
 
 func TestInventory_WithLabelSelectorMatchExpressions(t *testing.T) {
@@ -376,13 +376,13 @@ func TestInventory_WithLabelSelectorMatchExpressions(t *testing.T) {
 	require.NotEmpty(t, inv.Spec.Assets)
 
 	options := inv.Spec.Assets[0].Connections[0].Options
-	namespaceSelector, err := labels.Parse(options[k8sOptionNamespaceLabelSelector])
+	namespaceSelector, err := labels.Parse(options[k8s.NamespaceLabelSelectorOption])
 	require.NoError(t, err)
 	assert.True(t, namespaceSelector.Matches(labels.Set{"tenant": "team-a"}))
 	assert.False(t, namespaceSelector.Matches(labels.Set{"tenant": "team-c"}))
 	assert.False(t, namespaceSelector.Matches(labels.Set{"tenant": "team-a", "scan.mondoo.com/disabled": "true"}))
 
-	objectSelector, err := labels.Parse(options[k8sOptionObjectLabelSelector])
+	objectSelector, err := labels.Parse(options[k8s.ObjectLabelSelectorOption])
 	require.NoError(t, err)
 	assert.True(t, objectSelector.Matches(labels.Set{"app": "frontend", "track": "stable"}))
 	assert.False(t, objectSelector.Matches(labels.Set{"app": "frontend", "track": "legacy"}))
