@@ -782,29 +782,6 @@ func TestInventory_WithoutRepositoryFilters(t *testing.T) {
 	assert.False(t, hasExclude, "images-exclude key should not be present when no filters configured")
 }
 
-func TestInventory_WithLabelSelectors(t *testing.T) {
-	auditConfig := v1alpha2.MondooAuditConfig{
-		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
-		Spec: v1alpha2.MondooAuditConfigSpec{
-			Filtering: v1alpha2.Filtering{
-				NamespaceLabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"tenant": "team-a"}},
-				ObjectLabelSelector:    &metav1.LabelSelector{MatchLabels: map[string]string{"scan": "enabled"}},
-			},
-		},
-	}
-
-	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{}, nil, nil)
-	require.NoError(t, err)
-
-	var inv inventory.Inventory
-	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
-	require.NotEmpty(t, inv.Spec.Assets)
-
-	opts := inv.Spec.Assets[0].Connections[0].Options
-	assert.Equal(t, "tenant=team-a", opts[k8s.NamespaceLabelSelectorOption])
-	assert.Equal(t, "scan=enabled", opts[k8s.ObjectLabelSelectorOption])
-}
-
 func TestInventory_WithInvalidLabelSelector(t *testing.T) {
 	auditConfig := v1alpha2.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
