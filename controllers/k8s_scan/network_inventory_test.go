@@ -360,6 +360,24 @@ func TestExternalClusterInventoryIncludesNetworkInventoryOption(t *testing.T) {
 	assertNoNetworkInventoryDiscoveryTargets(t, targets)
 }
 
+func TestNetworkInventoryWiringDecodedLocalAndExternal(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				NetworkInventory: v1alpha2.NetworkInventorySpec{Enable: true},
+			},
+		},
+	}
+
+	localOptions, localTargets := inventoryConnection(t, auditConfig)
+	assert.NotEmpty(t, localOptions[NetworkInventoryOption])
+	assert.Contains(t, localTargets, "clusters")
+
+	externalOptions, externalTargets := externalClusterInventoryConnection(t, auditConfig, v1alpha2.ExternalCluster{Name: "remote"})
+	assert.NotEmpty(t, externalOptions[NetworkInventoryOption])
+	assert.Contains(t, externalTargets, "clusters")
+}
+
 func TestExternalClusterInventoryHonorsDisabledNetworkInventorySources(t *testing.T) {
 	auditConfig := v1alpha2.MondooAuditConfig{
 		Spec: v1alpha2.MondooAuditConfigSpec{
