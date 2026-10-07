@@ -9,7 +9,7 @@ package v1alpha2
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -765,12 +765,12 @@ func (in *ResourceWatcherSpec) DeepCopyInto(out *ResourceWatcherSpec) {
 	}
 	if in.NamespaceLabelSelector != nil {
 		in, out := &in.NamespaceLabelSelector, &out.NamespaceLabelSelector
-		*out = new(metav1.LabelSelector)
+		*out = new(v1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.ObjectLabelSelector != nil {
 		in, out := &in.ObjectLabelSelector, &out.ObjectLabelSelector
-		*out = new(metav1.LabelSelector)
+		*out = new(v1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 }
