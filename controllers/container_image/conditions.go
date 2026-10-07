@@ -66,11 +66,8 @@ func updateImageScanningConfigErrorCondition(config *v1alpha2.MondooAuditConfig,
 		config.Status.Conditions,
 		v1alpha2.K8sContainerImageScanningDegraded,
 		corev1.ConditionTrue,
-<<<<<<< HEAD
-		"KubernetesContainerImageScanConfigInvalid",
-=======
 		reason,
->>>>>>> 9bf63dd (feat: filter scheduled scans by labels)
+		reason,
 		err.Error(),
 		mondoo.UpdateConditionIfReasonOrMessageChange,
 		[]string{},
