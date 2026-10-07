@@ -26,8 +26,11 @@ func ProfileForNode(nodes v1alpha2.Nodes, node corev1.Node) *v1alpha2.NodeScanPr
 // ProfileResources returns the resource requirements for a node. A profile without resources
 // falls back to spec.nodes.resources, which itself falls back to the node scanning defaults.
 func ProfileResources(nodes v1alpha2.Nodes, profile *v1alpha2.NodeScanProfile) corev1.ResourceRequirements {
-	if profile != nil && profile.Resources.Size() != 0 {
-		return profile.Resources
+	if profile != nil {
+		resources := profile.Resources
+		if len(resources.Limits) != 0 || len(resources.Requests) != 0 || len(resources.Claims) != 0 {
+			return resources
+		}
 	}
 	return nodes.Resources
 }

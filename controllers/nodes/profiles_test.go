@@ -119,6 +119,14 @@ func TestProfileResources(t *testing.T) {
 		assert.Equal(t, nodeDefaults.Resources, got)
 	})
 
+	t.Run("a profile with empty resource maps falls back to spec.nodes.resources", func(t *testing.T) {
+		got := ProfileResources(nodeDefaults, &v1alpha2.NodeScanProfile{
+			Name:      "small",
+			Resources: corev1.ResourceRequirements{Limits: corev1.ResourceList{}, Requests: corev1.ResourceList{}},
+		})
+		assert.Equal(t, nodeDefaults.Resources, got)
+	})
+
 	t.Run("a profile with resources wins", func(t *testing.T) {
 		profile := &v1alpha2.NodeScanProfile{Name: "large", Resources: profileResourceRequirements("2G")}
 		got := ProfileResources(nodeDefaults, profile)
@@ -192,6 +200,5 @@ func TestCronJob_ProfileDrivesGoMemLimit(t *testing.T) {
 			goMemLimit = env.Value
 		}
 	}
-	assert.NotEmpty(t, goMemLimit)
-	assert.NotEqual(t, "", goMemLimit)
+	assert.Equal(t, "1800000000", goMemLimit)
 }

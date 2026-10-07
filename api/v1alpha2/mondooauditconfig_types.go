@@ -676,8 +676,7 @@ type Nodes struct {
 	// without profiles keeps its behaviour. Profiles apply to the "cronjob" style only,
 	// because a single DaemonSet cannot set per-node resources.
 	// +optional
-	// +listType=map
-	// +listMapKey=name
+	// +listType=atomic
 	Profiles []NodeScanProfile `json:"profiles,omitempty"`
 	// Schedule specifies a custom crontab schedule for the node scanning job. If not specified, the default schedule is
 	// used. Only applicable for CronJob style
