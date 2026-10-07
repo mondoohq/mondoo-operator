@@ -18,6 +18,17 @@ import (
 
 const NetworkInventoryOption = "kubernetesNetworkInventory"
 
+func discoveryTargets(spec v1alpha2.NetworkInventorySpec, containerImageScanning bool) []string {
+	targets := append([]string(nil), K8sDiscoveryTargets...)
+	if spec.Enable && !slices.Contains(targets, "clusters") {
+		targets = append(targets, "clusters")
+	}
+	if containerImageScanning && !slices.Contains(targets, "container-images") {
+		targets = append(targets, "container-images")
+	}
+	return targets
+}
+
 const (
 	networkInventoryInvalidCIDRReason         = "InvalidCIDRClassification"
 	networkInventoryInvalidObservedFlowReason = "InvalidObservedFlowConfig"

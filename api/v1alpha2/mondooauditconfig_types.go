@@ -375,10 +375,12 @@ type FlowEndpointSpec struct {
 
 	// Namespace is the namespace that contains the flow endpoint Service.
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=63
 	Namespace string `json:"namespace,omitempty"`
 
 	// ServiceName is the flow endpoint Service name.
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=63
 	ServiceName string `json:"serviceName,omitempty"`
 }
 

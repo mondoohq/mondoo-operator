@@ -1473,11 +1473,13 @@ spec:
                               namespace:
                                 description: Namespace is the namespace that contains
                                   the flow endpoint Service.
+                                maxLength: 63
                                 pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                                 type: string
                               serviceName:
                                 description: ServiceName is the flow endpoint Service
                                   name.
+                                maxLength: 63
                                 pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                                 type: string
                             type: object
@@ -1491,11 +1493,13 @@ spec:
                               namespace:
                                 description: Namespace is the namespace that contains
                                   the flow endpoint Service.
+                                maxLength: 63
                                 pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                                 type: string
                               serviceName:
                                 description: ServiceName is the flow endpoint Service
                                   name.
+                                maxLength: 63
                                 pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                                 type: string
                             type: object

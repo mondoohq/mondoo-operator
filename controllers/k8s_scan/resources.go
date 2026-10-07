@@ -1053,6 +1053,9 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 	if err != nil {
 		return "", err
 	}
+	if err := addNetworkInventoryOptions(selectorOpts, m.Spec.KubernetesResources.NetworkInventory); err != nil {
+		return "", err
+	}
 
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
@@ -1069,7 +1072,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 								"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
 							},
 							Discover: &inventory.Discovery{
-								Targets: K8sDiscoveryTargets,
+								Targets: discoveryTargets(m.Spec.KubernetesResources.NetworkInventory, false),
 							},
 						},
 					},
@@ -1122,11 +1125,7 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 
 	// Determine discovery targets based on whether container image scanning is enabled
 	// Make a copy to avoid mutating the shared slice
-	targets := make([]string, len(K8sDiscoveryTargets))
-	copy(targets, K8sDiscoveryTargets)
-	if cluster.ContainerImageScanning {
-		targets = append(targets, "container-images")
-	}
+	targets := discoveryTargets(m.Spec.KubernetesResources.NetworkInventory, cluster.ContainerImageScanning)
 
 	opts := map[string]string{
 		"namespaces":         strings.Join(filtering.Namespaces.Include, ","),
@@ -1138,6 +1137,9 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 		return "", err
 	}
 	maps.Copy(opts, selectorOpts)
+	if err := addNetworkInventoryOptions(opts, m.Spec.KubernetesResources.NetworkInventory); err != nil {
+		return "", err
+	}
 	if cluster.ContainerImageScanning {
 		repos := externalClusterRepositories(cluster, m)
 		if len(repos.Include) > 0 {
