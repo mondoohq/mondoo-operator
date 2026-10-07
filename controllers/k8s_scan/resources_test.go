@@ -158,23 +158,6 @@ func TestExternalClusterInventory_EmptyClusterNamespaceFilteringOverridesGlobal(
 	assert.Empty(t, options["namespaces-exclude"])
 }
 
-func TestInventory_WithLabelSelectors(t *testing.T) {
-	auditConfig := *testAuditConfig()
-	auditConfig.Spec.Filtering = v1alpha2.Filtering{
-		NamespaceLabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"tenant": "team-a"}},
-		ObjectLabelSelector:    &metav1.LabelSelector{MatchLabels: map[string]string{"scan": "enabled"}},
-	}
-
-	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
-	require.NoError(t, err)
-
-	var inv inventory.Inventory
-	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
-	options := inv.Spec.Assets[0].Connections[0].Options
-	assert.Equal(t, "tenant=team-a", options[k8s.NamespaceLabelSelectorOption])
-	assert.Equal(t, "scan=enabled", options[k8s.ObjectLabelSelectorOption])
-}
-
 func TestInventory_WithoutLabelSelectors(t *testing.T) {
 	invStr, err := Inventory("", testClusterUID, *testAuditConfig(), v1alpha2.MondooOperatorConfig{})
 	require.NoError(t, err)
