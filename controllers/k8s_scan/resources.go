@@ -1053,6 +1053,9 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 	if err != nil {
 		return "", err
 	}
+	if err := addNetworkInventoryOptions(selectorOpts, m.Spec.KubernetesResources.NetworkInventory); err != nil {
+		return "", err
+	}
 
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
@@ -1138,6 +1141,9 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 		return "", err
 	}
 	maps.Copy(opts, selectorOpts)
+	if err := addNetworkInventoryOptions(opts, m.Spec.KubernetesResources.NetworkInventory); err != nil {
+		return "", err
+	}
 	if cluster.ContainerImageScanning {
 		repos := externalClusterRepositories(cluster, m)
 		if len(repos.Include) > 0 {

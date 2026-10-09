@@ -78,6 +78,21 @@ spec:
     #   #   - deployments
     #   #   - daemonsets
 
+    # Override network inventory collection defaults
+    # networkInventory:
+    #   hbn:
+    #     enable: true                  # default: true
+    #     includeLegacyResources: true  # default: true
+    #   multiNetworkPolicy:
+    #     enable: true                  # default: true
+    #   classifications:
+    #     publicCidrs:
+    #       - 0.0.0.0/0
+    #     privateCidrs:
+    #       - 10.0.0.0/8
+    #     trustedEgressCidrs:
+    #       - 203.0.113.0/24
+
     # External clusters to scan from this operator instance
     # Four authentication methods are available (mutually exclusive):
     #

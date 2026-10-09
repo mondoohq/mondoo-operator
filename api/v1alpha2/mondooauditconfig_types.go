@@ -241,6 +241,11 @@ type KubernetesResources struct {
 	// +optional
 	ActiveDeadline *metav1.Duration `json:"activeDeadline,omitempty"`
 
+	// NetworkInventory tunes the network posture inventory collected during Kubernetes resource
+	// scans, including scans of external clusters. Requires cnspec v13.24.0 or later.
+	// +optional
+	NetworkInventory NetworkInventorySpec `json:"networkInventory,omitempty"`
+
 	// ExternalClusters defines remote K8s clusters to scan from this operator instance.
 	// Each external cluster will have its own CronJob created with the appropriate kubeconfig.
 	// +optional
@@ -283,6 +288,57 @@ type ResourceWatcherSpec struct {
 	// deployments, daemonsets, statefulsets, replicasets. When true, defaults to:
 	// pods, deployments, daemonsets, statefulsets, replicasets, jobs, cronjobs, services, ingresses, namespaces
 	ResourceTypes []string `json:"resourceTypes,omitempty"`
+}
+
+// NetworkInventorySpec tunes the Kubernetes network posture inventory collected by the scanner.
+// The scanner collects network posture by default; these settings only override its defaults.
+type NetworkInventorySpec struct {
+	// HBN configures collection of HBN network resources.
+	// +optional
+	HBN HBNNetworkInventorySpec `json:"hbn,omitempty"`
+
+	// MultiNetworkPolicy configures collection of secondary-interface network policy resources.
+	// +optional
+	MultiNetworkPolicy MultiNetworkPolicyInventorySpec `json:"multiNetworkPolicy,omitempty"`
+
+	// Classifications configures custom CIDR classifications used by network posture resources.
+	// +optional
+	Classifications NetworkInventoryClassifications `json:"classifications,omitempty"`
+}
+
+// HBNNetworkInventorySpec configures HBN network inventory collection.
+type HBNNetworkInventorySpec struct {
+	// Enable controls whether HBN resources are collected. Defaults to true.
+	// +optional
+	Enable *bool `json:"enable,omitempty"`
+
+	// IncludeLegacyResources controls whether legacy Telekom HBN API groups are collected in
+	// addition to current HBN resources. Defaults to true.
+	// +optional
+	IncludeLegacyResources *bool `json:"includeLegacyResources,omitempty"`
+}
+
+// MultiNetworkPolicyInventorySpec configures secondary-interface network policy collection.
+type MultiNetworkPolicyInventorySpec struct {
+	// Enable controls whether MultiNetworkPolicy and NetworkAttachmentDefinition resources are
+	// collected. Defaults to true.
+	// +optional
+	Enable *bool `json:"enable,omitempty"`
+}
+
+// NetworkInventoryClassifications configures CIDR classification overrides.
+type NetworkInventoryClassifications struct {
+	// PublicCIDRs are CIDR ranges treated as public exposure ranges.
+	// +optional
+	PublicCIDRs []string `json:"publicCidrs,omitempty"`
+
+	// PrivateCIDRs are CIDR ranges treated as private/internal ranges.
+	// +optional
+	PrivateCIDRs []string `json:"privateCidrs,omitempty"`
+
+	// TrustedEgressCIDRs are CIDR ranges treated as approved egress destinations.
+	// +optional
+	TrustedEgressCIDRs []string `json:"trustedEgressCidrs,omitempty"`
 }
 
 // ExternalCluster defines configuration for scanning a remote K8s cluster

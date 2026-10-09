@@ -1402,6 +1402,58 @@ spec:
                         minimum: 0
                         type: integer
                     type: object
+                  networkInventory:
+                    description: |-
+                      NetworkInventory tunes the network posture inventory collected during Kubernetes resource
+                      scans, including scans of external clusters. Requires cnspec v13.24.0 or later.
+                    properties:
+                      classifications:
+                        description: Classifications configures custom CIDR classifications
+                          used by network posture resources.
+                        properties:
+                          privateCidrs:
+                            description: PrivateCIDRs are CIDR ranges treated as private/internal
+                              ranges.
+                            items:
+                              type: string
+                            type: array
+                          publicCidrs:
+                            description: PublicCIDRs are CIDR ranges treated as public
+                              exposure ranges.
+                            items:
+                              type: string
+                            type: array
+                          trustedEgressCidrs:
+                            description: TrustedEgressCIDRs are CIDR ranges treated
+                              as approved egress destinations.
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      hbn:
+                        description: HBN configures collection of HBN network resources.
+                        properties:
+                          enable:
+                            description: Enable controls whether HBN resources are
+                              collected. Defaults to true.
+                            type: boolean
+                          includeLegacyResources:
+                            description: |-
+                              IncludeLegacyResources controls whether legacy Telekom HBN API groups are collected in
+                              addition to current HBN resources. Defaults to true.
+                            type: boolean
+                        type: object
+                      multiNetworkPolicy:
+                        description: MultiNetworkPolicy configures collection of secondary-interface
+                          network policy resources.
+                        properties:
+                          enable:
+                            description: |-
+                              Enable controls whether MultiNetworkPolicy and NetworkAttachmentDefinition resources are
+                              collected. Defaults to true.
+                            type: boolean
+                        type: object
+                    type: object
                   resourceWatcher:
                     description: |-
                       ResourceWatcher configures real-time resource watching and scanning.

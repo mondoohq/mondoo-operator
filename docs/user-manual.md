@@ -13,6 +13,8 @@ This user manual describes how to install and use the Mondoo Operator.
   - [Creating a MondooAuditConfig](#creating-a-mondooauditconfig)
     - [Filter Kubernetes objects based on namespace](#filter-kubernetes-objects-based-on-namespace)
       - [Wildcards](#wildcards)
+    - [Filter Kubernetes objects based on labels](#filter-kubernetes-objects-based-on-labels)
+    - [Tune the network inventory](#tune-the-network-inventory)
   - [Scanning External Clusters](#scanning-external-clusters)
     - [Creating a kubeconfig Secret](#creating-a-kubeconfig-secret)
     - [Configuring external cluster scanning](#configuring-external-cluster-scanning)
@@ -291,6 +293,44 @@ block), and the resource watcher. They require cnspec v13.30.1 or later.
 > **Note:** The resource watcher only receives events for objects that match
 > `objectLabelSelector`. If an object's labels change so that it no longer
 > matches, no final scan is triggered for it.
+
+### Tune the network inventory
+
+Kubernetes resource scans collect normalized network posture: Services, Ingress, Gateway API
+gateways and routes, NetworkPolicy, AdminNetworkPolicy and BaselineAdminNetworkPolicy, Calico and
+Cilium policies, MultiNetworkPolicy and NetworkAttachmentDefinition, and HBN resources. Resource
+types whose CRDs are not installed are skipped. Use `kubernetesResources.networkInventory` to
+override the collection defaults:
+
+```yaml
+spec:
+  kubernetesResources:
+    enable: true
+    networkInventory:
+      hbn:
+        # Collect HBN resources (default: true)
+        enable: true
+        # Also collect the legacy *.t-caas.telekom.com API groups (default: true)
+        includeLegacyResources: false
+      multiNetworkPolicy:
+        # Collect MultiNetworkPolicy and NetworkAttachmentDefinition resources (default: true)
+        enable: true
+      classifications:
+        publicCidrs:
+          - 0.0.0.0/0
+          - ::/0
+        privateCidrs:
+          - 10.0.0.0/8
+        trustedEgressCidrs:
+          - 203.0.113.0/24
+```
+
+The `classifications` CIDR lists override how network posture resources classify address ranges as
+public, private, or approved egress destinations. Invalid CIDRs mark Kubernetes resource scanning
+as degraded and are reported in the `MondooAuditConfig` status.
+
+The settings also apply to [external clusters](#scanning-external-clusters). They require cnspec
+v13.24.0 or later.
 
 ## GitOps installs: let the operator create its Console integration
 

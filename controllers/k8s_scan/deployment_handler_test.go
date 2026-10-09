@@ -230,6 +230,57 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	s.Equal("local", scanStatus.Target)
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_NetworkInventoryConfigErrorCondition() {
+	s.auditConfig.Spec.KubernetesResources.NetworkInventory = mondoov1alpha2.NetworkInventorySpec{
+		Classifications: mondoov1alpha2.NetworkInventoryClassifications{
+			PublicCIDRs: []string{"not-a-cidr"},
+		},
+	}
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.Error(err)
+	s.True(result.IsZero())
+
+	s.Require().Len(d.Mondoo.Status.Conditions, 1)
+	condition := d.Mondoo.Status.Conditions[0]
+	s.Equal("KubernetesResourcesScanConfigInvalid", condition.Reason)
+	s.Contains(condition.Message, "publicCidrs")
+	s.Equal(corev1.ConditionTrue, condition.Status)
+	s.Equal(mondoov1alpha2.K8sResourcesScanningDegraded, condition.Type)
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_ExternalClusterNetworkInventoryConfigErrorCondition() {
+	s.auditConfig.Spec.KubernetesResources.Enable = false
+	s.auditConfig.Spec.KubernetesResources.NetworkInventory = mondoov1alpha2.NetworkInventorySpec{
+		Classifications: mondoov1alpha2.NetworkInventoryClassifications{
+			PrivateCIDRs: []string{"10.0.0.0/33"},
+		},
+	}
+	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
+		{
+			Name: "external",
+			KubeconfigSecretRef: &corev1.LocalObjectReference{
+				Name: "external-kubeconfig",
+			},
+		},
+	}
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.Error(err)
+	s.True(result.IsZero())
+
+	s.Require().Len(d.Mondoo.Status.Conditions, 1)
+	condition := d.Mondoo.Status.Conditions[0]
+	s.Equal("KubernetesResourcesScanConfigInvalid", condition.Reason)
+	s.Contains(condition.Message, "privateCidrs")
+	s.Equal(corev1.ConditionTrue, condition.Status)
+	s.Equal(mondoov1alpha2.K8sResourcesScanningDegraded, condition.Type)
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_Disable() {
 	d := s.createDeploymentHandler()
 	mondooAuditConfig := &s.auditConfig

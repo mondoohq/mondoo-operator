@@ -53,3 +53,18 @@ func updateWorkloadsConditions(config *v1alpha2.MondooAuditConfig, degradedStatu
 	config.Status.Conditions = mondoo.SetMondooAuditCondition(
 		config.Status.Conditions, v1alpha2.K8sResourcesScanningDegraded, status, reason, msg, updateCheck, affectedPods, memoryLimit)
 }
+
+// updateWorkloadsConfigErrorCondition marks Kubernetes resource scanning as degraded because the
+// scan configuration could not be rendered, e.g. due to an invalid CIDR or label selector.
+func updateWorkloadsConfigErrorCondition(config *v1alpha2.MondooAuditConfig, err error) {
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(
+		config.Status.Conditions,
+		v1alpha2.K8sResourcesScanningDegraded,
+		corev1.ConditionTrue,
+		"KubernetesResourcesScanConfigInvalid",
+		err.Error(),
+		mondoo.UpdateConditionIfReasonOrMessageChange,
+		[]string{},
+		"",
+	)
+}
