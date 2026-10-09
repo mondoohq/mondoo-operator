@@ -285,6 +285,33 @@ func TestDeployment_WithLabelSelectors(t *testing.T) {
 	assert.Contains(t, cmd, "scan notin (disabled)")
 }
 
+func TestDeployment_ResourceWatcherLabelSelectorsOverrideFiltering(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-config", Namespace: "mondoo-operator"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable: true,
+				ResourceWatcher: v1alpha2.ResourceWatcherSpec{
+					Enable:                 true,
+					NamespaceLabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"tenant": "watcher"}},
+					ObjectLabelSelector:    &metav1.LabelSelector{MatchLabels: map[string]string{"scan": "enabled"}},
+				},
+			},
+			Filtering: v1alpha2.Filtering{
+				NamespaceLabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"tenant": "global"}},
+				ObjectLabelSelector:    &metav1.LabelSelector{MatchLabels: map[string]string{"scan": "all"}},
+			},
+		},
+	}
+
+	deployment := mustDeployment(t, "ghcr.io/mondoohq/cnspec:latest", "", "", config, v1alpha2.MondooOperatorConfig{})
+	cmd := deployment.Spec.Template.Spec.Containers[0].Command
+	assert.Contains(t, cmd, "tenant=watcher")
+	assert.NotContains(t, cmd, "tenant=global")
+	assert.Contains(t, cmd, "scan=enabled")
+	assert.NotContains(t, cmd, "scan=all")
+}
+
 func TestDeployment_WithInvalidLabelSelectorReturnsError(t *testing.T) {
 	config := &v1alpha2.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{

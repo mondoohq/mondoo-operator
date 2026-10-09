@@ -90,7 +90,17 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 	if len(m.Spec.Filtering.Namespaces.Exclude) > 0 {
 		cmd = append(cmd, "--namespaces-exclude", strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","))
 	}
-	selectorOpts, err := k8s.LabelSelectorOptions(m.Spec.Filtering)
+	filtering := m.Spec.Filtering
+	// Resource-watcher selectors are more specific than the audit-wide filters.
+	// Use them when configured so the watcher does not silently watch a broader
+	// set of resources than requested.
+	if watcher := m.Spec.KubernetesResources.ResourceWatcher; watcher.NamespaceLabelSelector != nil {
+		filtering.NamespaceLabelSelector = watcher.NamespaceLabelSelector
+	}
+	if watcher := m.Spec.KubernetesResources.ResourceWatcher; watcher.ObjectLabelSelector != nil {
+		filtering.ObjectLabelSelector = watcher.ObjectLabelSelector
+	}
+	selectorOpts, err := k8s.LabelSelectorOptions(filtering)
 	if err != nil {
 		return nil, fmt.Errorf("invalid filtering label selector: %w", err)
 	}
