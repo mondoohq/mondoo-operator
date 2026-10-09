@@ -24,22 +24,22 @@ const (
 // inventory options. Unset or empty selectors are omitted from the result.
 func LabelSelectorOptions(f v1alpha2.Filtering) (map[string]string, error) {
 	opts := map[string]string{}
-	if err := addLabelSelectorOption(opts, NamespaceLabelSelectorOption, f.NamespaceLabelSelector); err != nil {
+	if err := addLabelSelectorOption(opts, NamespaceLabelSelectorOption, "namespaceLabelSelector", f.NamespaceLabelSelector); err != nil {
 		return nil, err
 	}
-	if err := addLabelSelectorOption(opts, ObjectLabelSelectorOption, f.ObjectLabelSelector); err != nil {
+	if err := addLabelSelectorOption(opts, ObjectLabelSelectorOption, "objectLabelSelector", f.ObjectLabelSelector); err != nil {
 		return nil, err
 	}
 	return opts, nil
 }
 
-func addLabelSelectorOption(opts map[string]string, option string, labelSelector *metav1.LabelSelector) error {
+func addLabelSelectorOption(opts map[string]string, option, field string, labelSelector *metav1.LabelSelector) error {
 	if labelSelector == nil {
 		return nil
 	}
 	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
 	if err != nil {
-		return fmt.Errorf("invalid %s: %w", option, err)
+		return fmt.Errorf("invalid filtering.%s: %w", field, err)
 	}
 	if selector.Empty() {
 		return nil
