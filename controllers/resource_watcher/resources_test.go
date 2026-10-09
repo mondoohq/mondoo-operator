@@ -16,6 +16,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 )
 
 func mustDeployment(t *testing.T, image, integrationMRN, clusterUID string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *appsv1.Deployment {
@@ -315,7 +316,9 @@ func TestDeployment_WithInvalidLabelSelectorReturnsError(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Nil(t, deployment)
-	assert.Contains(t, err.Error(), "invalid object-label-selector")
+	var selectorErr k8s.InvalidLabelSelectorError
+	require.ErrorAs(t, err, &selectorErr)
+	assert.Contains(t, err.Error(), "filtering.objectLabelSelector")
 }
 
 func TestDeployment_WithoutLabelSelectorsOmitsSelectorArgs(t *testing.T) {
