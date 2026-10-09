@@ -60,6 +60,7 @@ func UpdateDeploymentFields(obj, desired *appsv1.Deployment) {
 	ps.ServiceAccountName = dps.ServiceAccountName
 	ps.NodeSelector = dps.NodeSelector
 	ps.Tolerations = dps.Tolerations
+	ps.InitContainers = dps.InitContainers
 	ps.Containers = dps.Containers
 	ps.Volumes = dps.Volumes
 	ps.ImagePullSecrets = dps.ImagePullSecrets
@@ -81,6 +82,7 @@ func UpdateDaemonSetFields(obj, desired *appsv1.DaemonSet) {
 	ps.AutomountServiceAccountToken = dps.AutomountServiceAccountToken
 	ps.NodeSelector = dps.NodeSelector
 	ps.Tolerations = dps.Tolerations
+	ps.InitContainers = dps.InitContainers
 	ps.Containers = dps.Containers
 	ps.Volumes = dps.Volumes
 	ps.ImagePullSecrets = dps.ImagePullSecrets
