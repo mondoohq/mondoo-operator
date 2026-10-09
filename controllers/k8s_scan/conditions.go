@@ -4,8 +4,6 @@
 package k8s_scan
 
 import (
-	"errors"
-
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -56,17 +54,14 @@ func updateWorkloadsConditions(config *v1alpha2.MondooAuditConfig, degradedStatu
 		config.Status.Conditions, v1alpha2.K8sResourcesScanningDegraded, status, reason, msg, updateCheck, affectedPods, memoryLimit)
 }
 
+// updateWorkloadsConfigErrorCondition marks Kubernetes resource scanning as degraded because the
+// scan configuration could not be rendered, e.g. due to an invalid CIDR or label selector.
 func updateWorkloadsConfigErrorCondition(config *v1alpha2.MondooAuditConfig, err error) {
-	reason := "KubernetesResourcesScanConfigInvalid"
-	var validationErr networkInventoryValidationError
-	if errors.As(err, &validationErr) {
-		reason = validationErr.reason
-	}
 	config.Status.Conditions = mondoo.SetMondooAuditCondition(
 		config.Status.Conditions,
 		v1alpha2.K8sResourcesScanningDegraded,
 		corev1.ConditionTrue,
-		reason,
+		"KubernetesResourcesScanConfigInvalid",
 		err.Error(),
 		mondoo.UpdateConditionIfReasonOrMessageChange,
 		[]string{},

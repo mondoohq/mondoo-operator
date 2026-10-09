@@ -1072,7 +1072,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 								"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
 							},
 							Discover: &inventory.Discovery{
-								Targets: discoveryTargets(m.Spec.KubernetesResources.NetworkInventory, false),
+								Targets: K8sDiscoveryTargets,
 							},
 						},
 					},
@@ -1125,7 +1125,11 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 
 	// Determine discovery targets based on whether container image scanning is enabled
 	// Make a copy to avoid mutating the shared slice
-	targets := discoveryTargets(m.Spec.KubernetesResources.NetworkInventory, cluster.ContainerImageScanning)
+	targets := make([]string, len(K8sDiscoveryTargets))
+	copy(targets, K8sDiscoveryTargets)
+	if cluster.ContainerImageScanning {
+		targets = append(targets, "container-images")
+	}
 
 	opts := map[string]string{
 		"namespaces":         strings.Join(filtering.Namespaces.Include, ","),

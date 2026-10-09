@@ -232,7 +232,6 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 
 func (s *DeploymentHandlerSuite) TestReconcile_NetworkInventoryConfigErrorCondition() {
 	s.auditConfig.Spec.KubernetesResources.NetworkInventory = mondoov1alpha2.NetworkInventorySpec{
-		Enable: true,
 		Classifications: mondoov1alpha2.NetworkInventoryClassifications{
 			PublicCIDRs: []string{"not-a-cidr"},
 		},
@@ -246,30 +245,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_NetworkInventoryConfigErrorCondit
 
 	s.Require().Len(d.Mondoo.Status.Conditions, 1)
 	condition := d.Mondoo.Status.Conditions[0]
-	s.Equal(networkInventoryInvalidCIDRReason, condition.Reason)
+	s.Equal("KubernetesResourcesScanConfigInvalid", condition.Reason)
 	s.Contains(condition.Message, "publicCidrs")
-	s.Equal(corev1.ConditionTrue, condition.Status)
-	s.Equal(mondoov1alpha2.K8sResourcesScanningDegraded, condition.Type)
-}
-
-func (s *DeploymentHandlerSuite) TestReconcile_NetworkInventoryObservedFlowDurationCondition() {
-	s.auditConfig.Spec.KubernetesResources.NetworkInventory = mondoov1alpha2.NetworkInventorySpec{
-		Enable: true,
-		ObservedFlows: mondoov1alpha2.ObservedFlowsSpec{
-			Timeout: metav1.Duration{Duration: -1 * time.Second},
-		},
-	}
-	d := s.createDeploymentHandler()
-	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
-
-	result, err := d.Reconcile(s.ctx)
-	s.Error(err)
-	s.True(result.IsZero())
-
-	s.Require().Len(d.Mondoo.Status.Conditions, 1)
-	condition := d.Mondoo.Status.Conditions[0]
-	s.Equal(networkInventoryInvalidObservedFlowReason, condition.Reason)
-	s.Contains(condition.Message, "timeout")
 	s.Equal(corev1.ConditionTrue, condition.Status)
 	s.Equal(mondoov1alpha2.K8sResourcesScanningDegraded, condition.Type)
 }
@@ -277,9 +254,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_NetworkInventoryObservedFlowDurat
 func (s *DeploymentHandlerSuite) TestReconcile_ExternalClusterNetworkInventoryConfigErrorCondition() {
 	s.auditConfig.Spec.KubernetesResources.Enable = false
 	s.auditConfig.Spec.KubernetesResources.NetworkInventory = mondoov1alpha2.NetworkInventorySpec{
-		Enable: true,
-		ObservedFlows: mondoov1alpha2.ObservedFlowsSpec{
-			Lookback: metav1.Duration{Duration: -1 * time.Second},
+		Classifications: mondoov1alpha2.NetworkInventoryClassifications{
+			PrivateCIDRs: []string{"10.0.0.0/33"},
 		},
 	}
 	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
@@ -299,8 +275,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_ExternalClusterNetworkInventoryCo
 
 	s.Require().Len(d.Mondoo.Status.Conditions, 1)
 	condition := d.Mondoo.Status.Conditions[0]
-	s.Equal(networkInventoryInvalidObservedFlowReason, condition.Reason)
-	s.Contains(condition.Message, "lookback")
+	s.Equal("KubernetesResourcesScanConfigInvalid", condition.Reason)
+	s.Contains(condition.Message, "privateCidrs")
 	s.Equal(corev1.ConditionTrue, condition.Status)
 	s.Equal(mondoov1alpha2.K8sResourcesScanningDegraded, condition.Type)
 }

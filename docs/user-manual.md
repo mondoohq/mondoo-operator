@@ -13,7 +13,8 @@ This user manual describes how to install and use the Mondoo Operator.
   - [Creating a MondooAuditConfig](#creating-a-mondooauditconfig)
     - [Filter Kubernetes objects based on namespace](#filter-kubernetes-objects-based-on-namespace)
       - [Wildcards](#wildcards)
-    - [Extended network inventory](#extended-network-inventory)
+    - [Filter Kubernetes objects based on labels](#filter-kubernetes-objects-based-on-labels)
+    - [Tune the network inventory](#tune-the-network-inventory)
   - [Scanning External Clusters](#scanning-external-clusters)
     - [Creating a kubeconfig Secret](#creating-a-kubeconfig-secret)
     - [Configuring external cluster scanning](#configuring-external-cluster-scanning)
@@ -293,6 +294,44 @@ block), and the resource watcher. They require cnspec v13.30.1 or later.
 > `objectLabelSelector`. If an object's labels change so that it no longer
 > matches, no final scan is triggered for it.
 
+### Tune the network inventory
+
+Kubernetes resource scans collect normalized network posture: Services, Ingress, Gateway API
+gateways and routes, NetworkPolicy, AdminNetworkPolicy and BaselineAdminNetworkPolicy, Calico and
+Cilium policies, MultiNetworkPolicy and NetworkAttachmentDefinition, and HBN resources. Resource
+types whose CRDs are not installed are skipped. Use `kubernetesResources.networkInventory` to
+override the collection defaults:
+
+```yaml
+spec:
+  kubernetesResources:
+    enable: true
+    networkInventory:
+      hbn:
+        # Collect HBN resources (default: true)
+        enable: true
+        # Also collect the legacy *.t-caas.telekom.com API groups (default: true)
+        includeLegacyResources: false
+      multiNetworkPolicy:
+        # Collect MultiNetworkPolicy and NetworkAttachmentDefinition resources (default: true)
+        enable: true
+      classifications:
+        publicCidrs:
+          - 0.0.0.0/0
+          - ::/0
+        privateCidrs:
+          - 10.0.0.0/8
+        trustedEgressCidrs:
+          - 203.0.113.0/24
+```
+
+The `classifications` CIDR lists override how network posture resources classify address ranges as
+public, private, or approved egress destinations. Invalid CIDRs mark Kubernetes resource scanning
+as degraded and are reported in the `MondooAuditConfig` status.
+
+The settings also apply to [external clusters](#scanning-external-clusters). They require cnspec
+v13.24.0 or later.
+
 ## GitOps installs: let the operator create its Console integration
 
 A Kubernetes integration in the Mondoo Console gives you health check-ins, an integration status card, pause/resume scanning from the Console, and integration-scoped asset grouping. Normally a human creates the integration in the Console and pastes its long-lived token into the cluster.
@@ -347,55 +386,6 @@ Details worth knowing:
 - **Deleting the integration in the Console** does not make the operator recreate it. The operator reports a degraded `MondooIntegrationDegraded` condition explaining the state; scanning continues. To re-provision, delete the Secret referenced by `mondooCredsSecretRef`.
 - **Deleting the MondooAuditConfig** reports the integration as deleted in the Console and, with `deletionPolicy: Delete` (the default), removes operator-created integrations entirely. Assets and their history are kept. Integrations you created manually in the Console are never deleted.
 - The credential from step 1 is kept in a companion Secret (`<creds secret name>-provisioner`) so the operator can clean up the integration later. Delete it if you prefer; the integration then stays in the Console when the CR is deleted.
-
-### Extended network inventory
-
-Enable `kubernetesResources.networkInventory` to collect normalized network
-posture evidence during the scheduled Kubernetes resource scan. This does not
-install webhooks, enforce network policies, or put Mondoo in the admission path.
-
-The scanner keeps working on clusters where optional CRDs are absent. When the
-CRDs exist and the scanner service account can list them, Mondoo collects
-normalized evidence for Kubernetes Services, Ingress, Gateway API gateways and
-routes, native NetworkPolicy, AdminNetworkPolicy and BaselineAdminNetworkPolicy,
-MultiNetworkPolicy and NetworkAttachmentDefinition, Calico NetworkPolicy and
-GlobalNetworkPolicy, Cilium NetworkPolicy and ClusterwideNetworkPolicy, and the
-supported HBN current or legacy resource signals. Raw HBN drill-down resources
-such as node status, traffic mirrors, collectors, and full BGP topology are
-follow-up provider work.
-
-```yaml
-spec:
-  kubernetesResources:
-    enable: true
-    networkInventory:
-      enable: true
-      hbn:
-        enable: true
-        includeLegacyResources: true
-      multiNetworkPolicy:
-        enable: true
-      classifications:
-        publicCidrs:
-          - 0.0.0.0/0
-          - ::/0
-        privateCidrs:
-          - 10.0.0.0/8
-          - 172.16.0.0/12
-          - 192.168.0.0/16
-        trustedEgressCidrs:
-          - 203.0.113.0/24
-      observedFlows:
-        enable: false
-        calicoWhisker:
-          enable: false
-          namespace: calico-system
-          serviceName: whisker
-        ciliumHubble:
-          enable: false
-          namespace: kube-system
-          serviceName: hubble-relay
-```
 
 ## Scanning External Clusters
 
