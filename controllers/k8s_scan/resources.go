@@ -1053,9 +1053,10 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 	if err != nil {
 		return "", err
 	}
-	if err := addNetworkInventoryOptions(selectorOpts, m.Spec.KubernetesResources.NetworkInventory); err != nil {
+	if err := addKyvernoOptions(selectorOpts, m.Spec.KubernetesResources.Kyverno); err != nil {
 		return "", err
 	}
+	targets := kyvernoDiscoveryTargets(append([]string(nil), K8sDiscoveryTargets...), m.Spec.KubernetesResources.Kyverno)
 
 	inv := &inventory.Inventory{
 		Metadata: &inventory.ObjectMeta{
@@ -1072,7 +1073,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 								"namespaces-exclude": strings.Join(m.Spec.Filtering.Namespaces.Exclude, ","),
 							},
 							Discover: &inventory.Discovery{
-								Targets: K8sDiscoveryTargets,
+								Targets: targets,
 							},
 						},
 					},
@@ -1127,6 +1128,7 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 	// Make a copy to avoid mutating the shared slice
 	targets := make([]string, len(K8sDiscoveryTargets))
 	copy(targets, K8sDiscoveryTargets)
+	targets = kyvernoDiscoveryTargets(targets, m.Spec.KubernetesResources.Kyverno)
 	if cluster.ContainerImageScanning {
 		targets = append(targets, "container-images")
 	}
@@ -1141,7 +1143,7 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 		return "", err
 	}
 	maps.Copy(opts, selectorOpts)
-	if err := addNetworkInventoryOptions(opts, m.Spec.KubernetesResources.NetworkInventory); err != nil {
+	if err := addKyvernoOptions(opts, m.Spec.KubernetesResources.Kyverno); err != nil {
 		return "", err
 	}
 	if cluster.ContainerImageScanning {
