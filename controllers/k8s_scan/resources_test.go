@@ -313,6 +313,68 @@ func TestCronJob_WithImagePullSecrets(t *testing.T) {
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
 }
 
+func TestCronJob_ImagePullPolicy(t *testing.T) {
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	t.Run("defaults to IfNotPresent", func(t *testing.T) {
+		cj := CronJob("test-image:latest", testAuditConfig(), cfg)
+		container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+		assert.Equal(t, corev1.PullIfNotPresent, container.ImagePullPolicy)
+	})
+
+	t.Run("honors the configured policy", func(t *testing.T) {
+		m := testAuditConfig()
+		m.Spec.Scanner.Image.PullPolicy = corev1.PullAlways
+
+		cj := CronJob("test-image:latest", m, cfg)
+		container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+		assert.Equal(t, corev1.PullAlways, container.ImagePullPolicy)
+	})
+}
+
+func TestExternalClusterCronJob_ImagePullPolicy(t *testing.T) {
+	cluster := v1alpha2.ExternalCluster{
+		Name: "remote",
+		WorkloadIdentity: &v1alpha2.WorkloadIdentityConfig{
+			Provider: "gke",
+			GKE: &v1alpha2.GKEWorkloadIdentity{
+				ProjectID:            "my-project",
+				ClusterName:          "remote-cluster",
+				ClusterLocation:      "us-central1",
+				GoogleServiceAccount: "scanner@my-project.iam.gserviceaccount.com",
+			},
+		},
+	}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	assertPullPolicies := func(t *testing.T, m *v1alpha2.MondooAuditConfig, container, initContainer corev1.PullPolicy) {
+		t.Helper()
+		podSpec := ExternalClusterCronJob("test-image:latest", cluster, m, cfg).Spec.JobTemplate.Spec.Template.Spec
+
+		require.NotEmpty(t, podSpec.InitContainers, "expected a kubeconfig-generating init container")
+		for _, c := range podSpec.InitContainers {
+			assert.Equal(t, initContainer, c.ImagePullPolicy, "init container %q", c.Name)
+		}
+		for _, c := range podSpec.Containers {
+			assert.Equal(t, container, c.ImagePullPolicy, "container %q", c.Name)
+		}
+	}
+
+	t.Run("init containers default to IfNotPresent", func(t *testing.T) {
+		m := testAuditConfig()
+		m.Spec.Scanner.Image.PullPolicy = corev1.PullAlways
+
+		assertPullPolicies(t, m, corev1.PullAlways, corev1.PullIfNotPresent)
+	})
+
+	t.Run("honors the configured init container policy", func(t *testing.T) {
+		m := testAuditConfig()
+		m.Spec.Scanner.InitContainerImagePullPolicy = corev1.PullNever
+
+		assertPullPolicies(t, m, corev1.PullIfNotPresent, corev1.PullNever)
+	})
+}
+
 func TestCronJob_HasReportTypeNone(t *testing.T) {
 	m := testAuditConfig()
 	cfg := v1alpha2.MondooOperatorConfig{}

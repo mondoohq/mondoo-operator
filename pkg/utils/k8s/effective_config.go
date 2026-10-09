@@ -142,6 +142,7 @@ func preserveLocalFields(effective, local *v1alpha2.MondooAuditConfigSpec) {
 	effective.RemoteManaged = local.RemoteManaged
 	effective.Scanner.ServiceAccountName = local.Scanner.ServiceAccountName
 	effective.Scanner.Image = local.Scanner.Image
+	effective.Scanner.InitContainerImagePullPolicy = local.Scanner.InitContainerImagePullPolicy
 }
 
 func applyDefaults(spec *v1alpha2.MondooAuditConfigSpec) {

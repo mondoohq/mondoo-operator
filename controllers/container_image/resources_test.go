@@ -164,6 +164,43 @@ func TestCronJob_WithImagePullSecrets(t *testing.T) {
 	assert.Equal(t, "my-registry-secret", secrets[0].Name)
 }
 
+func TestCronJob_ImagePullPolicy(t *testing.T) {
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	t.Run("defaults to IfNotPresent", func(t *testing.T) {
+		cj := CronJob("test-image:latest", "", testClusterUID, "", testAuditConfig(), cfg)
+		assert.Equal(t, corev1.PullIfNotPresent, cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+
+	t.Run("honors the configured policy", func(t *testing.T) {
+		m := testAuditConfig()
+		m.Spec.Scanner.Image.PullPolicy = corev1.PullAlways
+
+		cj := CronJob("test-image:latest", "", testClusterUID, "", m, cfg)
+		assert.Equal(t, corev1.PullAlways, cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+
+	t.Run("registry credential init container uses its own policy", func(t *testing.T) {
+		m := testAuditConfig()
+		m.Spec.Scanner.Image.PullPolicy = corev1.PullAlways
+		m.Spec.Containers.WorkloadIdentity = &v1alpha2.WorkloadIdentityConfig{
+			Provider: v1alpha2.CloudProviderGKE,
+			GKE: &v1alpha2.GKEWorkloadIdentity{
+				ProjectID:            "my-project",
+				GoogleServiceAccount: "scanner@my-project.iam.gserviceaccount.com",
+			},
+		}
+
+		podSpec := CronJob("test-image:latest", "", testClusterUID, "", m, cfg).Spec.JobTemplate.Spec.Template.Spec
+		require.Len(t, podSpec.InitContainers, 1)
+		assert.Equal(t, corev1.PullIfNotPresent, podSpec.InitContainers[0].ImagePullPolicy)
+
+		m.Spec.Scanner.InitContainerImagePullPolicy = corev1.PullNever
+		podSpec = CronJob("test-image:latest", "", testClusterUID, "", m, cfg).Spec.JobTemplate.Spec.Template.Spec
+		assert.Equal(t, corev1.PullNever, podSpec.InitContainers[0].ImagePullPolicy)
+	})
+}
+
 func TestCronJob_ImagePullSecrets_AppendsMultiple(t *testing.T) {
 	m := testAuditConfig()
 	cfg := v1alpha2.MondooOperatorConfig{

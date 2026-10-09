@@ -66,6 +66,16 @@ spec:
                         type: string
                       name:
                         type: string
+                      pullPolicy:
+                        description: |-
+                          PullPolicy is the image pull policy for the scanner containers the operator creates.
+                          Helper init containers are configured separately via
+                          Scanner.InitContainerImagePullPolicy. Defaults to IfNotPresent.
+                        enum:
+                        - Always
+                        - IfNotPresent
+                        - Never
+                        type: string
                       tag:
                         type: string
                     type: object
@@ -1992,9 +2002,30 @@ spec:
                         type: string
                       name:
                         type: string
+                      pullPolicy:
+                        description: |-
+                          PullPolicy is the image pull policy for the scanner containers the operator creates.
+                          Helper init containers are configured separately via
+                          Scanner.InitContainerImagePullPolicy. Defaults to IfNotPresent.
+                        enum:
+                        - Always
+                        - IfNotPresent
+                        - Never
+                        type: string
                       tag:
                         type: string
                     type: object
+                  initContainerImagePullPolicy:
+                    description: |-
+                      InitContainerImagePullPolicy is the image pull policy for the helper init containers the
+                      operator creates: the cloud CLI (gcloud/aws/az), SPIFFE helper and registry credential
+                      init containers. These use third-party images, so this is separate from Image.PullPolicy.
+                      Defaults to IfNotPresent.
+                    enum:
+                    - Always
+                    - IfNotPresent
+                    - Never
+                    type: string
                   privateRegistriesPullSecretRef:
                     description: |-
                       PrivateRegistriesPullSecretRef defines the name of a secret that contains the credentials for the private
