@@ -326,7 +326,8 @@ spec:
                           type: string
                         description: |-
                           NodeSelector constrains the scan pods to nodes with matching labels. It is ignored for
-                          node scan pods because those are pinned to a specific node.
+                          CronJob-style node scan pods because those are pinned to a specific node. For the node
+                          scanning DaemonSet it limits which nodes run a scanner pod, and so which nodes are scanned.
                         type: object
                       tolerations:
                         description: Tolerations are appended to the tolerations of
@@ -757,7 +758,8 @@ spec:
                       type: string
                     description: |-
                       NodeSelector constrains the scan pods to nodes with matching labels. It is ignored for
-                      node scan pods because those are pinned to a specific node.
+                      CronJob-style node scan pods because those are pinned to a specific node. For the node
+                      scanning DaemonSet it limits which nodes run a scanner pod, and so which nodes are scanned.
                     type: object
                   tolerations:
                     description: Tolerations are appended to the tolerations of the
@@ -1324,7 +1326,8 @@ spec:
                   jobOverrides:
                     description: |-
                       JobOverrides customizes the Jobs generated for Kubernetes resource scanning,
-                      including the CronJobs for external clusters.
+                      including the CronJobs for external clusters, and the resource watcher Deployment.
+                      TTLSecondsAfterFinished does not apply to the Deployment.
                     properties:
                       annotations:
                         additionalProperties:
@@ -1346,7 +1349,8 @@ spec:
                           type: string
                         description: |-
                           NodeSelector constrains the scan pods to nodes with matching labels. It is ignored for
-                          node scan pods because those are pinned to a specific node.
+                          CronJob-style node scan pods because those are pinned to a specific node. For the node
+                          scanning DaemonSet it limits which nodes run a scanner pod, and so which nodes are scanned.
                         type: object
                       tolerations:
                         description: Tolerations are appended to the tolerations of
@@ -1658,8 +1662,10 @@ spec:
                     type: integer
                   jobOverrides:
                     description: |-
-                      JobOverrides customizes the Jobs generated for node scanning. Only applicable for CronJob
-                      style. NodeSelector is ignored because node scan pods are pinned to a specific node.
+                      JobOverrides customizes the workloads generated for node scanning: the Jobs for CronJob
+                      style and the DaemonSet for DaemonSet style. TTLSecondsAfterFinished only applies to
+                      CronJob style. NodeSelector is ignored for CronJob style because those pods are pinned to
+                      a specific node.
                     properties:
                       annotations:
                         additionalProperties:
@@ -1681,7 +1687,8 @@ spec:
                           type: string
                         description: |-
                           NodeSelector constrains the scan pods to nodes with matching labels. It is ignored for
-                          node scan pods because those are pinned to a specific node.
+                          CronJob-style node scan pods because those are pinned to a specific node. For the node
+                          scanning DaemonSet it limits which nodes run a scanner pod, and so which nodes are scanned.
                         type: object
                       tolerations:
                         description: Tolerations are appended to the tolerations of
