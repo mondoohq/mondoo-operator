@@ -190,10 +190,7 @@ func TestIsGlobPattern(t *testing.T) {
 	}
 }
 
-func TestHasGlobPattern(t *testing.T) {
-	assert.False(t, HasGlobPattern(nil))
-	assert.False(t, HasGlobPattern([]string{}))
-	assert.False(t, HasGlobPattern([]string{"default", "kube-system"}))
-	assert.True(t, HasGlobPattern([]string{"default", "prod-*"}))
-	assert.True(t, HasGlobPattern([]string{"prod-*"}))
+func TestNilNamespaceFilterAllowsEverything(t *testing.T) {
+	var f *NamespaceFilter
+	assert.True(t, f.Allow("any-namespace"))
 }

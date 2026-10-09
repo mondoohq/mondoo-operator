@@ -5,6 +5,7 @@ package utils
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/gobwas/glob"
@@ -20,16 +21,6 @@ const globMetaChars = `*?[]{}!\`
 // name other than itself.
 func IsGlobPattern(s string) bool {
 	return strings.ContainsAny(s, globMetaChars)
-}
-
-// HasGlobPattern reports whether any entry in patterns uses glob syntax.
-func HasGlobPattern(patterns []string) bool {
-	for _, p := range patterns {
-		if IsGlobPattern(p) {
-			return true
-		}
-	}
-	return false
 }
 
 // NamespaceFilter decides whether a namespace is in scope for watching or
@@ -66,8 +57,13 @@ func NewNamespaceFilter(includeNamespaces, excludeNamespaces []string) (*Namespa
 	return &NamespaceFilter{include: include, exclude: exclude}, nil
 }
 
-// Allow reports whether the namespace is in scope.
+// Allow reports whether the namespace is in scope. A nil filter allows every
+// namespace.
 func (f *NamespaceFilter) Allow(namespace string) bool {
+	if f == nil {
+		return true
+	}
+
 	// Anything on the include list means accept only from that list.
 	if len(f.include) > 0 {
 		return matchesAny(f.include, namespace)
@@ -95,12 +91,7 @@ func compileGlobs(patterns []string) ([]glob.Glob, error) {
 }
 
 func matchesAny(globs []glob.Glob, s string) bool {
-	for _, g := range globs {
-		if g.Match(s) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(globs, func(g glob.Glob) bool { return g.Match(s) })
 }
 
 // AllowNamespace reports whether the namespace is in scope for the given include

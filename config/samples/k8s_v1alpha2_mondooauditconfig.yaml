@@ -32,9 +32,12 @@ spec:
     image:
       name: ghcr.io/mondoohq/mondoo-operator
       tag: latest
-      # Pull policy for every container the operator creates.
+      # Pull policy for the scanner containers.
       # One of Always, IfNotPresent (default), or Never.
       # pullPolicy: IfNotPresent
+    # Pull policy for the cloud CLI, SPIFFE helper and registry credential init containers.
+    # One of Always, IfNotPresent (default), or Never.
+    # initContainerImagePullPolicy: IfNotPresent
     resources:
       requests:
         cpu: 100m

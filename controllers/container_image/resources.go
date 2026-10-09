@@ -214,7 +214,7 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 		)
 
 		// Add init container for registry credential generation
-		podSpec.InitContainers = append(podSpec.InitContainers, k8s.RegistryWIFInitContainer(wif, m.Spec.Scanner.Image.PullPolicyOrDefault()))
+		podSpec.InitContainers = append(podSpec.InitContainers, k8s.RegistryWIFInitContainer(wif, m.Spec.Scanner.InitContainerImagePullPolicyOrDefault()))
 
 		// AKS Workload Identity webhook requires this label on the pod template only.
 		// Copy labels so we don't mutate the CronJob/Job metadata.

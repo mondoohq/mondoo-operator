@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strings"
 
-	"go.mondoo.com/mondoo-operator/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -19,6 +18,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"go.mondoo.com/mondoo-operator/pkg/utils"
 )
 
 var watcherLogger = ctrl.Log.WithName("resource-watcher")

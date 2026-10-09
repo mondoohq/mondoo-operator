@@ -332,9 +332,7 @@ func TestCronJob_ImagePullPolicy(t *testing.T) {
 	})
 }
 
-func TestExternalClusterCronJob_ImagePullPolicyAppliesToInitContainers(t *testing.T) {
-	m := testAuditConfig()
-	m.Spec.Scanner.Image.PullPolicy = corev1.PullAlways
+func TestExternalClusterCronJob_ImagePullPolicy(t *testing.T) {
 	cluster := v1alpha2.ExternalCluster{
 		Name: "remote",
 		WorkloadIdentity: &v1alpha2.WorkloadIdentityConfig{
@@ -349,16 +347,32 @@ func TestExternalClusterCronJob_ImagePullPolicyAppliesToInitContainers(t *testin
 	}
 	cfg := v1alpha2.MondooOperatorConfig{}
 
-	cj := ExternalClusterCronJob("test-image:latest", cluster, m, cfg)
-	podSpec := cj.Spec.JobTemplate.Spec.Template.Spec
+	assertPullPolicies := func(t *testing.T, m *v1alpha2.MondooAuditConfig, container, initContainer corev1.PullPolicy) {
+		t.Helper()
+		podSpec := ExternalClusterCronJob("test-image:latest", cluster, m, cfg).Spec.JobTemplate.Spec.Template.Spec
 
-	require.NotEmpty(t, podSpec.InitContainers, "expected a kubeconfig-generating init container")
-	for _, c := range podSpec.InitContainers {
-		assert.Equal(t, corev1.PullAlways, c.ImagePullPolicy, "init container %q", c.Name)
+		require.NotEmpty(t, podSpec.InitContainers, "expected a kubeconfig-generating init container")
+		for _, c := range podSpec.InitContainers {
+			assert.Equal(t, initContainer, c.ImagePullPolicy, "init container %q", c.Name)
+		}
+		for _, c := range podSpec.Containers {
+			assert.Equal(t, container, c.ImagePullPolicy, "container %q", c.Name)
+		}
 	}
-	for _, c := range podSpec.Containers {
-		assert.Equal(t, corev1.PullAlways, c.ImagePullPolicy, "container %q", c.Name)
-	}
+
+	t.Run("init containers default to IfNotPresent", func(t *testing.T) {
+		m := testAuditConfig()
+		m.Spec.Scanner.Image.PullPolicy = corev1.PullAlways
+
+		assertPullPolicies(t, m, corev1.PullAlways, corev1.PullIfNotPresent)
+	})
+
+	t.Run("honors the configured init container policy", func(t *testing.T) {
+		m := testAuditConfig()
+		m.Spec.Scanner.InitContainerImagePullPolicy = corev1.PullNever
+
+		assertPullPolicies(t, m, corev1.PullIfNotPresent, corev1.PullNever)
+	})
 }
 
 func TestCronJob_HasReportTypeNone(t *testing.T) {

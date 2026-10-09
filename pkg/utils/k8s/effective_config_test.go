@@ -43,8 +43,9 @@ func TestEffectiveSpec_FullMapping(t *testing.T) {
 		MondooTokenSecretRef: corev1.LocalObjectReference{Name: "my-token"},
 		ConsoleIntegration:   v1alpha2.ConsoleIntegration{Enable: true},
 		Scanner: v1alpha2.Scanner{
-			ServiceAccountName: "custom-sa",
-			Image:              v1alpha2.Image{Name: "custom-image", Tag: "v1"},
+			ServiceAccountName:           "custom-sa",
+			Image:                        v1alpha2.Image{Name: "custom-image", Tag: "v1", PullPolicy: corev1.PullAlways},
+			InitContainerImagePullPolicy: corev1.PullNever,
 		},
 	}
 	remoteConfig := `{
@@ -123,6 +124,8 @@ func TestEffectiveSpec_FullMapping(t *testing.T) {
 	assert.True(t, result.ConsoleIntegration.Enable)
 	assert.Equal(t, "custom-sa", result.Scanner.ServiceAccountName)
 	assert.Equal(t, "custom-image", result.Scanner.Image.Name)
+	assert.Equal(t, corev1.PullAlways, result.Scanner.Image.PullPolicy)
+	assert.Equal(t, corev1.PullNever, result.Scanner.InitContainerImagePullPolicy)
 	assert.True(t, result.RemoteManaged)
 }
 

@@ -202,6 +202,7 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 // ExternalClusterCronJob creates a CronJob for scanning a remote K8s cluster
 func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig) *batchv1.CronJob {
 	ls := ExternalClusterCronJobLabels(*m, cluster.Name)
+	initPullPolicy := m.Spec.Scanner.InitContainerImagePullPolicyOrDefault()
 
 	cmd := []string{
 		"cnspec", "scan", "k8s",
@@ -359,7 +360,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 			}
 		}
 
-		initContainers = append(initContainers, wifInitContainer(cluster, m.Spec.Scanner.Image.PullPolicyOrDefault()))
+		initContainers = append(initContainers, wifInitContainer(cluster, initPullPolicy))
 
 		// AKS Workload Identity webhook uses a pod-level objectSelector matching
 		// the label "azure.workload.identity/use: true" to inject federated token
@@ -432,7 +433,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 			}
 		}
 
-		initContainers = append(initContainers, spiffeInitContainer(cluster, m.Spec.Scanner.Image.PullPolicyOrDefault()))
+		initContainers = append(initContainers, spiffeInitContainer(cluster, initPullPolicy))
 
 	case cluster.VaultAuth != nil:
 		// Vault auth: operator fetches credentials and writes a kubeconfig Secret
@@ -589,7 +590,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 			corev1.EnvVar{Name: "DOCKER_CONFIG", Value: "/etc/opt/mondoo/docker"},
 		)
 
-		podSpec.InitContainers = append(podSpec.InitContainers, k8s.RegistryWIFInitContainer(m.Spec.Containers.WorkloadIdentity, m.Spec.Scanner.Image.PullPolicyOrDefault()))
+		podSpec.InitContainers = append(podSpec.InitContainers, k8s.RegistryWIFInitContainer(m.Spec.Containers.WorkloadIdentity, initPullPolicy))
 
 		// AKS Workload Identity webhook requires this label
 		if m.Spec.Containers.WorkloadIdentity.Provider == v1alpha2.CloudProviderAKS {

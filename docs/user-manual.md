@@ -1119,7 +1119,8 @@ unsuspended scan updates it.
 ## Set the image pull policy
 
 By default every container the operator creates uses `IfNotPresent`. Set
-`spec.scanner.image.pullPolicy` to change it:
+`spec.scanner.image.pullPolicy` to change it for the scanner containers, and
+`spec.scanner.initContainerImagePullPolicy` to change it for the helper init containers:
 
 ```yaml
 apiVersion: k8s.mondoo.com/v1alpha2
@@ -1131,24 +1132,28 @@ spec:
   scanner:
     image:
       pullPolicy: Always
+    initContainerImagePullPolicy: IfNotPresent
 ```
 
-Valid values are `Always`, `IfNotPresent`, and `Never`.
+Valid values for both are `Always`, `IfNotPresent`, and `Never`.
 
-The policy applies to every container and init container the operator generates:
+`spec.scanner.image.pullPolicy` applies to the scanner containers:
 
 - the Kubernetes resource scan CronJobs, including those for [external clusters](#scanning-external-clusters)
 - the container image scan CronJob
 - the node scan CronJobs and DaemonSet
 - the [resource watcher](#real-time-resource-watcher-opt-in) Deployment
-- the cloud CLI (`gcloud`/`aws`/`az`), SPIFFE helper, and registry credential init containers
+
+`spec.scanner.initContainerImagePullPolicy` applies to the cloud CLI (`gcloud`/`aws`/`az`),
+SPIFFE helper, and registry credential init containers. These use pinned third-party images, some
+of them large, so they are configured separately and keep `IfNotPresent` unless you change it.
 
 Two cases where this matters:
 
 - **`Always`** — you publish a moving tag such as `13-rootless` and want each scan to pick up the
   newest push. Prefer pinning `spec.scanner.image.digest` when you need reproducibility instead.
 - **`Never`** — an air-gapped cluster where images are preloaded onto the nodes and any registry
-  round trip would fail. Note that the third-party init container images
+  round trip would fail. Set both fields. Note that the third-party init container images
   (`gcloud`, `aws`, `az`, the SPIFFE helper, `busybox`) are not rewritten by
   `imageRegistry`/`registryMirrors`, so preload those under their original names.
 

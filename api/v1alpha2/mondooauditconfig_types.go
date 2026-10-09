@@ -200,6 +200,20 @@ type Scanner struct {
 	// Env allows setting extra environment variables for the scanner. If the operator sets already an env
 	// variable with the same name, the value specified here will override it.
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// InitContainerImagePullPolicy is the image pull policy for the helper init containers the
+	// operator creates: the cloud CLI (gcloud/aws/az), SPIFFE helper and registry credential
+	// init containers. These use third-party images, so this is separate from Image.PullPolicy.
+	// Defaults to IfNotPresent.
+	// +kubebuilder:validation:Enum=Always;IfNotPresent;Never
+	// +optional
+	InitContainerImagePullPolicy corev1.PullPolicy `json:"initContainerImagePullPolicy,omitempty"`
+}
+
+// InitContainerImagePullPolicyOrDefault returns the configured init container image pull
+// policy, falling back to IfNotPresent when none is set.
+func (s Scanner) InitContainerImagePullPolicyOrDefault() corev1.PullPolicy {
+	return pullPolicyOrDefault(s.InitContainerImagePullPolicy)
 }
 
 type KubernetesResources struct {
@@ -696,9 +710,9 @@ type Image struct {
 	// When specified, this takes precedence over Tag.
 	// +optional
 	Digest string `json:"digest,omitempty"`
-	// PullPolicy is the image pull policy applied to every container and init container
-	// the operator creates, including the cloud CLI and SPIFFE helper init containers.
-	// Defaults to IfNotPresent.
+	// PullPolicy is the image pull policy for the scanner containers the operator creates.
+	// Helper init containers are configured separately via
+	// Scanner.InitContainerImagePullPolicy. Defaults to IfNotPresent.
 	// +kubebuilder:validation:Enum=Always;IfNotPresent;Never
 	// +optional
 	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
@@ -707,8 +721,12 @@ type Image struct {
 // PullPolicyOrDefault returns the configured image pull policy, falling back to
 // IfNotPresent when none is set.
 func (i Image) PullPolicyOrDefault() corev1.PullPolicy {
-	if i.PullPolicy != "" {
-		return i.PullPolicy
+	return pullPolicyOrDefault(i.PullPolicy)
+}
+
+func pullPolicyOrDefault(p corev1.PullPolicy) corev1.PullPolicy {
+	if p != "" {
+		return p
 	}
 	return corev1.PullIfNotPresent
 }

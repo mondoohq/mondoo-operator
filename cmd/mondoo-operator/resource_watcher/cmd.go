@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -200,17 +201,17 @@ func init() {
 		// expanded up front: namespaces matching it may be created after startup.
 		// In that case watch cluster-wide and let the watcher's namespace filter
 		// drop events from namespaces that are out of scope.
-		switch {
-		case len(namespacesList) == 0:
-		case utils.HasGlobPattern(namespacesList):
-			logger.Info("Namespace include list contains glob patterns; watching all namespaces and filtering events per namespace",
-				"namespaces", namespacesList)
-		default:
-			byNamespace := make(map[string]cache.Config)
-			for _, ns := range namespacesList {
-				byNamespace[ns] = cache.Config{}
+		if len(namespacesList) > 0 {
+			if slices.ContainsFunc(namespacesList, utils.IsGlobPattern) {
+				logger.Info("Namespace include list contains glob patterns; watching all namespaces and filtering events per namespace",
+					"namespaces", namespacesList)
+			} else {
+				byNamespace := make(map[string]cache.Config)
+				for _, ns := range namespacesList {
+					byNamespace[ns] = cache.Config{}
+				}
+				cacheOpts.DefaultNamespaces = byNamespace
 			}
-			cacheOpts.DefaultNamespaces = byNamespace
 		}
 
 		c, err := cache.New(restConfig, cacheOpts)
