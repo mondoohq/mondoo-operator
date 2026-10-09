@@ -1044,8 +1044,10 @@ You can adjust the schedule for the following components:
 
 ## Customize the generated scan Jobs
 
-The operator can apply common customizations to the Jobs spawned by the scan CronJobs directly,
-so you don't need mutating webhooks (such as Kyverno policies) to patch the generated resources.
+The operator can apply common customizations to the Jobs spawned by the scan CronJobs, the
+[resource watcher](#real-time-resource-watcher-opt-in) Deployment and the node scanning DaemonSet
+directly, so you don't need mutating webhooks (such as Kyverno policies) to patch the generated
+resources.
 Each scanning component (`kubernetesResources`, `containers`, and `nodes`) accepts a `jobOverrides`
 section:
 
@@ -1090,11 +1092,16 @@ spec:
 Notes:
 
 - `kubernetesResources.jobOverrides` also applies to the CronJobs created for
-  [external clusters](#scanning-external-clusters).
+  [external clusters](#scanning-external-clusters) and to the resource watcher Deployment.
+- `nodes.jobOverrides` applies to both node scanning styles: the CronJobs for `cronjob` style and
+  the DaemonSet for `daemonset` style.
 - `annotations` are added to both the Job metadata and the pod template. Annotations managed by
   the operator take precedence and cannot be overwritten.
-- `nodeSelector` is ignored for node scan pods because they are pinned to a specific node.
-- `nodes.jobOverrides` only applies to the `cronjob` node scanning style.
+- `ttlSecondsAfterFinished` only applies to Jobs, so it has no effect on the resource watcher
+  Deployment or the node scanning DaemonSet.
+- `nodeSelector` is ignored for `cronjob` style node scan pods because they are pinned to a
+  specific node. For `daemonset` style it limits which nodes run a scanner pod, and so which
+  nodes are scanned.
 
 To pause scheduled scan CronJobs without deleting generated resources, set `suspend: true` on the relevant scan configuration:
 
