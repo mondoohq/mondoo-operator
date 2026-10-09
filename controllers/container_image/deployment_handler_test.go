@@ -400,7 +400,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sContainerImageScanningStatus()
 	s.Equal("local", scanStatus.Target)
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_InvalidLabelSelectorCondition() {
+func (s *DeploymentHandlerSuite) TestReconcile_ConfigErrorCondition() {
 	s.auditConfig.Spec.Filtering.ObjectLabelSelector = &metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{Key: "track", Operator: metav1.LabelSelectorOpIn},
@@ -415,7 +415,7 @@ func (s *DeploymentHandlerSuite) TestReconcile_InvalidLabelSelectorCondition() {
 
 	s.Require().Len(d.Mondoo.Status.Conditions, 1)
 	condition := d.Mondoo.Status.Conditions[0]
-	s.Equal("InvalidLabelSelector", condition.Reason)
+	s.Equal("KubernetesContainerImageScanConfigInvalid", condition.Reason)
 	s.Contains(condition.Message, "filtering.objectLabelSelector")
 	s.Equal(corev1.ConditionTrue, condition.Status)
 	s.Equal(mondoov1alpha2.K8sContainerImageScanningDegraded, condition.Type)
