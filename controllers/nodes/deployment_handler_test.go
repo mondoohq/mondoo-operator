@@ -19,6 +19,7 @@ import (
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 	"go.mondoo.com/mondoo-operator/pkg/constants"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
 	fakeMondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo/fake"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
@@ -252,6 +253,37 @@ func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs() {
 	// Verify node garbage collection cronjob does not exist (removed in simplification)
 	gcCj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: GarbageCollectCronJobName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
 	s.Error(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(gcCj), gcCj))
+}
+
+func (s *DeploymentHandlerSuite) TestReconcile_LongAuditConfigName() {
+	for _, style := range []v1alpha2.NodeScanStyle{v1alpha2.NodeScanStyle_CronJob, v1alpha2.NodeScanStyle_DaemonSet} {
+		s.Run(string(style), func() {
+			s.BeforeTest("", "")
+			s.seedNodes()
+			d := s.createDeploymentHandler()
+			// The console names MondooAuditConfigs "mondoo-client-<integration-id>"
+			s.auditConfig.Name = "mondoo-client-3kdilqnrrrnl6jafhvbvtpwv0er"
+			s.auditConfig.Spec.Nodes.Style = style
+			mondooAuditConfig := &s.auditConfig
+			s.NoError(d.KubeClient.Create(s.ctx, mondooAuditConfig))
+
+			result, err := d.Reconcile(s.ctx)
+			s.NoError(err)
+			s.True(result.IsZero())
+
+			if style == v1alpha2.NodeScanStyle_CronJob {
+				cronJobs := &batchv1.CronJobList{}
+				s.NoError(d.KubeClient.List(s.ctx, cronJobs))
+				s.Len(cronJobs.Items, 2)
+				for _, cj := range cronJobs.Items {
+					s.LessOrEqual(len(cj.Name), k8s.ResourceNameMaxLength)
+				}
+			} else {
+				ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: DaemonSetName(s.auditConfig.Name), Namespace: s.auditConfig.Namespace}}
+				s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(ds), ds))
+			}
+		})
+	}
 }
 
 func (s *DeploymentHandlerSuite) TestReconcile_CreateCronJobs_CustomEnvVars() {
