@@ -6,7 +6,6 @@ package nodes
 import (
 	"crypto/sha256"
 	"fmt"
-	"math"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -32,6 +31,10 @@ const (
 	GarbageCollectCronJobNameBase  = "-node-gc"
 	InventoryConfigMapBase         = "-node-inventory"
 	InventoryConfigMapWithNodeBase = "-node-inventory-"
+
+	// minNodeHashLen is the minimum number of hash chars used to replace a node name.
+	// Fewer chars make it likely that two nodes end up with the same resource name.
+	minNodeHashLen = 8
 
 	ignoreQueryAnnotationPrefix = "policies.k8s.mondoo.com/"
 
@@ -348,19 +351,11 @@ func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) 
 }
 
 func CronJobName(prefix, suffix string) string {
-	// If the name becomes longer than 52 chars, then we hash the suffix and trim
-	// it such that the full name fits within 52 chars. This is needed because in
-	// manager Kubernetes services such as EKS or GKE the node names can be very long.
-	base := fmt.Sprintf("%s%s", prefix, CronJobNameBase)
-	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), suffix))
+	return nodeScopedName(prefix, CronJobNameBase, suffix)
 }
 
 func DeploymentName(prefix, suffix string) string {
-	// If the name becomes longer than 52 chars, then we hash the suffix and trim
-	// it such that the full name fits within 52 chars. This is needed because in
-	// manager Kubernetes services such as EKS or GKE the node names can be very long.
-	base := fmt.Sprintf("%s%s", prefix, DeploymentNameBase)
-	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), suffix))
+	return nodeScopedName(prefix, DeploymentNameBase, suffix)
 }
 
 func DaemonSetName(prefix string) string {
@@ -376,8 +371,7 @@ func ConfigMapName(prefix string) string {
 }
 
 func ConfigMapNameWithNode(prefix, nodeName string) string {
-	base := fmt.Sprintf("%s%s", prefix, InventoryConfigMapWithNodeBase)
-	return fmt.Sprintf("%s%s", base, NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), nodeName))
+	return nodeScopedName(prefix, InventoryConfigMapWithNodeBase, nodeName)
 }
 
 func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig) (string, error) {
@@ -450,10 +444,24 @@ func GarbageCollectCronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string
 	}
 }
 
-func NodeNameOrHash(allowedLen int, nodeName string) string {
-	if len(nodeName) > allowedLen {
-		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(nodeName)))
-		return hash[:int(math.Min(float64(allowedLen), float64(len(hash))))]
+// nodeScopedName builds prefix+infix+nodeName and makes sure the result fits within
+// k8s.ResourceNameMaxLength chars. Node names on managed Kubernetes services such as EKS
+// or GKE can be very long, so if the node name doesn't fit it is replaced by a trimmed
+// hash. If prefix+infix is too long to leave room for at least minNodeHashLen hash chars
+// (e.g. a long MondooAuditConfig name like "mondoo-client-<integration-id>"), the prefix
+// is truncated as well and the hash is computed over the full name to keep it unique.
+func nodeScopedName(prefix, infix, nodeName string) string {
+	base := prefix + infix
+	allowedLen := k8s.ResourceNameMaxLength - len(base)
+	if len(nodeName) <= allowedLen {
+		return base + nodeName
 	}
-	return nodeName
+
+	if allowedLen >= minNodeHashLen {
+		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(nodeName)))
+		return base + hash[:min(allowedLen, len(hash))]
+	}
+
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(base+nodeName)))
+	return prefix[:k8s.ResourceNameMaxLength-len(infix)-minNodeHashLen] + infix + hash[:minNodeHashLen]
 }
