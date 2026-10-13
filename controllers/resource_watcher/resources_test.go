@@ -315,7 +315,7 @@ func TestDeployment_WithInvalidLabelSelectorReturnsError(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Nil(t, deployment)
-	assert.Contains(t, err.Error(), "invalid object-label-selector")
+	assert.Contains(t, err.Error(), "invalid filtering.objectLabelSelector")
 }
 
 func TestDeployment_WithoutLabelSelectorsOmitsSelectorArgs(t *testing.T) {

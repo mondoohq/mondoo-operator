@@ -69,5 +69,5 @@ func TestLabelSelectorOptions_Invalid(t *testing.T) {
 		},
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid namespace-label-selector")
+	assert.Contains(t, err.Error(), "invalid filtering.namespaceLabelSelector")
 }

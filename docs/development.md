@@ -400,11 +400,24 @@ externalClusters:
       name: prod-kubeconfig
     # Override the default schedule for this cluster
     schedule: "0 */2 * * *"
-    # Cluster-specific namespace filtering
+    # Cluster-specific filtering
     filtering:
       namespaces:
         exclude:
           - kube-system
+      namespaceLabelSelector:
+        matchLabels:
+          tenant: team-a
+        matchExpressions:
+          - key: environment
+            operator: In
+            values: ["prod", "stage"]
+      objectLabelSelector:
+        matchLabels:
+          app: frontend
+        matchExpressions:
+          - key: scan.mondoo.com/disabled
+            operator: DoesNotExist
     # Enable container image scanning for this external cluster
     containerImageScanning: true
     # Reference to private registry credentials for this cluster
@@ -439,9 +452,9 @@ spec:
 | `metrics.resourceLabels`  | Labels to add to ServiceMonitor for Prometheus discovery |
 | `skipContainerResolution` | Skip resolving image tags to SHA digests                 |
 
-### Namespace Filtering
+### Namespace and Label Filtering
 
-Filter which namespaces are scanned:
+Filter which namespaces and objects are scanned:
 
 ```yaml
 spec:
@@ -455,9 +468,23 @@ spec:
       # include:
       #   - production
       #   - staging
+    namespaceLabelSelector:
+      matchLabels:
+        tenant: team-a
+      matchExpressions:
+        - key: environment
+          operator: In
+          values: ["prod", "stage"]
+    objectLabelSelector:
+      matchLabels:
+        app: frontend
+      matchExpressions:
+        - key: scan.mondoo.com/disabled
+          operator: DoesNotExist
 ```
 
-Note: If both `include` and `exclude` are specified, only `include` is used.
+Note: If both `include` and `exclude` are specified, only `include` is used. Label selectors are
+applied in addition to the namespace lists and require cnspec v13.30.1 or later.
 
 ### Scanner Configuration
 
