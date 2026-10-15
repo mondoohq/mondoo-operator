@@ -253,6 +253,7 @@ type KubernetesResources struct {
 	// When omitted, Kyverno collection is disabled. Set kyverno.enable to true to collect Kyverno resources.
 	// Collection happens through the normal cnspec Kubernetes scanner and is not part of admission handling.
 	// Requires a scanner image with cnspec Kubernetes provider support for the kyverno discovery target and options.
+	// +optional
 	Kyverno KyvernoSpec `json:"kyverno,omitempty"`
 
 	// ExternalClusters defines remote K8s clusters to scan from this operator instance.
