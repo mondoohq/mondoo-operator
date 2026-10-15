@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -44,7 +45,8 @@ func TestNormalizeResourceTypes(t *testing.T) {
 }
 
 func TestNewResourceWatcherCopiesDefaultResourceTypes(t *testing.T) {
-	watcher := NewResourceWatcher(nil, nil, WatcherConfig{WatchAllResources: true})
+	watcher, err := NewResourceWatcher(nil, nil, WatcherConfig{WatchAllResources: true})
+	require.NoError(t, err)
 	assert.Equal(t, DefaultResourceTypes, watcher.config.ResourceTypes)
 
 	watcher.config.ResourceTypes[0] = "changed"

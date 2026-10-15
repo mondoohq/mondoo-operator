@@ -93,6 +93,10 @@ func NewResourceWatcher(c ctrlcache.Cache, debouncer *Debouncer, config WatcherC
 	// Normalize defaults too, returning an independent slice without mutating
 	// the shared lists if aliases or duplicates are added later.
 	config.ResourceTypes = normalizeResourceTypes(config.ResourceTypes)
+	nsFilter, err := utils.NewNamespaceFilter(config.Namespaces, config.NamespacesExclude)
+	if err != nil {
+		return nil, err
+	}
 	return &ResourceWatcher{
 		cache:           c,
 		namespaceReader: c,
