@@ -385,11 +385,11 @@ func TestCronJob_PriorityClassName(t *testing.T) {
 	}
 	mac := testMondooAuditConfig()
 
-	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 	assert.Empty(t, cj.Spec.JobTemplate.Spec.Template.Spec.PriorityClassName)
 
 	mac.Spec.Nodes.PriorityClassName = "mondoo-node-critical"
-	cj = CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	cj = CronJob("test123", constants.BusyBoxImage, testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 	assert.Equal(t, "mondoo-node-critical", cj.Spec.JobTemplate.Spec.Template.Spec.PriorityClassName)
 }
 
@@ -397,7 +397,7 @@ func TestDaemonSet_PriorityClassName(t *testing.T) {
 	mac := *testMondooAuditConfig()
 	mac.Spec.Nodes.PriorityClassName = "mondoo-node-critical"
 
-	ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
+	ds := DaemonSet(mac, false, "test123", constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{}, nil)
 	assert.Equal(t, "mondoo-node-critical", ds.Spec.Template.Spec.PriorityClassName)
 }
 
@@ -430,7 +430,7 @@ func TestCronJob_Suspend(t *testing.T) {
 	mac := testMondooAuditConfig()
 	mac.Spec.Nodes.Suspend = true
 
-	cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 
 	require.NotNil(t, cj.Spec.Suspend)
 	assert.True(t, *cj.Spec.Suspend)
@@ -448,13 +448,13 @@ func TestCronJob_SuspendMatrix(t *testing.T) {
 		mac := testMondooAuditConfig()
 		mac.Spec.Nodes.Suspend = true
 
-		current := CronJob("test123", testNode, mac, false, cfg)
+		current := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, cfg)
 		require.NotNil(t, current.Spec.Suspend)
 		assert.True(t, *current.Spec.Suspend)
 
 		mac.Spec.Nodes.Suspend = false
 		mac.Status.ScanningPaused = false
-		desired := CronJob("test123", testNode, mac, false, cfg)
+		desired := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, cfg)
 		k8s.UpdateCronJobFields(current, desired)
 
 		require.NotNil(t, current.Spec.Suspend)
@@ -466,7 +466,7 @@ func TestCronJob_SuspendMatrix(t *testing.T) {
 		mac.Spec.Nodes.Suspend = false
 		mac.Status.ScanningPaused = true
 
-		cj := CronJob("test123", testNode, mac, false, cfg)
+		cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, cfg)
 		require.NotNil(t, cj.Spec.Suspend)
 		assert.True(t, *cj.Spec.Suspend)
 	})
@@ -476,7 +476,7 @@ func TestCronJob_SuspendMatrix(t *testing.T) {
 		mac.Spec.Nodes.Suspend = false
 		mac.Status.ScanningPaused = false
 
-		cj := CronJob("test123", testNode, mac, false, cfg)
+		cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, cfg)
 		require.NotNil(t, cj.Spec.Suspend)
 		assert.False(t, *cj.Spec.Suspend)
 	})
@@ -491,12 +491,12 @@ func TestCronJob_UnsuspendWhenScanningResumed(t *testing.T) {
 	mac := testMondooAuditConfig()
 	mac.Status.ScanningPaused = true
 
-	current := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	current := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 	require.NotNil(t, current.Spec.Suspend)
 	assert.True(t, *current.Spec.Suspend)
 
 	mac.Status.ScanningPaused = false
-	desired := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
+	desired := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, v1alpha2.MondooOperatorConfig{})
 	k8s.UpdateCronJobFields(current, desired)
 
 	require.NotNil(t, current.Spec.Suspend)
@@ -638,7 +638,7 @@ func TestCronJob_ImagePullPolicy(t *testing.T) {
 	cfg := v1alpha2.MondooOperatorConfig{}
 
 	t.Run("defaults to IfNotPresent", func(t *testing.T) {
-		cj := CronJob("test123", testNode, testMondooAuditConfig(), false, cfg)
+		cj := CronJob("test123", constants.BusyBoxImage, testNode, testMondooAuditConfig(), false, cfg)
 		assert.Equal(t, corev1.PullIfNotPresent, cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].ImagePullPolicy)
 	})
 
@@ -646,7 +646,7 @@ func TestCronJob_ImagePullPolicy(t *testing.T) {
 		mac := testMondooAuditConfig()
 		mac.Spec.Scanner.Image.PullPolicy = corev1.PullNever
 
-		cj := CronJob("test123", testNode, mac, false, cfg)
+		cj := CronJob("test123", constants.BusyBoxImage, testNode, mac, false, cfg)
 		assert.Equal(t, corev1.PullNever, cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].ImagePullPolicy)
 	})
 }
@@ -655,7 +655,7 @@ func TestDaemonSet_ImagePullPolicy(t *testing.T) {
 	cfg := v1alpha2.MondooOperatorConfig{}
 
 	t.Run("defaults to IfNotPresent", func(t *testing.T) {
-		ds := DaemonSet(*testMondooAuditConfig(), false, "test123", cfg, nil)
+		ds := DaemonSet(*testMondooAuditConfig(), false, "test123", constants.BusyBoxImage, cfg, nil)
 		assert.Equal(t, corev1.PullIfNotPresent, ds.Spec.Template.Spec.Containers[0].ImagePullPolicy)
 	})
 
@@ -663,7 +663,7 @@ func TestDaemonSet_ImagePullPolicy(t *testing.T) {
 		mac := *testMondooAuditConfig()
 		mac.Spec.Scanner.Image.PullPolicy = corev1.PullAlways
 
-		ds := DaemonSet(mac, false, "test123", cfg, nil)
+		ds := DaemonSet(mac, false, "test123", constants.BusyBoxImage, cfg, nil)
 		assert.Equal(t, corev1.PullAlways, ds.Spec.Template.Spec.Containers[0].ImagePullPolicy)
 	})
 }
