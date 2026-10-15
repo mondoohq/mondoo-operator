@@ -463,5 +463,6 @@ func nodeScopedName(prefix, infix, nodeName string) string {
 	}
 
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(base+nodeName)))
-	return prefix[:k8s.ResourceNameMaxLength-len(infix)-minNodeHashLen] + infix + hash[:minNodeHashLen]
+	maxPrefixLen := max(0, k8s.ResourceNameMaxLength-len(infix)-minNodeHashLen)
+	return prefix[:min(len(prefix), maxPrefixLen)] + infix + hash[:minNodeHashLen]
 }
