@@ -1,0 +1,72 @@
+# Copyright Mondoo, Inc. 2026
+# SPDX-License-Identifier: BUSL-1.1
+
+# A *<Kind>Name helper is trusted by object-name-not-length-checked, so its body must truncate.
+# See .xgrep/README.md for the contract.
+rules:
+  - id: mondoo-name-helper-without-length-check
+    languages: [go]
+    severity: ERROR
+    message: >-
+      $F builds a Kubernetes object name (its name ends in <Kind>Name) without any length check
+      in its body: no k8s.ResourceNameMaxLength, nodeScopedName, k8s.cronJobName,
+      k8s.CronJobName / CronJobNameWithCluster, ConfigMapNameWithNode or sha256. Callers trust it
+      with user input (audit config, node and cluster names), so the result can exceed the
+      52/63-char limits. A helper that only spells an old-style name for cleanup is named
+      Old*/Legacy*/Deprecated* and is skipped.
+    fix-hint: >-
+      Delegate to nodeScopedName(prefix, infix, name) or k8s.CronJobName / CronJobNameWithCluster,
+      or compare against k8s.ResourceNameMaxLength and hash the overflow with sha256 (never slice
+      the input to fit).
+    metadata:
+      category: change-risk
+      signal: likelihood
+      consequence-class: scan-silently-not-run
+      incidents:
+        - "mondoo-operator#1498 (2026-05): the three CronJobName helpers were plain concatenation"
+      known-gaps:
+        - "length-check evidence is a fixed list of primitives (ResourceNameMaxLength, nodeScopedName, cronJobName, k8s.CronJobName*, ConfigMapNameWithNode, sha256.Sum256); a new primitive must be added here"
+        - "only plain functions are checked; a method named *Name() string would be trusted by the taint rule but not checked here (none exist today)"
+      known-fires-on-main:
+        - "controllers/nodes/resources.go DaemonSetName, GarbageCollectCronJobName (a CronJob, so 52 chars applies), ConfigMapName"
+        - "controllers/resource_watcher/resources.go DeploymentName"
+        - "controllers/container_image/resources.go ConfigMapName, WIFServiceAccountName"
+        - "controllers/k8s_scan/resources.go ConfigMapName, ExternalClusterConfigMapName, ExternalClusterSAKubeconfigName, WIFServiceAccountName; vault.go VaultKubeconfigSecretName"
+        - "pkg/utils/k8s/private_registries.go MergedSecretName"
+    paths:
+      include: ["**/*.go"]
+      exclude: ["**/*_test.go", "**/zz_generated*.go", "tests/**", ".xgrep/**"]
+    patterns:
+      - pattern: |
+          func $F(...) string { ... }
+      - metavariable-regex:
+          metavariable: $F
+          regex: '^\w*(CronJob|Job|Deployment|DaemonSet|StatefulSet|Service|Pod|ConfigMap|Secret|ServiceAccount|Kubeconfig|Role|RoleBinding|Webhook)Name\w*$'
+      # legacy-name helpers exist to find and delete old-style objects; they must not truncate
+      - metavariable-pattern:
+          metavariable: $F
+          patterns:
+            - pattern-not-regex: '^(Old|Legacy|Deprecated)'
+      # evidence of a length check anywhere in the body, as AST patterns (a regex over the
+      # function range is unreliable in xgrep 0.84: it can run on to the next match)
+      - pattern-not: |
+          func $F(...) string { ... <... $PKG.ResourceNameMaxLength ...> ... }
+      - pattern-not: |
+          func $F(...) string { ... <... ResourceNameMaxLength ...> ... }
+      - pattern-not: |
+          func $F(...) string { ... <... nodeScopedName(...) ...> ... }
+      - pattern-not: |
+          func $F(...) string { ... <... cronJobName(...) ...> ... }
+      - pattern-not: |
+          func $F(...) string { ... <... $PKG.CronJobName(...) ...> ... }
+      - pattern-not: |
+          func $F(...) string { ... <... $PKG.CronJobNameWithCluster(...) ...> ... }
+      - pattern-not: |
+          func $F(...) string { ... <... CronJobName(...) ...> ... }
+      - pattern-not: |
+          func $F(...) string { ... <... CronJobNameWithCluster(...) ...> ... }
+      - pattern-not: |
+          func $F(...) string { ... <... ConfigMapNameWithNode(...) ...> ... }
+      - pattern-not: |
+          func $F(...) string { ... <... sha256.Sum256(...) ...> ... }
+      - focus-metavariable: $F

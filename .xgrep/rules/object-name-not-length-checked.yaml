@@ -1,0 +1,84 @@
+# Copyright Mondoo, Inc. 2026
+# SPDX-License-Identifier: BUSL-1.1
+
+# A Kubernetes object's name must come from a length-checked helper, never from a bare
+# concatenation of user input. See .xgrep/README.md for the contract and the sibling rules.
+rules:
+  - id: mondoo-object-name-not-length-checked
+    languages: [go]
+    severity: ERROR
+    message: >-
+      The name of this $KIND is built from a name that was never length-checked ($N). Audit
+      config, node, cluster and namespace names are user input. CronJob names must fit in 52
+      chars (the Job suffix needs 11), Job/Service/StatefulSet in 63, label values in 63, and
+      this repo caps every generated name at k8s.ResourceNameMaxLength (52). Build it with a
+      <Kind>Name helper that truncates (k8s.CronJobName, CronJobNameWithCluster, nodeScopedName);
+      name-helper-without-length-check keeps those helpers honest. An old-style name that is
+      only spelled to delete the old object gets an inline nosemgrep comment with the reason.
+    fix-hint: >-
+      Replace the concatenation with a call to a *<Kind>Name helper that truncates through
+      k8s.CronJobName / k8s.CronJobNameWithCluster / nodeScopedName (hash the overflow, never
+      slice it). An inline len() guard is not recognized; put the check in the helper.
+    metadata:
+      category: change-risk
+      signal: likelihood
+      consequence-class: scan-silently-not-run
+      incidents:
+        - "mondoo-operator#1498 (2026-05): CronJob names over 52 chars for external clusters, Jobs never created"
+        - "mondoo-operator#1651 (2026-10): panic on long MondooAuditConfig names"
+      known-gaps:
+        - "a literal that copies exactly Name and Namespace from one object (Name: m.Name, Namespace: m.Namespace, nothing else) reads as a reference to that object and is not flagged; with any other field present it is"
+        - "a NEW call to a plain helper that already exists on main is invisible in --baseline-commit mode (the helper's own finding sits on an unchanged line); the full scan lists those helpers"
+        - "taint is intra-file: a helper in another package is trusted by its name and policed by name-helper-without-length-check"
+        - "a constructor that receives the name as a bare string parameter is not a source; constructors here take the MondooAuditConfig"
+      known-fires-on-main:
+        - "controllers/k8s_scan/deployment_handler.go cleanupWorkloadDeployment: old-style Deployment and ConfigMap names, deleted not created"
+        - "pkg/utils/k8s/space_config.go: config override Secret built inline"
+        - "pkg/utils/mondoo/integration_provision.go: provisioner Secret built from the user's SA secret name"
+    paths:
+      include: ["**/*.go"]
+      exclude: ["**/*_test.go", "**/zz_generated*.go", "tests/**", ".xgrep/**"]
+    options:
+      # the identity-copy exclusion above must match a two-field ObjectMeta exactly
+      implicit_ellipsis: false
+    pattern-sources:
+      - pattern: $X.Name
+      - pattern: $X.Namespace
+      - pattern: $X.GetName()
+      - pattern: $X.GetNamespace()
+    pattern-sanitizers:
+      # a reference to an object the user named (a secret ref in the spec) is not a built name
+      - pattern: $Y.Spec.$Z.Name
+      # length-checked: a name helper (its body is checked by name-helper-without-length-check)
+      # or one of the two truncating primitives
+      - patterns:
+          - pattern-either:
+              - pattern: $F(...)
+              - pattern: $PKG.$F(...)
+          - metavariable-regex:
+              metavariable: $F
+              regex: '^(\w*(CronJob|Job|Deployment|DaemonSet|StatefulSet|Service|Pod|ConfigMap|Secret|ServiceAccount|Kubeconfig|Role|RoleBinding|Webhook)Name\w*|nodeScopedName|cronJobName)$'
+      # inside a name helper the input is the helper's job. Without this, a same-file helper
+      # whose body reads m.Name hands taint to its caller past the sanitizer above (xgrep follows
+      # calls within a file).
+      - patterns:
+          - pattern-inside: |
+              func $HELPER(...) string { ... }
+          - metavariable-regex:
+              metavariable: $HELPER
+              regex: '^\w*(CronJob|Job|Deployment|DaemonSet|StatefulSet|Service|Pod|ConfigMap|Secret|ServiceAccount|Kubeconfig|Role|RoleBinding|Webhook)Name\w*$'
+          - pattern: $ANY
+    pattern-sinks:
+      # any Kubernetes object literal: <api group>.<Kind>{ObjectMeta: metav1.ObjectMeta{Name: ...}}
+      - patterns:
+          - pattern: '$PKG.$KIND{..., ObjectMeta: metav1.ObjectMeta{..., Name: $N, ...}, ...}'
+          # a literal that only copies another object's name and namespace refers to that
+          # object (desired.Name from a constructor, a Get key): not a new name
+          - pattern-not: '$PKG.$KIND{..., ObjectMeta: metav1.ObjectMeta{Name: $Y.Name, Namespace: $Y.Namespace}, ...}'
+          - focus-metavariable: $N
+      # fmt.Sprintf as the Name value carries no taint in xgrep 0.84 (concatenation, strings.Join
+      # and other calls do), so its arguments are sinks of their own
+      - patterns:
+          - pattern-inside: '$PKG.$KIND{..., ObjectMeta: metav1.ObjectMeta{..., Name: fmt.Sprintf(...), ...}, ...}'
+          - pattern: fmt.Sprintf($F, ..., $X, ...)
+          - focus-metavariable: $X

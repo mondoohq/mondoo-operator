@@ -1,0 +1,33 @@
+# Copyright Mondoo, Inc. 2026
+# SPDX-License-Identifier: BUSL-1.1
+
+# A length derived from the name limit must be clamped before it reaches a slice (#1651).
+rules:
+  - id: mondoo-name-limit-arithmetic-unclamped
+    languages: [go]
+    severity: WARNING
+    message: >-
+      A length derived from the name limit (ResourceNameMaxLength - len(...)) is passed to a
+      helper unclamped. When the prefix alone exceeds the limit the value goes negative and the
+      slice inside panics: that was #1651. Clamp it (max(0, ...), min(n, len(s))) or branch on
+      it first.
+    fix-hint: >-
+      Compute allowed := k8s.ResourceNameMaxLength - len(base), return early or hash when it is
+      below the minimum you need, and slice with min(allowed, len(s)) only.
+    metadata:
+      category: change-risk
+      signal: likelihood
+      consequence-class: operator-panic
+      incidents:
+        - "mondoo-operator#1651 (2026-10): NodeNameOrHash(k8s.ResourceNameMaxLength-len(base), ...) went negative, the slice inside panicked"
+      known-gaps:
+        - "a slice bound built from the limit (s[:ResourceNameMaxLength-len(x)]) is not matched: slice expressions match no AST pattern in xgrep 0.84"
+      known-fires-on-main: []
+    paths:
+      include: ["**/*.go"]
+      exclude: ["**/*_test.go", "**/zz_generated*.go", "tests/**", ".xgrep/**"]
+    pattern-either:
+      - pattern: $FN(k8s.ResourceNameMaxLength - $E, ...)
+      - pattern: $FN(k8s.ResourceNameMaxLength - $E - $E2, ...)
+      - pattern: $FN(ResourceNameMaxLength - $E, ...)
+      - pattern: $FN(ResourceNameMaxLength - $E - $E2, ...)
