@@ -33,7 +33,7 @@ const (
 	// MondooParallelismEnv sets how many assets cnspec scans in parallel. cnspec v14 changed the
 	// default from sequential to a per-provider value, which multiplies memory use within the
 	// scan pod's fixed limits, so the operator keeps scans sequential. Users can override it
-	// through the scanner/containers env.
+	// through the scanner/containers/nodes env.
 	MondooParallelismEnv     = "MONDOO_PARALLELISM"
 	DefaultMondooParallelism = "1"
 )

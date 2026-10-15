@@ -185,6 +185,30 @@ func TestCronJob_HasReportTypeNone(t *testing.T) {
 	assert.Contains(t, cmd, "--report-type none")
 }
 
+func TestResources_Parallelism(t *testing.T) {
+	envValue := func(env []corev1.EnvVar) string {
+		for _, e := range env {
+			if e.Name == "MONDOO_PARALLELISM" {
+				return e.Value
+			}
+		}
+		return ""
+	}
+	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
+
+	m := testMondooAuditConfig()
+	cj := CronJob("test-image:latest", node, m, false, v1alpha2.MondooOperatorConfig{})
+	assert.Equal(t, "1", envValue(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env))
+	ds := DaemonSet(*m, false, "test-image:latest", v1alpha2.MondooOperatorConfig{}, nil)
+	assert.Equal(t, "1", envValue(ds.Spec.Template.Spec.Containers[0].Env))
+
+	m.Spec.Nodes.Env = []corev1.EnvVar{{Name: "MONDOO_PARALLELISM", Value: "4"}}
+	cj = CronJob("test-image:latest", node, m, false, v1alpha2.MondooOperatorConfig{})
+	assert.Equal(t, "4", envValue(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env))
+	ds = DaemonSet(*m, false, "test-image:latest", v1alpha2.MondooOperatorConfig{}, nil)
+	assert.Equal(t, "4", envValue(ds.Spec.Template.Spec.Containers[0].Env))
+}
+
 func TestResources_GOMEMLIMIT(t *testing.T) {
 	tests := []struct {
 		name               string
