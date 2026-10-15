@@ -1197,7 +1197,7 @@ of them large, so they are configured separately and keep `IfNotPresent` unless 
 
 Two cases where this matters:
 
-- **`Always`** — you publish a moving tag such as `13-rootless` and want each scan to pick up the
+- **`Always`** — you publish a moving tag such as `14-rootless` and want each scan to pick up the
   newest push. Prefer pinning `spec.scanner.image.digest` when you need reproducibility instead.
 - **`Never`** — an air-gapped cluster where images are preloaded onto the nodes and any registry
   round trip would fail. Set both fields. Note that the third-party init container images
