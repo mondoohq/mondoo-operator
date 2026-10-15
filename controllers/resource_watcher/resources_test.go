@@ -319,9 +319,6 @@ func TestDeployment_WithInvalidLabelSelectorReturnsError(t *testing.T) {
 	var selectorErr k8s.InvalidLabelSelectorError
 	require.ErrorAs(t, err, &selectorErr)
 	assert.Contains(t, err.Error(), "filtering.objectLabelSelector")
-	var selectorErr k8s.InvalidLabelSelectorError
-	require.ErrorAs(t, err, &selectorErr)
-	assert.Contains(t, err.Error(), "filtering.objectLabelSelector")
 }
 
 func TestDeployment_WithoutLabelSelectorsOmitsSelectorArgs(t *testing.T) {
