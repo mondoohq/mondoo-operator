@@ -439,13 +439,13 @@ func runtimeCacheWithScannerSet(cache v1alpha2.RuntimeCacheScanner, set *v1alpha
 	if resourceRequirementsConfigured(set.Resources) {
 		cache.Resources = set.Resources
 	}
-	if len(set.NodeSelector) > 0 {
+	if set.NodeSelector != nil {
 		cache.NodeSelector = set.NodeSelector
 	}
 	if set.Affinity != nil {
 		cache.Affinity = set.Affinity
 	}
-	if len(set.Tolerations) > 0 {
+	if set.Tolerations != nil {
 		cache.Tolerations = set.Tolerations
 	}
 	if set.PriorityClassName != "" {
@@ -545,19 +545,15 @@ func DaemonSetNameForScannerSet(prefix, scannerSetName string) string {
 		return DaemonSetName(prefix)
 	}
 	base := fmt.Sprintf("%s-runtime-cache-", prefix)
-	allowedLen := k8s.DaemonSetNameChildResourceSafeMaxLength - len(base)
-	if allowedLen > 0 {
-		return fmt.Sprintf("%s%s", base, scannerSetNameOrHash(allowedLen, scannerSetName))
+	maxLen := k8s.DaemonSetNameChildResourceSafeMaxLength
+	if len(base)+len(scannerSetName) <= maxLen {
+		return base + scannerSetName
 	}
-
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(scannerSetName)))[:8]
-	maxBaseLen := k8s.DaemonSetNameChildResourceSafeMaxLength - len(hash) - 1
+	maxBaseLen := maxLen - len(hash) - 1
 	trimmedBase := strings.TrimRight(base, "-")
 	if len(trimmedBase) > maxBaseLen {
 		trimmedBase = strings.TrimRight(trimmedBase[:maxBaseLen], "-")
-	}
-	if trimmedBase == "" {
-		return hash[:8]
 	}
 	return fmt.Sprintf("%s-%s", trimmedBase, hash)
 }

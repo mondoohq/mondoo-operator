@@ -964,6 +964,16 @@ func (s *DeploymentHandlerSuite) TestUpdateDaemonSetScanStatus() {
 	}
 }
 
+func (s *DeploymentHandlerSuite) TestUpdateDaemonSetScanStatusFailureTakesPrecedenceOverPending() {
+	d := DeploymentHandler{Mondoo: &v1alpha2.MondooAuditConfig{}}
+	d.updateDaemonSetScanStatus([]appsv1.DaemonSet{
+		{Status: appsv1.DaemonSetStatus{}},
+		{Status: appsv1.DaemonSetStatus{DesiredNumberScheduled: 2, CurrentNumberScheduled: 1}},
+	})
+	s.Require().Len(d.Mondoo.Status.Scans, 1)
+	s.Equal(v1alpha2.MondooAuditConfigScanPhaseFailed, d.Mondoo.Status.Scans[0].Phase)
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_NodeScanningOOMStatus() {
 	s.seedNodes()
 	d := s.createDeploymentHandler()

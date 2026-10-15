@@ -605,17 +605,20 @@ func (n *DeploymentHandler) updateDaemonSetScanStatus(daemonSets []appsv1.Daemon
 		mondoo.ReplaceScanStatuses(n.Mondoo, v1alpha2.MondooAuditConfigScanTypeNodes, status)
 		return
 	}
+	pending := false
 	for i := range daemonSets {
 		ds := daemonSets[i]
 		if ds.Status.DesiredNumberScheduled == 0 {
-			status.Phase = v1alpha2.MondooAuditConfigScanPhasePending
-			status.Message = "Node scanning DaemonSet has not reported desired nodes yet"
-			break
+			pending = true
 		} else if ds.Status.CurrentNumberScheduled < ds.Status.DesiredNumberScheduled {
 			status.Phase = v1alpha2.MondooAuditConfigScanPhaseFailed
 			status.Message = "Node scanning DaemonSet is not scheduled on all desired nodes"
 			break
 		}
+	}
+	if status.Phase == v1alpha2.MondooAuditConfigScanPhaseRunning && pending {
+		status.Phase = v1alpha2.MondooAuditConfigScanPhasePending
+		status.Message = "Node scanning DaemonSet has not reported desired nodes yet"
 	}
 	mondoo.ReplaceScanStatuses(n.Mondoo, v1alpha2.MondooAuditConfigScanTypeNodes, status)
 }

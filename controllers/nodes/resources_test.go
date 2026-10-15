@@ -347,6 +347,7 @@ func TestDaemonSetNameForScannerSetUsesDaemonSetLengthBudget(t *testing.T) {
 	name := DaemonSetNameForScannerSet(prefix, "workers")
 	assert.LessOrEqual(t, len(name), k8s.DaemonSetNameChildResourceSafeMaxLength)
 	assert.Greater(t, len(name), k8s.ResourceNameMaxLength)
+	assert.NotEqual(t, name, DaemonSetNameForScannerSet(prefix, "control-plane"))
 }
 
 func TestValidateScannerSets(t *testing.T) {
