@@ -356,13 +356,13 @@ func nodeScannerSpecForSet(nodes v1alpha2.Nodes, set *v1alpha2.NodeScannerSet) v
 	if resourceRequirementsConfigured(set.Resources) {
 		nodes.Resources = set.Resources
 	}
-	if len(set.NodeSelector) > 0 {
+	if set.NodeSelector != nil {
 		nodes.NodeSelector = set.NodeSelector
 	}
 	if set.Affinity != nil {
 		nodes.Affinity = set.Affinity
 	}
-	if len(set.Tolerations) > 0 {
+	if set.Tolerations != nil {
 		nodes.Tolerations = set.Tolerations
 	}
 	if set.PriorityClassName != "" {
@@ -379,7 +379,7 @@ func resourceRequirementsConfigured(resources corev1.ResourceRequirements) bool 
 }
 
 func nodeScannerTolerations(nodes v1alpha2.Nodes, inherited []corev1.Toleration) []corev1.Toleration {
-	if len(nodes.Tolerations) > 0 {
+	if nodes.Tolerations != nil {
 		return nodes.Tolerations
 	}
 	return inherited
