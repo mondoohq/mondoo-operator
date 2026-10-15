@@ -101,9 +101,10 @@ func CronJob(image, renderImage string, node corev1.Node, m *v1alpha2.MondooAudi
 							},
 						},
 						Spec: corev1.PodSpec{
-							NodeName:      node.Name,
-							RestartPolicy: corev1.RestartPolicyOnFailure,
-							Tolerations:   k8s.TaintsToTolerations(node.Spec.Taints),
+							NodeName:          node.Name,
+							PriorityClassName: m.Spec.Nodes.PriorityClassName,
+							RestartPolicy:     corev1.RestartPolicyOnFailure,
+							Tolerations:       k8s.TaintsToTolerations(node.Spec.Taints),
 							// The node scanning does not use the Kubernetes API at all, therefore the service account token
 							// should not be mounted at all.
 							AutomountServiceAccountToken: ptr.To(false),
@@ -139,7 +140,7 @@ func CronJob(image, renderImage string, node corev1.Node, m *v1alpha2.MondooAudi
 									}, proxyEnvVars...), m.Spec.Nodes.Env),
 									TerminationMessagePath:   "/dev/termination-log",
 									TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-									ImagePullPolicy:          corev1.PullIfNotPresent,
+									ImagePullPolicy:          m.Spec.Scanner.Image.PullPolicyOrDefault(),
 								},
 							},
 							Volumes: []corev1.Volume{
@@ -263,7 +264,7 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image, renderImag
 							},
 							TerminationMessagePath:   "/dev/termination-log",
 							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-							ImagePullPolicy:          corev1.PullIfNotPresent,
+							ImagePullPolicy:          m.Spec.Scanner.Image.PullPolicyOrDefault(),
 							VolumeMounts: []corev1.VolumeMount{
 								{Name: "root", ReadOnly: true, MountPath: "/mnt/host/"},
 								{Name: "config", ReadOnly: true, MountPath: "/etc/opt/"},
