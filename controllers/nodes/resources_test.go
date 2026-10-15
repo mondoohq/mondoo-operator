@@ -17,7 +17,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/tests/framework/utils"
-	"go.mondoo.com/mql/v13/providers-sdk/v1/inventory"
+	"go.mondoo.com/mql/providers-sdk/v1/inventory"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

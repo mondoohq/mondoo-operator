@@ -113,6 +113,7 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
+	envVars = append(envVars, corev1.EnvVar{Name: constants.MondooParallelismEnv, Value: constants.DefaultMondooParallelism})
 
 	// Add proxy environment variables if not skipped for cnspec components
 	if !cfg.Spec.SkipProxyForCnspec {

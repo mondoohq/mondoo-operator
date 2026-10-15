@@ -21,7 +21,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/gomemlimit"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	mondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
-	"go.mondoo.com/mql/v13/providers-sdk/v1/inventory"
+	"go.mondoo.com/mql/providers-sdk/v1/inventory"
 )
 
 const (

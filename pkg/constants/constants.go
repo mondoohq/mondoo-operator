@@ -29,6 +29,13 @@ const (
 	MondooAuditConfigAnnotation          = "mondoo.com/audit-config/name"
 	MondooAuditConfigNamespaceAnnotation = "mondoo.com/audit-config/namespace"
 	MondooClusterNameAnnotation          = "mondoo.com/audit-config/cluster-name"
+
+	// MondooParallelismEnv sets how many assets cnspec scans in parallel. cnspec v14 changed the
+	// default from sequential to a per-provider value, which multiplies memory use within the
+	// scan pod's fixed limits, so the operator keeps scans sequential. Users can override it
+	// through the scanner/containers env.
+	MondooParallelismEnv     = "MONDOO_PARALLELISM"
+	DefaultMondooParallelism = "1"
 )
 
 // AuditConfigAnnotations returns operator-managed annotations identifying the
