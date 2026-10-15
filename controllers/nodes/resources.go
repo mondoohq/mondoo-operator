@@ -417,19 +417,18 @@ func DaemonSetNameForScannerSet(prefix, scannerSetName string) string {
 		return DaemonSetName(prefix)
 	}
 	base := fmt.Sprintf("%s%s-", prefix, DaemonSetNameBase)
-	allowedLen := k8s.DaemonSetNameChildResourceSafeMaxLength - len(base)
-	if allowedLen > 0 {
-		return fmt.Sprintf("%s%s", base, NodeNameOrHash(allowedLen, scannerSetName))
-	}
-
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(scannerSetName)))[:8]
-	maxBaseLen := k8s.DaemonSetNameChildResourceSafeMaxLength - len(hash) - 1
+	maxLen := k8s.DaemonSetNameChildResourceSafeMaxLength
+	if len(base)+len(scannerSetName) <= maxLen {
+		return base + scannerSetName
+	}
+	maxBaseLen := maxLen - len(hash) - 1
 	trimmedBase := strings.TrimRight(base, "-")
 	if len(trimmedBase) > maxBaseLen {
 		trimmedBase = strings.TrimRight(trimmedBase[:maxBaseLen], "-")
 	}
 	if trimmedBase == "" {
-		return hash[:int(math.Min(float64(len(hash)), float64(k8s.DaemonSetNameChildResourceSafeMaxLength)))]
+		return hash
 	}
 	return fmt.Sprintf("%s-%s", trimmedBase, hash)
 }
