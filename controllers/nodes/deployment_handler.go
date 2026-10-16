@@ -99,7 +99,11 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 
 	nodes := &corev1.NodeList{}
-	if err := n.KubeClient.List(ctx, nodes); err != nil {
+	nodeListOpts, err := nodeListOptions(n.Mondoo)
+	if err != nil {
+		return err
+	}
+	if err := n.KubeClient.List(ctx, nodes, nodeListOpts...); err != nil {
 		n.log().Error(err, "Failed to list cluster nodes")
 		return err
 	}
@@ -112,18 +116,16 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 		n.log().Error(err, "Failed to clean up node scanning DaemonSet", "namespace", ds.Namespace, "name", ds.Name)
 		return err
 	}
+	if err := n.cleanupLegacyPerNodeResources(ctx); err != nil {
+		return err
+	}
+
+	if err := n.syncConfigMap(ctx, clusterUid); err != nil {
+		return err
+	}
 
 	// Create/update CronJobs for nodes
 	for _, node := range nodes.Items {
-		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ConfigMapNameWithNode(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace}}
-		if err := k8s.DeleteIfExists(ctx, n.KubeClient, cm); err != nil {
-			n.log().Error(err, "Failed to clean up old ConfigMap for node scanning", "namespace", cm.Namespace, "name", cm.Name)
-			return err
-		}
-
-		if err := n.syncConfigMap(ctx, clusterUid); err != nil {
-			return err
-		}
 
 		desired := CronJob(mondooClientImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
 		cronJob := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
@@ -205,8 +207,23 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 	}
 
 	nodes := &corev1.NodeList{}
-	if err := n.KubeClient.List(ctx, nodes); err != nil {
+	nodeListOpts, err := nodeListOptions(n.Mondoo)
+	if err != nil {
+		return err
+	}
+	if err := n.KubeClient.List(ctx, nodes, nodeListOpts...); err != nil {
 		n.log().Error(err, "Failed to list cluster nodes")
+		return err
+	}
+
+	if err := n.cleanupCronJobsForDeletedNodes(ctx, *nodes); err != nil {
+		return err
+	}
+	if err := n.cleanupLegacyPerNodeResources(ctx); err != nil {
+		return err
+	}
+
+	if err := n.syncConfigMap(ctx, clusterUid); err != nil {
 		return err
 	}
 
@@ -224,10 +241,6 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ConfigMapNameWithNode(n.Mondoo.Name, node.Name), Namespace: n.Mondoo.Namespace}}
 		if err := k8s.DeleteIfExists(ctx, n.KubeClient, cm); err != nil {
 			n.log().Error(err, "Failed to clean up old ConfigMap for node scanning", "namespace", cm.Namespace, "name", cm.Name)
-			return err
-		}
-
-		if err := n.syncConfigMap(ctx, clusterUid); err != nil {
 			return err
 		}
 
@@ -298,6 +311,17 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 	return nil
 }
 
+func nodeListOptions(m *v1alpha2.MondooAuditConfig) ([]client.ListOption, error) {
+	if m.Spec.Nodes.LabelSelector == nil {
+		return nil, nil
+	}
+	selector, err := metav1.LabelSelectorAsSelector(m.Spec.Nodes.LabelSelector)
+	if err != nil {
+		return nil, err
+	}
+	return []client.ListOption{client.MatchingLabelsSelector{Selector: selector}}, nil
+}
+
 func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string) error {
 	integrationMrn, err := k8s.TryGetIntegrationMrnForAuditConfig(ctx, n.KubeClient, *n.Mondoo)
 	if err != nil {
@@ -318,6 +342,44 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string
 		return nil
 	}); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (n *DeploymentHandler) cleanupLegacyPerNodeResources(ctx context.Context) error {
+	listOpts := &client.ListOptions{
+		Namespace:     n.Mondoo.Namespace,
+		LabelSelector: labels.SelectorFromSet(NodeScanningLabels(*n.Mondoo)),
+	}
+
+	deployments := &appsv1.DeploymentList{}
+	if err := n.KubeClient.List(ctx, deployments, listOpts); err != nil {
+		logger.Error(err, "Failed to list legacy node scanning Deployments", "namespace", n.Mondoo.Namespace)
+		return err
+	}
+	for i := range deployments.Items {
+		deployment := &deployments.Items[i]
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, deployment); err != nil {
+			logger.Error(err, "Failed to clean up legacy node scanning Deployment", "namespace", deployment.Namespace, "name", deployment.Name)
+			return err
+		}
+	}
+
+	configMaps := &corev1.ConfigMapList{}
+	if err := n.KubeClient.List(ctx, configMaps, listOpts); err != nil {
+		logger.Error(err, "Failed to list legacy node scanning ConfigMaps", "namespace", n.Mondoo.Namespace)
+		return err
+	}
+	for i := range configMaps.Items {
+		configMap := &configMaps.Items[i]
+		if configMap.Name == ConfigMapName(n.Mondoo.Name) {
+			continue
+		}
+		if err := k8s.DeleteIfExists(ctx, n.KubeClient, configMap); err != nil {
+			logger.Error(err, "Failed to clean up legacy node scanning ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
+			return err
+		}
 	}
 
 	return nil
