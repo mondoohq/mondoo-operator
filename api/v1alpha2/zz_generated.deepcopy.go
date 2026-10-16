@@ -870,6 +870,11 @@ func (in *Nodes) DeepCopyInto(out *Nodes) {
 		}
 	}
 	out.ScheduleSpread = in.ScheduleSpread
+	if in.LabelSelector != nil {
+		in, out := &in.LabelSelector, &out.LabelSelector
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
 		*out = make([]corev1.EnvVar, len(*in))
