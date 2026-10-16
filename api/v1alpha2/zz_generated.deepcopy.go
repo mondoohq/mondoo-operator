@@ -827,6 +827,11 @@ func (in *NetworkInventorySpec) DeepCopy() *NetworkInventorySpec {
 func (in *Nodes) DeepCopyInto(out *Nodes) {
 	*out = *in
 	in.Resources.DeepCopyInto(&out.Resources)
+	if in.LabelSelector != nil {
+		in, out := &in.LabelSelector, &out.LabelSelector
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
 		*out = make([]corev1.EnvVar, len(*in))
