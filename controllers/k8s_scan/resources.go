@@ -17,7 +17,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/gomemlimit"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	mondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
-	"go.mondoo.com/mql/v13/providers-sdk/v1/inventory"
+	"go.mondoo.com/mql/providers-sdk/v1/inventory"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -74,6 +74,7 @@ func CronJob(image string, m *v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOpe
 
 	envVars := buildEnvVars(cfg)
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
+	envVars = append(envVars, corev1.EnvVar{Name: constants.MondooParallelismEnv, Value: constants.DefaultMondooParallelism})
 	envVars = append(envVars, corev1.EnvVar{Name: "GOMEMLIMIT", Value: gcLimit})
 	envVars = k8s.MergeEnv(envVars, m.Spec.Scanner.Env)
 
@@ -223,6 +224,7 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 
 	envVars := buildEnvVars(cfg)
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
+	envVars = append(envVars, corev1.EnvVar{Name: constants.MondooParallelismEnv, Value: constants.DefaultMondooParallelism})
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_TMP_DIR", Value: "/tmp"})
 	envVars = append(envVars, corev1.EnvVar{Name: "GOMEMLIMIT", Value: extGcLimit})
 	// Point KUBECONFIG to the mounted kubeconfig file

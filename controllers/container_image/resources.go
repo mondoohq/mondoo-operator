@@ -17,7 +17,7 @@ import (
 	"go.mondoo.com/mondoo-operator/pkg/utils/gomemlimit"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	mondoo "go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
-	"go.mondoo.com/mql/v13/providers-sdk/v1/inventory"
+	"go.mondoo.com/mql/providers-sdk/v1/inventory"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,6 +63,7 @@ func CronJob(image, integrationMrn, clusterUid, privateRegistrySecretName string
 
 	envVars := feature_flags.AllFeatureFlagsAsEnv()
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_AUTO_UPDATE", Value: "false"})
+	envVars = append(envVars, corev1.EnvVar{Name: constants.MondooParallelismEnv, Value: constants.DefaultMondooParallelism})
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_TMP_DIR", Value: "/tmp"})
 	envVars = append(envVars, corev1.EnvVar{Name: "GOMEMLIMIT", Value: gcLimit})
 	envVars = append(envVars, corev1.EnvVar{Name: "MONDOO_MAX_PROVIDER_CONNECTIONS", Value: defaultMaxProviderConnections})

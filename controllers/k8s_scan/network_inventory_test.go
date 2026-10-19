@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
-	"go.mondoo.com/mql/v13/providers-sdk/v1/inventory"
+	"go.mondoo.com/mql/providers-sdk/v1/inventory"
 )
 
 func TestNetworkInventoryOption(t *testing.T) {

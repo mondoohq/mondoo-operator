@@ -36,8 +36,8 @@ func IsGlobPattern(s string) bool {
 // MondooAuditConfig selects the same namespaces whether it is evaluated here or
 // inside a scan job.
 type NamespaceFilter struct {
-	include []glob.Glob
-	exclude []glob.Glob
+	include []*glob.Pattern
+	exclude []*glob.Pattern
 }
 
 // NewNamespaceFilter compiles the include and exclude patterns. It returns an
@@ -74,12 +74,12 @@ func (f *NamespaceFilter) Allow(namespace string) bool {
 	return !matchesAny(f.exclude, namespace)
 }
 
-func compileGlobs(patterns []string) ([]glob.Glob, error) {
+func compileGlobs(patterns []string) ([]*glob.Pattern, error) {
 	if len(patterns) == 0 {
 		return nil, nil
 	}
 
-	compiled := make([]glob.Glob, 0, len(patterns))
+	compiled := make([]*glob.Pattern, 0, len(patterns))
 	for _, p := range patterns {
 		g, err := glob.Compile(p)
 		if err != nil {
@@ -90,8 +90,8 @@ func compileGlobs(patterns []string) ([]glob.Glob, error) {
 	return compiled, nil
 }
 
-func matchesAny(globs []glob.Glob, s string) bool {
-	return slices.ContainsFunc(globs, func(g glob.Glob) bool { return g.Match(s) })
+func matchesAny(globs []*glob.Pattern, s string) bool {
+	return slices.ContainsFunc(globs, func(g *glob.Pattern) bool { return g.Match(s) })
 }
 
 // AllowNamespace reports whether the namespace is in scope for the given include

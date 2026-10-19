@@ -18,7 +18,7 @@ import (
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
-	"go.mondoo.com/mql/v13/providers-sdk/v1/inventory"
+	"go.mondoo.com/mql/providers-sdk/v1/inventory"
 )
 
 const testClusterUID = "abcdefg"
@@ -295,6 +295,18 @@ func TestCronJob_SkipProxyForCnspec(t *testing.T) {
 	_, hasHTTPSProxy := envMap["HTTPS_PROXY"]
 	assert.False(t, hasHTTPProxy, "HTTP_PROXY should not be set when SkipProxyForCnspec is true")
 	assert.False(t, hasHTTPSProxy, "HTTPS_PROXY should not be set when SkipProxyForCnspec is true")
+}
+
+func TestCronJob_Parallelism(t *testing.T) {
+	cj := CronJob("test-image:latest", testAuditConfig(), v1alpha2.MondooOperatorConfig{})
+	envMap := envToMap(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+	assert.Equal(t, "1", envMap["MONDOO_PARALLELISM"])
+
+	m := testAuditConfig()
+	m.Spec.Scanner.Env = []corev1.EnvVar{{Name: "MONDOO_PARALLELISM", Value: "4"}}
+	cj = CronJob("test-image:latest", m, v1alpha2.MondooOperatorConfig{})
+	envMap = envToMap(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+	assert.Equal(t, "4", envMap["MONDOO_PARALLELISM"])
 }
 
 func TestCronJob_WithImagePullSecrets(t *testing.T) {
