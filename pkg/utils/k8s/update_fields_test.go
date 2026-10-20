@@ -22,7 +22,8 @@ func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{{Name: "test", Image: "test:latest"}},
+							InitContainers: []corev1.Container{{Name: "init", Image: "busybox:1.36"}},
+							Containers:     []corev1.Container{{Name: "test", Image: "test:latest"}},
 							ImagePullSecrets: []corev1.LocalObjectReference{
 								{Name: "my-secret"},
 								{Name: "another-secret"},
@@ -38,6 +39,7 @@ func TestUpdateCronJobFields_ImagePullSecrets(t *testing.T) {
 	UpdateCronJobFields(obj, desired)
 
 	assert.Equal(t, desired.Spec.Schedule, obj.Spec.Schedule)
+	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.InitContainers, obj.Spec.JobTemplate.Spec.Template.Spec.InitContainers)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.Containers, obj.Spec.JobTemplate.Spec.Template.Spec.Containers)
 	assert.Equal(t, desired.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets, obj.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets)
 }
@@ -136,7 +138,8 @@ func TestUpdateDeploymentFields_ImagePullSecrets(t *testing.T) {
 		Spec: appsv1.DeploymentSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{Name: "test", Image: "test:latest"}},
+					InitContainers: []corev1.Container{{Name: "init", Image: "busybox:1.36"}},
+					Containers:     []corev1.Container{{Name: "test", Image: "test:latest"}},
 					ImagePullSecrets: []corev1.LocalObjectReference{
 						{Name: "my-secret"},
 					},
@@ -149,6 +152,7 @@ func TestUpdateDeploymentFields_ImagePullSecrets(t *testing.T) {
 	UpdateDeploymentFields(obj, desired)
 
 	assert.Equal(t, desired.Spec.Template.Spec.ImagePullSecrets, obj.Spec.Template.Spec.ImagePullSecrets)
+	assert.Equal(t, desired.Spec.Template.Spec.InitContainers, obj.Spec.Template.Spec.InitContainers)
 	assert.Equal(t, desired.Spec.Template.Spec.Containers, obj.Spec.Template.Spec.Containers)
 }
 
@@ -178,7 +182,8 @@ func TestUpdateDaemonSetFields_ImagePullSecrets(t *testing.T) {
 		Spec: appsv1.DaemonSetSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{Name: "test", Image: "test:latest"}},
+					InitContainers: []corev1.Container{{Name: "init", Image: "busybox:1.36"}},
+					Containers:     []corev1.Container{{Name: "test", Image: "test:latest"}},
 					ImagePullSecrets: []corev1.LocalObjectReference{
 						{Name: "my-secret"},
 					},
@@ -191,6 +196,7 @@ func TestUpdateDaemonSetFields_ImagePullSecrets(t *testing.T) {
 	UpdateDaemonSetFields(obj, desired)
 
 	assert.Equal(t, desired.Spec.Template.Spec.ImagePullSecrets, obj.Spec.Template.Spec.ImagePullSecrets)
+	assert.Equal(t, desired.Spec.Template.Spec.InitContainers, obj.Spec.Template.Spec.InitContainers)
 	assert.Equal(t, desired.Spec.Template.Spec.Containers, obj.Spec.Template.Spec.Containers)
 }
 
