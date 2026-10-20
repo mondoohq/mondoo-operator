@@ -118,7 +118,8 @@ func TestCacheTransform_PassesUnknownTypesThrough(t *testing.T) {
 }
 
 func TestCacheTransform_HandlesEveryWatchedResourceType(t *testing.T) {
-	watcher := NewResourceWatcher(nil, nil, WatcherConfig{})
+	watcher, err := NewResourceWatcher(nil, nil, WatcherConfig{})
+	require.NoError(t, err)
 	types := append([]string{}, DefaultResourceTypes...)
 	types = append(types, "configmaps", "secrets", "serviceaccounts")
 

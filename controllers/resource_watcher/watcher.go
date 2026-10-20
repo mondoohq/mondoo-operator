@@ -246,7 +246,8 @@ func normalizeResourceType(resourceType string) string {
 	}
 }
 
-// shouldWatchNamespace returns true if the namespace should be watched.
+// shouldWatchNamespace returns true if the namespace should be watched. Include
+// and exclude entries may be literal names or glob patterns such as "prod-*".
 func (w *ResourceWatcher) shouldWatchNamespace(namespace string) bool {
 	return w.nsFilter.Allow(namespace)
 }
