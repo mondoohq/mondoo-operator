@@ -12,6 +12,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -105,9 +106,11 @@ func TestCacheTransform_DropsPayload(t *testing.T) {
 }
 
 func TestCacheTransform_PassesUnknownTypesThrough(t *testing.T) {
-	obj := &corev1.Endpoints{
+	obj := &corev1.ResourceQuota{
 		ObjectMeta: testMeta(),
-		Subsets:    []corev1.EndpointSubset{{Addresses: []corev1.EndpointAddress{{IP: "10.0.0.1"}}}},
+		Spec: corev1.ResourceQuotaSpec{
+			Hard: corev1.ResourceList{corev1.ResourcePods: resource.MustParse("10")},
+		},
 	}
 	want := obj.DeepCopy()
 
