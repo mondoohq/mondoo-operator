@@ -23,6 +23,13 @@ import (
 //
 // Labels stay. They are small next to a spec, and label based filtering of the
 // watched resources is in review in #1518.
+//
+// This transform is intentionally more aggressive than the operator's
+// transformPod and transformNode in cmd/mondoo-operator/operator/cache.go.
+// The operator cache keeps the spec and status fields its controllers read,
+// such as spec.nodeName and the container statuses for OOM detection, while
+// this cache serves no reads at all and can drop everything but metadata.
+// Keep the two separate; do not unify them.
 func CacheTransform(obj any) (any, error) {
 	switch o := obj.(type) {
 	case *appsv1.Deployment:
