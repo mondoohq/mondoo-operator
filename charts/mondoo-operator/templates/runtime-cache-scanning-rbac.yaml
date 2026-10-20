@@ -1,0 +1,37 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "mondoo-operator.fullname" . }}-runtime-cache-scanning
+  labels:
+  {{- include "mondoo-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - nodes
+  - pods
+  verbs:
+  - get
+  - watch
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "mondoo-operator.fullname" . }}-runtime-cache-scanning
+  labels:
+  {{- include "mondoo-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: '{{ include "mondoo-operator.fullname" . }}-runtime-cache-scanning'
+subjects:
+- kind: ServiceAccount
+  name: '{{ .Values.runtimeCacheScanning.serviceAccount.name | default (printf "%s-runtime-cache-scanning" (include "mondoo-operator.fullname" .)) }}'
+  namespace: '{{ .Release.Namespace }}'
+{{- range .Values.runtimeCacheScanning.extraClusterRoleBindingSubjects }}
+- kind: ServiceAccount
+  name: '{{ .name }}'
+  namespace: '{{ .namespace | default $.Release.Namespace }}'
+{{- end }}
