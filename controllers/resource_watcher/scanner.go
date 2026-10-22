@@ -6,6 +6,7 @@ package resource_watcher
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"sort"
@@ -41,6 +42,9 @@ type ScannerConfig struct {
 	NamespaceLabelSelector string
 	// ObjectLabelSelector is a label selector for objects to include in scanning.
 	ObjectLabelSelector string
+	// InheritNamespaceLabels are the namespace label keys (glob patterns allowed) that
+	// scanned workloads inherit from their namespace.
+	InheritNamespaceLabels []string
 	// ClusterUID is the unique identifier of the cluster.
 	ClusterUID string
 	// IntegrationMRN is the integration MRN for asset labeling.
@@ -173,6 +177,7 @@ func (s *Scanner) generateInventory(resources []K8sResourceIdentifier) ([]byte, 
 	if s.config.ObjectLabelSelector != "" {
 		opts[k8s.ObjectLabelSelectorOption] = s.config.ObjectLabelSelector
 	}
+	maps.Copy(opts, k8s.InheritNamespaceLabelsOptions(s.config.InheritNamespaceLabels))
 
 	managedBy := mondoo.ManagedByLabel(s.config.ClusterUID)
 
