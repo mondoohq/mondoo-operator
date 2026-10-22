@@ -80,6 +80,8 @@ func UpdateDaemonSetFields(obj, desired *appsv1.DaemonSet) {
 	ps.PriorityClassName = dps.PriorityClassName
 	ps.AutomountServiceAccountToken = dps.AutomountServiceAccountToken
 	ps.NodeSelector = dps.NodeSelector
+	// Copied unconditionally: a nil desired Affinity clears a node affinity that a
+	// previously set spec.nodes.labelSelector added.
 	ps.Affinity = dps.Affinity
 	ps.Tolerations = dps.Tolerations
 	ps.Containers = dps.Containers
