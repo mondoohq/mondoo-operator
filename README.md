@@ -139,6 +139,7 @@ spec:
 | Node Scanning                    |      ✅      |           ❌            |
 | Container Image Scanning         |      ✅      |           ✅            |
 | Namespace Filtering              |      ✅      |           ✅            |
+| Namespace Label Inheritance      |      ✅      |           ✅            |
 | Kubeconfig Auth                  |      -       |           ✅            |
 | Workload Identity (GKE/EKS/AKS) |      -       | ✅ ⚠️ Experimental      |
 | SPIFFE Auth                      |      -       | ✅ ⚠️ Experimental      |

@@ -14,6 +14,7 @@ This user manual describes how to install and use the Mondoo Operator.
     - [Filter Kubernetes objects based on namespace](#filter-kubernetes-objects-based-on-namespace)
       - [Wildcards](#wildcards)
     - [Filter Kubernetes objects based on labels](#filter-kubernetes-objects-based-on-labels)
+    - [Inherit namespace labels onto workloads](#inherit-namespace-labels-onto-workloads)
     - [Tune the network inventory](#tune-the-network-inventory)
   - [Scanning External Clusters](#scanning-external-clusters)
     - [Creating a kubeconfig Secret](#creating-a-kubeconfig-secret)
@@ -293,6 +294,44 @@ block), and the resource watcher. They require cnspec v13.30.1 or later.
 > **Note:** The resource watcher only receives events for objects that match
 > `objectLabelSelector`. If an object's labels change so that it no longer
 > matches, no final scan is triggered for it.
+
+### Inherit namespace labels onto workloads
+
+Namespaces often carry ownership facts, for example a team id, that the
+workloads inside them do not repeat. `inheritNamespaceLabels` lists the
+namespace label keys that every workload discovered in a namespace inherits
+from that namespace. Entries are label keys or glob patterns.
+
+```
+...
+spec:
+...
+  inheritNamespaceLabels:
+    - my.company.com/team
+    - my.company.com/*
+```
+
+With this configuration a namespace labeled `my.company.com/team: aaabbbccc`
+yields pods, deployments, jobs and the other workloads under it with the same
+label. A label the workload already carries is kept: the namespace only fills
+in keys the workload lacks and never overwrites or removes one.
+
+The typical use is asset routing. With scans reporting at organization scope,
+one routing rule per team (`LABEL my.company.com/team EQUAL <team id>`, target:
+the team's space) places every workload of that team's namespaces in the
+team's space, and a catch-all rule takes the workloads of namespaces without
+the label.
+
+The setting applies to the scheduled Kubernetes resources scan, external
+clusters, the container image scan, and the resource watcher, so a rescan by
+any of them keeps the inherited labels. Container images are not labeled yet:
+an image is shared by every namespace that runs it, and the rule for it is
+planned separately. The feature requires the first k8s provider release after
+14.2.0 (mondoohq/mql#12086) in the cnspec image the operator uses.
+
+> **Note:** Remote-managed configurations (`remoteManaged: true`) are rebuilt
+> from the Console on every reconcile and do not pick this field up from the
+> local `MondooAuditConfig` until the Console exposes it.
 
 ### Tune the network inventory
 

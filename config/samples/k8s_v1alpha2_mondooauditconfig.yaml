@@ -254,3 +254,10 @@ spec:
     #   matchExpressions:
     #     - key: scan.mondoo.com/disabled
     #       operator: DoesNotExist
+
+  # Copy selected namespace labels onto every workload discovered in that namespace
+  # (glob patterns allowed). A label the workload already carries is kept.
+  # Requires the first k8s provider release after 14.2.0 (mondoohq/mql#12086).
+  # inheritNamespaceLabels:
+  #   - my.company.com/team
+  #   - my.company.com/*
