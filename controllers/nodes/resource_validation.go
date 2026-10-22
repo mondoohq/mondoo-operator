@@ -35,8 +35,9 @@ const nodeScanMemoryLimitWarnRatio = 0.7
 // Both a missing/zero limit and missing/zero allocatable memory are treated as "not
 // unsafe": there is nothing meaningful to compare.
 func UnsafeNodeScanMemoryLimit(resources corev1.ResourceRequirements, node corev1.Node) (limit, allocatable resource.Quantity, unsafe bool) {
+	// Limits.Memory() never returns nil: a missing key yields a zero quantity.
 	memLimit := resources.Limits.Memory()
-	if memLimit == nil || memLimit.IsZero() {
+	if memLimit.IsZero() {
 		return resource.Quantity{}, resource.Quantity{}, false
 	}
 
