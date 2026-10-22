@@ -163,3 +163,29 @@ func oomPodList() *corev1.PodList {
 		},
 	}
 }
+
+func TestConditions_OOM_ReportsTheScanContainerLimit(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Containers: v1alpha2.Containers{Enable: true},
+		},
+	}
+
+	// The kubelet sorts container statuses by name, a sidecar can therefore sit
+	// at a different index in the spec than in the status.
+	podList := oomPodList()
+	pod := &podList.Items[0]
+	pod.Spec.Containers = append([]corev1.Container{{
+		Name: "zzz-sidecar",
+		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("64Mi")},
+		},
+	}}, pod.Spec.Containers...)
+	pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, corev1.ContainerStatus{Name: "zzz-sidecar"})
+
+	updateImageScanningConditions(config, true, podList)
+
+	cond := config.Status.Conditions[0]
+	assert.Equal(t, oomMessage, cond.Message)
+	assert.Equal(t, "1Gi", cond.MemoryLimit)
+}
