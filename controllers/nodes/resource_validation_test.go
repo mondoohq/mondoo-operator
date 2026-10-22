@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -116,4 +118,27 @@ func TestNodeScanMemoryLimitWarning_ReportsPercentage(t *testing.T) {
 	)
 	assert.True(t, unsafe)
 	assert.Contains(t, nodeScanMemoryLimitWarning(limit, allocatable), "100%")
+}
+
+func TestUnsafeNodeScanMemoryLimit_FollowsNodeScanProfile(t *testing.T) {
+	// The warning must evaluate the limit a node actually gets, which a matching
+	// profile overrides. This mirrors the resolution used by CronJob().
+	nodes := v1alpha2.Nodes{
+		Resources: resourcesWithMemoryLimit("8G"),
+		Profiles: []v1alpha2.NodeScanProfile{{
+			Name:         "small",
+			NodeSelector: map[string]string{"size": "small"},
+			Resources:    resourcesWithMemoryLimit("1G"),
+		}},
+	}
+
+	small := nodeWithAllocatableMemory("4G")
+	small.Labels = map[string]string{"size": "small"}
+	_, _, unsafe := UnsafeNodeScanMemoryLimit(ProfileResources(nodes, ProfileForNode(nodes, small)), small)
+	assert.False(t, unsafe, "profile limit of 1G on a 4G node is safe even though the base limit is 8G")
+
+	large := nodeWithAllocatableMemory("4G")
+	large.Labels = map[string]string{"size": "large"}
+	_, _, unsafe = UnsafeNodeScanMemoryLimit(ProfileResources(nodes, ProfileForNode(nodes, large)), large)
+	assert.True(t, unsafe, "unmatched node falls back to the 8G base limit, which exceeds 4G")
 }

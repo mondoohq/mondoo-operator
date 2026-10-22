@@ -136,8 +136,11 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 			return err
 		}
 
+		// Check the limit the node actually gets: a matching node scan profile overrides
+		// spec.nodes.resources, so the warning has to follow the same resolution as CronJob().
+		nodeResources := ProfileResources(n.Mondoo.Spec.Nodes, ProfileForNode(n.Mondoo.Spec.Nodes, node))
 		if limit, allocatable, unsafe := UnsafeNodeScanMemoryLimit(
-			k8s.ResourcesRequirementsWithDefaults(n.Mondoo.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources),
+			k8s.ResourcesRequirementsWithDefaults(nodeResources, k8s.DefaultNodeScanningResources),
 			node,
 		); unsafe {
 			unsafeMemoryNodes = append(unsafeMemoryNodes, node.Name)
