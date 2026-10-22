@@ -230,10 +230,12 @@ func (s *DeploymentHandlerSuite) TestReconcile_K8sResourceScanningStatus() {
 	s.Equal("local", scanStatus.Target)
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_NetworkInventoryConfigErrorCondition() {
-	s.auditConfig.Spec.KubernetesResources.NetworkInventory = mondoov1alpha2.NetworkInventorySpec{
-		Classifications: mondoov1alpha2.NetworkInventoryClassifications{
-			PublicCIDRs: []string{"not-a-cidr"},
+func (s *DeploymentHandlerSuite) TestReconcile_InvalidKyvernoConfigCondition() {
+	enabled := true
+	s.auditConfig.Spec.KubernetesResources.Kyverno = mondoov1alpha2.KyvernoSpec{
+		Enable: &enabled,
+		MappingAnnotations: mondoov1alpha2.KyvernoMappingAnnotationsSpec{
+			CheckUIDs: []string{"example.com/check,uid"},
 		},
 	}
 	d := s.createDeploymentHandler()
@@ -245,17 +247,19 @@ func (s *DeploymentHandlerSuite) TestReconcile_NetworkInventoryConfigErrorCondit
 
 	s.Require().Len(d.Mondoo.Status.Conditions, 1)
 	condition := d.Mondoo.Status.Conditions[0]
-	s.Equal("KubernetesResourcesScanConfigInvalid", condition.Reason)
-	s.Contains(condition.Message, "publicCidrs")
+	s.Equal("InvalidKyvernoConfig", condition.Reason)
+	s.Contains(condition.Message, "kyverno-mapping-annotation-check-uids")
 	s.Equal(corev1.ConditionTrue, condition.Status)
 	s.Equal(mondoov1alpha2.K8sResourcesScanningDegraded, condition.Type)
 }
 
-func (s *DeploymentHandlerSuite) TestReconcile_ExternalClusterNetworkInventoryConfigErrorCondition() {
+func (s *DeploymentHandlerSuite) TestReconcile_ExternalClusterInvalidKyvernoConfigCondition() {
+	enabled := true
 	s.auditConfig.Spec.KubernetesResources.Enable = false
-	s.auditConfig.Spec.KubernetesResources.NetworkInventory = mondoov1alpha2.NetworkInventorySpec{
-		Classifications: mondoov1alpha2.NetworkInventoryClassifications{
-			PrivateCIDRs: []string{"10.0.0.0/33"},
+	s.auditConfig.Spec.KubernetesResources.Kyverno = mondoov1alpha2.KyvernoSpec{
+		Enable: &enabled,
+		ExceptionAnnotations: mondoov1alpha2.KyvernoExceptionAnnotationsSpec{
+			Owners: []string{"example.com/owner,team"},
 		},
 	}
 	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
@@ -275,8 +279,8 @@ func (s *DeploymentHandlerSuite) TestReconcile_ExternalClusterNetworkInventoryCo
 
 	s.Require().Len(d.Mondoo.Status.Conditions, 1)
 	condition := d.Mondoo.Status.Conditions[0]
-	s.Equal("KubernetesResourcesScanConfigInvalid", condition.Reason)
-	s.Contains(condition.Message, "privateCidrs")
+	s.Equal("InvalidKyvernoConfig", condition.Reason)
+	s.Contains(condition.Message, "kyverno-exception-annotation-owners")
 	s.Equal(corev1.ConditionTrue, condition.Status)
 	s.Equal(mondoov1alpha2.K8sResourcesScanningDegraded, condition.Type)
 }
