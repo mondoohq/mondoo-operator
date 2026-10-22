@@ -503,7 +503,9 @@ func nodeSelectorOperator(operator metav1.LabelSelectorOperator) corev1.NodeSele
 		// Unreachable in practice: syncDaemonSet validates the selector through
 		// nodeListOptions (metav1.LabelSelectorAsSelector) before building the DaemonSet,
 		// and that rejects unknown operators. Keep a safe fallback for direct callers.
-		logger.Info("Unknown label selector operator, defaulting to In", "operator", operator)
+		// logr has no warn level; Error with a nil error is the repo's idiom for a
+		// condition that should surface in monitoring without failing the reconcile.
+		logger.Error(nil, "Unknown label selector operator, defaulting to In", "operator", operator)
 		return corev1.NodeSelectorOpIn
 	}
 }
