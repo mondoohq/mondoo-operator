@@ -500,6 +500,9 @@ func nodeSelectorOperator(operator metav1.LabelSelectorOperator) corev1.NodeSele
 	case metav1.LabelSelectorOpDoesNotExist:
 		return corev1.NodeSelectorOpDoesNotExist
 	default:
+		// Unreachable in practice: syncDaemonSet validates the selector through
+		// nodeListOptions (metav1.LabelSelectorAsSelector) before building the DaemonSet,
+		// and that rejects unknown operators. Keep a safe fallback for direct callers.
 		logger.Info("Unknown label selector operator, defaulting to In", "operator", operator)
 		return corev1.NodeSelectorOpIn
 	}

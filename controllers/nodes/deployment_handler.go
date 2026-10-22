@@ -382,6 +382,10 @@ func (n *DeploymentHandler) syncConfigMap(ctx context.Context, clusterUid string
 	return nil
 }
 
+// cleanupLegacyPerNodeResources removes the per-node Deployments and ConfigMaps that
+// older operator versions created. Both lists go through the cached client and are
+// filtered by the node scanning labels, so they are cheap once nothing is left.
+// TODO: drop this migration path once releases that created those resources are out of support.
 func (n *DeploymentHandler) cleanupLegacyPerNodeResources(ctx context.Context) error {
 	listOpts := &client.ListOptions{
 		Namespace:     n.Mondoo.Namespace,
