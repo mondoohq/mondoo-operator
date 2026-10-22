@@ -536,6 +536,11 @@ func (in *MondooAuditConfigSpec) DeepCopyInto(out *MondooAuditConfigSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.InheritNamespaceLabels != nil {
+		in, out := &in.InheritNamespaceLabels, &out.InheritNamespaceLabels
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	in.JobOverrides.DeepCopyInto(&out.JobOverrides)
 	if in.Admission != nil {
 		in, out := &in.Admission, &out.Admission

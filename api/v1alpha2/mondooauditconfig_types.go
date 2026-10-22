@@ -41,6 +41,14 @@ type MondooAuditConfigSpec struct {
 	// and filterable in the Mondoo Console.
 	Annotations map[string]string `json:"annotations,omitempty"`
 
+	// InheritNamespaceLabels lists namespace label keys that every workload discovered in a
+	// namespace inherits from that namespace, for example "my.company.com/team". Glob patterns
+	// are allowed ("my.company.com/*"). A label the workload already carries is kept. Applies to
+	// the Kubernetes resources scan, external clusters, the container image scan and the
+	// resource watcher. Requires a cnspec image whose k8s provider supports it.
+	// +optional
+	InheritNamespaceLabels []string `json:"inheritNamespaceLabels,omitempty"`
+
 	// JobOverrides provides global defaults for all operator-generated scan Jobs.
 	// Per-scan-type overrides (e.g. spec.containers.jobOverrides) are deep-merged
 	// with this global config; per-type values take precedence on key conflicts.

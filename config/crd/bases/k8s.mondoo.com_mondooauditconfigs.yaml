@@ -732,6 +732,16 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                 type: object
+              inheritNamespaceLabels:
+                description: |-
+                  InheritNamespaceLabels lists namespace label keys that every workload discovered in a
+                  namespace inherits from that namespace, for example "my.company.com/team". Glob patterns
+                  are allowed ("my.company.com/*"). A label the workload already carries is kept. Applies to
+                  the Kubernetes resources scan, external clusters, the container image scan and the
+                  resource watcher. Requires a cnspec image whose k8s provider supports it.
+                items:
+                  type: string
+                type: array
               jobOverrides:
                 description: |-
                   JobOverrides provides global defaults for all operator-generated scan Jobs.
