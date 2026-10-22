@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -209,11 +210,87 @@ func TestResources_Parallelism(t *testing.T) {
 	assert.Equal(t, "4", envValue(ds.Spec.Template.Spec.Containers[0].Env))
 }
 
-func TestResources_GOMEMLIMIT(t *testing.T) {
+func TestNodeScanStartDelay(t *testing.T) {
+	const nodeName = "test-node"
+	spread := 10 * time.Minute
+
+	delay := nodeScanStartDelay(nodeName, spread)
+	assert.GreaterOrEqual(t, delay, time.Duration(0))
+	assert.LessOrEqual(t, delay, spread)
+	assert.Equal(t, delay, nodeScanStartDelay(nodeName, spread))
+	assert.Zero(t, nodeScanStartDelay(nodeName, 0))
+	assert.Zero(t, nodeScanStartDelay(nodeName, -time.Minute))
+}
+
+func TestCronJob_ScheduleSpreadDelaysScanner(t *testing.T) {
+	m := testMondooAuditConfig()
+	m.Spec.Nodes.ScheduleSpread = metav1.Duration{Duration: time.Minute}
+	nodeName := firstNodeNameWithDelay(t, m.Spec.Nodes.ScheduleSpread.Duration)
+	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", node, m, false, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+	delay := nodeScanStartDelay(node.Name, m.Spec.Nodes.ScheduleSpread.Duration)
+
+	assert.Equal(t, []string{"/bin/sh", "-c", nodeScanDelayScript}, container.Command)
+	assert.Equal(t, fmt.Sprintf("%d", int64(delay/time.Second)), container.Args[0])
+	assert.Equal(t, []string{
+		"cnspec", "scan", "local",
+		"--config", "/etc/opt/mondoo/mondoo.yml",
+		"--inventory-template", "/etc/opt/mondoo/inventory_template.yml",
+		"--report-type", "none",
+	}, container.Args[1:])
+}
+
+func TestCronJob_ScheduleSpreadDisabledKeepsDirectCommand(t *testing.T) {
+	m := testMondooAuditConfig()
+	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
+	cfg := v1alpha2.MondooOperatorConfig{}
+
+	cj := CronJob("test-image:latest", node, m, false, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	assert.Equal(t, "cnspec", container.Command[0])
+	assert.Empty(t, container.Args)
+}
+
+func TestCronJob_ScheduleSpreadKeepsProxyArgSafe(t *testing.T) {
+	m := testMondooAuditConfig()
+	m.Spec.Nodes.ScheduleSpread = metav1.Duration{Duration: 10 * time.Minute}
+	nodeName := firstNodeNameWithDelay(t, m.Spec.Nodes.ScheduleSpread.Duration)
+	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+	const proxyValue = "https://proxy.example:8443; echo injected"
+	cfg := v1alpha2.MondooOperatorConfig{
+		Spec: v1alpha2.MondooOperatorConfigSpec{
+			HttpsProxy: ptr.To(proxyValue),
+		},
+	}
+
+	cj := CronJob("test-image:latest", node, m, false, cfg)
+	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+
+	require.Equal(t, []string{"/bin/sh", "-c", nodeScanDelayScript}, container.Command)
+	require.GreaterOrEqual(t, len(container.Args), 2)
+
+	proxyFlagIndex := -1
+	for i, arg := range container.Args {
+		if arg == "--api-proxy" {
+			proxyFlagIndex = i
+			break
+		}
+	}
+	require.NotEqual(t, -1, proxyFlagIndex, "expected --api-proxy argument")
+	require.Greater(t, len(container.Args), proxyFlagIndex+1, "expected proxy value after --api-proxy")
+	assert.Equal(t, proxyValue, container.Args[proxyFlagIndex+1])
+}
+
+func TestResources_GOMemoryTuning(t *testing.T) {
 	tests := []struct {
 		name               string
 		mondooauditconfig  func() *v1alpha2.MondooAuditConfig
 		expectedGoMemLimit string
+		expectedGoGC       string
 	}{
 		{
 			name: "resources should match default",
@@ -221,6 +298,7 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 				return testMondooAuditConfig()
 			},
 			expectedGoMemLimit: "225000000",
+			expectedGoGC:       "50",
 		},
 		{
 			name: "resources should match spec",
@@ -234,6 +312,35 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 				return mac
 			},
 			expectedGoMemLimit: "94371840",
+			expectedGoGC:       "50",
+		},
+		{
+			name: "resources should use moderate gc in middle range",
+			mondooauditconfig: func() *v1alpha2.MondooAuditConfig {
+				mac := testMondooAuditConfig()
+				mac.Spec.Nodes.Resources = corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("768Mi"),
+					},
+				}
+				return mac
+			},
+			expectedGoMemLimit: "724775731",
+			expectedGoGC:       "75",
+		},
+		{
+			name: "resources should use moderate gc for larger finite limits",
+			mondooauditconfig: func() *v1alpha2.MondooAuditConfig {
+				mac := testMondooAuditConfig()
+				mac.Spec.Nodes.Resources = corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+				}
+				return mac
+			},
+			expectedGoMemLimit: "1932735283",
+			expectedGoGC:       "75",
 		},
 		{
 			name: "resources should match off",
@@ -247,6 +354,7 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 				return mac
 			},
 			expectedGoMemLimit: "off",
+			expectedGoGC:       "100",
 		},
 	}
 
@@ -259,14 +367,9 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 			}
 			mac := test.mondooauditconfig()
 			cj := CronJob("test123", testNode, mac, false, v1alpha2.MondooOperatorConfig{})
-			goMemLimitEnv := corev1.EnvVar{}
-			for _, env := range cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
-				if env.Name == "GOMEMLIMIT" {
-					goMemLimitEnv = env
-					break
-				}
-			}
-			assert.Equal(t, test.expectedGoMemLimit, goMemLimitEnv.Value)
+			envMap := envToMap(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env)
+			assert.Equal(t, test.expectedGoMemLimit, envMap["GOMEMLIMIT"])
+			assert.Equal(t, test.expectedGoGC, envMap["GOGC"])
 		})
 	}
 
@@ -274,14 +377,9 @@ func TestResources_GOMEMLIMIT(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mac := *test.mondooauditconfig()
 			ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
-			goMemLimitEnv := corev1.EnvVar{}
-			for _, env := range ds.Spec.Template.Spec.Containers[0].Env {
-				if env.Name == "GOMEMLIMIT" {
-					goMemLimitEnv = env
-					break
-				}
-			}
-			assert.Equal(t, test.expectedGoMemLimit, goMemLimitEnv.Value)
+			envMap := envToMap(ds.Spec.Template.Spec.Containers[0].Env)
+			assert.Equal(t, test.expectedGoMemLimit, envMap["GOMEMLIMIT"])
+			assert.Equal(t, test.expectedGoGC, envMap["GOGC"])
 		})
 	}
 }
@@ -739,6 +837,18 @@ func envToMap(envVars []corev1.EnvVar) map[string]string {
 		m[e.Name] = e.Value
 	}
 	return m
+}
+
+func firstNodeNameWithDelay(t *testing.T, spread time.Duration) string {
+	t.Helper()
+	for i := 0; i < 1024; i++ {
+		nodeName := fmt.Sprintf("test-node-%d", i)
+		if nodeScanStartDelay(nodeName, spread) > 0 {
+			return nodeName
+		}
+	}
+	t.Fatalf("could not find node name with non-zero delay for spread %s", spread)
+	return ""
 }
 
 func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {

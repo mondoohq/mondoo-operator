@@ -63,8 +63,17 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 		proxyEnvVars = k8s.ProxyEnvVars(cfg)
 	}
 
-	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
+	// A node scan profile gives a group of nodes its own resources and tolerations. Nodes
+	// without a matching profile keep the settings of spec.nodes.
+	profile := ProfileForNode(m.Spec.Nodes, node)
+	containerResources := k8s.ResourcesRequirementsWithDefaults(
+		ProfileResources(m.Spec.Nodes, profile), k8s.DefaultNodeScanningResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
+	gcPercent := gomemlimit.CalculateNodeScanGoGC(containerResources)
+	scanCommand, scanArgs := nodeScanCommand(
+		cmd,
+		nodeScanStartDelay(node.Name, m.Spec.Nodes.ScheduleSpread.Duration),
+	)
 
 	cj := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -102,7 +111,7 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 							NodeName:          node.Name,
 							PriorityClassName: m.Spec.Nodes.PriorityClassName,
 							RestartPolicy:     corev1.RestartPolicyOnFailure,
-							Tolerations:       k8s.TaintsToTolerations(node.Spec.Taints),
+							Tolerations:       ProfileTolerations(node, profile),
 							// The node scanning does not use the Kubernetes API at all, therefore the service account token
 							// should not be mounted at all.
 							AutomountServiceAccountToken: ptr.To(false),
@@ -110,7 +119,8 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 								{
 									Image:     image,
 									Name:      "cnspec",
-									Command:   cmd,
+									Command:   scanCommand,
+									Args:      scanArgs,
 									Resources: containerResources,
 									SecurityContext: &corev1.SecurityContext{
 										AllowPrivilegeEscalation: ptr.To(isOpenshift),
@@ -132,6 +142,7 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 										{Name: "MONDOO_AUTO_UPDATE", Value: "false"},
 										{Name: constants.MondooParallelismEnv, Value: constants.DefaultMondooParallelism},
 										{Name: "NODE_NAME", Value: node.Name},
+										{Name: "GOGC", Value: gcPercent},
 										{Name: "GOMEMLIMIT", Value: gcLimit},
 									}, proxyEnvVars...), m.Spec.Nodes.Env),
 									TerminationMessagePath:   "/dev/termination-log",
@@ -215,6 +226,7 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 
 	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
+	gcPercent := gomemlimit.CalculateNodeScanGoGC(containerResources)
 
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -268,6 +280,7 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 								{Name: "MONDOO_PROCFS", Value: "on"},
 								{Name: "MONDOO_AUTO_UPDATE", Value: "false"},
 								{Name: constants.MondooParallelismEnv, Value: constants.DefaultMondooParallelism},
+								{Name: "GOGC", Value: gcPercent},
 								{Name: "GOMEMLIMIT", Value: gcLimit},
 								{Name: "NODE_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"}}},
 							}, proxyEnvVars...), m.Spec.Nodes.Env),

@@ -1077,6 +1077,27 @@ kubectl -n mondoo-operator edit mondooauditconfigs.k8s.mondoo.com mondoo-client
     schedule: 41 * * * *
 ```
 
+Node scan CronJobs can be spread across a bounded startup window to avoid
+starting every node scan at the same time:
+
+```yaml
+spec:
+  nodes:
+    enable: true
+    style: cronjob
+    schedule: "0 */3 * * *"
+    scheduleSpread: 30m
+```
+
+`scheduleSpread` derives a stable delay from each node name, so reconciles do
+not reshuffle the schedule. It defaults to `0s` and applies only to CronJob
+style node scanning. The CronJob schedule itself is unchanged; the scanner
+waits before starting its scan. This smooths cluster-wide concurrent starts
+(and aggregate memory/IO peaks); it does not reduce per-pod scan memory.
+Keep `scheduleSpread` shorter than the cron interval. With
+`ConcurrencyPolicy: Forbid`, a delayed scan that is still running when the
+next cron trigger fires can cause that run to be skipped.
+
 You can adjust the schedule for the following components:
 - Kubernetes Resources Scanning
 - Container Image Scanning
@@ -1382,6 +1403,72 @@ spec:
 ```
 After you saved the changes, the `mondoo-operator-controller-manager` will adjust the corresponding Deployment or CronJob.
 
+### Give groups of nodes their own node scanner settings
+
+`spec.nodes.resources` sets one limit for every node. A cluster with nodes of different sizes then
+has to use one limit sized for the largest node. Node scan pods are pinned with `spec.nodeName`, so
+a limit near the memory of a small node can starve that node instead of stopping the scan.
+
+Use `spec.nodes.profiles` to give groups of nodes their own settings. Each profile has a name, a
+node selector, resources and tolerations:
+
+```yaml
+spec:
+  nodes:
+    enable: true
+    style: cronjob
+    # Nodes that match no profile use these settings.
+    resources:
+      limits:
+        cpu: 300m
+        memory: 250M
+      requests:
+        cpu: 100m
+        memory: 150M
+    profiles:
+      - name: memory-optimized
+        nodeSelector:
+          node.kubernetes.io/instance-type: r5.4xlarge
+        resources:
+          limits:
+            cpu: 1
+            memory: 2G
+          requests:
+            cpu: 300m
+            memory: 500M
+        tolerations:
+          - key: workload
+            operator: Equal
+            value: memory
+            effect: NoSchedule
+      - name: small
+        nodeSelector:
+          node.kubernetes.io/instance-type: t3.small
+        resources:
+          limits:
+            cpu: 200m
+            memory: 200M
+          requests:
+            cpu: 50m
+            memory: 100M
+```
+
+Rules:
+
+* A node matches a profile when it carries every label of the `nodeSelector`.
+* The operator uses the first profile in the list that matches. Put the most specific profile first.
+* A profile with an empty `nodeSelector` matches every node. Put such a profile last.
+* A node that matches no profile uses `spec.nodes.resources` and `spec.nodes.jobOverrides`.
+* A profile without `resources` falls back to `spec.nodes.resources`.
+* Profile tolerations are added after the tolerations that the operator derives from the taints of
+  the node. The operator always tolerates the taints of the node it scans.
+* `GOMEMLIMIT` follows the memory limit of the matched profile.
+
+Profiles apply to the `cronjob` style only, because one DaemonSet cannot set per-node resources.
+The CRD rejects a config that sets `profiles` together with the `deployment` or `daemonset` style.
+
+A config without `profiles` behaves exactly as before.
+
 ## Uninstalling the Mondoo operator
 
 Before uninstalling the Mondoo operator, be sure to delete all `MondooAuditConfig` and `MondooOperatorConfig` objects. You can find any in your cluster by running:
@@ -1516,11 +1603,15 @@ Search for the `nodes:` section and specify the new limits there. It should look
 spec:
   nodes:
     enable: true
+    # Optional: spread node CronJob startup within this window
+    scheduleSpread: 30m
     resources:
       limits:
         cpu: 200m
         memory: 200Mi
 ```
+
+Node scan pods automatically set `GOMEMLIMIT` from `nodes.resources.limits.memory` (set to 90% of the limit, leaving 10% headroom) and apply adaptive `GOGC` values (`50` up to `512Mi`, `75` above `512Mi` when a memory limit is set, and `100` when no memory limit is configured). This is intended to reduce peak memory under finite cgroup limits by triggering more frequent GC cycles, so scans can take longer and use more CPU. Exact impact depends on workload and should be validated in your cluster. You can still override either variable via `spec.nodes.env` when needed.
 
 ### How can I trigger a new scan?
 

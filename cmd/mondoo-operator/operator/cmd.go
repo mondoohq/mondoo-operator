@@ -88,6 +88,7 @@ func init() {
 			LeaderElectionID:       "60679458.mondoo.com",
 			LeaseDuration:          ptr.To(30 * time.Second),
 			RenewDeadline:          ptr.To(20 * time.Second),
+			Cache:                  cacheOptions(),
 			Client: client.Options{
 				Cache: &client.CacheOptions{
 					DisableFor: []client.Object{

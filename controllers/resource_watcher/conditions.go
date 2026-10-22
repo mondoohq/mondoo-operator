@@ -37,7 +37,7 @@ func updateResourceWatcherConditions(config *v1alpha2.MondooAuditConfig, degrade
 	}
 
 	currentPod := k8s.GetNewestPodFromList(pods.Items)
-	for i, containerStatus := range currentPod.Status.ContainerStatuses {
+	for _, containerStatus := range currentPod.Status.ContainerStatuses {
 		if containerStatus.Name != "mondoo-resource-watcher" {
 			continue
 		}
@@ -45,7 +45,7 @@ func updateResourceWatcherConditions(config *v1alpha2.MondooAuditConfig, degrade
 			(containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 137) {
 			msg = oomMessage
 			affectedPods = append(affectedPods, currentPod.Name)
-			memoryLimit = currentPod.Spec.Containers[i].Resources.Limits.Memory().String()
+			memoryLimit = k8s.ContainerMemoryLimit(&currentPod, containerStatus.Name)
 			reason = "ResourceWatcherUnavailable"
 			status = corev1.ConditionTrue
 		}
