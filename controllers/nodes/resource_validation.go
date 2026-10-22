@@ -60,10 +60,11 @@ func nodeScanMemoryLimitWarning(limit, allocatable resource.Quantity) string {
 			"Node scan pods are pinned with spec.nodeName and bypass the scheduler, so this limit is not "+
 			"validated against the node. At this size the kernel may be unable to contain an overrunning "+
 			"scan within its own cgroup and can starve kubelet instead of OOMKilling the scan. "+
-			"Consider lowering spec.nodes.resources.limits.memory to at most %d%% of the smallest node's "+
-			"allocatable memory.",
+			"Consider lowering the node scan memory limit (spec.nodes.resources.limits.memory, or the "+
+			"resources of the spec.nodes.profiles entry that matches the node) to at most %d%% of the "+
+			"smallest node's allocatable memory.",
 		limit.String(),
-		100*float64(limit.Value())/float64(allocatable.Value()),
+		100*limit.AsApproximateFloat64()/allocatable.AsApproximateFloat64(),
 		allocatable.String(),
 		int(nodeScanMemoryLimitWarnRatio*100),
 	)
