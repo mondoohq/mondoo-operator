@@ -809,3 +809,32 @@ func envToMap(envVars []corev1.EnvVar) map[string]string {
 	}
 	return m
 }
+
+func TestInventory_WithInheritNamespaceLabels(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			InheritNamespaceLabels: []string{"my.company.com/team"},
+		},
+	}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{}, nil, nil)
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	require.NotEmpty(t, inv.Spec.Assets)
+	assert.Equal(t, "my.company.com/team", inv.Spec.Assets[0].Connections[0].Options[k8s.InheritNamespaceLabelsOption])
+}
+
+func TestInventory_WithoutInheritNamespaceLabels(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"}}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{}, nil, nil)
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	require.NotEmpty(t, inv.Spec.Assets)
+	assert.NotContains(t, inv.Spec.Assets[0].Connections[0].Options, k8s.InheritNamespaceLabelsOption)
+}
