@@ -1652,6 +1652,20 @@ spec:
 
 Node scan pods automatically set `GOMEMLIMIT` from `nodes.resources.limits.memory` (set to 90% of the limit, leaving 10% headroom) and apply adaptive `GOGC` values (`50` up to `512Mi`, `75` above `512Mi` when a memory limit is set, and `100` when no memory limit is configured). This is intended to reduce peak memory under finite cgroup limits by triggering more frequent GC cycles, so scans can take longer and use more CPU. Exact impact depends on workload and should be validated in your cluster. You can still override either variable via `spec.nodes.env` when needed.
 
+To scan only a subset of nodes, set `nodes.labelSelector`. In CronJob mode, the operator creates node scan CronJobs only for matching nodes and removes CronJobs for nodes that no longer match. In DaemonSet mode, the selector is enforced as required node affinity.
+`labelSelector` decides *which* nodes are scanned; `nodes.profiles` decides the resources and tolerations a
+selected node gets, and `nodes.jobOverrides.nodeSelector` only applies to the DaemonSet style. Nodes that
+stop matching the selector have their CronJobs removed.
+
+```yaml
+spec:
+  nodes:
+    enable: true
+    labelSelector:
+      matchLabels:
+        pool: platform
+```
+
 ### How can I trigger a new scan?
 
 The operator runs a full cluster scan and node scans hourly. If you need to manually trigger those scans there are two options:

@@ -80,6 +80,11 @@ func UpdateDaemonSetFields(obj, desired *appsv1.DaemonSet) {
 	ps.PriorityClassName = dps.PriorityClassName
 	ps.AutomountServiceAccountToken = dps.AutomountServiceAccountToken
 	ps.NodeSelector = dps.NodeSelector
+	// The operator owns the whole pod spec of the node scanning DaemonSet, so Affinity is
+	// replaced rather than merged: a nil desired Affinity clears the node affinity that a
+	// previously set spec.nodes.labelSelector added, and any affinity set on the live object
+	// by other means is overwritten on the next reconcile.
+	ps.Affinity = dps.Affinity
 	ps.Tolerations = dps.Tolerations
 	ps.Containers = dps.Containers
 	ps.Volumes = dps.Volumes
