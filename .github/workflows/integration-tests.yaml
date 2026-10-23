@@ -83,7 +83,14 @@ jobs:
         uses: nolar/setup-k3d-k3s@62c9d1bd2bc843275c85d2e7dcd696edc1160eee # v1.1.0
         if: matrix.k8s-distro == 'k3d'
         with:
-          channel: ${{ matrix.k8s-version }}
+          # Resolve the newest k3s patch of this minor through the authenticated GitHub
+          # releases API (with retries) instead of a k3s release channel. The channel server
+          # intermittently answers without a latest version, and k3d then builds an invalid
+          # image reference ("invalid reference format").
+          version: ${{ matrix.k8s-version }}
+          # Pin k3d: with the default 'latest' the installer resolves the tag through an
+          # unauthenticated redirect lookup that intermittently fails on runners and 404s.
+          k3d-tag: v5.9.0
           k3d-args: --k3s-arg=--disable=traefik@server:*
           github-token: ${{ github.token }}
 
@@ -146,7 +153,9 @@ jobs:
       - name: Start k3d
         uses: nolar/setup-k3d-k3s@62c9d1bd2bc843275c85d2e7dcd696edc1160eee # v1.1.0
         with:
-          channel: v1.34
+          # See the integration-tests job for why version and k3d-tag are pinned.
+          version: v1.34
+          k3d-tag: v5.9.0
           k3d-args: --k3s-arg=--disable=traefik@server:*
           github-token: ${{ github.token }}
 

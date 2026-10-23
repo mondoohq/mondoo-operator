@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -167,7 +168,44 @@ func (s *ExternalClusterSuite) createTargetCluster() error {
 	if err != nil {
 		return fmt.Errorf("failed to create target cluster: %v, output: %s", err, string(output))
 	}
-	return nil
+	return s.waitForTargetClusterReady()
+}
+
+// waitForTargetClusterReady blocks until the API server of the target cluster answers
+// /readyz. "k3d cluster create" returns once the server node is up, which can be a few
+// seconds before kube-apiserver listens; a connectivity pod started right away then sees
+// "connection refused" on port 6443.
+func (s *ExternalClusterSuite) waitForTargetClusterReady() error {
+	kubeconfig, err := exec.Command("k3d", "kubeconfig", "get", targetClusterName).Output()
+	if err != nil {
+		return fmt.Errorf("failed to get target kubeconfig: %v", err)
+	}
+	// The test's temp dir is removed by the testing package when the suite ends.
+	kubeconfigPath := filepath.Join(s.T().TempDir(), "target-kubeconfig.yaml")
+	if err := os.WriteFile(kubeconfigPath, kubeconfig, 0600); err != nil {
+		return fmt.Errorf("failed to write target kubeconfig: %v", err)
+	}
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	deadline := time.NewTimer(2 * time.Minute)
+	defer deadline.Stop()
+	var lastOutput []byte
+	for {
+		cmd := exec.Command("kubectl", "--kubeconfig", kubeconfigPath, "get", "--raw", "/readyz") // #nosec G204
+		lastOutput, err = cmd.CombinedOutput()
+		if err == nil {
+			zap.S().Info("Target cluster API server is ready")
+			return nil
+		}
+		select {
+		case <-s.ctx.Done():
+			return s.ctx.Err()
+		case <-deadline.C:
+			return fmt.Errorf("target cluster API server did not become ready in time: %v, output: %s", err, string(lastOutput))
+		case <-ticker.C:
+		}
+	}
 }
 
 func (s *ExternalClusterSuite) cleanupTargetCluster() {
