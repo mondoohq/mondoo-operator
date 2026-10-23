@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"os/exec"
 	"strings"
 	"testing"
@@ -179,30 +180,32 @@ func (s *ExternalClusterSuite) waitForTargetClusterReady() error {
 	if err != nil {
 		return fmt.Errorf("failed to get target kubeconfig: %v", err)
 	}
-	tmpFile, err := os.CreateTemp("", "external-cluster-target-kubeconfig-*.yaml")
-	if err != nil {
-		return fmt.Errorf("failed to create temp kubeconfig: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-	if _, err := tmpFile.Write(kubeconfig); err != nil {
-		return fmt.Errorf("failed to write temp kubeconfig: %v", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("failed to close temp kubeconfig: %v", err)
+	// The test's temp dir is removed by the testing package when the suite ends.
+	kubeconfigPath := filepath.Join(s.T().TempDir(), "target-kubeconfig.yaml")
+	if err := os.WriteFile(kubeconfigPath, kubeconfig, 0600); err != nil {
+		return fmt.Errorf("failed to write target kubeconfig: %v", err)
 	}
 
-	deadline := time.Now().Add(2 * time.Minute)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	deadline := time.NewTimer(2 * time.Minute)
+	defer deadline.Stop()
 	var lastOutput []byte
-	for time.Now().Before(deadline) {
-		cmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "get", "--raw", "/readyz") // #nosec G204
+	for {
+		cmd := exec.Command("kubectl", "--kubeconfig", kubeconfigPath, "get", "--raw", "/readyz") // #nosec G204
 		lastOutput, err = cmd.CombinedOutput()
 		if err == nil {
 			zap.S().Info("Target cluster API server is ready")
 			return nil
 		}
-		time.Sleep(2 * time.Second)
+		select {
+		case <-s.ctx.Done():
+			return s.ctx.Err()
+		case <-deadline.C:
+			return fmt.Errorf("target cluster API server did not become ready in time: %v, output: %s", err, string(lastOutput))
+		case <-ticker.C:
+		}
 	}
-	return fmt.Errorf("target cluster API server did not become ready in time: %v, output: %s", err, string(lastOutput))
 }
 
 func (s *ExternalClusterSuite) cleanupTargetCluster() {
