@@ -186,8 +186,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigKubernetesResources(auditCon
 
 	// The number of assets from upstream is limited by paganiation.
 	// In case we have more than 100 workloads, we need to call this mutlple times, with different page numbers.
-	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
-	s.NoError(err, "Failed to list assets with scores.")
+	assets := s.waitForScoredAssets("Kubernetes resources")
 	zap.S().Info("number of assets from upstream: ", len(assets))
 
 	// TODO: the cluster name is non-deterministic currently so we cannot test for it
@@ -327,8 +326,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigContainers(auditConfig mondo
 	// Verify the container images have been sent upstream and have scores.
 	// The number of assets from upstream is limited by paganiation.
 	// In case we have more than 100 workloads, we need to call this mutlple times, with different page numbers.
-	assets, err := s.spaceClient.ListAssetsWithScores(s.ctx)
-	s.NoError(err, "Failed to list assets with scores")
+	assets := s.waitForScoredAssets("container images")
 
 	assetNames := utils.AssetNames(assets)
 	s.Subset(assetNames, containerImages, "Container images were not sent upstream.")
@@ -535,38 +533,7 @@ func (s *AuditConfigBaseSuite) testMondooAuditConfigResourceWatcher(auditConfig 
 	// Poll for assets to appear upstream and be scored. The resource watcher needs time
 	// to detect the change, debounce, scan, and upload results. Scoring is also asynchronous,
 	// so we poll until assets are both present and scored.
-	zap.S().Info("Waiting for resource watcher scan results to appear and be scored upstream.")
-	var scoredAssets []assets.AssetWithScore
-	err = s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
-		var listErr error
-		scoredAssets, listErr = s.spaceClient.ListAssetsWithScores(s.ctx)
-		if listErr != nil {
-			zap.S().Infof("Failed to list assets: %v", listErr)
-			return false, nil
-		}
-		if len(scoredAssets) == 0 {
-			zap.S().Info("No assets found upstream yet, retrying...")
-			return false, nil
-		}
-		// Check if all scorable assets have been scored
-		allScored := true
-		for _, asset := range scoredAssets {
-			if asset.Platform.Name == "scratch" || asset.Platform.Name == "k8s-cluster" || asset.Platform.Name == "k8s-namespace" || asset.Platform.Name == "k8s-service" {
-				continue
-			}
-			if asset.Grade == "U" || asset.Grade == "" {
-				allScored = false
-				break
-			}
-		}
-		if !allScored {
-			zap.S().Infof("Found %d assets upstream but not all scored yet, retrying...", len(scoredAssets))
-			return false, nil
-		}
-		zap.S().Infof("Found %d scored assets upstream", len(scoredAssets))
-		return true, nil
-	})
-	s.NoError(err, "Assets were not sent upstream or not scored by the resource watcher.")
+	scoredAssets := s.waitForScoredAssets("resource watcher")
 
 	s.AssetsNotUnscored(scoredAssets)
 
@@ -643,11 +610,51 @@ var (
 	}
 )
 
+// isScorableAsset reports whether an asset is expected to carry a score upstream.
+// Scratch containers are not scored, and cluster, namespace and service assets have no
+// policies enabled, so they are always unscored.
+func isScorableAsset(asset assets.AssetWithScore) bool {
+	switch asset.Platform.Name {
+	case "scratch", "k8s-cluster", "k8s-namespace", "k8s-service":
+		return false
+	}
+	return true
+}
+
+// waitForScoredAssets lists the assets of the space until every scorable asset has a
+// score, and returns the final list. Scoring happens asynchronously upstream after the
+// scan results are uploaded, so a single list right after the scan Job completes races
+// it. "what" names the scan for log and failure messages.
+func (s *AuditConfigBaseSuite) waitForScoredAssets(what string) []assets.AssetWithScore {
+	zap.S().Infof("Waiting for the %s scan results to appear and be scored upstream.", what)
+	var scoredAssets []assets.AssetWithScore
+	err := s.testCluster.K8sHelper.ExecuteWithRetries(func() (bool, error) {
+		var listErr error
+		scoredAssets, listErr = s.spaceClient.ListAssetsWithScores(s.ctx)
+		if listErr != nil {
+			zap.S().Infof("Failed to list assets: %v", listErr)
+			return false, nil
+		}
+		if len(scoredAssets) == 0 {
+			zap.S().Info("No assets found upstream yet, retrying...")
+			return false, nil
+		}
+		for _, asset := range scoredAssets {
+			if isScorableAsset(asset) && (asset.Grade == "U" || asset.Grade == "") {
+				zap.S().Infof("Found %d assets upstream but %s is not scored yet, retrying...", len(scoredAssets), asset.Name)
+				return false, nil
+			}
+		}
+		zap.S().Infof("Found %d scored assets upstream", len(scoredAssets))
+		return true, nil
+	})
+	s.NoErrorf(err, "Assets of the %s scan were not sent upstream or not scored in time.", what)
+	return scoredAssets
+}
+
 func (s *AuditConfigBaseSuite) AssetsNotUnscored(assets []assets.AssetWithScore) {
 	for _, asset := range assets {
-		// We don't score scratch containers at the moment so they are always unscored.
-		// We don't have policies for a cluster asset enabled at the moment so they are always unscored.
-		if asset.Platform.Name != "scratch" && asset.Platform.Name != "k8s-cluster" && asset.Platform.Name != "k8s-namespace" && asset.Platform.Name != "k8s-service" {
+		if isScorableAsset(asset) {
 			if asset.Grade == "U" || asset.Grade == "" {
 				zap.S().Infof("Asset %s has no score", asset.Name)
 			}
