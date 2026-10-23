@@ -439,5 +439,6 @@ func containerImageOptions(m v1alpha2.MondooAuditConfig) (map[string]string, err
 		return nil, err
 	}
 	maps.Copy(opts, selectorOpts)
+	maps.Copy(opts, k8s.InheritNamespaceLabelsOptions(m.Spec.InheritNamespaceLabels))
 	return opts, nil
 }

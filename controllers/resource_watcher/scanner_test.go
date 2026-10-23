@@ -60,3 +60,40 @@ func TestScannerGenerateInventory_LabelSelectors(t *testing.T) {
 		})
 	}
 }
+
+func TestScannerGenerateInventory_InheritNamespaceLabels(t *testing.T) {
+	resources := []K8sResourceIdentifier{{Type: "deployments", Namespace: "default", Name: "nginx"}}
+
+	tests := []struct {
+		name     string
+		config   ScannerConfig
+		expected string
+	}{
+		{
+			name:     "set",
+			config:   ScannerConfig{InheritNamespaceLabels: []string{"my.company.com/team"}},
+			expected: "my.company.com/team",
+		},
+		{
+			name:   "unset",
+			config: ScannerConfig{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			invBytes, err := NewScanner(tt.config).generateInventory(resources)
+			require.NoError(t, err)
+
+			var inv inventory.Inventory
+			require.NoError(t, yaml.Unmarshal(invBytes, &inv))
+			opts := inv.Spec.Assets[0].Connections[0].Options
+
+			if tt.expected == "" {
+				assert.NotContains(t, opts, k8s.InheritNamespaceLabelsOption)
+			} else {
+				assert.Equal(t, tt.expected, opts[k8s.InheritNamespaceLabelsOption])
+			}
+		})
+	}
+}

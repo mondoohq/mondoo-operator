@@ -60,6 +60,7 @@ func init() {
 	resourceTypes := Cmd.Flags().StringSlice("resource-types", nil, "Resource types to watch (comma-separated). Overrides --watch-all-resources if specified.")
 	namespaceLabelSelector := Cmd.Flags().String("namespace-label-selector", "", "Kubernetes label selector for namespaces whose resources should be watched.")
 	objectLabelSelector := Cmd.Flags().String("object-label-selector", "", "Kubernetes label selector for watched objects.")
+	inheritNamespaceLabels := Cmd.Flags().StringSlice("inherit-namespace-labels", nil, "Namespace label keys (comma-separated, glob supported) that scanned workloads inherit from their namespace.")
 	apiProxy := Cmd.Flags().String("api-proxy", "", "HTTP proxy to use for API requests.")
 	timeout := Cmd.Flags().Duration("timeout", 25*time.Minute, "Timeout for scan operations.")
 	annotations := Cmd.Flags().StringToString("annotation", nil, "Annotations to add to scanned assets (can specify multiple, e.g., --annotation env=prod --annotation team=platform).")
@@ -232,6 +233,7 @@ func init() {
 			NamespacesExclude:      namespacesExcludeList,
 			NamespaceLabelSelector: *namespaceLabelSelector,
 			ObjectLabelSelector:    *objectLabelSelector,
+			InheritNamespaceLabels: *inheritNamespaceLabels,
 			ClusterUID:             *clusterUID,
 			IntegrationMRN:         *integrationMRN,
 		})

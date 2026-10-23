@@ -984,3 +984,46 @@ func envToMap(envVars []corev1.EnvVar) map[string]string {
 	}
 	return m
 }
+
+func TestInventory_WithInheritNamespaceLabels(t *testing.T) {
+	auditConfig := *testAuditConfig()
+	auditConfig.Spec.InheritNamespaceLabels = []string{"my.company.com/team", "my.company.com/*"}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	options := inv.Spec.Assets[0].Connections[0].Options
+	assert.Equal(t, "my.company.com/team,my.company.com/*", options[k8s.InheritNamespaceLabelsOption])
+}
+
+func TestInventory_WithoutInheritNamespaceLabels(t *testing.T) {
+	invStr, err := Inventory("", testClusterUID, *testAuditConfig(), v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	assert.NotContains(t, inv.Spec.Assets[0].Connections[0].Options, k8s.InheritNamespaceLabelsOption)
+}
+
+func TestExternalClusterInventory_InheritsGlobalInheritNamespaceLabels(t *testing.T) {
+	auditConfig := v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			InheritNamespaceLabels: []string{"my.company.com/team"},
+		},
+	}
+	// The cluster overrides filtering; the inheritance list is global and still applies.
+	cluster := v1alpha2.ExternalCluster{
+		Name: "remote-cluster",
+		Filtering: &v1alpha2.Filtering{
+			ObjectLabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"scan": "enabled"}},
+		},
+	}
+
+	options := externalClusterInventoryOptions(t, auditConfig, cluster)
+
+	assert.Equal(t, "my.company.com/team", options[k8s.InheritNamespaceLabelsOption])
+	assert.Equal(t, "scan=enabled", options[k8s.ObjectLabelSelectorOption])
+}

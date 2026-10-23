@@ -712,3 +712,22 @@ func envToMap(envVars []corev1.EnvVar) map[string]string {
 	}
 	return m
 }
+
+func TestDeployment_WithInheritNamespaceLabels(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-config", Namespace: "mondoo-operator"},
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			KubernetesResources: v1alpha2.KubernetesResources{
+				Enable:          true,
+				ResourceWatcher: v1alpha2.ResourceWatcherSpec{Enable: true},
+			},
+			InheritNamespaceLabels: []string{"my.company.com/team", "my.company.com/*"},
+		},
+	}
+
+	deployment, err := Deployment("ghcr.io/mondoohq/cnspec:latest", "", "", config, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+
+	cmdStr := strings.Join(deployment.Spec.Template.Spec.Containers[0].Command, " ")
+	assert.Contains(t, cmdStr, "--inherit-namespace-labels my.company.com/team,my.company.com/*")
+}

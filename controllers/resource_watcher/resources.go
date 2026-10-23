@@ -100,6 +100,10 @@ func Deployment(image, integrationMRN, clusterUID string, m *v1alpha2.MondooAudi
 			cmd = append(cmd, "--"+opt, v)
 		}
 	}
+	// A single-key map, so the argument order stays stable.
+	for opt, v := range k8s.InheritNamespaceLabelsOptions(m.Spec.InheritNamespaceLabels) {
+		cmd = append(cmd, "--"+opt, v)
+	}
 
 	// Add API proxy if configured (respect SkipProxyForCnspec since resource watcher uses cnspec)
 	if !cfg.Spec.SkipProxyForCnspec {

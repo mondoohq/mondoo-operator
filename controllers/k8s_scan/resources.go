@@ -1055,6 +1055,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 	if err != nil {
 		return "", err
 	}
+	maps.Copy(selectorOpts, k8s.InheritNamespaceLabelsOptions(m.Spec.InheritNamespaceLabels))
 	if err := addNetworkInventoryOptions(selectorOpts, m.Spec.KubernetesResources.NetworkInventory); err != nil {
 		return "", err
 	}
@@ -1143,6 +1144,7 @@ func ExternalClusterInventory(integrationMRN, operatorClusterUID string, cluster
 		return "", err
 	}
 	maps.Copy(opts, selectorOpts)
+	maps.Copy(opts, k8s.InheritNamespaceLabelsOptions(m.Spec.InheritNamespaceLabels))
 	if err := addNetworkInventoryOptions(opts, m.Spec.KubernetesResources.NetworkInventory); err != nil {
 		return "", err
 	}
