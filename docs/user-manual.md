@@ -14,7 +14,7 @@ This user manual describes how to install and use the Mondoo Operator.
     - [Filter Kubernetes objects based on namespace](#filter-kubernetes-objects-based-on-namespace)
       - [Wildcards](#wildcards)
     - [Filter Kubernetes objects based on labels](#filter-kubernetes-objects-based-on-labels)
-    - [Inherit namespace labels onto workloads](#inherit-namespace-labels-onto-workloads)
+    - [Inherit namespace labels onto workloads and container images](#inherit-namespace-labels-onto-workloads-and-container-images)
     - [Tune the network inventory](#tune-the-network-inventory)
   - [Scanning External Clusters](#scanning-external-clusters)
     - [Creating a kubeconfig Secret](#creating-a-kubeconfig-secret)
@@ -295,12 +295,13 @@ block), and the resource watcher. They require cnspec v13.30.1 or later.
 > `objectLabelSelector`. If an object's labels change so that it no longer
 > matches, no final scan is triggered for it.
 
-### Inherit namespace labels onto workloads
+### Inherit namespace labels onto workloads and container images
 
 Namespaces often carry ownership facts, for example a team id, that the
 workloads inside them do not repeat. `inheritNamespaceLabels` lists the
 namespace label keys that every workload discovered in a namespace inherits
-from that namespace. Entries are label keys or glob patterns.
+from that namespace. Entries are label keys or glob patterns. Quote a pattern
+that starts with `*`, since YAML reads a bare `*` as an alias.
 
 ```
 ...
@@ -322,12 +323,56 @@ the team's space) places every workload of that team's namespaces in the
 team's space, and a catch-all rule takes the workloads of namespaces without
 the label.
 
+#### Container images
+
+A container image is one asset per digest, shared by every namespace that runs
+it, so it cannot simply take its namespace's label: two teams may run the same
+image. Instead, each inherited key is decided by a vote of the namespaces in
+scope that run the image and carry the key. Namespaces without the key do not
+vote.
+
+- All voters agree → the image gets `key=value`.
+- Voters disagree → the key stays unset and the image gets the marker label
+  `k8s.mondoo.com/namespace-label-conflict`, whose value lists the keys they
+  disagree on (comma-separated).
+- No voter → the image is left as it is.
+
+For example, with `my.company.com/team` inherited and four namespaces:
+
+| Image | Run in | Result |
+|---|---|---|
+| `redis` | team-gamma | `my.company.com/team=gamma` |
+| `busybox` | team-alpha, platform-tools (no team label) | `my.company.com/team=alpha` |
+| `nginx` | team-alpha, team-beta | no team key, marker `k8s.mondoo.com/namespace-label-conflict=my.company.com/team` |
+
+A routing rule can then send shared images to a space of their own, placed
+before the catch-all: `LABEL k8s.mondoo.com/namespace-label-conflict CONTAINS
+my.company.com/team`. Use `EQUAL` or `CONTAINS` for this rule, not
+`MATCHES *`: an absent label matches `*` as the empty string, so that form
+would catch every asset.
+
+The vote is taken within one cluster scan, over the namespaces its `filtering`
+selects. Under organization-scope routing that is sound, because the label
+value selects the space, so two clusters that disagree about an image produce
+two assets in two spaces. In a single space fed by several clusters, the one
+shared image asset takes whichever cluster scanned last, and its team label
+can flip between scans. A namespace running thousands of distinct images may
+exceed the size the scan can carry for its verdicts; the scan then leaves that
+namespace's images unlabeled and logs a warning.
+
+#### Where it applies and when changes propagate
+
 The setting applies to the scheduled Kubernetes resources scan, external
 clusters, the container image scan, and the resource watcher, so a rescan by
-any of them keeps the inherited labels. Container images are not labeled yet:
-an image is shared by every namespace that runs it, and the rule for it is
-planned separately. The feature requires the first k8s provider release after
-14.2.0 (mondoohq/mql#12086) in the cnspec image the operator uses.
+any of them keeps the inherited labels. A namespace relabel reaches its
+workloads on the next scheduled scan, or earlier through the resource watcher
+when the workload itself changes; it reaches container images on the next
+container image scan. With the scan cache enabled, an image scanned within the
+cache TTL is skipped, so its labels refresh once the TTL has passed.
+
+The feature requires the first k8s provider release after 14.2.0
+(mondoohq/mql#12086 for workloads, mondoohq/mql#12102 for container images) in
+the cnspec image the operator uses.
 
 > **Note:** Remote-managed configurations (`remoteManaged: true`) are rebuilt
 > from the Console on every reconcile and do not pick this field up from the
