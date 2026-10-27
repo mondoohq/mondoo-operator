@@ -1490,7 +1490,9 @@ spec:
                                   description: Selects a key of a ConfigMap.
                                   properties:
                                     key:
-                                      description: The key to select.
+                                      description: |-
+                                        The key to select from the ConfigMap's Data field.
+                                        Keys in the BinaryData field are not currently propagated to container env vars.
                                       type: string
                                     name:
                                       default: ""
@@ -2695,7 +2697,9 @@ spec:
                                         description: Selects a key of a ConfigMap.
                                         properties:
                                           key:
-                                            description: The key to select.
+                                            description: |-
+                                              The key to select from the ConfigMap's Data field.
+                                              Keys in the BinaryData field are not currently propagated to container env vars.
                                             type: string
                                           name:
                                             default: ""
@@ -3278,6 +3282,16 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                 type: object
+              inheritNamespaceLabels:
+                description: |-
+                  InheritNamespaceLabels lists namespace label keys that every workload discovered in a
+                  namespace inherits from that namespace, for example "my.company.com/team". Glob patterns
+                  are allowed ("my.company.com/*"). A label the workload already carries is kept. Applies to
+                  the Kubernetes resources scan, external clusters, the container image scan and the
+                  resource watcher. Requires a cnspec image whose k8s provider supports it.
+                items:
+                  type: string
+                type: array
               jobOverrides:
                 description: |-
                   JobOverrides provides global defaults for all operator-generated scan Jobs.
@@ -5259,6 +5273,53 @@ spec:
                         minimum: 0
                         type: integer
                     type: object
+                  labelSelector:
+                    description: LabelSelector selects nodes to scan. When unset,
+                      all nodes are scanned.
+                    properties:
+                      matchExpressions:
+                        description: matchExpressions is a list of label selector
+                          requirements. The requirements are ANDed.
+                        items:
+                          description: |-
+                            A label selector requirement is a selector that contains values, a key, and an operator that
+                            relates the key and values.
+                          properties:
+                            key:
+                              description: key is the label key that the selector
+                                applies to.
+                              type: string
+                            operator:
+                              description: |-
+                                operator represents a key's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists and DoesNotExist.
+                              type: string
+                            values:
+                              description: |-
+                                values is an array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced during a strategic
+                                merge patch.
+                              items:
+                                type: string
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
+                        x-kubernetes-list-type: atomic
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                          map is equivalent to an element of matchExpressions, whose key field is "key", the
+                          operator is "In", and the values array contains only "value". The requirements are ANDed.
+                        type: object
+                    type: object
+                    x-kubernetes-map-type: atomic
                   nodeSelector:
                     additionalProperties:
                       type: string
@@ -5273,6 +5334,142 @@ spec:
                       scheduler, so they can only evict other pods on a full node when the PriorityClass is
                       critical (e.g. "system-node-critical").
                     type: string
+                  profiles:
+                    description: |-
+                      Profiles gives groups of nodes their own resources and tolerations. The operator uses
+                      the first profile in the list whose nodeSelector matches the node. A node that matches
+                      no profile uses spec.nodes.resources and spec.nodes.jobOverrides, so an existing config
+                      without profiles keeps its behaviour. Profiles apply to the "cronjob" style only,
+                      because a single DaemonSet cannot set per-node resources.
+                    items:
+                      description: |-
+                        NodeScanProfile gives a group of nodes its own node scanner settings. Use profiles when
+                        one cluster holds nodes of different sizes. A small node and a large node then get their
+                        own memory limit, instead of sharing one limit sized for the largest node.
+                      properties:
+                        name:
+                          description: Name identifies the profile. Names must be
+                            unique within the list.
+                          maxLength: 63
+                          minLength: 1
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                          type: string
+                        nodeSelector:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            NodeSelector selects the nodes of this profile. A node matches when it carries every
+                            label in the map. An empty selector matches every node.
+                          type: object
+                        resources:
+                          description: |-
+                            Resources sets the resource requirements for the scan pods on the matched nodes.
+                            An empty value falls back to spec.nodes.resources.
+                          properties:
+                            claims:
+                              description: |-
+                                Claims lists the names of resources, defined in spec.resourceClaims,
+                                that are used by this container.
+
+                                This field depends on the
+                                DynamicResourceAllocation feature gate.
+
+                                This field is immutable. It can only be set for containers.
+                              items:
+                                description: ResourceClaim references one entry in
+                                  PodSpec.ResourceClaims.
+                                properties:
+                                  name:
+                                    description: |-
+                                      Name must match the name of one entry in pod.spec.resourceClaims of
+                                      the Pod where this field is used. It makes that resource available
+                                      inside a container.
+                                    type: string
+                                  request:
+                                    description: |-
+                                      Request is the name chosen for a request in the referenced claim.
+                                      If empty, everything from the claim is made available, otherwise
+                                      only the result of this request.
+                                    type: string
+                                required:
+                                - name
+                                type: object
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - name
+                              x-kubernetes-list-type: map
+                            limits:
+                              additionalProperties:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              description: |-
+                                Limits describes the maximum amount of compute resources allowed.
+                                More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                              type: object
+                            requests:
+                              additionalProperties:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              description: |-
+                                Requests describes the minimum amount of compute resources required.
+                                If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                                otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                                More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                              type: object
+                          type: object
+                        tolerations:
+                          description: |-
+                            Tolerations are appended to the tolerations of the scan pods on the matched nodes.
+                            The operator always adds a toleration for each taint of the node itself.
+                          items:
+                            description: |-
+                              The pod this Toleration is attached to tolerates any taint that matches
+                              the triple <key,value,effect> using the matching operator <operator>.
+                            properties:
+                              effect:
+                                description: |-
+                                  Effect indicates the taint effect to match. Empty means match all taint effects.
+                                  When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
+                                type: string
+                              key:
+                                description: |-
+                                  Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                                  If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+                                type: string
+                              operator:
+                                description: |-
+                                  Operator represents a key's relationship to the value.
+                                  Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
+                                  Exists is equivalent to wildcard for value, so that a pod can
+                                  tolerate all taints of a particular category.
+                                  Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
+                                type: string
+                              tolerationSeconds:
+                                description: |-
+                                  TolerationSeconds represents the period of time the toleration (which must be
+                                  of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                                  it is not set, which means tolerate the taint forever (do not evict). Zero and
+                                  negative values will be treated as 0 (evict immediately) by the system.
+                                format: int64
+                                type: integer
+                              value:
+                                description: |-
+                                  Value is the taint value the toleration matches to.
+                                  If the operator is Exists, the value should be empty, otherwise just a regular string.
+                                type: string
+                            type: object
+                          type: array
+                      required:
+                      - name
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
                   resources:
                     description: ResourceRequirements describes the compute resource
                       requirements.
@@ -6301,7 +6498,9 @@ spec:
                                     description: Selects a key of a ConfigMap.
                                     properties:
                                       key:
-                                        description: The key to select.
+                                        description: |-
+                                          The key to select from the ConfigMap's Data field.
+                                          Keys in the BinaryData field are not currently propagated to container env vars.
                                         type: string
                                       name:
                                         default: ""
@@ -6558,6 +6757,12 @@ spec:
                       Schedule specifies a custom crontab schedule for the node scanning job. If not specified, the default schedule is
                       used. Only applicable for CronJob style
                     type: string
+                  scheduleSpread:
+                    description: |-
+                      ScheduleSpread adds a deterministic startup delay to node scan CronJobs.
+                      The delay is derived from the node name and is bounded by this duration.
+                      A zero value preserves the existing behavior. Only applicable for CronJob style.
+                    type: string
                   style:
                     default: cronjob
                     description: Style specifies how node scanning is deployed. The
@@ -6618,9 +6823,12 @@ spec:
                     type: array
                 type: object
                 x-kubernetes-validations:
+                - message: spec.nodes.profiles is supported for style cronjob only
+                  rule: '!has(self.profiles) || size(self.profiles) == 0 || !has(self.style)
+                    || self.style == ''cronjob'''
                 - message: nodes.scannerSets requires nodes.style daemonset
                   rule: '!has(self.scannerSets) || size(self.scannerSets) == 0 ||
-                    self.style == ''daemonset'''
+                    (has(self.style) && self.style == ''daemonset'')'
               remoteManaged:
                 description: |-
                   RemoteManaged indicates that the scan configuration is managed by the
