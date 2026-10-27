@@ -31,7 +31,7 @@ const (
 // returns the original MondooCredsSecretRef.
 func ConfigSecretRef(m v1alpha2.MondooAuditConfig) corev1.LocalObjectReference {
 	if m.Spec.SpaceID != "" {
-		return corev1.LocalObjectReference{Name: m.Name + ConfigOverrideSecretSuffix}
+		return corev1.LocalObjectReference{Name: ConfigOverrideSecretName(m.Name)}
 	}
 	return m.Spec.MondooCredsSecretRef
 }
@@ -46,7 +46,7 @@ func SyncConfigOverrideSecret(
 	if m.Spec.SpaceID == "" {
 		// Clean up any leftover override secret from when spaceId was previously set
 		derivedSecret := &corev1.Secret{}
-		key := client.ObjectKey{Name: m.Name + ConfigOverrideSecretSuffix, Namespace: m.Namespace}
+		key := client.ObjectKey{Name: ConfigOverrideSecretName(m.Name), Namespace: m.Namespace}
 		if err := kubeClient.Get(ctx, key, derivedSecret); err == nil {
 			if err := kubeClient.Delete(ctx, derivedSecret); err != nil {
 				return fmt.Errorf("failed to clean up override secret: %w", err)
@@ -83,7 +83,7 @@ func SyncConfigOverrideSecret(
 
 	derivedSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      m.Name + ConfigOverrideSecretSuffix,
+			Name:      ConfigOverrideSecretName(m.Name),
 			Namespace: m.Namespace,
 		},
 	}
@@ -120,4 +120,10 @@ func SpaceMrnForAuditConfig(m v1alpha2.MondooAuditConfig) string {
 		return SpaceMrnPrefix + m.Spec.SpaceID
 	}
 	return ""
+}
+
+// ConfigOverrideSecretName returns the name of the derived credentials Secret
+// that carries the space-scoped service account for the MondooAuditConfig named auditConfigName.
+func ConfigOverrideSecretName(auditConfigName string) string {
+	return Name(auditConfigName, ConfigOverrideSecretSuffix)
 }

@@ -276,7 +276,7 @@ func ConfigMap(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 }
 
 func ConfigMapName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
+	return k8s.Name(prefix, InventoryConfigMapBase)
 }
 
 func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, cfg v1alpha2.MondooOperatorConfig, platformIdsExclude []string, scanTime *time.Time) (string, error) {
@@ -348,7 +348,7 @@ func Inventory(integrationMRN, clusterUID string, m v1alpha2.MondooAuditConfig, 
 
 // WIFServiceAccountName returns the name for the container registry WIF ServiceAccount
 func WIFServiceAccountName(prefix string) string {
-	return fmt.Sprintf("%s-cr-wif", prefix)
+	return k8s.Name(prefix, "-cr-wif")
 }
 
 // WIFServiceAccount creates a ServiceAccount with cloud-specific annotations for container registry WIF

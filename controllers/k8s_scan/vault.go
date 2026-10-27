@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/vault-client-go/schema"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -133,7 +134,7 @@ func vaultRequeueInterval(ttl string) time.Duration {
 
 // VaultKubeconfigSecretName returns the name for the Vault kubeconfig Secret.
 func VaultKubeconfigSecretName(prefix, clusterName string) string {
-	return fmt.Sprintf("%s-vault-kubeconfig-%s", prefix, clusterName)
+	return k8s.ScopedName(prefix, "-vault-kubeconfig", clusterName)
 }
 
 // buildVaultKubeconfig generates a kubeconfig YAML given a server URL, bearer token,

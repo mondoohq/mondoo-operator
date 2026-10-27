@@ -177,7 +177,7 @@ func resolveProvisionerCredential(
 ) *provisionerCredential {
 	provisionerSecret := &corev1.Secret{}
 	key := client.ObjectKey{
-		Name:      m.Spec.MondooCredsSecretRef.Name + constants.MondooProvisionerSecretSuffix,
+		Name:      ProvisionerSecretName(m.Spec.MondooCredsSecretRef.Name),
 		Namespace: m.Namespace,
 	}
 	if err := kubeClient.Get(ctx, key, provisionerSecret); err == nil {

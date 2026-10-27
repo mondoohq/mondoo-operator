@@ -101,6 +101,59 @@ func cronJobName(scanType, id, clusterName string) string {
 	return base + "-" + idHash
 }
 
+// Name joins prefix and suffix into an object name that fits ResourceNameMaxLength.
+//
+// A name that fits is returned unchanged, so every object that exists today keeps
+// its name. When it does not fit, the prefix (the user's part: a MondooAuditConfig
+// or Secret name) is cut to make room and a short hash of the whole prefix is
+// appended to the cut, so two long prefixes that differ only past the cut still
+// name different objects; the suffix (the operator's own, short) stays whole at
+// the end, where it says what the object is:
+//
+//	{prefix}{suffix}                     (fits)
+//	{cutPrefix}-{prefixHash}{suffix}     (cut)
+func Name(prefix, suffix string) string {
+	if full := prefix + suffix; len(full) <= ResourceNameMaxLength {
+		return full
+	}
+	prefixHash := fmt.Sprintf("%x", sha256.Sum256([]byte(prefix)))[:hashLen]
+	room := ResourceNameMaxLength - len(suffix) - 1 - hashLen
+	if room <= 0 {
+		// The suffix alone leaves no room for any of the prefix.
+		return trimName(prefixHash + suffix)
+	}
+	return strings.TrimRight(prefix[:room], "-") + "-" + prefixHash + suffix
+}
+
+// ScopedName builds {prefix}{infix}-{scope} for an object that belongs to one
+// scope of a MondooAuditConfig (an external cluster), within ResourceNameMaxLength.
+// The scope is user input too. A name that fits is returned unchanged. Otherwise
+// the prefix is cut first (as in Name) and the scope kept whole; when the scope
+// itself leaves no room, it is replaced by its hash and the prefix cut as needed:
+//
+//	{prefix}{infix}-{scope}                           (fits)
+//	{cutPrefix}-{prefixHash}{infix}-{scope}           (prefix cut)
+//	{prefix or cut}{infix}-{scopeHash}                (scope hashed)
+func ScopedName(prefix, infix, scope string) string {
+	if full := prefix + infix + "-" + scope; len(full) <= ResourceNameMaxLength {
+		return full
+	}
+	tail := infix + "-" + scope
+	if room := ResourceNameMaxLength - len(tail) - 1 - hashLen; room > 0 {
+		return Name(prefix, tail)
+	}
+	scopeHash := fmt.Sprintf("%x", sha256.Sum256([]byte(scope)))[:hashLen]
+	return Name(prefix, infix+"-"+scopeHash)
+}
+
+// trimName cuts s to ResourceNameMaxLength without leaving a trailing dash.
+func trimName(s string) string {
+	if len(s) > ResourceNameMaxLength {
+		s = s[:ResourceNameMaxLength]
+	}
+	return strings.TrimRight(s, "-")
+}
+
 // integrationID extracts the integration ID from an audit config name.
 // "mondoo-client" → "" (default, no integration ID)
 // "mondoo-client-abc123" → "abc123"

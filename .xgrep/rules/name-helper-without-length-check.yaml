@@ -27,12 +27,7 @@ rules:
       known-gaps:
         - "length-check evidence is a fixed list of primitives (ResourceNameMaxLength, nodeScopedName, cronJobName, k8s.CronJobName*, ConfigMapNameWithNode, sha256.Sum256); a new primitive must be added here"
         - "only plain functions are checked; a method named *Name() string would be trusted by the taint rule but not checked here (none exist today)"
-      known-fires-on-main:
-        - "controllers/nodes/resources.go DaemonSetName, GarbageCollectCronJobName (a CronJob, so 52 chars applies), ConfigMapName"
-        - "controllers/resource_watcher/resources.go DeploymentName"
-        - "controllers/container_image/resources.go ConfigMapName, WIFServiceAccountName"
-        - "controllers/k8s_scan/resources.go ConfigMapName, ExternalClusterConfigMapName, ExternalClusterSAKubeconfigName, WIFServiceAccountName; vault.go VaultKubeconfigSecretName"
-        - "pkg/utils/k8s/private_registries.go MergedSecretName"
+      known-fires-on-main: []
     paths:
       include: ["**/*.go"]
       exclude: ["**/*_test.go", "**/zz_generated*.go", "tests/**", ".xgrep/**"]
@@ -69,4 +64,14 @@ rules:
           func $F(...) string { ... <... ConfigMapNameWithNode(...) ...> ... }
       - pattern-not: |
           func $F(...) string { ... <... sha256.Sum256(...) ...> ... }
+      # the general primitives (pkg/utils/k8s/naming.go), qualified from other packages
+      # and bare inside package k8s
+      - pattern-not: |
+          func $F(...) string { ... <... $PKG.Name(...) ...> ... }
+      - pattern-not: |
+          func $F(...) string { ... <... $PKG.ScopedName(...) ...> ... }
+      - pattern-not: |
+          func $F(...) string { ... <... Name(...) ...> ... }
+      - pattern-not: |
+          func $F(...) string { ... <... ScopedName(...) ...> ... }
       - focus-metavariable: $F
