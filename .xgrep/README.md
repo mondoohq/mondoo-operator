@@ -1,6 +1,6 @@
 # xgrep rules
 
-Repo-specific static checks, run with [xgrep](https://github.com/mondoohq/xgrep)
+Repo-specific static checks, run with [xgrep](https://www.npmjs.com/package/@mondoohq/xgrep)
 (`npm i -g @mondoohq/xgrep`, Semgrep-compatible rule syntax). One rule per file, each with a
 sibling `.go` fixture (`//go:build ignore`, never compiled) carrying `// ruleid:` / `// ok:` cases.
 
