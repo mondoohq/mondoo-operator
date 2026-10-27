@@ -6,8 +6,6 @@ package nodes
 import (
 	"crypto/sha256"
 	"fmt"
-	"math"
-	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -260,7 +258,7 @@ func daemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 				},
 				Spec: corev1.PodSpec{
 					NodeSelector:      nodeSpec.NodeSelector,
-					Affinity:          nodeSpec.Affinity,
+					Affinity:          nodeSpec.Affinity.DeepCopy(),
 					PriorityClassName: nodeSpec.PriorityClassName,
 					// The node scanning does not use the Kubernetes API at all, therefore the service account token
 					// should not be mounted at all.
@@ -346,10 +344,25 @@ func daemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 			cfg.Spec.ImagePullSecrets...)
 	}
 	if nodeAffinity := nodeSelectorAffinity(m.Spec.Nodes.LabelSelector); nodeAffinity != nil {
-		if ds.Spec.Template.Spec.Affinity == nil {
-			ds.Spec.Template.Spec.Affinity = &corev1.Affinity{}
+		affinity := ds.Spec.Template.Spec.Affinity
+		if affinity == nil {
+			affinity = &corev1.Affinity{}
+			ds.Spec.Template.Spec.Affinity = affinity
 		}
-		ds.Spec.Template.Spec.Affinity.NodeAffinity = nodeAffinity
+		if affinity.NodeAffinity == nil {
+			affinity.NodeAffinity = &corev1.NodeAffinity{}
+		}
+		required := affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		if required == nil || len(required.NodeSelectorTerms) == 0 {
+			affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		} else {
+			// spec.nodes.affinity (or a scanner set) already requires node terms. Terms are
+			// ORed, so the labelSelector requirements are ANDed into every term to keep both.
+			labelRequirements := nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions
+			for i := range required.NodeSelectorTerms {
+				required.NodeSelectorTerms[i].MatchExpressions = append(required.NodeSelectorTerms[i].MatchExpressions, labelRequirements...)
+			}
+		}
 	}
 
 	k8s.ApplyDaemonSetOverrides(ds, k8s.MergeJobOverrides(m.Spec.JobOverrides, m.Spec.Nodes.JobOverrides))
@@ -437,21 +450,7 @@ func DaemonSetNameForScannerSet(prefix, scannerSetName string) string {
 	if scannerSetName == "" {
 		return DaemonSetName(prefix)
 	}
-	base := fmt.Sprintf("%s%s-", prefix, DaemonSetNameBase)
-	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(scannerSetName)))[:8]
-	maxLen := k8s.DaemonSetNameChildResourceSafeMaxLength
-	if len(base)+len(scannerSetName) <= maxLen {
-		return base + scannerSetName
-	}
-	maxBaseLen := maxLen - len(hash) - 1
-	trimmedBase := strings.TrimRight(base, "-")
-	if len(trimmedBase) > maxBaseLen {
-		trimmedBase = strings.TrimRight(trimmedBase[:maxBaseLen], "-")
-	}
-	if trimmedBase == "" {
-		return hash
-	}
-	return fmt.Sprintf("%s-%s", trimmedBase, hash)
+	return k8s.ScopedName(prefix, DaemonSetNameBase, scannerSetName)
 }
 
 func GarbageCollectCronJobName(prefix string) string {

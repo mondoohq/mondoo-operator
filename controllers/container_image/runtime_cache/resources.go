@@ -537,29 +537,18 @@ func validateScannerSets(path string, sets []v1alpha2.NodeScannerSet) error {
 }
 
 func DaemonSetName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, DaemonSetNameSuffix)
+	return k8s.Name(prefix, DaemonSetNameSuffix)
 }
 
 func DaemonSetNameForScannerSet(prefix, scannerSetName string) string {
 	if scannerSetName == "" {
 		return DaemonSetName(prefix)
 	}
-	base := fmt.Sprintf("%s-runtime-cache-", prefix)
-	maxLen := k8s.DaemonSetNameChildResourceSafeMaxLength
-	if len(base)+len(scannerSetName) <= maxLen {
-		return base + scannerSetName
-	}
-	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(scannerSetName)))[:8]
-	maxBaseLen := maxLen - len(hash) - 1
-	trimmedBase := strings.TrimRight(base, "-")
-	if len(trimmedBase) > maxBaseLen {
-		trimmedBase = strings.TrimRight(trimmedBase[:maxBaseLen], "-")
-	}
-	return fmt.Sprintf("%s-%s", trimmedBase, hash)
+	return k8s.ScopedName(prefix, "-runtime-cache", scannerSetName)
 }
 
 func ConfigMapName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, InventoryConfigMapSuffix)
+	return k8s.Name(prefix, InventoryConfigMapSuffix)
 }
 
 func Labels(m v1alpha2.MondooAuditConfig) map[string]string {
@@ -598,22 +587,6 @@ func scannerSetNameValue(set *v1alpha2.NodeScannerSet) string {
 		return ""
 	}
 	return strings.TrimSpace(set.Name)
-}
-
-func scannerSetNameOrHash(allowedLen int, name string) string {
-	name = sanitizeDNSLabel(name)
-	if allowedLen <= 0 {
-		sum := fmt.Sprintf("%x", sha256.Sum256([]byte(name)))
-		return sum[:8]
-	}
-	if len(name) <= allowedLen {
-		return name
-	}
-	sum := fmt.Sprintf("%x", sha256.Sum256([]byte(name)))
-	if allowedLen <= 8 {
-		return sum[:allowedLen]
-	}
-	return fmt.Sprintf("%s-%s", strings.TrimRight(name[:allowedLen-9], "-"), sum[:8])
 }
 
 func DelegateVolumeName(name string) string {

@@ -342,11 +342,10 @@ func TestDaemonSetForScannerSetInheritsTopLevelFields(t *testing.T) {
 	assert.Equal(t, "true", env["SHARED"])
 }
 
-func TestDaemonSetNameForScannerSetUsesDaemonSetLengthBudget(t *testing.T) {
+func TestDaemonSetNameForScannerSetFitsNameLimit(t *testing.T) {
 	prefix := strings.Repeat("a", 55)
 	name := DaemonSetNameForScannerSet(prefix, "workers")
-	assert.LessOrEqual(t, len(name), k8s.DaemonSetNameChildResourceSafeMaxLength)
-	assert.Greater(t, len(name), k8s.ResourceNameMaxLength)
+	assert.LessOrEqual(t, len(name), k8s.ResourceNameMaxLength)
 	assert.NotEqual(t, name, DaemonSetNameForScannerSet(prefix, "control-plane"))
 }
 
@@ -1013,4 +1012,27 @@ func testMondooAuditConfig() *v1alpha2.MondooAuditConfig {
 			Namespace: testNamespace,
 		},
 	}
+}
+
+func TestDaemonSet_LabelSelectorKeepsConfiguredNodeAffinity(t *testing.T) {
+	mac := *testMondooAuditConfig()
+	mac.Spec.Nodes.Style = v1alpha2.NodeScanStyle_DaemonSet
+	mac.Spec.Nodes.LabelSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"scan": "yes"}}
+	poolTerm := corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{
+		{Key: "pool", Operator: corev1.NodeSelectorOpIn, Values: []string{"platform"}},
+	}}
+	mac.Spec.Nodes.Affinity = &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{poolTerm}},
+	}}
+
+	ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
+
+	terms := ds.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+	require.Len(t, terms, 1)
+	assert.Equal(t, []corev1.NodeSelectorRequirement{
+		{Key: "pool", Operator: corev1.NodeSelectorOpIn, Values: []string{"platform"}},
+		{Key: "scan", Operator: corev1.NodeSelectorOpIn, Values: []string{"yes"}},
+	}, terms[0].MatchExpressions)
+	// the audit config itself must not be mutated
+	assert.Len(t, mac.Spec.Nodes.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions, 1)
 }

@@ -324,11 +324,10 @@ func TestDaemonSetForScannerSetMergesEnvWithDeterministicPrecedence(t *testing.T
 	assert.Equal(t, "true", envMap["SET_ONLY"])
 }
 
-func TestDaemonSetNameForScannerSetUsesDaemonSetLengthBudget(t *testing.T) {
+func TestDaemonSetNameForScannerSetFitsNameLimit(t *testing.T) {
 	prefix := strings.Repeat("a", 45)
 	name := DaemonSetNameForScannerSet(prefix, "control-plane-workers")
-	assert.LessOrEqual(t, len(name), k8s.DaemonSetNameChildResourceSafeMaxLength)
-	assert.Greater(t, len(name), k8s.ResourceNameMaxLength)
+	assert.LessOrEqual(t, len(name), k8s.ResourceNameMaxLength)
 	assert.NotEqual(t, name, DaemonSetNameForScannerSet(prefix, "control-plane-other"))
 }
 
@@ -390,12 +389,6 @@ func TestDaemonSetRuntimeDelegatesMountExactSockets(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 2, containerdMounts)
-}
-
-func TestScannerSetNameOrHashTrimsDashBeforeHash(t *testing.T) {
-	name := scannerSetNameOrHash(16, "abcdef-ghijklmnopqrstuvwxyz")
-	assert.Regexp(t, `^abcdef-[0-9a-f]{8}$`, name)
-	assert.NotContains(t, name, "--")
 }
 
 func TestRuntimeCacheRBACDoesNotGrantSecrets(t *testing.T) {
