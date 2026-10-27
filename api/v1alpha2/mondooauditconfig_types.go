@@ -249,6 +249,11 @@ type KubernetesResources struct {
 	// +optional
 	ActiveDeadline *metav1.Duration `json:"activeDeadline,omitempty"`
 
+	// NetworkInventory tunes the network posture inventory collected during Kubernetes resource
+	// scans, including scans of external clusters. Requires cnspec v13.24.0 or later.
+	// +optional
+	NetworkInventory NetworkInventorySpec `json:"networkInventory,omitempty"`
+
 	// Kyverno configures collection of Kyverno policies, policy reports, and PolicyExceptions.
 	// When omitted, Kyverno collection is disabled. Set kyverno.enable to true to collect Kyverno resources.
 	// Collection happens through the normal cnspec Kubernetes scanner and is not part of admission handling.

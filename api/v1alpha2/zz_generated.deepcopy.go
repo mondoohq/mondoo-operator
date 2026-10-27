@@ -366,6 +366,7 @@ func (in *KubernetesResources) DeepCopyInto(out *KubernetesResources) {
 		*out = new(v1.Duration)
 		**out = **in
 	}
+	in.NetworkInventory.DeepCopyInto(&out.NetworkInventory)
 	in.Kyverno.DeepCopyInto(&out.Kyverno)
 	if in.ExternalClusters != nil {
 		in, out := &in.ExternalClusters, &out.ExternalClusters
