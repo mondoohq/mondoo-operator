@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"strings"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/hashicorp/vault-client-go/schema"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
