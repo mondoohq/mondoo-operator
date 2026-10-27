@@ -74,7 +74,7 @@ func parseServiceAccountCredential(tokenSecretData string) (*provisionerCredenti
 func loadPersistedProvisionerCredential(ctx context.Context, kubeClient client.Client, serviceAccountSecret types.NamespacedName) (*provisionerCredential, bool) {
 	secret := &corev1.Secret{}
 	key := client.ObjectKey{
-		Name:      serviceAccountSecret.Name + constants.MondooProvisionerSecretSuffix,
+		Name:      ProvisionerSecretName(serviceAccountSecret.Name),
 		Namespace: serviceAccountSecret.Namespace,
 	}
 	if err := kubeClient.Get(ctx, key, secret); err != nil {
@@ -434,7 +434,7 @@ func provisionConsoleIntegration(
 	// the CR.
 	provisionerSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceAccountSecret.Name + constants.MondooProvisionerSecretSuffix,
+			Name:      ProvisionerSecretName(serviceAccountSecret.Name),
 			Namespace: serviceAccountSecret.Namespace,
 		},
 	}

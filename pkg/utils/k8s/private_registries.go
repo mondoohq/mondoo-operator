@@ -43,7 +43,7 @@ type DockerAuthConfig struct {
 
 // MergedSecretName returns the name of the merged private registries secret for a MondooAuditConfig
 func MergedSecretName(m *v1alpha2.MondooAuditConfig) string {
-	return m.Name + MergedPrivateRegistriesSecretSuffix
+	return Name(m.Name, MergedPrivateRegistriesSecretSuffix)
 }
 
 // ReconcilePrivateRegistriesSecret reconciles the private registry secrets.

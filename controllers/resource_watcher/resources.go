@@ -28,7 +28,7 @@ const (
 
 // DeploymentName returns the name of the resource watcher deployment for a given MondooAuditConfig.
 func DeploymentName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, DeploymentNameSuffix)
+	return k8s.Name(prefix, DeploymentNameSuffix)
 }
 
 // DeploymentLabels returns the labels for the resource watcher deployment.

@@ -31,10 +31,7 @@ rules:
         - "a NEW call to a plain helper that already exists on main is invisible in --baseline-commit mode (the helper's own finding sits on an unchanged line); the full scan lists those helpers"
         - "taint is intra-file: a helper in another package is trusted by its name and policed by name-helper-without-length-check"
         - "a constructor that receives the name as a bare string parameter is not a source; constructors here take the MondooAuditConfig"
-      known-fires-on-main:
-        - "controllers/k8s_scan/deployment_handler.go cleanupWorkloadDeployment: old-style Deployment and ConfigMap names, deleted not created"
-        - "pkg/utils/k8s/space_config.go: config override Secret built inline"
-        - "pkg/utils/mondoo/integration_provision.go: provisioner Secret built from the user's SA secret name"
+      known-fires-on-main: []
     paths:
       include: ["**/*.go"]
       exclude: ["**/*_test.go", "**/zz_generated*.go", "tests/**", ".xgrep/**"]
@@ -50,14 +47,14 @@ rules:
       # a reference to an object the user named (a secret ref in the spec) is not a built name
       - pattern: $Y.Spec.$Z.Name
       # length-checked: a name helper (its body is checked by name-helper-without-length-check)
-      # or one of the two truncating primitives
+      # or one of the truncating primitives (nodeScopedName, cronJobName, k8s.Name, k8s.ScopedName)
       - patterns:
           - pattern-either:
               - pattern: $F(...)
               - pattern: $PKG.$F(...)
           - metavariable-regex:
               metavariable: $F
-              regex: '^(\w*(CronJob|Job|Deployment|DaemonSet|StatefulSet|Service|Pod|ConfigMap|Secret|ServiceAccount|Kubeconfig|Role|RoleBinding|Webhook)Name\w*|nodeScopedName|cronJobName)$'
+              regex: '^(\w*(CronJob|Job|Deployment|DaemonSet|StatefulSet|Service|Pod|ConfigMap|Secret|ServiceAccount|Kubeconfig|Role|RoleBinding|Webhook)Name\w*|nodeScopedName|cronJobName|Name|ScopedName)$'
       # inside a name helper the input is the helper's job. Without this, a same-file helper
       # whose body reads m.Name hands taint to its caller past the sanitizer above (xgrep follows
       # calls within a file).

@@ -603,7 +603,8 @@ func (n *DeploymentHandler) cleanupWorkloadDeployment(ctx context.Context) error
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: n.Mondoo.Namespace,
-			Name:      fmt.Sprintf(WorkloadDeploymentNameTemplate, n.Mondoo.Name),
+			// legacy name, looked up only to delete it
+			Name: fmt.Sprintf(WorkloadDeploymentNameTemplate, n.Mondoo.Name), // nosemgrep: mondoo-object-name-not-length-checked
 		},
 	}
 
@@ -614,7 +615,8 @@ func (n *DeploymentHandler) cleanupWorkloadDeployment(ctx context.Context) error
 
 	cfgMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf(workloadDeploymentConfigMapNameTemplate, n.Mondoo.Name),
+			// legacy name, looked up only to delete it
+			Name:      fmt.Sprintf(workloadDeploymentConfigMapNameTemplate, n.Mondoo.Name), // nosemgrep: mondoo-object-name-not-length-checked
 			Namespace: n.Mondoo.Namespace,
 		},
 	}

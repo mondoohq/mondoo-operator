@@ -380,15 +380,15 @@ func DeploymentName(prefix, suffix string) string {
 }
 
 func DaemonSetName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, DaemonSetNameBase)
+	return k8s.Name(prefix, DaemonSetNameBase)
 }
 
 func GarbageCollectCronJobName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, GarbageCollectCronJobNameBase)
+	return k8s.Name(prefix, GarbageCollectCronJobNameBase)
 }
 
 func ConfigMapName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
+	return k8s.Name(prefix, InventoryConfigMapBase)
 }
 
 func ConfigMapNameWithNode(prefix, nodeName string) string {

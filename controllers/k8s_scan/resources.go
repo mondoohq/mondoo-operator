@@ -634,21 +634,21 @@ func ExternalClusterCronJobName(prefix, clusterName string) string {
 }
 
 func ConfigMapName(prefix string) string {
-	return fmt.Sprintf("%s%s", prefix, InventoryConfigMapBase)
+	return k8s.Name(prefix, InventoryConfigMapBase)
 }
 
 func ExternalClusterConfigMapName(prefix, clusterName string) string {
-	return fmt.Sprintf("%s%s-%s", prefix, InventoryConfigMapBase, clusterName)
+	return k8s.ScopedName(prefix, InventoryConfigMapBase, clusterName)
 }
 
 // ExternalClusterSAKubeconfigName returns the name for the SA kubeconfig ConfigMap
 func ExternalClusterSAKubeconfigName(prefix, clusterName string) string {
-	return fmt.Sprintf("%s-sa-kubeconfig-%s", prefix, clusterName)
+	return k8s.ScopedName(prefix, "-sa-kubeconfig", clusterName)
 }
 
 // WIFServiceAccountName returns the name for the WIF ServiceAccount
 func WIFServiceAccountName(prefix, clusterName string) string {
-	return fmt.Sprintf("%s-wif-%s", prefix, clusterName)
+	return k8s.ScopedName(prefix, "-wif", clusterName)
 }
 
 // ExternalClusterSAKubeconfig generates a kubeconfig that references mounted token and CA files
