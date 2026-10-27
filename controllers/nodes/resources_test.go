@@ -198,15 +198,15 @@ func TestResources_Parallelism(t *testing.T) {
 	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
 
 	m := testMondooAuditConfig()
-	cj := CronJob("test-image:latest", node, m, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test-image:latest", constants.BusyBoxImage, node, m, false, v1alpha2.MondooOperatorConfig{})
 	assert.Equal(t, "1", envValue(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env))
-	ds := DaemonSet(*m, false, "test-image:latest", v1alpha2.MondooOperatorConfig{}, nil)
+	ds := DaemonSet(*m, false, "test-image:latest", constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{}, nil)
 	assert.Equal(t, "1", envValue(ds.Spec.Template.Spec.Containers[0].Env))
 
 	m.Spec.Nodes.Env = []corev1.EnvVar{{Name: "MONDOO_PARALLELISM", Value: "4"}}
-	cj = CronJob("test-image:latest", node, m, false, v1alpha2.MondooOperatorConfig{})
+	cj = CronJob("test-image:latest", constants.BusyBoxImage, node, m, false, v1alpha2.MondooOperatorConfig{})
 	assert.Equal(t, "4", envValue(cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env))
-	ds = DaemonSet(*m, false, "test-image:latest", v1alpha2.MondooOperatorConfig{}, nil)
+	ds = DaemonSet(*m, false, "test-image:latest", constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{}, nil)
 	assert.Equal(t, "4", envValue(ds.Spec.Template.Spec.Containers[0].Env))
 }
 
@@ -229,7 +229,7 @@ func TestCronJob_ScheduleSpreadDelaysScanner(t *testing.T) {
 	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 	cfg := v1alpha2.MondooOperatorConfig{}
 
-	cj := CronJob("test-image:latest", node, m, false, cfg)
+	cj := CronJob("test-image:latest", constants.BusyBoxImage, node, m, false, cfg)
 	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
 	delay := nodeScanStartDelay(node.Name, m.Spec.Nodes.ScheduleSpread.Duration)
 
@@ -238,7 +238,7 @@ func TestCronJob_ScheduleSpreadDelaysScanner(t *testing.T) {
 	assert.Equal(t, []string{
 		"cnspec", "scan", "local",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
-		"--inventory-template", "/etc/opt/mondoo/inventory_template.yml",
+		"--inventory-file", nodeInventoryRenderedPath,
 		"--report-type", "none",
 	}, container.Args[1:])
 }
@@ -248,7 +248,7 @@ func TestCronJob_ScheduleSpreadDisabledKeepsDirectCommand(t *testing.T) {
 	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
 	cfg := v1alpha2.MondooOperatorConfig{}
 
-	cj := CronJob("test-image:latest", node, m, false, cfg)
+	cj := CronJob("test-image:latest", constants.BusyBoxImage, node, m, false, cfg)
 	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
 
 	assert.Equal(t, "cnspec", container.Command[0])
@@ -267,7 +267,7 @@ func TestCronJob_ScheduleSpreadKeepsProxyArgSafe(t *testing.T) {
 		},
 	}
 
-	cj := CronJob("test-image:latest", node, m, false, cfg)
+	cj := CronJob("test-image:latest", constants.BusyBoxImage, node, m, false, cfg)
 	container := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
 
 	require.Equal(t, []string{"/bin/sh", "-c", nodeScanDelayScript}, container.Command)
@@ -905,7 +905,7 @@ func TestDaemonSet_WithNodeLabelSelector(t *testing.T) {
 		},
 	}
 
-	ds := DaemonSet(mac, false, "test123", v1alpha2.MondooOperatorConfig{}, nil)
+	ds := DaemonSet(mac, false, "test123", constants.BusyBoxImage, v1alpha2.MondooOperatorConfig{}, nil)
 
 	require.NotNil(t, ds.Spec.Template.Spec.Affinity)
 	require.NotNil(t, ds.Spec.Template.Spec.Affinity.NodeAffinity)

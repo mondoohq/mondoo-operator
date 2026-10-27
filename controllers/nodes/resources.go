@@ -44,6 +44,7 @@ const (
 	nodeInventoryTemplatePath        = "/etc/opt/mondoo/inventory_template.yml"
 	nodeInventoryRenderedPath        = "/tmp/mondoo-node-inventory.yml"
 	nodeInventoryNodeNamePlaceholder = "__MONDOO_NODE_NAME__"
+	renderNodeInventoryContainerName = "render-node-inventory"
 )
 
 // CronJob creates a CronJob for node scanning
@@ -478,7 +479,7 @@ func renderNodeInventoryInitContainer(nodeName, image string) corev1.Container {
 	}
 
 	return corev1.Container{
-		Name:            "render-node-inventory",
+		Name:            renderNodeInventoryContainerName,
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Command:         []string{"/bin/sh", "-ec", render},

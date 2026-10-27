@@ -96,7 +96,7 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 	}
 	renderImage, err := n.ContainerImageResolver.ContainerImage(ctx, constants.BusyBoxImage, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
-		logger.Error(err, "Failed to resolve node inventory render container image")
+		n.log().Error(err, "Failed to resolve node inventory render container image")
 		return err
 	}
 
@@ -159,10 +159,6 @@ func (n *DeploymentHandler) syncCronJob(ctx context.Context) error {
 				unsafeMemoryAllocatable = allocatable
 				haveUnsafeMemory = true
 			}
-		}
-
-		if err := n.syncConfigMap(ctx, clusterUid); err != nil {
-			return err
 		}
 
 		desired := CronJob(mondooClientImage, renderImage, node, n.Mondoo, n.IsOpenshift, *n.MondooOperatorConfig)
@@ -246,7 +242,7 @@ func (n *DeploymentHandler) syncDaemonSet(ctx context.Context) error {
 	}
 	renderImage, err := n.ContainerImageResolver.ContainerImage(ctx, constants.BusyBoxImage, n.MondooOperatorConfig.Spec.SkipContainerResolution)
 	if err != nil {
-		logger.Error(err, "Failed to resolve node inventory render container image")
+		n.log().Error(err, "Failed to resolve node inventory render container image")
 		return err
 	}
 
