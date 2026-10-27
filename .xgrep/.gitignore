@@ -1,0 +1,4 @@
+# written by every xgrep run: scan -> ./.xgrep/findings.json, test <dir> -> <dir>/.xgrep/findings.json
+findings.json
+scan-cache.json
+rules/.xgrep/
