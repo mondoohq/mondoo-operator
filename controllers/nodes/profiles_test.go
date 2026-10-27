@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
+	"go.mondoo.com/mondoo-operator/pkg/constants"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -167,12 +168,12 @@ func TestCronJob_UsesMatchingProfile(t *testing.T) {
 		},
 	}
 
-	large := CronJob("test-image", nodeWithLabels("node-large", map[string]string{"size": "large"}), mac, false, v1alpha2.MondooOperatorConfig{})
+	large := CronJob("test-image", constants.BusyBoxImage, nodeWithLabels("node-large", map[string]string{"size": "large"}), mac, false, v1alpha2.MondooOperatorConfig{})
 	largeSpec := large.Spec.JobTemplate.Spec.Template.Spec
 	assert.Equal(t, resource.MustParse("2G"), largeSpec.Containers[0].Resources.Limits[corev1.ResourceMemory])
 	assert.Contains(t, largeSpec.Tolerations, corev1.Toleration{Key: "workload", Operator: corev1.TolerationOpExists})
 
-	small := CronJob("test-image", nodeWithLabels("node-small", map[string]string{"size": "small"}), mac, false, v1alpha2.MondooOperatorConfig{})
+	small := CronJob("test-image", constants.BusyBoxImage, nodeWithLabels("node-small", map[string]string{"size": "small"}), mac, false, v1alpha2.MondooOperatorConfig{})
 	smallSpec := small.Spec.JobTemplate.Spec.Template.Spec
 	assert.Equal(t, resource.MustParse("400M"), smallSpec.Containers[0].Resources.Limits[corev1.ResourceMemory])
 	assert.NotContains(t, smallSpec.Tolerations, corev1.Toleration{Key: "workload", Operator: corev1.TolerationOpExists})
@@ -182,7 +183,7 @@ func TestCronJob_WithoutProfilesIsUnchanged(t *testing.T) {
 	mac := testMondooAuditConfig()
 	node := nodeWithLabels("node-a", map[string]string{"size": "large"})
 
-	before := CronJob("test-image", node, mac, false, v1alpha2.MondooOperatorConfig{})
+	before := CronJob("test-image", constants.BusyBoxImage, node, mac, false, v1alpha2.MondooOperatorConfig{})
 	assert.Equal(t, k8s.DefaultNodeScanningResources, before.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Resources)
 	assert.Equal(t, k8s.TaintsToTolerations(node.Spec.Taints), before.Spec.JobTemplate.Spec.Template.Spec.Tolerations)
 }
@@ -193,7 +194,7 @@ func TestCronJob_ProfileDrivesGoMemLimit(t *testing.T) {
 		{Name: "large", NodeSelector: map[string]string{"size": "large"}, Resources: profileResourceRequirements("2G")},
 	}
 
-	cj := CronJob("test-image", nodeWithLabels("node-large", map[string]string{"size": "large"}), mac, false, v1alpha2.MondooOperatorConfig{})
+	cj := CronJob("test-image", constants.BusyBoxImage, nodeWithLabels("node-large", map[string]string{"size": "large"}), mac, false, v1alpha2.MondooOperatorConfig{})
 	var goMemLimit string
 	for _, env := range cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
 		if env.Name == "GOMEMLIMIT" {
