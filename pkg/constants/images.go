@@ -6,7 +6,7 @@ package constants
 const (
 	// Google Cloud SDK image - slim variant for smaller size
 	// https://cloud.google.com/sdk/docs/downloads-docker
-	GCloudSDKImage = "gcr.io/google.com/cloudsdktool/google-cloud-cli:499.0.0-slim"
+	GCloudSDKImage = "gcr.io/google.com/cloudsdktool/google-cloud-cli:591.0.0-slim"
 
 	// AWS CLI image
 	// https://hub.docker.com/r/amazon/aws-cli

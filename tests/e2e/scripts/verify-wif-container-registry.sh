@@ -43,9 +43,9 @@ check "Container registry WIF SA has ${CR_WIF_ANNOTATION_KEY} annotation" \
     [[ \"\${ANNOTATION}\" == '${EXPECTED_CR_WIF_VALUE}' ]]
   "
 
-# Check containers-scan CronJob exists
+# Check container-scan CronJob exists
 check "Container image scanning CronJob exists" \
-  bash -c "kubectl get cronjobs -n '${NAMESPACE}' -o name | grep -q containers-scan"
+  bash -c "kubectl get cronjobs -n '${NAMESPACE}' -o name | grep -q container-scan"
 
 # Check CronJob has generate-registry-creds init container
 check "CronJob has generate-registry-creds init container" \

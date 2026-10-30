@@ -1731,7 +1731,7 @@ uses GCP Workload Identity to authenticate to a target GKE cluster without stati
 
 **Key GKE-specific details:**
 - ServiceAccount annotation: `iam.gke.io/gcp-service-account`
-- Init container image: `gcr.io/google.com/cloudsdktool/google-cloud-cli:499.0.0-slim`
+- Init container image: `gcr.io/google.com/cloudsdktool/google-cloud-cli:591.0.0-slim`
 - Kubeconfig command: `gcloud container clusters get-credentials $CLUSTER_NAME --project $PROJECT_ID --location $CLUSTER_LOCATION`
 - Environment variables: `CLUSTER_NAME`, `PROJECT_ID`, `CLUSTER_LOCATION`
 - API fields: `projectId`, `clusterName`, `clusterLocation`, `googleServiceAccount`
