@@ -121,8 +121,8 @@ type K8sIntegrationConfig struct {
 	ScanCacheEnabled bool   `json:"scanCacheEnabled,omitempty"`
 	ScanCacheTTL     string `json:"scanCacheTtl,omitempty"`
 
-	K8sActiveDeadline        int64 `json:"k8sActiveDeadline,omitempty"`
-	ContainersActiveDeadline int64 `json:"containersActiveDeadline,omitempty"`
+	K8sActiveDeadline        ProtoInt64 `json:"k8sActiveDeadline,omitempty"`
+	ContainersActiveDeadline ProtoInt64 `json:"containersActiveDeadline,omitempty"`
 
 	JobOverrides           *K8sJobOverridesConfig `json:"jobOverrides,omitempty"`
 	ScannerJobOverrides    *K8sJobOverridesConfig `json:"scannerJobOverrides,omitempty"`
@@ -138,6 +138,46 @@ type K8sIntegrationConfig struct {
 	ScannerEnv    []K8sEnvVarConfig `json:"scannerEnv,omitempty"`
 	NodesEnv      []K8sEnvVarConfig `json:"nodesEnv,omitempty"`
 	ContainersEnv []K8sEnvVarConfig `json:"containersEnv,omitempty"`
+
+	InheritNamespaceLabels []string                   `json:"inheritNamespaceLabels,omitempty"`
+	NamespaceLabelSelector *K8sLabelSelectorConfig    `json:"namespaceLabelSelector,omitempty"`
+	ObjectLabelSelector    *K8sLabelSelectorConfig    `json:"objectLabelSelector,omitempty"`
+	NetworkInventory       *K8sNetworkInventoryConfig `json:"networkInventory,omitempty"`
+
+	K8sSuspend        bool `json:"k8sSuspend,omitempty"`
+	NodesSuspend      bool `json:"nodesSuspend,omitempty"`
+	ContainersSuspend bool `json:"containersSuspend,omitempty"`
+
+	NodesProfiles       []K8sNodeScanProfileConfig `json:"nodesProfiles,omitempty"`
+	NodesScheduleSpread string                     `json:"nodesScheduleSpread,omitempty"`
+	NodesLabelSelector  *K8sLabelSelectorConfig    `json:"nodesLabelSelector,omitempty"`
+}
+
+type K8sLabelSelectorConfig struct {
+	MatchLabels      map[string]string                   `json:"matchLabels,omitempty"`
+	MatchExpressions []K8sLabelSelectorRequirementConfig `json:"matchExpressions,omitempty"`
+}
+
+type K8sLabelSelectorRequirementConfig struct {
+	Key      string   `json:"key,omitempty"`
+	Operator string   `json:"operator,omitempty"`
+	Values   []string `json:"values,omitempty"`
+}
+
+type K8sNetworkInventoryConfig struct {
+	HbnEnable                 *bool    `json:"hbnEnable,omitempty"`
+	HbnIncludeLegacyResources *bool    `json:"hbnIncludeLegacyResources,omitempty"`
+	MultiNetworkPolicyEnable  *bool    `json:"multiNetworkPolicyEnable,omitempty"`
+	PublicCidrs               []string `json:"publicCidrs,omitempty"`
+	PrivateCidrs              []string `json:"privateCidrs,omitempty"`
+	TrustedEgressCidrs        []string `json:"trustedEgressCidrs,omitempty"`
+}
+
+type K8sNodeScanProfileConfig struct {
+	Name         string                         `json:"name,omitempty"`
+	NodeSelector map[string]string              `json:"nodeSelector,omitempty"`
+	Resources    *K8sResourceRequirementsConfig `json:"resources,omitempty"`
+	Tolerations  []K8sTolerationConfig          `json:"tolerations,omitempty"`
 }
 
 type K8sResourceRequirementsConfig struct {
@@ -168,11 +208,26 @@ type K8sTolerationConfig struct {
 	Operator string `json:"operator,omitempty"`
 	Value    string `json:"value,omitempty"`
 	Effect   string `json:"effect,omitempty"`
+
+	TolerationSeconds *ProtoInt64 `json:"tolerationSeconds,omitempty"`
 }
 
 type K8sEnvVarConfig struct {
-	Name  string `json:"name,omitempty"`
-	Value string `json:"value,omitempty"`
+	Name      string                 `json:"name,omitempty"`
+	Value     string                 `json:"value,omitempty"`
+	ValueFrom *K8sEnvVarSourceConfig `json:"valueFrom,omitempty"`
+}
+
+type K8sEnvVarSourceConfig struct {
+	SecretKeyRef    *K8sKeySelectorConfig `json:"secretKeyRef,omitempty"`
+	ConfigMapKeyRef *K8sKeySelectorConfig `json:"configMapKeyRef,omitempty"`
+	FieldPath       string                `json:"fieldPath,omitempty"`
+}
+
+type K8sKeySelectorConfig struct {
+	Name     string `json:"name,omitempty"`
+	Key      string `json:"key,omitempty"`
+	Optional bool   `json:"optional,omitempty"`
 }
 
 type K8sExternalClusterConfig struct {
@@ -190,6 +245,14 @@ type K8sExternalClusterConfig struct {
 	Aks                    *K8sAksWifConfig `json:"aks,omitempty"`
 	Spiffe                 *K8sSpiffeConfig `json:"spiffe,omitempty"`
 	Vault                  *K8sVaultConfig  `json:"vault,omitempty"`
+
+	Schedule                    string                  `json:"schedule,omitempty"`
+	Suspend                     bool                    `json:"suspend,omitempty"`
+	RepositoriesAllowList       []string                `json:"repositoriesAllowList,omitempty"`
+	RepositoriesDenyList        []string                `json:"repositoriesDenyList,omitempty"`
+	PrivateRegistriesPullSecret string                  `json:"privateRegistriesPullSecret,omitempty"`
+	NamespaceLabelSelector      *K8sLabelSelectorConfig `json:"namespaceLabelSelector,omitempty"`
+	ObjectLabelSelector         *K8sLabelSelectorConfig `json:"objectLabelSelector,omitempty"`
 }
 
 type K8sContainersWifConfig struct {
@@ -232,8 +295,12 @@ type K8sSpiffeConfig struct {
 }
 
 type K8sVaultConfig struct {
-	Server              string `json:"server,omitempty"`
-	VaultAddr           string `json:"vaultAddr,omitempty"`
+	// Server is part of the remote shape but unused: the external cluster's own
+	// Server field names the target API server.
+	Server string `json:"server,omitempty"`
+	// The remote config sends the Vault address under "addr".
+	VaultAddr           string `json:"addr,omitempty"`
+	VaultNamespace      string `json:"vaultNamespace,omitempty"`
 	AuthRole            string `json:"authRole,omitempty"`
 	CredsRole           string `json:"credsRole,omitempty"`
 	AuthPath            string `json:"authPath,omitempty"`

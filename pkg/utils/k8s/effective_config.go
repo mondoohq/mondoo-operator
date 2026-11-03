@@ -121,6 +121,19 @@ func mapRemoteConfig(cfg *mondooclient.K8sIntegrationConfig, uid types.UID, warn
 
 	spec.KubernetesResources.ExternalClusters = mapExternalClusters(cfg.ExternalClusters)
 
+	spec.InheritNamespaceLabels = cfg.InheritNamespaceLabels
+	spec.Filtering.NamespaceLabelSelector = mapLabelSelector(cfg.NamespaceLabelSelector)
+	spec.Filtering.ObjectLabelSelector = mapLabelSelector(cfg.ObjectLabelSelector)
+	spec.KubernetesResources.NetworkInventory = mapNetworkInventory(cfg.NetworkInventory)
+
+	spec.KubernetesResources.Suspend = cfg.K8sSuspend
+	spec.Nodes.Suspend = cfg.NodesSuspend
+	spec.Containers.Suspend = cfg.ContainersSuspend
+
+	spec.Nodes.Profiles = mapNodeProfiles(cfg.NodesProfiles, warnings)
+	spec.Nodes.ScheduleSpread = parseDuration(cfg.NodesScheduleSpread)
+	spec.Nodes.LabelSelector = mapLabelSelector(cfg.NodesLabelSelector)
+
 	for _, name := range cfg.PrivateRegistriesPullSecretRefs {
 		spec.Scanner.PrivateRegistriesPullSecretRefs = append(
 			spec.Scanner.PrivateRegistriesPullSecretRefs,
@@ -214,15 +227,77 @@ func mapJobOverrides(cfg *mondooclient.K8sJobOverridesConfig) v1alpha2.JobOverri
 		ttl := cfg.TTLSecondsAfterFinished
 		jo.TTLSecondsAfterFinished = &ttl
 	}
-	for _, t := range cfg.Tolerations {
-		jo.Tolerations = append(jo.Tolerations, corev1.Toleration{
+	jo.Tolerations = mapTolerations(cfg.Tolerations)
+	return jo
+}
+
+func mapTolerations(cfgs []mondooclient.K8sTolerationConfig) []corev1.Toleration {
+	var tolerations []corev1.Toleration
+	for _, t := range cfgs {
+		toleration := corev1.Toleration{
 			Key:      t.Key,
 			Operator: corev1.TolerationOperator(t.Operator),
 			Value:    t.Value,
 			Effect:   corev1.TaintEffect(t.Effect),
+		}
+		if t.TolerationSeconds != nil {
+			secs := int64(*t.TolerationSeconds)
+			toleration.TolerationSeconds = &secs
+		}
+		tolerations = append(tolerations, toleration)
+	}
+	return tolerations
+}
+
+func mapLabelSelector(cfg *mondooclient.K8sLabelSelectorConfig) *metav1.LabelSelector {
+	if cfg == nil || (len(cfg.MatchLabels) == 0 && len(cfg.MatchExpressions) == 0) {
+		return nil
+	}
+	sel := &metav1.LabelSelector{MatchLabels: cfg.MatchLabels}
+	for _, e := range cfg.MatchExpressions {
+		sel.MatchExpressions = append(sel.MatchExpressions, metav1.LabelSelectorRequirement{
+			Key:      e.Key,
+			Operator: metav1.LabelSelectorOperator(e.Operator),
+			Values:   e.Values,
 		})
 	}
-	return jo
+	return sel
+}
+
+func mapNetworkInventory(cfg *mondooclient.K8sNetworkInventoryConfig) v1alpha2.NetworkInventorySpec {
+	if cfg == nil {
+		return v1alpha2.NetworkInventorySpec{}
+	}
+	return v1alpha2.NetworkInventorySpec{
+		HBN: v1alpha2.HBNNetworkInventorySpec{
+			Enable:                 cfg.HbnEnable,
+			IncludeLegacyResources: cfg.HbnIncludeLegacyResources,
+		},
+		MultiNetworkPolicy: v1alpha2.MultiNetworkPolicyInventorySpec{
+			Enable: cfg.MultiNetworkPolicyEnable,
+		},
+		Classifications: v1alpha2.NetworkInventoryClassifications{
+			PublicCIDRs:        cfg.PublicCidrs,
+			PrivateCIDRs:       cfg.PrivateCidrs,
+			TrustedEgressCIDRs: cfg.TrustedEgressCidrs,
+		},
+	}
+}
+
+func mapNodeProfiles(cfgs []mondooclient.K8sNodeScanProfileConfig, warnings *[]string) []v1alpha2.NodeScanProfile {
+	if len(cfgs) == 0 {
+		return nil
+	}
+	profiles := make([]v1alpha2.NodeScanProfile, 0, len(cfgs))
+	for i, p := range cfgs {
+		profiles = append(profiles, v1alpha2.NodeScanProfile{
+			Name:         p.Name,
+			NodeSelector: p.NodeSelector,
+			Resources:    mapResources(p.Resources, fmt.Sprintf("nodesProfiles[%d].resources", i), warnings),
+			Tolerations:  mapTolerations(p.Tolerations),
+		})
+	}
+	return profiles
 }
 
 func mapEnvVars(cfgEnvs []mondooclient.K8sEnvVarConfig) []corev1.EnvVar {
@@ -231,9 +306,44 @@ func mapEnvVars(cfgEnvs []mondooclient.K8sEnvVarConfig) []corev1.EnvVar {
 	}
 	envs := make([]corev1.EnvVar, 0, len(cfgEnvs))
 	for _, e := range cfgEnvs {
-		envs = append(envs, corev1.EnvVar{Name: e.Name, Value: e.Value})
+		envs = append(envs, corev1.EnvVar{Name: e.Name, Value: e.Value, ValueFrom: mapEnvVarSource(e.ValueFrom)})
 	}
 	return envs
+}
+
+func mapEnvVarSource(cfg *mondooclient.K8sEnvVarSourceConfig) *corev1.EnvVarSource {
+	if cfg == nil {
+		return nil
+	}
+	src := &corev1.EnvVarSource{}
+	if cfg.SecretKeyRef != nil {
+		src.SecretKeyRef = &corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{Name: cfg.SecretKeyRef.Name},
+			Key:                  cfg.SecretKeyRef.Key,
+			Optional:             optionalBool(cfg.SecretKeyRef.Optional),
+		}
+	}
+	if cfg.ConfigMapKeyRef != nil {
+		src.ConfigMapKeyRef = &corev1.ConfigMapKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{Name: cfg.ConfigMapKeyRef.Name},
+			Key:                  cfg.ConfigMapKeyRef.Key,
+			Optional:             optionalBool(cfg.ConfigMapKeyRef.Optional),
+		}
+	}
+	if cfg.FieldPath != "" {
+		src.FieldRef = &corev1.ObjectFieldSelector{FieldPath: cfg.FieldPath}
+	}
+	if src.SecretKeyRef == nil && src.ConfigMapKeyRef == nil && src.FieldRef == nil {
+		return nil
+	}
+	return src
+}
+
+func optionalBool(b bool) *bool {
+	if !b {
+		return nil
+	}
+	return &b
 }
 
 func mapExternalClusters(cfgs []mondooclient.K8sExternalClusterConfig) []v1alpha2.ExternalCluster {
@@ -245,6 +355,17 @@ func mapExternalClusters(cfgs []mondooclient.K8sExternalClusterConfig) []v1alpha
 		cluster := v1alpha2.ExternalCluster{
 			Name:                   c.Name,
 			ContainerImageScanning: c.ContainerImageScanning,
+			Schedule:               c.Schedule,
+			Suspend:                c.Suspend,
+		}
+		if len(c.RepositoriesAllowList) > 0 || len(c.RepositoriesDenyList) > 0 {
+			cluster.Repositories = &v1alpha2.FilteringSpec{
+				Include: c.RepositoriesAllowList,
+				Exclude: c.RepositoriesDenyList,
+			}
+		}
+		if c.PrivateRegistriesPullSecret != "" {
+			cluster.PrivateRegistriesPullSecretRef = &corev1.LocalObjectReference{Name: c.PrivateRegistriesPullSecret}
 		}
 		if c.KubeconfigSecret != "" {
 			ref := corev1.LocalObjectReference{Name: c.KubeconfigSecret}
@@ -260,13 +381,17 @@ func mapExternalClusters(cfgs []mondooclient.K8sExternalClusterConfig) []v1alpha
 			}
 			cluster.ServiceAccountAuth = sa
 		}
-		if len(c.NamespaceAllowList) > 0 || len(c.NamespaceDenyList) > 0 {
-			cluster.Filtering = &v1alpha2.Filtering{
-				Namespaces: v1alpha2.FilteringSpec{
-					Include: c.NamespaceAllowList,
-					Exclude: c.NamespaceDenyList,
-				},
-			}
+		filtering := v1alpha2.Filtering{
+			Namespaces: v1alpha2.FilteringSpec{
+				Include: c.NamespaceAllowList,
+				Exclude: c.NamespaceDenyList,
+			},
+			NamespaceLabelSelector: mapLabelSelector(c.NamespaceLabelSelector),
+			ObjectLabelSelector:    mapLabelSelector(c.ObjectLabelSelector),
+		}
+		if len(filtering.Namespaces.Include) > 0 || len(filtering.Namespaces.Exclude) > 0 ||
+			filtering.NamespaceLabelSelector != nil || filtering.ObjectLabelSelector != nil {
+			cluster.Filtering = &filtering
 		}
 		if c.WifProvider != "" {
 			wif := mapExternalClusterWif(c)
@@ -286,6 +411,7 @@ func mapExternalClusters(cfgs []mondooclient.K8sExternalClusterConfig) []v1alpha
 			cluster.VaultAuth = &v1alpha2.VaultAuthConfig{
 				Server:              c.Server,
 				VaultAddr:           c.Vault.VaultAddr,
+				VaultNamespace:      c.Vault.VaultNamespace,
 				AuthRole:            c.Vault.AuthRole,
 				CredsRole:           c.Vault.CredsRole,
 				AuthPath:            c.Vault.AuthPath,
@@ -336,6 +462,7 @@ func mapExternalClusterWif(c mondooclient.K8sExternalClusterConfig) *v1alpha2.Wo
 			ClientID:       c.Aks.ClientID,
 			TenantID:       c.Aks.TenantID,
 			Endpoint:       c.Aks.Endpoint,
+			LoginServer:    c.Aks.LoginServer,
 		}
 	}
 	return wif
