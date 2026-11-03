@@ -26,6 +26,7 @@ var remoteUnmappedSpecFields = map[string]string{ //nolint:gosec // G101: keys a
 	"mondooTokenSecretRef":                       "local: bootstraps the connection to Mondoo",
 	"consoleIntegration":                         "local: bootstraps the connection to Mondoo",
 	"remoteManaged":                              "local: decides whether the remote config applies at all",
+	"scheduleGuard":                              "local: the minimum scan interval guard is a cluster-side safety net",
 	"scanner.image":                              "local: image overrides and mirrors are per cluster",
 	"scanner.serviceAccountName":                 "local: the service account exists in the cluster",
 	"scanner.initContainerImagePullPolicy":       "local: tied to the local image override",

@@ -2403,6 +2403,23 @@ spec:
                     default: mondoo-operator-k8s-resources-scanning
                     type: string
                 type: object
+              scheduleGuard:
+                description: |-
+                  ScheduleGuard controls the guard that keeps scan schedules from firing more
+                  often than once an hour. The guard is on by default and is a local setting:
+                  it is never sent to the Mondoo Console and it also applies to schedules that
+                  come from a remotely managed configuration.
+                properties:
+                  disable:
+                    description: |-
+                      Disable turns the guard off. When the guard is on, every scan schedule
+                      (spec.kubernetesResources.schedule, spec.kubernetesResources.externalClusters[].schedule,
+                      spec.nodes.schedule, spec.containers.schedule) that would fire more often than once
+                      an hour is run hourly instead, and spec.nodes.intervalTimer is raised to at least 60
+                      minutes. The stored schedule stays as configured and the ScanScheduleGuarded
+                      condition reports what was changed.
+                    type: boolean
+                type: object
               spaceId:
                 description: |-
                   SpaceID optionally specifies the target Mondoo space for asset routing.

@@ -61,6 +61,13 @@ type MondooAuditConfigSpec struct {
 	// +optional
 	RemoteManaged bool `json:"remoteManaged,omitempty"`
 
+	// ScheduleGuard controls the guard that keeps scan schedules from firing more
+	// often than once an hour. The guard is on by default and is a local setting:
+	// it is never sent to the Mondoo Console and it also applies to schedules that
+	// come from a remotely managed configuration.
+	// +optional
+	ScheduleGuard ScheduleGuard `json:"scheduleGuard,omitempty"`
+
 	// Admission is DEPRECATED and ignored. Admission webhooks were removed in v12.1.0.
 	// The operator will automatically clean up any orphaned admission resources.
 	// See docs/admission-migration-guide.md for migration instructions.
@@ -224,6 +231,18 @@ type Scanner struct {
 // policy, falling back to IfNotPresent when none is set.
 func (s Scanner) InitContainerImagePullPolicyOrDefault() corev1.PullPolicy {
 	return pullPolicyOrDefault(s.InitContainerImagePullPolicy)
+}
+
+// ScheduleGuard configures the minimum scan interval guard.
+type ScheduleGuard struct {
+	// Disable turns the guard off. When the guard is on, every scan schedule
+	// (spec.kubernetesResources.schedule, spec.kubernetesResources.externalClusters[].schedule,
+	// spec.nodes.schedule, spec.containers.schedule) that would fire more often than once
+	// an hour is run hourly instead, and spec.nodes.intervalTimer is raised to at least 60
+	// minutes. The stored schedule stays as configured and the ScanScheduleGuarded
+	// condition reports what was changed.
+	// +optional
+	Disable bool `json:"disable,omitempty"`
 }
 
 type KubernetesResources struct {
@@ -1011,6 +1030,9 @@ const (
 	ScanningPausedCondition MondooAuditConfigConditionType = "ScanningPaused"
 	// RemoteConfigDegradedCondition indicates a failure fetching or parsing remote config
 	RemoteConfigDegradedCondition MondooAuditConfigConditionType = "RemoteConfigDegraded"
+	// ScanScheduleGuardedCondition is True while the schedule guard runs one or more scans
+	// less often than configured because the configured schedule fires more than once an hour.
+	ScanScheduleGuardedCondition MondooAuditConfigConditionType = "ScanScheduleGuarded"
 )
 
 //+kubebuilder:object:root=true

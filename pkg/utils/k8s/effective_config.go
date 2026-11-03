@@ -153,6 +153,7 @@ func preserveLocalFields(effective, local *v1alpha2.MondooAuditConfigSpec) {
 	effective.MondooTokenSecretRef = local.MondooTokenSecretRef
 	effective.ConsoleIntegration = local.ConsoleIntegration
 	effective.RemoteManaged = local.RemoteManaged
+	effective.ScheduleGuard = local.ScheduleGuard
 	effective.Scanner.ServiceAccountName = local.Scanner.ServiceAccountName
 	effective.Scanner.Image = local.Scanner.Image
 	effective.Scanner.InitContainerImagePullPolicy = local.Scanner.InitContainerImagePullPolicy

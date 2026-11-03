@@ -17,6 +17,7 @@ import (
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1396,3 +1397,83 @@ func TestIsCronJobScanPod(t *testing.T) {
 }
 
 func boolPtr(b bool) *bool { return &b }
+
+func reconcileScheduleGuardConfig(t *testing.T, mondooAuditConfig *v1alpha2.MondooAuditConfig) (client.Client, *v1alpha2.MondooAuditConfig, *batchv1.CronJob) {
+	t.Helper()
+	utilruntime.Must(v1alpha2.AddToScheme(scheme.Scheme))
+
+	fakeClient := fake.NewClientBuilder().
+		WithStatusSubresource(mondooAuditConfig).
+		WithObjects(mondooAuditConfig, testKubeSystemNamespace()).
+		Build()
+
+	reconciler := &MondooAuditConfigReconciler{
+		Client:                 fakeClient,
+		StatusReporter:         status.NewStatusReporter(fakeClient, nil, k8sVersion, mondoofake.NewNoOpContainerImageResolver()),
+		ContainerImageResolver: mondoofake.NewNoOpContainerImageResolver(),
+	}
+
+	ctx := context.Background()
+	_, err := reconciler.Reconcile(ctx, reconcile.Request{
+		NamespacedName: types.NamespacedName{Name: testMondooAuditConfigName, Namespace: testNamespace},
+	})
+	require.NoError(t, err)
+
+	persisted := &v1alpha2.MondooAuditConfig{}
+	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(mondooAuditConfig), persisted))
+
+	cronJob := &batchv1.CronJob{}
+	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{
+		Name: k8s_scan.CronJobName(mondooAuditConfig.Name), Namespace: testNamespace,
+	}, cronJob))
+
+	return fakeClient, persisted, cronJob
+}
+
+func TestMondooAuditConfig_ScheduleGuard_ClampsFrequentSchedule(t *testing.T) {
+	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.KubernetesResources.Enable = true
+	mondooAuditConfig.Spec.KubernetesResources.Schedule = "*/5 * * * *"
+
+	_, persisted, cronJob := reconcileScheduleGuardConfig(t, mondooAuditConfig)
+
+	assert.Equal(t, "0 * * * *", cronJob.Spec.Schedule, "the CronJob runs on the guarded schedule")
+	assert.Equal(t, "*/5 * * * *", persisted.Spec.KubernetesResources.Schedule, "the stored spec keeps the configured schedule")
+
+	cond := mondoo.FindMondooAuditConditions(persisted.Status.Conditions, v1alpha2.ScanScheduleGuardedCondition)
+	require.NotNil(t, cond)
+	assert.Equal(t, corev1.ConditionTrue, cond.Status)
+	assert.Equal(t, "ScheduleTooFrequent", cond.Reason)
+	assert.Contains(t, cond.Message, `spec.kubernetesResources.schedule "*/5 * * * *" -> "0 * * * *"`)
+}
+
+func TestMondooAuditConfig_ScheduleGuard_ClearsConditionOnceScheduleIsSane(t *testing.T) {
+	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.KubernetesResources.Enable = true
+	mondooAuditConfig.Spec.KubernetesResources.Schedule = "30 * * * *"
+	mondooAuditConfig.Status.Conditions = []v1alpha2.MondooAuditConfigCondition{{
+		Type: v1alpha2.ScanScheduleGuardedCondition, Status: corev1.ConditionTrue, Reason: "ScheduleTooFrequent",
+	}}
+
+	_, persisted, cronJob := reconcileScheduleGuardConfig(t, mondooAuditConfig)
+
+	assert.Equal(t, "30 * * * *", cronJob.Spec.Schedule)
+	cond := mondoo.FindMondooAuditConditions(persisted.Status.Conditions, v1alpha2.ScanScheduleGuardedCondition)
+	require.NotNil(t, cond)
+	assert.Equal(t, corev1.ConditionFalse, cond.Status)
+}
+
+func TestMondooAuditConfig_ScheduleGuard_Disabled(t *testing.T) {
+	mondooAuditConfig := testMondooAuditConfig()
+	mondooAuditConfig.Spec.ScheduleGuard.Disable = true
+	mondooAuditConfig.Spec.KubernetesResources.Enable = true
+	mondooAuditConfig.Spec.KubernetesResources.Schedule = "*/5 * * * *"
+
+	_, persisted, cronJob := reconcileScheduleGuardConfig(t, mondooAuditConfig)
+
+	assert.Equal(t, "*/5 * * * *", cronJob.Spec.Schedule, "a disabled guard leaves the schedule alone")
+	cond := mondoo.FindMondooAuditConditions(persisted.Status.Conditions, v1alpha2.ScanScheduleGuardedCondition)
+	if cond != nil {
+		assert.Equal(t, corev1.ConditionFalse, cond.Status)
+	}
+}
