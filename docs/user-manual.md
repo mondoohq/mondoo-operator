@@ -375,8 +375,9 @@ The feature requires the first k8s provider release after 14.2.0
 the cnspec image the operator uses.
 
 > **Note:** Remote-managed configurations (`remoteManaged: true`) are rebuilt
-> from the Console on every reconcile and do not pick this field up from the
-> local `MondooAuditConfig` until the Console exposes it.
+> from the Console on every reconcile and take `inheritNamespaceLabels` from the
+> Console's Kubernetes integration settings, not from the local
+> `MondooAuditConfig`.
 
 ### Tune the network inventory
 

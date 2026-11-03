@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.mondoo.com/mondoo-operator/pkg/client/mondooclient"
 )
 
 func TestParseK8sIntegrationConfig_FullConfig(t *testing.T) {
@@ -84,8 +86,8 @@ func TestParseK8sIntegrationConfig_FullConfig(t *testing.T) {
 	assert.Equal(t, []string{"docker.io/test/*"}, cfg.ContainerRepositoriesDenyList)
 	assert.True(t, cfg.ScanCacheEnabled)
 	assert.Equal(t, "24h", cfg.ScanCacheTTL)
-	assert.Equal(t, int64(3600), cfg.K8sActiveDeadline)
-	assert.Equal(t, int64(7200), cfg.ContainersActiveDeadline)
+	assert.Equal(t, mondooclient.ProtoInt64(3600), cfg.K8sActiveDeadline)
+	assert.Equal(t, mondooclient.ProtoInt64(7200), cfg.ContainersActiveDeadline)
 }
 
 func TestParseK8sIntegrationConfig_MinimalConfig(t *testing.T) {
@@ -94,6 +96,27 @@ func TestParseK8sIntegrationConfig_MinimalConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, cfg.PauseScanning)
 	assert.Equal(t, int32(0), cfg.ScannerReplicas)
+}
+
+// The server stores the config with protojson, which encodes int64 fields as strings
+// and emits K8sVaultAuth.addr under its proto name.
+func TestParseK8sIntegrationConfig_ProtojsonShape(t *testing.T) {
+	raw := `{
+		"k8sActiveDeadline": "3600",
+		"containersActiveDeadline": "7200",
+		"scannerJobOverrides": {"tolerations": [{"key": "k", "operator": "Exists", "tolerationSeconds": "300"}]},
+		"externalClusters": [{"name": "remote", "server": "https://remote:6443", "vault": {"addr": "https://vault:8200", "vaultNamespace": "team"}}]
+	}`
+	cfg, err := ParseK8sIntegrationConfig([]byte(raw))
+	require.NoError(t, err)
+	assert.Equal(t, mondooclient.ProtoInt64(3600), cfg.K8sActiveDeadline)
+	assert.Equal(t, mondooclient.ProtoInt64(7200), cfg.ContainersActiveDeadline)
+	require.Len(t, cfg.ScannerJobOverrides.Tolerations, 1)
+	require.NotNil(t, cfg.ScannerJobOverrides.Tolerations[0].TolerationSeconds)
+	assert.Equal(t, mondooclient.ProtoInt64(300), *cfg.ScannerJobOverrides.Tolerations[0].TolerationSeconds)
+	require.Len(t, cfg.ExternalClusters, 1)
+	assert.Equal(t, "https://vault:8200", cfg.ExternalClusters[0].Vault.VaultAddr)
+	assert.Equal(t, "team", cfg.ExternalClusters[0].Vault.VaultNamespace)
 }
 
 func TestParseK8sIntegrationConfig_InvalidJSON(t *testing.T) {
