@@ -353,6 +353,11 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		mondooAuditConfig.Spec = *remoteEffectiveSpec
 	}
 
+	// Guard against scan schedules that fire more often than once an hour. This only
+	// changes the in-memory spec the sub-reconcilers work with; the stored spec and the
+	// schedules reported to the Mondoo Console stay as configured.
+	r.applyScheduleGuard(mondooAuditConfig, log)
+
 	nodes := nodes.DeploymentHandler{
 		Mondoo:                 mondooAuditConfig,
 		KubeClient:             r.Client,
@@ -433,6 +438,35 @@ func (r *MondooAuditConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	return finalResult, nil
+}
+
+// applyScheduleGuard clamps too-frequent scan schedules on the in-memory spec and keeps the
+// ScanScheduleGuarded condition in sync with what the guard changed.
+func (r *MondooAuditConfigReconciler) applyScheduleGuard(config *v1alpha2.MondooAuditConfig, log logr.Logger) {
+	changes := k8s.ApplyScheduleGuard(&config.Spec)
+	if len(changes) == 0 {
+		if cond := mondoo.FindMondooAuditConditions(config.Status.Conditions, v1alpha2.ScanScheduleGuardedCondition); cond != nil && cond.Status == corev1.ConditionTrue {
+			config.Status.Conditions = mondoo.SetMondooAuditCondition(
+				config.Status.Conditions, v1alpha2.ScanScheduleGuardedCondition, corev1.ConditionFalse,
+				"ScheduleWithinLimits", "All scan schedules run at most once an hour",
+				mondoo.UpdateConditionIfReasonOrMessageChange, nil, "",
+			)
+		}
+		return
+	}
+
+	described := make([]string, 0, len(changes))
+	for _, change := range changes {
+		log.Info("scan schedule fires more often than once an hour, running it hourly instead; set spec.scheduleGuard.disable to opt out",
+			"field", change.Field, "configured", change.From, "effective", change.To)
+		described = append(described, change.String())
+	}
+	config.Status.Conditions = mondoo.SetMondooAuditCondition(
+		config.Status.Conditions, v1alpha2.ScanScheduleGuardedCondition, corev1.ConditionTrue,
+		"ScheduleTooFrequent",
+		"Scan schedules that fire more often than once an hour run hourly instead (set spec.scheduleGuard.disable to opt out): "+strings.Join(described, "; "),
+		mondoo.UpdateConditionIfReasonOrMessageChange, nil, "",
+	)
 }
 
 func (r *MondooAuditConfigReconciler) recordConditionEvents(

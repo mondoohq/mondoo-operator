@@ -1188,6 +1188,41 @@ You can adjust the schedule for the following components:
 - Container Image Scanning
 - Node Scanning
 
+### Minimum scan interval
+
+A scan pass of a larger cluster takes longer than a few minutes, and the operator's asset
+cleanup window is derived from the schedule. A schedule that fires more often than once an
+hour therefore makes scans run back-to-back, keeps purging and re-creating the same assets and
+puts constant load on the Mondoo platform and on your container registry.
+
+The operator guards against this by default. Every scan schedule
+(`kubernetesResources.schedule`, `kubernetesResources.externalClusters[].schedule`,
+`nodes.schedule` and `containers.schedule`) that would fire more often than once an hour is
+run hourly instead: the minute field is replaced by the first minute it matches and the other
+fields are kept, so `*/5 * * * *` runs as `0 * * * *` and `*/15 9-17 * * *` runs as
+`0 9-17 * * *`. A `nodes.intervalTimer` below 60 minutes is raised to 60.
+
+The guard only changes what the operator runs. The stored `MondooAuditConfig` keeps the
+configured schedule, the Mondoo Console keeps showing it, and the guard also applies to
+schedules that come from a remotely managed configuration. When the guard changes a schedule
+it logs the change and sets the `ScanScheduleGuarded` condition on the `MondooAuditConfig`:
+
+```bash
+kubectl -n mondoo-operator get mondooauditconfigs.k8s.mondoo.com mondoo-client \
+  -o jsonpath='{.status.conditions[?(@.type=="ScanScheduleGuarded")].message}'
+```
+
+To run scans more often than once an hour anyway, turn the guard off:
+
+```yaml
+spec:
+  scheduleGuard:
+    disable: true
+  kubernetesResources:
+    enable: true
+    schedule: "*/30 * * * *"
+```
+
 ## Customize the generated scan Jobs
 
 The operator can apply common customizations to the Jobs spawned by the scan CronJobs, the

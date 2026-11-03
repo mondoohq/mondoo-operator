@@ -585,3 +585,17 @@ func TestEffectiveSpec_InvalidResourceQuantityWarning(t *testing.T) {
 	_, hasMemLimit := result.Scanner.Resources.Limits[corev1.ResourceMemory]
 	assert.False(t, hasMemLimit, "invalid memLimit should be skipped")
 }
+
+func TestEffectiveSpec_ScheduleGuardStaysLocal(t *testing.T) {
+	spec := v1alpha2.MondooAuditConfigSpec{
+		RemoteManaged: true,
+		ScheduleGuard: v1alpha2.ScheduleGuard{Disable: true},
+	}
+	remoteConfig := `{"scanWorkloads": true, "schedule": "*/5 * * * *"}`
+
+	result, _, err := EffectiveSpec(spec, remoteConfig, types.UID("test-uid"))
+	require.NoError(t, err)
+
+	assert.True(t, result.ScheduleGuard.Disable, "the schedule guard setting must come from the local spec, not the remote config")
+	assert.Equal(t, "*/5 * * * *", result.KubernetesResources.Schedule, "EffectiveSpec must not clamp; the reconciler does that on the in-memory spec")
+}
