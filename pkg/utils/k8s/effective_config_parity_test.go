@@ -21,9 +21,9 @@ import (
 // remoteUnmappedSpecFields are the MondooAuditConfig spec paths a remote-managed
 // configuration does not set. Every other spec field must be reachable from the
 // remote config, so a new field without a remote mapping fails TestRemoteConfigParity.
-var remoteUnmappedSpecFields = map[string]string{
+var remoteUnmappedSpecFields = map[string]string{ //nolint:gosec // G101: keys are spec field paths, not credentials
 	"mondooCredsSecretRef":                       "local: bootstraps the connection to Mondoo",
-	"mondooTokenSecretRef":                       "local: bootstraps the connection to Mondoo", //nolint:gosec // G101: a spec field path, not a credential
+	"mondooTokenSecretRef":                       "local: bootstraps the connection to Mondoo",
 	"consoleIntegration":                         "local: bootstraps the connection to Mondoo",
 	"remoteManaged":                              "local: decides whether the remote config applies at all",
 	"scanner.image":                              "local: image overrides and mirrors are per cluster",
