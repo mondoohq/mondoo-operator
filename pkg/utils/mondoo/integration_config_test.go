@@ -98,9 +98,9 @@ func TestParseK8sIntegrationConfig_MinimalConfig(t *testing.T) {
 	assert.Equal(t, int32(0), cfg.ScannerReplicas)
 }
 
-// The server stores the config with protojson, which encodes int64 fields as strings
-// and emits K8sVaultAuth.addr under its proto name.
-func TestParseK8sIntegrationConfig_ProtojsonShape(t *testing.T) {
+// The remote config encodes int64 fields as JSON strings and sends the Vault address
+// under "addr".
+func TestParseK8sIntegrationConfig_RemoteShape(t *testing.T) {
 	raw := `{
 		"k8sActiveDeadline": "3600",
 		"containersActiveDeadline": "7200",

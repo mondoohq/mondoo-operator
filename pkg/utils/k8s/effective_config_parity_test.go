@@ -23,7 +23,7 @@ import (
 // remote config, so a new field without a remote mapping fails TestRemoteConfigParity.
 var remoteUnmappedSpecFields = map[string]string{
 	"mondooCredsSecretRef":                       "local: bootstraps the connection to Mondoo",
-	"mondooTokenSecretRef":                       "local: bootstraps the connection to Mondoo",
+	"mondooTokenSecretRef":                       "local: bootstraps the connection to Mondoo", //nolint:gosec // G101: a spec field path, not a credential
 	"consoleIntegration":                         "local: bootstraps the connection to Mondoo",
 	"remoteManaged":                              "local: decides whether the remote config applies at all",
 	"scanner.image":                              "local: image overrides and mirrors are per cluster",
@@ -158,7 +158,7 @@ func TestEffectiveSpec_ParityFields(t *testing.T) {
 	remote := `{
 		"scanLocalCluster": true,
 		"scanNodes": true,
-		"inheritNamespaceLabels": ["tsec-psi-id", "team/*"],
+		"inheritNamespaceLabels": ["example.com/team-id", "example.com/cost-*"],
 		"namespaceLabelSelector": {"matchLabels": {"scan": "yes"}, "matchExpressions": [{"key": "tier", "operator": "In", "values": ["a", "b"]}]},
 		"objectLabelSelector": {"matchExpressions": [{"key": "skip", "operator": "DoesNotExist"}]},
 		"networkInventory": {"hbnEnable": false, "multiNetworkPolicyEnable": true, "publicCidrs": ["0.0.0.0/0"]},
@@ -185,7 +185,7 @@ func TestEffectiveSpec_ParityFields(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, warnings)
 
-	assert.Equal(t, []string{"tsec-psi-id", "team/*"}, spec.InheritNamespaceLabels)
+	assert.Equal(t, []string{"example.com/team-id", "example.com/cost-*"}, spec.InheritNamespaceLabels)
 	assert.Equal(t, &metav1.LabelSelector{
 		MatchLabels:      map[string]string{"scan": "yes"},
 		MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "tier", Operator: metav1.LabelSelectorOpIn, Values: []string{"a", "b"}}},

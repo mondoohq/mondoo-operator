@@ -295,8 +295,10 @@ type K8sSpiffeConfig struct {
 }
 
 type K8sVaultConfig struct {
+	// Server is part of the remote shape but unused: the external cluster's own
+	// Server field names the target API server.
 	Server string `json:"server,omitempty"`
-	// The server's proto field is "addr"; protojson emits it under that name.
+	// The remote config sends the Vault address under "addr".
 	VaultAddr           string `json:"addr,omitempty"`
 	VaultNamespace      string `json:"vaultNamespace,omitempty"`
 	AuthRole            string `json:"authRole,omitempty"`

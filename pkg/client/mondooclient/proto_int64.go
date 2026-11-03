@@ -9,9 +9,13 @@ import (
 	"strings"
 )
 
-// ProtoInt64 decodes an int64 from either a JSON number or a JSON string. The server
-// stores the integration config with protojson, which encodes int64 fields as strings.
+// ProtoInt64 is an int64 that the remote config encodes as a JSON string. It decodes
+// from either a JSON string or a JSON number and encodes as a JSON string.
 type ProtoInt64 int64
+
+func (p ProtoInt64) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + strconv.FormatInt(int64(p), 10) + `"`), nil
+}
 
 func (p *ProtoInt64) UnmarshalJSON(b []byte) error {
 	s := strings.Trim(string(b), `"`)
