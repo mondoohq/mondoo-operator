@@ -15,6 +15,8 @@ import (
 )
 
 const (
+	// ResourceNameMaxLength is the 52-char safety bound used for CronJob names so
+	// generated Job names stay within the Kubernetes 63-char limit.
 	ResourceNameMaxLength = 52
 )
 

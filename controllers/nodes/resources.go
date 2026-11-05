@@ -205,7 +205,16 @@ func CronJob(image string, node corev1.Node, m *v1alpha2.MondooAuditConfig, isOp
 
 // DaemonSet creates a DaemonSet for node scanning
 func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg v1alpha2.MondooOperatorConfig, tolerations []corev1.Toleration) *appsv1.DaemonSet {
-	labels := NodeScanningLabels(m)
+	return daemonSet(m, isOpenshift, image, cfg, tolerations, nil)
+}
+
+func DaemonSetForScannerSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg v1alpha2.MondooOperatorConfig, tolerations []corev1.Toleration, set v1alpha2.NodeScannerSet) *appsv1.DaemonSet {
+	return daemonSet(m, isOpenshift, image, cfg, tolerations, &set)
+}
+
+func daemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg v1alpha2.MondooOperatorConfig, tolerations []corev1.Toleration, set *v1alpha2.NodeScannerSet) *appsv1.DaemonSet {
+	scannerSetName := scannerSetNameValue(set)
+	labels := NodeScanningLabelsForScannerSet(m, scannerSetName)
 	cmd := []string{
 		"cnspec", "serve",
 		"--config", "/etc/opt/mondoo/mondoo.yml",
@@ -224,13 +233,14 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 		proxyEnvVars = k8s.ProxyEnvVars(cfg)
 	}
 
-	containerResources := k8s.ResourcesRequirementsWithDefaults(m.Spec.Nodes.Resources, k8s.DefaultNodeScanningResources)
+	nodeSpec := nodeScannerSpecForSet(m.Spec.Nodes, set)
+	containerResources := k8s.ResourcesRequirementsWithDefaults(nodeSpec.Resources, k8s.DefaultNodeScanningResources)
 	gcLimit := gomemlimit.CalculateGoMemLimit(containerResources)
 	gcPercent := gomemlimit.CalculateNodeScanGoGC(containerResources)
 
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      DaemonSetName(m.Name),
+			Name:      DaemonSetNameForScannerSet(m.Name, scannerSetName),
 			Namespace: m.Namespace,
 			Labels:    labels,
 			Annotations: map[string]string{
@@ -247,11 +257,13 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 					},
 				},
 				Spec: corev1.PodSpec{
-					PriorityClassName: m.Spec.Nodes.PriorityClassName,
+					NodeSelector:      nodeSpec.NodeSelector,
+					Affinity:          nodeSpec.Affinity.DeepCopy(),
+					PriorityClassName: nodeSpec.PriorityClassName,
 					// The node scanning does not use the Kubernetes API at all, therefore the service account token
 					// should not be mounted at all.
 					AutomountServiceAccountToken: ptr.To(false),
-					Tolerations:                  tolerations,
+					Tolerations:                  nodeScannerTolerations(nodeSpec, tolerations),
 					Containers: []corev1.Container{
 						{
 							Image:     image,
@@ -283,7 +295,7 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 								{Name: "GOGC", Value: gcPercent},
 								{Name: "GOMEMLIMIT", Value: gcLimit},
 								{Name: "NODE_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"}}},
-							}, proxyEnvVars...), m.Spec.Nodes.Env),
+							}, proxyEnvVars...), nodeSpec.Env),
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -332,10 +344,25 @@ func DaemonSet(m v1alpha2.MondooAuditConfig, isOpenshift bool, image string, cfg
 			cfg.Spec.ImagePullSecrets...)
 	}
 	if nodeAffinity := nodeSelectorAffinity(m.Spec.Nodes.LabelSelector); nodeAffinity != nil {
-		if ds.Spec.Template.Spec.Affinity == nil {
-			ds.Spec.Template.Spec.Affinity = &corev1.Affinity{}
+		affinity := ds.Spec.Template.Spec.Affinity
+		if affinity == nil {
+			affinity = &corev1.Affinity{}
+			ds.Spec.Template.Spec.Affinity = affinity
 		}
-		ds.Spec.Template.Spec.Affinity.NodeAffinity = nodeAffinity
+		if affinity.NodeAffinity == nil {
+			affinity.NodeAffinity = &corev1.NodeAffinity{}
+		}
+		required := affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		if required == nil || len(required.NodeSelectorTerms) == 0 {
+			affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		} else {
+			// spec.nodes.affinity (or a scanner set) already requires node terms. Terms are
+			// ORed, so the labelSelector requirements are ANDed into every term to keep both.
+			labelRequirements := nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions
+			for i := range required.NodeSelectorTerms {
+				required.NodeSelectorTerms[i].MatchExpressions = append(required.NodeSelectorTerms[i].MatchExpressions, labelRequirements...)
+			}
+		}
 	}
 
 	k8s.ApplyDaemonSetOverrides(ds, k8s.MergeJobOverrides(m.Spec.JobOverrides, m.Spec.Nodes.JobOverrides))
@@ -354,6 +381,42 @@ func nodeScanCapabilities(isOpenshift bool) *corev1.Capabilities {
 		caps.Add = []corev1.Capability{"DAC_READ_SEARCH", "SYS_PTRACE"}
 	}
 	return caps
+}
+
+func nodeScannerSpecForSet(nodes v1alpha2.Nodes, set *v1alpha2.NodeScannerSet) v1alpha2.Nodes {
+	if set == nil {
+		return nodes
+	}
+	if resourceRequirementsConfigured(set.Resources) {
+		nodes.Resources = set.Resources
+	}
+	if set.NodeSelector != nil {
+		nodes.NodeSelector = set.NodeSelector
+	}
+	if set.Affinity != nil {
+		nodes.Affinity = set.Affinity
+	}
+	if set.Tolerations != nil {
+		nodes.Tolerations = set.Tolerations
+	}
+	if set.PriorityClassName != "" {
+		nodes.PriorityClassName = set.PriorityClassName
+	}
+	if len(set.Env) > 0 {
+		nodes.Env = append(nodes.Env, set.Env...)
+	}
+	return nodes
+}
+
+func resourceRequirementsConfigured(resources corev1.ResourceRequirements) bool {
+	return len(resources.Limits) > 0 || len(resources.Requests) > 0
+}
+
+func nodeScannerTolerations(nodes v1alpha2.Nodes, inherited []corev1.Toleration) []corev1.Toleration {
+	if nodes.Tolerations != nil {
+		return nodes.Tolerations
+	}
+	return inherited
 }
 
 // ConfigMap creates a ConfigMap for node scanning inventory
@@ -381,6 +444,13 @@ func DeploymentName(prefix, suffix string) string {
 
 func DaemonSetName(prefix string) string {
 	return k8s.Name(prefix, DaemonSetNameBase)
+}
+
+func DaemonSetNameForScannerSet(prefix, scannerSetName string) string {
+	if scannerSetName == "" {
+		return DaemonSetName(prefix)
+	}
+	return k8s.ScopedName(prefix, DaemonSetNameBase, scannerSetName)
 }
 
 func GarbageCollectCronJobName(prefix string) string {
@@ -508,6 +578,21 @@ func nodeSelectorOperator(operator metav1.LabelSelectorOperator) corev1.NodeSele
 		logger.Error(nil, "Unknown label selector operator, defaulting to In", "operator", operator)
 		return corev1.NodeSelectorOpIn
 	}
+}
+
+func NodeScanningLabelsForScannerSet(m v1alpha2.MondooAuditConfig, scannerSetName string) map[string]string {
+	labels := NodeScanningLabels(m)
+	if scannerSetName != "" {
+		labels["scanner_set"] = scannerSetName
+	}
+	return labels
+}
+
+func scannerSetNameValue(set *v1alpha2.NodeScannerSet) string {
+	if set == nil {
+		return ""
+	}
+	return set.Name
 }
 
 func GarbageCollectCronJobLabels(m v1alpha2.MondooAuditConfig) map[string]string {
