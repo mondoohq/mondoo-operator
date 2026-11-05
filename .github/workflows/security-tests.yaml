@@ -35,13 +35,13 @@ jobs:
           go-version-file: "go.mod"
           cache: false
       - name: Scan AWS terraform with Mondoo
-        uses: mondoohq/actions/terraform-hcl@c38cfdf99da709760f58ff35aa5608688657f2f7 # v13.3.0
+        uses: mondoohq/actions/terraform-hcl@09a474d3d0da5e11449067957244f156a36bed62 # v14.0.0
         env:
           MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
         with:
           path: ".github/terraform/aws/main.tf"
       - name: Scan Azure terraform with Mondoo
-        uses: mondoohq/actions/terraform-hcl@c38cfdf99da709760f58ff35aa5608688657f2f7 # v13.3.0
+        uses: mondoohq/actions/terraform-hcl@09a474d3d0da5e11449067957244f156a36bed62 # v14.0.0
         env:
           MONDOO_CONFIG_BASE64: ${{ secrets.MONDOO_CLIENT }}
         with:
