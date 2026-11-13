@@ -89,6 +89,33 @@ func TestExternalClusterInventory_WithAnnotations(t *testing.T) {
 	}
 }
 
+func TestInventory_KyvernoWiring(t *testing.T) {
+	enabled := true
+	auditConfig := *testAuditConfig()
+	auditConfig.Spec.KubernetesResources.Kyverno = v1alpha2.KyvernoSpec{
+		Enable: &enabled,
+		MappingAnnotations: v1alpha2.KyvernoMappingAnnotationsSpec{
+			CheckUIDs: []string{"example.com/check"},
+		},
+	}
+
+	invStr, err := Inventory("", testClusterUID, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+	var inv inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(invStr), &inv))
+	options := inv.Spec.Assets[0].Connections[0].Options
+	assert.Equal(t, "example.com/check", options[kyvernoMappingAnnotationCheckUIDs])
+	assert.Contains(t, inv.Spec.Assets[0].Connections[0].Discover.Targets, "kyverno")
+
+	cluster := v1alpha2.ExternalCluster{Name: "remote"}
+	externalStr, err := ExternalClusterInventory("", testClusterUID, cluster, auditConfig, v1alpha2.MondooOperatorConfig{})
+	require.NoError(t, err)
+	var external inventory.Inventory
+	require.NoError(t, yaml.Unmarshal([]byte(externalStr), &external))
+	assert.Equal(t, "example.com/check", external.Spec.Assets[0].Connections[0].Options[kyvernoMappingAnnotationCheckUIDs])
+	assert.Contains(t, external.Spec.Assets[0].Connections[0].Discover.Targets, "kyverno")
+}
+
 func TestExternalClusterInventory_InheritsGlobalNamespaceFiltering(t *testing.T) {
 	auditConfig := v1alpha2.MondooAuditConfig{
 		ObjectMeta: metav1.ObjectMeta{Name: "mondoo-client"},
