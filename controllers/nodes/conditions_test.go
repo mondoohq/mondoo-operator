@@ -233,3 +233,33 @@ func oomPodList() *corev1.PodList {
 		},
 	}
 }
+
+func TestConditions_RenderInitContainerFailure(t *testing.T) {
+	config := &v1alpha2.MondooAuditConfig{
+		Spec: v1alpha2.MondooAuditConfigSpec{
+			Nodes: v1alpha2.Nodes{Enable: true},
+		},
+	}
+	pod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "node-scan-abc", CreationTimestamp: metav1.Now()},
+		Spec:       corev1.PodSpec{NodeName: "node-1"},
+		Status: corev1.PodStatus{InitContainerStatuses: []corev1.ContainerStatus{{
+			Name:  renderNodeInventoryContainerName,
+			State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ImagePullBackOff"}},
+		}}},
+	}
+
+	// A DaemonSet counts the pod as scheduled, so degradedStatus is false here.
+	updateNodeConditions(config, false, &corev1.PodList{Items: []corev1.Pod{pod}})
+
+	cond := config.Status.Conditions[0]
+	assert.Equal(t, "Node Scanning is unavailable: init container render-node-inventory failed (ImagePullBackOff)", cond.Message)
+	assert.Equal(t, "NodeScanningUnavailable", cond.Reason)
+	assert.Equal(t, corev1.ConditionTrue, cond.Status)
+	assert.Equal(t, []string{"node-scan-abc"}, cond.AffectedPods)
+
+	// Once the init container starts normally the condition clears.
+	pod.Status.InitContainerStatuses[0].State = corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "PodInitializing"}}
+	updateNodeConditions(config, false, &corev1.PodList{Items: []corev1.Pod{pod}})
+	assert.Equal(t, corev1.ConditionFalse, config.Status.Conditions[0].Status)
+}

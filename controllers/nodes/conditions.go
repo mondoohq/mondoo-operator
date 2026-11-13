@@ -4,6 +4,8 @@
 package nodes
 
 import (
+	"fmt"
+
 	"go.mondoo.com/mondoo-operator/api/v1alpha2"
 	"go.mondoo.com/mondoo-operator/pkg/utils/k8s"
 	"go.mondoo.com/mondoo-operator/pkg/utils/mondoo"
@@ -67,6 +69,40 @@ func updateNodeConditions(config *v1alpha2.MondooAuditConfig, degradedStatus boo
 		}
 	}
 
+	// A failing render-node-inventory init container keeps cnspec from ever starting. A
+	// DaemonSet still counts such pods as scheduled, so report it explicitly. OOM wins.
+	if len(affectedPods) == 0 && config.Spec.Nodes.Enable {
+		for _, pods := range podsPerNode {
+			currentPod := k8s.GetNewestPodFromList(pods)
+			if failure := renderInitFailure(&currentPod); failure != "" {
+				msg = fmt.Sprintf("Node Scanning is unavailable: init container %s failed (%s)", renderNodeInventoryContainerName, failure)
+				affectedPods = append(affectedPods, currentPod.Name)
+				reason = "NodeScanningUnavailable"
+				status = corev1.ConditionTrue
+			}
+		}
+	}
+
 	config.Status.Conditions = mondoo.SetMondooAuditCondition(
 		config.Status.Conditions, v1alpha2.NodeScanningDegraded, status, reason, msg, updateCheck, affectedPods, memoryLimit)
+}
+
+// renderInitFailure returns why the render-node-inventory init container of pod is failing,
+// or "" while it is running, starting normally or has succeeded.
+func renderInitFailure(pod *corev1.Pod) string {
+	for _, cs := range pod.Status.InitContainerStatuses {
+		if cs.Name != renderNodeInventoryContainerName {
+			continue
+		}
+		if w := cs.State.Waiting; w != nil && w.Reason != "" && w.Reason != "PodInitializing" && w.Reason != "ContainerCreating" {
+			return w.Reason
+		}
+		if t := cs.State.Terminated; t != nil && t.ExitCode != 0 {
+			if t.Reason != "" {
+				return t.Reason
+			}
+			return fmt.Sprintf("exit code %d", t.ExitCode)
+		}
+	}
+	return ""
 }

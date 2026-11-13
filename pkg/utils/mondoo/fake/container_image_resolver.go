@@ -56,6 +56,7 @@ func (c *noOpContainerImageResolver) MondooOperatorImage(ctx context.Context, us
 type ContainerImageResolverMock struct {
 	CnspecImageFunc         func(userImage, userTag, userDigest string, skipResolveImage bool) (string, error)
 	MondooOperatorImageFunc func(ctx context.Context, userImage, userTag, userDigest string, skipResolveImage bool) (string, error)
+	ContainerImageFunc      func(ctx context.Context, image string, skipResolveImage bool) (string, error)
 }
 
 func (c *ContainerImageResolverMock) CnspecImageVersion(_, _, _ string) string {
@@ -74,6 +75,17 @@ func (c *ContainerImageResolverMock) MondooOperatorImage(ctx context.Context, us
 		return c.MondooOperatorImageFunc(ctx, userImage, userTag, userDigest, skipResolveImage)
 	}
 	return fmt.Sprintf("%s:%s", mondoo.MondooOperatorImage, mondoo.MondooOperatorTag), nil
+}
+
+func (c *noOpContainerImageResolver) ContainerImage(ctx context.Context, image string, skipResolveImage bool) (string, error) {
+	return image, nil
+}
+
+func (c *ContainerImageResolverMock) ContainerImage(ctx context.Context, image string, skipResolveImage bool) (string, error) {
+	if c.ContainerImageFunc != nil {
+		return c.ContainerImageFunc(ctx, image, skipResolveImage)
+	}
+	return image, nil
 }
 
 func (c *noOpContainerImageResolver) WithImageRegistry(imageRegistry string) mondoo.ContainerImageResolver {
