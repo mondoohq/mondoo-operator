@@ -4,6 +4,7 @@
 package k8s
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -70,4 +71,6 @@ func TestLabelSelectorOptions_Invalid(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid filtering.namespaceLabelSelector")
+	var selectorErr InvalidLabelSelectorError
+	assert.True(t, errors.As(err, &selectorErr))
 }

@@ -113,7 +113,13 @@ spec:
     #     #   namespaceLabelSelector:
     #     #     matchLabels:
     #     #       tenant: team-a
+    #     #     matchExpressions:
+    #     #       - key: environment
+    #     #         operator: In
+    #     #         values: ["prod", "stage"]
     #     #   objectLabelSelector:
+    #     #     matchLabels:
+    #     #       app: frontend
     #     #     matchExpressions:
     #     #       - key: scan.mondoo.com/disabled
     #     #         operator: DoesNotExist
@@ -245,7 +251,7 @@ spec:
       #   - default
       #   - production
       #   - 'prod-*'
-    # Select namespaces by label (requires cnspec v13.30.1 or later).
+    # Select namespaces by label for scheduled scans.
     # namespaceLabelSelector:
     #   matchLabels:
     #     tenant: team-a
@@ -253,8 +259,10 @@ spec:
     #     - key: environment
     #       operator: In
     #       values: ["prod", "stage"]
-    # Select Kubernetes objects by label (requires cnspec v13.30.1 or later).
+    # Select Kubernetes objects by label for scheduled scans.
     # objectLabelSelector:
+    #   matchLabels:
+    #     app: frontend
     #   matchExpressions:
     #     - key: scan.mondoo.com/disabled
     #       operator: DoesNotExist
