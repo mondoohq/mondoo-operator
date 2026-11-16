@@ -58,9 +58,9 @@ spec:
       - name: crds
         configMap:
           name: {{ include "mondoo-operator.fullname" . }}-crds
-      {{- if .Values.operator.imagePullSecrets }}
+      {{- if .Values.crdUpgrade.image.imagePullSecrets }}
       imagePullSecrets:
-      {{- toYaml .Values.operator.imagePullSecrets | nindent 6 }}
+      {{- toYaml .Values.crdUpgrade.image.imagePullSecrets | nindent 6 }}
       {{- end }}
 
 ---
