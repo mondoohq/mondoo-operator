@@ -58,6 +58,11 @@ spec:
       - name: crds
         configMap:
           name: {{ include "mondoo-operator.fullname" . }}-crds
+      {{- if .Values.operator.imagePullSecrets }}
+      imagePullSecrets:
+      {{- toYaml .Values.operator.imagePullSecrets | nindent 6 }}
+      {{- end }}
+
 ---
 apiVersion: v1
 kind: ServiceAccount
