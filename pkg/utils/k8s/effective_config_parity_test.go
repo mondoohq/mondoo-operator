@@ -33,6 +33,7 @@ var remoteUnmappedSpecFields = map[string]string{ //nolint:gosec // G101: keys a
 	"scanner.privateRegistriesPullSecretRef":     "deprecated: privateRegistriesPullSecretRefs replaces it",
 	"kubernetesResources.containerImageScanning": "deprecated: containers.enable replaces it",
 	"admission":                                  "deprecated: ignored since v12.1.0",
+	"kubernetesResources.externalClusters.clientCertificateAuth": "local: the remote config has no field for a client certificate Secret",
 }
 
 func TestRemoteConfigParity(t *testing.T) {

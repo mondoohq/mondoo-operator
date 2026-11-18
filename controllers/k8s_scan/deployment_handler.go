@@ -43,6 +43,9 @@ func validateExternalClusterAuth(cluster v1alpha2.ExternalCluster) error {
 	if cluster.ServiceAccountAuth != nil {
 		authMethods++
 	}
+	if cluster.ClientCertificateAuth != nil {
+		authMethods++
+	}
 	if cluster.WorkloadIdentity != nil {
 		authMethods++
 	}
@@ -54,10 +57,10 @@ func validateExternalClusterAuth(cluster v1alpha2.ExternalCluster) error {
 	}
 
 	if authMethods == 0 {
-		return fmt.Errorf("externalCluster %q: must specify one of kubeconfigSecretRef, serviceAccountAuth, workloadIdentity, spiffeAuth, or vaultAuth", cluster.Name)
+		return fmt.Errorf("externalCluster %q: must specify one of kubeconfigSecretRef, serviceAccountAuth, clientCertificateAuth, workloadIdentity, spiffeAuth, or vaultAuth", cluster.Name)
 	}
 	if authMethods > 1 {
-		return fmt.Errorf("externalCluster %q: kubeconfigSecretRef, serviceAccountAuth, workloadIdentity, spiffeAuth, and vaultAuth are mutually exclusive", cluster.Name)
+		return fmt.Errorf("externalCluster %q: kubeconfigSecretRef, serviceAccountAuth, clientCertificateAuth, workloadIdentity, spiffeAuth, and vaultAuth are mutually exclusive", cluster.Name)
 	}
 
 	// Provider-specific validation for WorkloadIdentity
@@ -85,6 +88,16 @@ func validateExternalClusterAuth(cluster v1alpha2.ExternalCluster) error {
 		}
 		if cluster.ServiceAccountAuth.CredentialsSecretRef.Name == "" {
 			return fmt.Errorf("externalCluster %q: credentialsSecretRef.name is required for serviceAccountAuth", cluster.Name)
+		}
+	}
+
+	// Validation for ClientCertificateAuth
+	if cluster.ClientCertificateAuth != nil {
+		if cluster.ClientCertificateAuth.Server == "" {
+			return fmt.Errorf("externalCluster %q: server is required for clientCertificateAuth", cluster.Name)
+		}
+		if cluster.ClientCertificateAuth.CertificateSecretRef.Name == "" {
+			return fmt.Errorf("externalCluster %q: certificateSecretRef.name is required for clientCertificateAuth", cluster.Name)
 		}
 	}
 
@@ -339,6 +352,13 @@ func (n *DeploymentHandler) reconcileExternalClusters(ctx context.Context) error
 			}
 		}
 
+		// Sync client certificate kubeconfig ConfigMap if using ClientCertificateAuth
+		if cluster.ClientCertificateAuth != nil {
+			if err := n.syncExternalClusterCertKubeconfigConfigMap(ctx, cluster); err != nil {
+				return err
+			}
+		}
+
 		// Sync WIF ServiceAccount if using WorkloadIdentity
 		if cluster.WorkloadIdentity != nil {
 			if err := n.syncWIFServiceAccount(ctx, cluster); err != nil {
@@ -521,6 +541,18 @@ func (n *DeploymentHandler) cleanupOrphanedExternalClusterResources(ctx context.
 				return err
 			}
 
+			// Delete client certificate kubeconfig ConfigMap (if exists)
+			certKubeconfigCM := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ExternalClusterCertKubeconfigName(n.Mondoo.Name, clusterName),
+					Namespace: n.Mondoo.Namespace,
+				},
+			}
+			if err := k8s.DeleteIfExists(ctx, n.KubeClient, certKubeconfigCM); err != nil {
+				log.Error(err, "failed to delete orphaned client certificate kubeconfig ConfigMap for external cluster")
+				return err
+			}
+
 			// Delete WIF ServiceAccount (if exists)
 			wifSA := &corev1.ServiceAccount{
 				ObjectMeta: metav1.ObjectMeta{
@@ -630,6 +662,22 @@ func (n *DeploymentHandler) cleanupWorkloadDeployment(ctx context.Context) error
 // syncExternalClusterSAKubeconfigConfigMap syncs a ConfigMap containing the generated kubeconfig for ServiceAccountAuth
 func (n *DeploymentHandler) syncExternalClusterSAKubeconfigConfigMap(ctx context.Context, cluster v1alpha2.ExternalCluster) error {
 	desired := ExternalClusterSAKubeconfigConfigMap(cluster, n.Mondoo)
+
+	obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
+	if _, err := k8s.CreateOrUpdate(ctx, n.KubeClient, obj, n.Mondoo, n.externalClusterLog(cluster.Name), func() error {
+		obj.Labels = desired.Labels
+		obj.Data = desired.Data
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// syncExternalClusterCertKubeconfigConfigMap syncs a ConfigMap containing the generated kubeconfig for ClientCertificateAuth
+func (n *DeploymentHandler) syncExternalClusterCertKubeconfigConfigMap(ctx context.Context, cluster v1alpha2.ExternalCluster) error {
+	desired := ExternalClusterCertKubeconfigConfigMap(cluster, n.Mondoo)
 
 	obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Namespace: desired.Namespace}}
 	if _, err := k8s.CreateOrUpdate(ctx, n.KubeClient, obj, n.Mondoo, n.externalClusterLog(cluster.Name), func() error {

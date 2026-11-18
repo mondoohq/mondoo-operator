@@ -342,6 +342,37 @@ func ExternalClusterCronJob(image string, cluster v1alpha2.ExternalCluster, m *v
 			MountPath: "/etc/opt/mondoo/sa-credentials",
 		})
 
+	case cluster.ClientCertificateAuth != nil:
+		// Client certificate auth: mount the TLS secret + generated kubeconfig ConfigMap.
+		// The secret is mounted without subPath so renewed certificates reach the next scan.
+		volumes = append(
+			volumes,
+			corev1.Volume{
+				Name: "client-cert",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName:  cluster.ClientCertificateAuth.CertificateSecretRef.Name,
+						DefaultMode: ptr.To(int32(0o440)),
+					},
+				},
+			},
+			corev1.Volume{
+				Name: "kubeconfig",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: ExternalClusterCertKubeconfigName(m.Name, cluster.Name),
+						},
+					},
+				},
+			},
+		)
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "client-cert",
+			ReadOnly:  true,
+			MountPath: "/etc/opt/mondoo/client-cert",
+		})
+
 	case cluster.WorkloadIdentity != nil:
 		// WIF auth: use WIF ServiceAccount, init container to generate kubeconfig
 		serviceAccountName = WIFServiceAccountName(m.Name, cluster.Name)
@@ -646,6 +677,11 @@ func ExternalClusterSAKubeconfigName(prefix, clusterName string) string {
 	return k8s.ScopedName(prefix, "-sa-kubeconfig", clusterName)
 }
 
+// ExternalClusterCertKubeconfigName returns the name for the client certificate kubeconfig ConfigMap
+func ExternalClusterCertKubeconfigName(prefix, clusterName string) string {
+	return k8s.ScopedName(prefix, "-cert-kubeconfig", clusterName)
+}
+
 // WIFServiceAccountName returns the name for the WIF ServiceAccount
 func WIFServiceAccountName(prefix, clusterName string) string {
 	return k8s.ScopedName(prefix, "-wif", clusterName)
@@ -691,6 +727,43 @@ func ExternalClusterSAKubeconfigConfigMap(cluster v1alpha2.ExternalCluster, m *v
 		},
 		Data: map[string]string{
 			"kubeconfig": ExternalClusterSAKubeconfig(cluster),
+		},
+	}
+}
+
+// ExternalClusterCertKubeconfig generates a kubeconfig that references mounted client certificate, key and CA files
+func ExternalClusterCertKubeconfig(cluster v1alpha2.ExternalCluster) string {
+	return fmt.Sprintf(`apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: /etc/opt/mondoo/client-cert/ca.crt
+    server: %s
+  name: external
+contexts:
+- context:
+    cluster: external
+    user: scanner
+  name: default
+current-context: default
+users:
+- name: scanner
+  user:
+    client-certificate: /etc/opt/mondoo/client-cert/tls.crt
+    client-key: /etc/opt/mondoo/client-cert/tls.key
+`, cluster.ClientCertificateAuth.Server)
+}
+
+// ExternalClusterCertKubeconfigConfigMap creates a ConfigMap containing the generated kubeconfig for client certificate auth
+func ExternalClusterCertKubeconfigConfigMap(cluster v1alpha2.ExternalCluster, m *v1alpha2.MondooAuditConfig) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: m.Namespace,
+			Name:      ExternalClusterCertKubeconfigName(m.Name, cluster.Name),
+			Labels:    ExternalClusterCronJobLabels(*m, cluster.Name),
+		},
+		Data: map[string]string{
+			"kubeconfig": ExternalClusterCertKubeconfig(cluster),
 		},
 	}
 }

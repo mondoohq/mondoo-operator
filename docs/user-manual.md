@@ -567,7 +567,7 @@ externalClusters:
 
 ### Authentication methods
 
-The operator supports five authentication methods for external clusters. Choose the one that best fits your security requirements:
+The operator supports six authentication methods for external clusters. Choose the one that best fits your security requirements:
 
 #### 1. Kubeconfig (most flexible)
 
@@ -818,6 +818,64 @@ externalClusters:
 > **Note: Credential refresh timing**
 >
 > When VaultAuth is configured, the operator automatically reconciles at half the requested TTL (clamped between 10 minutes and 1 hour) to refresh credentials before they expire. For example, a `ttl: "1h"` results in a 30-minute refresh interval. If no TTL is specified, the operator defaults to refreshing every 30 minutes.
+
+#### 6. Client certificate
+
+Use an X.509 client certificate. This fits setups where the scanning cluster can issue certificates that the target cluster trusts, for example a Cluster API management cluster that holds the CA of its workload clusters.
+
+```yaml
+externalClusters:
+  - name: production
+    clientCertificateAuth:
+      server: "https://prod-cluster.example.com:6443"
+      certificateSecretRef:
+        name: prod-scanner-cert  # Secret with "tls.crt", "tls.key" and "ca.crt" keys
+```
+
+The Secret uses the layout of a `kubernetes.io/tls` Secret with `ca.crt`, as written by cert-manager. `ca.crt` is used to verify the API server of the target cluster. The operator mounts the whole Secret, so a renewed certificate is used by the next scan.
+
+With cert-manager and a CA Issuer that signs with the target cluster's CA:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: prod-scanner-cert
+  namespace: mondoo-operator
+spec:
+  secretName: prod-scanner-cert
+  commonName: mondoo-scanner
+  duration: 24h
+  renewBefore: 8h
+  privateKey:
+    algorithm: ECDSA
+  usages:
+    - client auth
+  issuerRef:
+    kind: Issuer
+    name: prod-cluster-ca
+```
+
+On the target cluster, bind a read-only ClusterRole to the certificate's common name:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mondoo-scanner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mondoo-scanner  # get, list and watch on the resources to scan
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: mondoo-scanner
+```
+
+> **Note: Revocation**
+>
+> Kubernetes does not check certificate revocation. Keep the certificate lifetime short and remove the ClusterRoleBinding to revoke access before the certificate expires. Do not put the certificate subject into the `system:masters` group.
 
 ## Container Image Scanning
 
