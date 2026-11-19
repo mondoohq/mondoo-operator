@@ -434,6 +434,97 @@ func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_ServiceAccountAut
 	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(externalCronJob), externalCronJob))
 }
 
+func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_ClientCertificateAuth() {
+	// Create TLS secret as written by cert-manager
+	certSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "workload-scanner-cert",
+			Namespace: s.auditConfig.Namespace,
+		},
+		Type: corev1.SecretTypeTLS,
+		Data: map[string][]byte{
+			"tls.crt": []byte("test-cert"),
+			"tls.key": []byte("test-key"),
+			"ca.crt":  []byte("test-ca-cert"),
+		},
+	}
+	s.fakeClientBuilder = s.fakeClientBuilder.WithObjects(certSecret)
+
+	// Configure external cluster with ClientCertificateAuth
+	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
+		{
+			Name: "workload",
+			ClientCertificateAuth: &mondoov1alpha2.ClientCertificateAuth{
+				Server: "https://workload.example.com:6443",
+				CertificateSecretRef: corev1.LocalObjectReference{
+					Name: "workload-scanner-cert",
+				},
+			},
+		},
+	}
+
+	d := s.createDeploymentHandler()
+	s.NoError(d.KubeClient.Create(s.ctx, &s.auditConfig))
+
+	result, err := d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+
+	// Verify client certificate kubeconfig ConfigMap was created
+	certKubeconfigCM := &corev1.ConfigMap{}
+	certKubeconfigCM.Name = ExternalClusterCertKubeconfigName(s.auditConfig.Name, "workload")
+	certKubeconfigCM.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(certKubeconfigCM), certKubeconfigCM))
+	s.Contains(certKubeconfigCM.Data["kubeconfig"], "server: https://workload.example.com:6443")
+	s.Contains(certKubeconfigCM.Data["kubeconfig"], "certificate-authority: /etc/opt/mondoo/client-cert/ca.crt")
+	s.Contains(certKubeconfigCM.Data["kubeconfig"], "client-certificate: /etc/opt/mondoo/client-cert/tls.crt")
+	s.Contains(certKubeconfigCM.Data["kubeconfig"], "client-key: /etc/opt/mondoo/client-cert/tls.key")
+
+	// Verify external cluster CronJob mounts the whole TLS secret and the generated kubeconfig
+	externalCronJob := &batchv1.CronJob{}
+	externalCronJob.Name = ExternalClusterCronJobName(s.auditConfig.Name, "workload")
+	externalCronJob.Namespace = s.auditConfig.Namespace
+	s.NoError(d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(externalCronJob), externalCronJob))
+
+	podSpec := externalCronJob.Spec.JobTemplate.Spec.Template.Spec
+	var certVolume, kubeconfigVolume *corev1.Volume
+	for i := range podSpec.Volumes {
+		switch podSpec.Volumes[i].Name {
+		case "client-cert":
+			certVolume = &podSpec.Volumes[i]
+		case "kubeconfig":
+			kubeconfigVolume = &podSpec.Volumes[i]
+		}
+	}
+	s.Require().NotNil(certVolume)
+	s.Require().NotNil(certVolume.Secret)
+	s.Equal("workload-scanner-cert", certVolume.Secret.SecretName)
+	s.Empty(certVolume.Secret.Items, "the whole secret must be mounted so renewed certificates are picked up")
+	s.Equal(int32(0o440), *certVolume.Secret.DefaultMode)
+	s.Require().NotNil(kubeconfigVolume)
+	s.Require().NotNil(kubeconfigVolume.ConfigMap)
+	s.Equal(certKubeconfigCM.Name, kubeconfigVolume.ConfigMap.Name)
+
+	var certMount *corev1.VolumeMount
+	for i := range podSpec.Containers[0].VolumeMounts {
+		if podSpec.Containers[0].VolumeMounts[i].Name == "client-cert" {
+			certMount = &podSpec.Containers[0].VolumeMounts[i]
+		}
+	}
+	s.Require().NotNil(certMount)
+	s.Equal("/etc/opt/mondoo/client-cert", certMount.MountPath)
+	s.True(certMount.ReadOnly)
+	s.Empty(certMount.SubPath)
+
+	// Remove the external cluster and verify the generated kubeconfig is cleaned up
+	d.Mondoo.Spec.KubernetesResources.ExternalClusters = nil
+	result, err = d.Reconcile(s.ctx)
+	s.NoError(err)
+	s.True(result.IsZero())
+	err = d.KubeClient.Get(s.ctx, client.ObjectKeyFromObject(certKubeconfigCM), certKubeconfigCM)
+	s.Error(err)
+}
+
 func (s *DeploymentHandlerSuite) TestReconcile_ExternalCluster_WorkloadIdentity_GKE() {
 	// Configure external cluster with GKE WorkloadIdentity
 	s.auditConfig.Spec.KubernetesResources.ExternalClusters = []mondoov1alpha2.ExternalCluster{
@@ -937,6 +1028,63 @@ func TestValidateExternalClusterAuth(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name: "valid client certificate auth",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				ClientCertificateAuth: &mondoov1alpha2.ClientCertificateAuth{
+					Server: "https://example.com:6443",
+					CertificateSecretRef: corev1.LocalObjectReference{
+						Name: "my-cert",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "client certificate auth without server",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				ClientCertificateAuth: &mondoov1alpha2.ClientCertificateAuth{
+					CertificateSecretRef: corev1.LocalObjectReference{
+						Name: "my-cert",
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "server is required for clientCertificateAuth",
+		},
+		{
+			name: "client certificate auth without certificate secret",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				ClientCertificateAuth: &mondoov1alpha2.ClientCertificateAuth{
+					Server: "https://example.com:6443",
+				},
+			},
+			expectError: true,
+			errorMsg:    "certificateSecretRef.name is required",
+		},
+		{
+			name: "client certificate auth combined with service account auth",
+			cluster: mondoov1alpha2.ExternalCluster{
+				Name: "test",
+				ClientCertificateAuth: &mondoov1alpha2.ClientCertificateAuth{
+					Server: "https://example.com:6443",
+					CertificateSecretRef: corev1.LocalObjectReference{
+						Name: "my-cert",
+					},
+				},
+				ServiceAccountAuth: &mondoov1alpha2.ServiceAccountAuth{
+					Server: "https://example.com:6443",
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "my-creds",
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "mutually exclusive",
+		},
+		{
 			name: "valid SPIFFE auth",
 			cluster: mondoov1alpha2.ExternalCluster{
 				Name: "test",
@@ -1249,6 +1397,37 @@ func TestExternalClusterSAKubeconfig(t *testing.T) {
 				t.Error("expected kubeconfig to contain tokenFile path")
 			}
 		})
+	}
+}
+
+// TestExternalClusterCertKubeconfig tests kubeconfig generation for client certificate auth
+func TestExternalClusterCertKubeconfig(t *testing.T) {
+	cluster := mondoov1alpha2.ExternalCluster{
+		Name: "test",
+		ClientCertificateAuth: &mondoov1alpha2.ClientCertificateAuth{
+			Server: "https://api.example.com:6443",
+			CertificateSecretRef: corev1.LocalObjectReference{
+				Name: "my-cert",
+			},
+		},
+	}
+
+	kubeconfig := ExternalClusterCertKubeconfig(cluster)
+
+	for _, want := range []string{
+		"server: https://api.example.com:6443",
+		"certificate-authority: /etc/opt/mondoo/client-cert/ca.crt",
+		"client-certificate: /etc/opt/mondoo/client-cert/tls.crt",
+		"client-key: /etc/opt/mondoo/client-cert/tls.key",
+	} {
+		if !strings.Contains(kubeconfig, want) {
+			t.Errorf("expected kubeconfig to contain %q", want)
+		}
+	}
+	for _, unwanted := range []string{"insecure-skip-tls-verify", "tokenFile"} {
+		if strings.Contains(kubeconfig, unwanted) {
+			t.Errorf("expected kubeconfig not to contain %q", unwanted)
+		}
 	}
 }
 
@@ -1684,6 +1863,15 @@ func TestExternalClusterNaming(t *testing.T) {
 			}
 			if !strings.HasSuffix(saKubeconfigName, tt.clusterName) {
 				t.Errorf("SA kubeconfig name should end with cluster name %q, got %q", tt.clusterName, saKubeconfigName)
+			}
+
+			// Test client certificate kubeconfig ConfigMap name
+			certKubeconfigName := ExternalClusterCertKubeconfigName(tt.prefix, tt.clusterName)
+			if !strings.HasPrefix(certKubeconfigName, tt.prefix) {
+				t.Errorf("client certificate kubeconfig name should start with prefix %q, got %q", tt.prefix, certKubeconfigName)
+			}
+			if !strings.HasSuffix(certKubeconfigName, tt.clusterName) {
+				t.Errorf("client certificate kubeconfig name should end with cluster name %q, got %q", tt.clusterName, certKubeconfigName)
 			}
 
 			// Test WIF ServiceAccount name

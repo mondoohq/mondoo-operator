@@ -378,29 +378,34 @@ type ExternalCluster struct {
 
 	// KubeconfigSecretRef references a Secret containing kubeconfig for the remote cluster.
 	// The Secret must have a key "kubeconfig" with the kubeconfig content.
-	// Mutually exclusive with ServiceAccountAuth, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
+	// Mutually exclusive with ServiceAccountAuth, ClientCertificateAuth, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
 	// +optional
 	KubeconfigSecretRef *corev1.LocalObjectReference `json:"kubeconfigSecretRef,omitempty"`
 
 	// ServiceAccountAuth configures authentication using a service account token.
-	// Mutually exclusive with KubeconfigSecretRef, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
+	// Mutually exclusive with KubeconfigSecretRef, ClientCertificateAuth, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
 	// +optional
 	ServiceAccountAuth *ServiceAccountAuth `json:"serviceAccountAuth,omitempty"`
 
+	// ClientCertificateAuth configures authentication using an X.509 client certificate.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
+	// +optional
+	ClientCertificateAuth *ClientCertificateAuth `json:"clientCertificateAuth,omitempty"`
+
 	// WorkloadIdentity configures cloud-native Workload Identity Federation authentication.
-	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, SPIFFEAuth, and VaultAuth.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, ClientCertificateAuth, SPIFFEAuth, and VaultAuth.
 	// +optional
 	WorkloadIdentity *WorkloadIdentityConfig `json:"workloadIdentity,omitempty"`
 
 	// SPIFFEAuth configures SPIFFE/SPIRE-based authentication using X.509 SVIDs.
-	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, and VaultAuth.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, ClientCertificateAuth, WorkloadIdentity, and VaultAuth.
 	// +optional
 	SPIFFEAuth *SPIFFEAuthConfig `json:"spiffeAuth,omitempty"`
 
 	// VaultAuth configures HashiCorp Vault Kubernetes secrets engine for dynamic credential generation.
 	// The operator authenticates to Vault during reconciliation using its own service account token,
 	// fetches short-lived credentials, and writes a kubeconfig Secret that the CronJob mounts.
-	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, and SPIFFEAuth.
+	// Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, ClientCertificateAuth, WorkloadIdentity, and SPIFFEAuth.
 	// +optional
 	VaultAuth *VaultAuthConfig `json:"vaultAuth,omitempty"`
 
@@ -456,6 +461,23 @@ type ServiceAccountAuth struct {
 	// +optional
 	// +kubebuilder:default=false
 	SkipTLSVerify bool `json:"skipTLSVerify,omitempty"`
+}
+
+// ClientCertificateAuth defines authentication using an X.509 client certificate
+type ClientCertificateAuth struct {
+	// Server is the URL of the Kubernetes API server.
+	// Example: "https://my-cluster.example.com:6443"
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^https://.*`
+	Server string `json:"server"`
+
+	// CertificateSecretRef references a Secret in the namespace of the MondooAuditConfig containing:
+	//   - "tls.crt": The client certificate (required)
+	//   - "tls.key": The client private key (required)
+	//   - "ca.crt": The CA certificate used to verify the API server (required)
+	// This is the layout of a kubernetes.io/tls Secret as written by cert-manager.
+	// +kubebuilder:validation:Required
+	CertificateSecretRef corev1.LocalObjectReference `json:"certificateSecretRef"`
 }
 
 // CloudProvider specifies the cloud provider for Workload Identity Federation

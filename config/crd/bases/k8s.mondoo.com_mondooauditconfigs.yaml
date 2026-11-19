@@ -844,6 +844,40 @@ spec:
                       description: ExternalCluster defines configuration for scanning
                         a remote K8s cluster
                       properties:
+                        clientCertificateAuth:
+                          description: |-
+                            ClientCertificateAuth configures authentication using an X.509 client certificate.
+                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
+                          properties:
+                            certificateSecretRef:
+                              description: |-
+                                CertificateSecretRef references a Secret in the namespace of the MondooAuditConfig containing:
+                                  - "tls.crt": The client certificate (required)
+                                  - "tls.key": The client private key (required)
+                                  - "ca.crt": The CA certificate used to verify the API server (required)
+                                This is the layout of a kubernetes.io/tls Secret as written by cert-manager.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            server:
+                              description: |-
+                                Server is the URL of the Kubernetes API server.
+                                Example: "https://my-cluster.example.com:6443"
+                              pattern: ^https://.*
+                              type: string
+                          required:
+                          - certificateSecretRef
+                          - server
+                          type: object
                         containerImageScanning:
                           description: ContainerImageScanning enables scanning of
                             container images in this external cluster.
@@ -975,7 +1009,7 @@ spec:
                           description: |-
                             KubeconfigSecretRef references a Secret containing kubeconfig for the remote cluster.
                             The Secret must have a key "kubeconfig" with the kubeconfig content.
-                            Mutually exclusive with ServiceAccountAuth, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
+                            Mutually exclusive with ServiceAccountAuth, ClientCertificateAuth, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
                           properties:
                             name:
                               default: ""
@@ -1042,7 +1076,7 @@ spec:
                         serviceAccountAuth:
                           description: |-
                             ServiceAccountAuth configures authentication using a service account token.
-                            Mutually exclusive with KubeconfigSecretRef, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
+                            Mutually exclusive with KubeconfigSecretRef, ClientCertificateAuth, WorkloadIdentity, SPIFFEAuth, and VaultAuth.
                           properties:
                             credentialsSecretRef:
                               description: |-
@@ -1079,7 +1113,7 @@ spec:
                         spiffeAuth:
                           description: |-
                             SPIFFEAuth configures SPIFFE/SPIRE-based authentication using X.509 SVIDs.
-                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, and VaultAuth.
+                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, ClientCertificateAuth, WorkloadIdentity, and VaultAuth.
                           properties:
                             audience:
                               description: |-
@@ -1128,7 +1162,7 @@ spec:
                             VaultAuth configures HashiCorp Vault Kubernetes secrets engine for dynamic credential generation.
                             The operator authenticates to Vault during reconciliation using its own service account token,
                             fetches short-lived credentials, and writes a kubeconfig Secret that the CronJob mounts.
-                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, WorkloadIdentity, and SPIFFEAuth.
+                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, ClientCertificateAuth, WorkloadIdentity, and SPIFFEAuth.
                           properties:
                             authPath:
                               default: auth/kubernetes
@@ -1215,7 +1249,7 @@ spec:
                         workloadIdentity:
                           description: |-
                             WorkloadIdentity configures cloud-native Workload Identity Federation authentication.
-                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, SPIFFEAuth, and VaultAuth.
+                            Mutually exclusive with KubeconfigSecretRef, ServiceAccountAuth, ClientCertificateAuth, SPIFFEAuth, and VaultAuth.
                           properties:
                             aks:
                               description: |-
